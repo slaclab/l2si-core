@@ -185,6 +185,6 @@ begin
          axiReadMaster  => axilReadMaster,
          axiReadSlave   => axilReadSlave,
          axiWriteMaster => axilWriteMaster,
-         axiWriteSlave  => axilWriteSlave)
+         axiWriteSlave  => axilWriteSlave);
 
 end mapping;
