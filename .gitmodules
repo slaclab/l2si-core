@@ -7,3 +7,6 @@
 [submodule "fimrware/submodules/lcls-timing-core"]
 	path = fimrware/submodules/lcls-timing-core
 	url = https://github.com/slaclab/lcls-timing-core
+[submodule "fimrware/submodules/amc-carrier-core"]
+	path = fimrware/submodules/amc-carrier-core
+	url = https://github.com/slaclab/amc-carrier-core

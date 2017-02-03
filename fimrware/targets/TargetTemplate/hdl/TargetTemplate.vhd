@@ -205,8 +205,8 @@ begin
    U_AppTop : entity work.AppTop
       generic map (
          TPD_G          => TPD_G,
-         JESD_RX_LANE_G => (others => 4),
-         JESD_TX_LANE_G => (others => 2),
+         JESD_RX_LANE_G => (others => 0),
+         JESD_TX_LANE_G => (others => 0),
          JESD_REF_SEL_G => (others => DEV_CLK2_SEL_C))
       port map (
          ----------------------
