@@ -1,8 +1,8 @@
 -------------------------------------------------------------------------------
 -- File       : TargetTemplate.vhd
 -- Company    : SLAC National Accelerator Laboratory
--- Created    : 2016-04-14
--- Last update: 2016-11-14
+-- Created    : 2017-02-04
+-- Last update: 2017-02-07
 -------------------------------------------------------------------------------
 -- Description: Firmware Target's Top Level
 -- 
@@ -68,21 +68,22 @@ entity TargetTemplate is
       rtmHsRxN         : in    sl;
       rtmHsTxP         : out   sl;
       rtmHsTxN         : out   sl;
+      -- RTM's Clock Reference 
       genClkP          : in    sl;
-      genClkN          : in    sl;      
+      genClkN          : in    sl;
       ----------------
       -- Core Ports --
       ----------------   
       -- Common Fabricate Clock
       fabClkP          : in    sl;
       fabClkN          : in    sl;
-      -- RTM Ethernet Ports
-      ethRxP           : in    sl;
-      ethRxN           : in    sl;
-      ethTxP           : out   sl;
-      ethTxN           : out   sl;
-      xauiClkP         : in    sl;
-      xauiClkN         : in    sl;
+      -- Ethernet Ports
+      ethRxP           : in    slv(3 downto 0);
+      ethRxN           : in    slv(3 downto 0);
+      ethTxP           : out   slv(3 downto 0);
+      ethTxN           : out   slv(3 downto 0);
+      ethClkP          : in    sl;
+      ethClkN          : in    sl;
       -- Backplane MPS Ports
       mpsClkIn         : in    sl;
       mpsClkOut        : out   sl;
@@ -145,13 +146,13 @@ end TargetTemplate;
 
 architecture top_level of TargetTemplate is
 
-   -- AXI-Lite Interface (regClk domain)
-   signal regClk               : sl;
-   signal regRst               : sl;
-   signal regReadMaster        : AxiLiteReadMasterType;
-   signal regReadSlave         : AxiLiteReadSlaveType;
-   signal regWriteMaster       : AxiLiteWriteMasterType;
-   signal regWriteSlave        : AxiLiteWriteSlaveType;
+   -- AXI-Lite Interface (axilClk domain)
+   signal axilClk              : sl;
+   signal axilRst              : sl;
+   signal axilReadMaster       : AxiLiteReadMasterType;
+   signal axilReadSlave        : AxiLiteReadSlaveType;
+   signal axilWriteMaster      : AxiLiteWriteMasterType;
+   signal axilWriteSlave       : AxiLiteWriteSlaveType;
    -- Timing Interface (timingClk domain) 
    signal timingClk            : sl;
    signal timingRst            : sl;
@@ -170,55 +171,62 @@ architecture top_level of TargetTemplate is
    signal obAppWaveformSlaves  : WaveformSlaveArrayType;
    signal ibAppWaveformMasters : WaveformMasterArrayType;
    signal ibAppWaveformSlaves  : WaveformSlaveArrayType;
-   -- Backplane Messaging Interface (bpMsgClk domain)
-   signal bpMsgClk             : sl;
-   signal bpMsgRst             : sl;
-   signal bpMsgBus             : BpMsgBusArray(BP_MSG_SIZE_C-1 downto 0);
-   -- Application Debug Interface (ref156MHzClk domain)
+   -- Backplane Messaging Interface  (axilClk domain)
+   signal obBpMsgClientMaster  : AxiStreamMasterType;
+   signal obBpMsgClientSlave   : AxiStreamSlaveType;
+   signal ibBpMsgClientMaster  : AxiStreamMasterType;
+   signal ibBpMsgClientSlave   : AxiStreamSlaveType;
+   signal obBpMsgServerMaster  : AxiStreamMasterType;
+   signal obBpMsgServerSlave   : AxiStreamSlaveType;
+   signal ibBpMsgServerMaster  : AxiStreamMasterType;
+   signal ibBpMsgServerSlave   : AxiStreamSlaveType;
+   -- Application Debug Interface (axilClk domain)
    signal obAppDebugMaster     : AxiStreamMasterType;
    signal obAppDebugSlave      : AxiStreamSlaveType;
    signal ibAppDebugMaster     : AxiStreamMasterType;
    signal ibAppDebugSlave      : AxiStreamSlaveType;
-   -- BSI Interface (bsiClk domain) 
-   signal bsiClk               : sl;
-   signal bsiRst               : sl;
-   signal bsiBus               : BsiBusType;
-   -- MPS Concentrator Interface (ref156MHzClk domain)
+   -- MPS Concentrator Interface (axilClk domain)
    signal mpsObMasters         : AxiStreamMasterArray(14 downto 0);
    signal mpsObSlaves          : AxiStreamSlaveArray(14 downto 0);
    -- Reference Clocks and Resets
    signal recTimingClk         : sl;
    signal recTimingRst         : sl;
-   signal ref125MHzClk         : sl;
-   signal ref125MHzRst         : sl;
-   signal ref156MHzClk         : sl;
-   signal ref156MHzRst         : sl;
-   signal ref312MHzClk         : sl;
-   signal ref312MHzRst         : sl;
-   signal ref625MHzClk         : sl;
-   signal ref625MHzRst         : sl;
    signal gthFabClk            : sl;
+   -- Misc. Interface (axilClk domain)
    signal ethPhyReady          : sl;
+   signal ipmiBsi              : BsiBusType;
 
 begin
 
    U_AppTop : entity work.AppTop
       generic map (
-         TPD_G          => TPD_G,
-         JESD_RX_LANE_G => (others => 0),
-         JESD_TX_LANE_G => (others => 0),
-         JESD_REF_SEL_G => (others => DEV_CLK2_SEL_C))
+         TPD_G                => TPD_G,
+         -- JESD Generics
+         JESD_DRP_EN_G        => false,          -- Configured by application
+         JESD_RX_LANE_G       => (others => 4),  -- Configured by application
+         JESD_TX_LANE_G       => (others => 2),  -- Configured by application
+         JESD_RX_POLARITY_G   => (others => "0000000"),  -- Configured by application
+         JESD_TX_POLARITY_G   => (others => "0000000"),  -- Configured by application
+         JESD_REF_SEL_G       => (others => DEV_CLK2_SEL_C),  -- Configured by application
+         -- Signal Generator Generics
+         SIG_GEN_SIZE_G       => (others => 0),  -- Configured by application
+         SIG_GEN_ADDR_WIDTH_G => (others => 9),  -- Configured by application
+         SIG_GEN_LANE_MODE_G  => (others => "0000000"),  -- Configured by application
+         -- Triggering Generics
+         TRIG_SIZE_G          => 3,     -- Configured by application
+         TRIG_DELAY_WIDTH_G   => 32,    -- Configured by application
+         TRIG_PULSE_WIDTH_G   => 32)    -- Configured by application
       port map (
          ----------------------
          -- Top Level Interface
          ----------------------
-         -- AXI-Lite Interface (regClk domain)
-         regClk               => regClk,
-         regRst               => regRst,
-         regReadMaster        => regReadMaster,
-         regReadSlave         => regReadSlave,
-         regWriteMaster       => regWriteMaster,
-         regWriteSlave        => regWriteSlave,
+         -- AXI-Lite Interface (axilClk domain)
+         axilClk              => axilClk,
+         axilRst              => axilRst,
+         axilReadMaster       => axilReadMaster,
+         axilReadSlave        => axilReadSlave,
+         axilWriteMaster      => axilWriteMaster,
+         axilWriteSlave       => axilWriteSlave,
          -- Timing Interface (timingClk domain) 
          timingClk            => timingClk,
          timingRst            => timingRst,
@@ -237,34 +245,29 @@ begin
          obAppWaveformSlaves  => obAppWaveformSlaves,
          ibAppWaveformMasters => ibAppWaveformMasters,
          ibAppWaveformSlaves  => ibAppWaveformSlaves,
-         -- Backplane Messaging Interface (bpMsgClk domain)
-         bpMsgClk             => bpMsgClk,
-         bpMsgRst             => bpMsgRst,
-         bpMsgBus             => bpMsgBus,
-         -- Application Debug Interface (ref156MHzClk domain)
+         -- Backplane Messaging Interface  (axilClk domain)
+         obBpMsgClientMaster  => obBpMsgClientMaster,
+         obBpMsgClientSlave   => obBpMsgClientSlave,
+         ibBpMsgClientMaster  => ibBpMsgClientMaster,
+         ibBpMsgClientSlave   => ibBpMsgClientSlave,
+         obBpMsgServerMaster  => obBpMsgServerMaster,
+         obBpMsgServerSlave   => obBpMsgServerSlave,
+         ibBpMsgServerMaster  => ibBpMsgServerMaster,
+         ibBpMsgServerSlave   => ibBpMsgServerSlave,
+         -- Application Debug Interface (axilClk domain)
          obAppDebugMaster     => obAppDebugMaster,
          obAppDebugSlave      => obAppDebugSlave,
          ibAppDebugMaster     => ibAppDebugMaster,
          ibAppDebugSlave      => ibAppDebugSlave,
-         -- BSI Interface (bsiClk domain) 
-         bsiClk               => bsiClk,
-         bsiRst               => bsiRst,
-         bsiBus               => bsiBus,
-         -- MPS Concentrator Interface (ref156MHzClk domain)
+         -- MPS Concentrator Interface (axilClk domain)
          mpsObMasters         => mpsObMasters,
          mpsObSlaves          => mpsObSlaves,
          -- Reference Clocks and Resets
          recTimingClk         => recTimingClk,
          recTimingRst         => recTimingRst,
-         ref125MHzClk         => ref125MHzClk,
-         ref125MHzRst         => ref125MHzRst,
-         ref156MHzClk         => ref156MHzClk,
-         ref156MHzRst         => ref156MHzRst,
-         ref312MHzClk         => ref312MHzClk,
-         ref312MHzRst         => ref312MHzRst,
-         ref625MHzClk         => ref625MHzClk,
-         ref625MHzRst         => ref625MHzRst,
          gthFabClk            => gthFabClk,
+         -- Misc. Interface (axilClk domain)
+         ipmiBsi              => ipmiBsi,
          ethPhyReady          => ethPhyReady,
          -----------------------
          -- Application Ports --
@@ -301,24 +304,25 @@ begin
          rtmHsRxN             => rtmHsRxN,
          rtmHsTxP             => rtmHsTxP,
          rtmHsTxN             => rtmHsTxN,
+         -- RTM's Clock Reference 
          genClkP              => genClkP,
          genClkN              => genClkN);
 
-   U_Core : entity work.DebugRtmEthAmcCarrierCore
+   U_Core : entity work.AmcCarrierCoreBase
       generic map (
-         TPD_G         => TPD_G,
-         DISABLE_BSA_G => true)
+         TPD_G      => TPD_G,
+         APP_TYPE_G => APP_NULL_TYPE_C)  -- Configured by application (refer to AmcCarrierPkg for list of all application types
       port map (
          ----------------------
          -- Top Level Interface
          ----------------------
-         -- AXI-Lite Interface (regClk domain)
-         regClk               => regClk,
-         regRst               => regRst,
-         regReadMaster        => regReadMaster,
-         regReadSlave         => regReadSlave,
-         regWriteMaster       => regWriteMaster,
-         regWriteSlave        => regWriteSlave,
+         -- AXI-Lite Interface (axilClk domain)
+         axilClk              => axilClk,
+         axilRst              => axilRst,
+         axilReadMaster       => axilReadMaster,
+         axilReadSlave        => axilReadSlave,
+         axilWriteMaster      => axilWriteMaster,
+         axilWriteSlave       => axilWriteSlave,
          -- Timing Interface (timingClk domain) 
          timingClk            => timingClk,
          timingRst            => timingRst,
@@ -337,34 +341,29 @@ begin
          obAppWaveformSlaves  => obAppWaveformSlaves,
          ibAppWaveformMasters => ibAppWaveformMasters,
          ibAppWaveformSlaves  => ibAppWaveformSlaves,
-         -- Backplane Messaging Interface (bpMsgClk domain)
-         bpMsgClk             => bpMsgClk,
-         bpMsgRst             => bpMsgRst,
-         bpMsgBus             => bpMsgBus,
-         -- Application Debug Interface (ref156MHzClk domain)
+         -- Backplane Messaging Interface  (axilClk domain)
+         obBpMsgClientMaster  => obBpMsgClientMaster,
+         obBpMsgClientSlave   => obBpMsgClientSlave,
+         ibBpMsgClientMaster  => ibBpMsgClientMaster,
+         ibBpMsgClientSlave   => ibBpMsgClientSlave,
+         obBpMsgServerMaster  => obBpMsgServerMaster,
+         obBpMsgServerSlave   => obBpMsgServerSlave,
+         ibBpMsgServerMaster  => ibBpMsgServerMaster,
+         ibBpMsgServerSlave   => ibBpMsgServerSlave,
+         -- Application Debug Interface (axilClk domain)
          obAppDebugMaster     => obAppDebugMaster,
          obAppDebugSlave      => obAppDebugSlave,
          ibAppDebugMaster     => ibAppDebugMaster,
          ibAppDebugSlave      => ibAppDebugSlave,
-         -- BSI Interface (bsiClk domain) 
-         bsiClk               => bsiClk,
-         bsiRst               => bsiRst,
-         bsiBus               => bsiBus,
-         -- MPS Concentrator Interface (ref156MHzClk domain)
+         -- MPS Concentrator Interface (axilClk domain)
          mpsObMasters         => mpsObMasters,
          mpsObSlaves          => mpsObSlaves,
          -- Reference Clocks and Resets
          recTimingClk         => recTimingClk,
          recTimingRst         => recTimingRst,
-         ref125MHzClk         => ref125MHzClk,
-         ref125MHzRst         => ref125MHzRst,
-         ref156MHzClk         => ref156MHzClk,
-         ref156MHzRst         => ref156MHzRst,
-         ref312MHzClk         => ref312MHzClk,
-         ref312MHzRst         => ref312MHzRst,
-         ref625MHzClk         => ref625MHzClk,
-         ref625MHzRst         => ref625MHzRst,
          gthFabClk            => gthFabClk,
+         -- Misc. Interface (axilClk domain)
+         ipmiBsi              => ipmiBsi,
          ethPhyReady          => ethPhyReady,
          ----------------
          -- Core Ports --
@@ -372,13 +371,13 @@ begin
          -- Common Fabricate Clock
          fabClkP              => fabClkP,
          fabClkN              => fabClkN,
-         -- RTM ETH Ports
+         -- ETH Ports
          ethRxP               => ethRxP,
          ethRxN               => ethRxN,
          ethTxP               => ethTxP,
          ethTxN               => ethTxN,
-         xauiClkP             => xauiClkP,
-         xauiClkN             => xauiClkN,
+         ethClkP              => ethClkP,
+         ethClkN              => ethClkN,
          -- Backplane MPS Ports
          mpsClkIn             => mpsClkIn,
          mpsClkOut            => mpsClkOut,

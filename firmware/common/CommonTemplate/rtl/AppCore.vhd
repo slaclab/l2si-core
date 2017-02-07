@@ -1,8 +1,8 @@
 -------------------------------------------------------------------------------
 -- File       : AppCore.vhd
 -- Company    : SLAC National Accelerator Laboratory
--- Created    : 2017-02-02
--- Last update: 2017-02-02
+-- Created    : 2017-02-04
+-- Last update: 2017-02-06
 -------------------------------------------------------------------------------
 -- Description: Application Core's Top Level
 --
@@ -36,155 +36,265 @@ entity AppCore is
       TPD_G            : time             := 1 ns;
       SIM_SPEEDUP_G    : boolean          := false;
       SIMULATION_G     : boolean          := false;
-      AXI_CLK_FREQ_G   : real             := 156.25E+6;
       AXI_BASE_ADDR_G  : slv(31 downto 0) := x"80000000";
       AXI_ERROR_RESP_G : slv(1 downto 0)  := AXI_RESP_SLVERR_C);
    port (
       -- Clocks and resets   
-      jesdClk          : in    slv(1 downto 0);
-      jesdRst          : in    slv(1 downto 0);
-      jesdClk2x        : in    slv(1 downto 0);
-      jesdRst2x        : in    slv(1 downto 0);
-      -- DaqMux/Trig Interface (recTimingClk domain) 
-      freezeHw         : out   slv(1 downto 0);
-      evrTrig          : in    AppTopTrigType;
-      userTrig         : out   slv(1 downto 0);
+      jesdClk             : in    slv(1 downto 0);
+      jesdRst             : in    slv(1 downto 0);
+      jesdClk2x           : in    slv(1 downto 0);
+      jesdRst2x           : in    slv(1 downto 0);
+      -- DaqMux/Trig Interface (timingClk domain) 
+      freezeHw            : out   slv(1 downto 0);
+      evrTrig             : in    AppTopTrigType;
+      userTrig            : out   slv(1 downto 0);
       -- JESD SYNC Interface (jesdClk[1:0] domain)
-      jesdSysRef       : out   slv(1 downto 0);
-      jesdRxSync       : in    slv(1 downto 0);
-      jesdTxSync       : out   slv(1 downto 0);
+      jesdSysRef          : out   slv(1 downto 0);
+      jesdRxSync          : in    slv(1 downto 0);
+      jesdTxSync          : out   slv(1 downto 0);
       -- ADC/DAC/Debug Interface (jesdClk[1:0] domain)
-      adcValids        : in    Slv7Array(1 downto 0);
-      adcValues        : in    sampleDataVectorArray(1 downto 0, 6 downto 0);
-      dacValids        : out   Slv7Array(1 downto 0);
-      dacValues        : out   sampleDataVectorArray(1 downto 0, 6 downto 0);
-      debugValids      : out   Slv4Array(1 downto 0);
-      debugValues      : out   sampleDataVectorArray(1 downto 0, 3 downto 0);
+      adcValids           : in    Slv7Array(1 downto 0);
+      adcValues           : in    sampleDataVectorArray(1 downto 0, 6 downto 0);
+      dacValids           : out   Slv7Array(1 downto 0);
+      dacValues           : out   sampleDataVectorArray(1 downto 0, 6 downto 0);
+      debugValids         : out   Slv4Array(1 downto 0);
+      debugValues         : out   sampleDataVectorArray(1 downto 0, 3 downto 0);
       -- DAC Signal Generator Interface
       -- If SIG_GEN_LANE_MODE_G = '0', (jesdClk[1:0] domain)
       -- If SIG_GEN_LANE_MODE_G = '1', (jesdClk2x[1:0] domain)
-      dacSigCtrl       : out   DacSigCtrlArray(1 downto 0);
-      dacSigStatus     : in    DacSigStatusArray(1 downto 0);
-      dacSigValids     : in    Slv7Array(1 downto 0);
-      dacSigValues     : in    sampleDataVectorArray(1 downto 0, 6 downto 0);
+      dacSigCtrl          : out   DacSigCtrlArray(1 downto 0);
+      dacSigStatus        : in    DacSigStatusArray(1 downto 0);
+      dacSigValids        : in    Slv7Array(1 downto 0);
+      dacSigValues        : in    sampleDataVectorArray(1 downto 0, 6 downto 0);
       -- AXI-Lite Interface (axilClk domain) [0x8FFFFFFF:0x80000000]
-      axilClk          : in    sl;
-      axilRst          : in    sl;
-      axilReadMaster   : in    AxiLiteReadMasterType;
-      axilReadSlave    : out   AxiLiteReadSlaveType;
-      axilWriteMaster  : in    AxiLiteWriteMasterType;
-      axilWriteSlave   : out   AxiLiteWriteSlaveType;
+      axilClk             : in    sl;
+      axilRst             : in    sl;
+      axilReadMaster      : in    AxiLiteReadMasterType;
+      axilReadSlave       : out   AxiLiteReadSlaveType;
+      axilWriteMaster     : in    AxiLiteWriteMasterType;
+      axilWriteSlave      : out   AxiLiteWriteSlaveType;
       ----------------------
       -- Top Level Interface
       ----------------------
-      -- Timing Interface (recTimingClk domain) 
-      timingBus        : in    TimingBusType;
-      timingPhy        : out   TimingPhyType;
-      timingPhyClk     : in    sl;
-      timingPhyRst     : in    sl;
+      -- Timing Interface (timingClk domain) 
+      timingClk           : in    sl;
+      timingRst           : in    sl;
+      timingBus           : in    TimingBusType;
+      timingPhy           : out   TimingPhyType;
+      timingPhyClk        : in    sl;
+      timingPhyRst        : in    sl;
       -- Diagnostic Interface (diagnosticClk domain)
-      diagnosticClk    : out   sl;
-      diagnosticRst    : out   sl;
-      diagnosticBus    : out   DiagnosticBusType;
-      -- Backplane Messaging Interface (bpMsgClk domain)
-      bpMsgClk         : out   sl;
-      bpMsgRst         : out   sl;
-      bpMsgBus         : in    BpMsgBusArray(BP_MSG_SIZE_C-1 downto 0);
-      -- Application Debug Interface (ref156MHzClk domain)
-      obAppDebugMaster : out   AxiStreamMasterType;
-      obAppDebugSlave  : in    AxiStreamSlaveType;
-      ibAppDebugMaster : in    AxiStreamMasterType;
-      ibAppDebugSlave  : out   AxiStreamSlaveType;
-      -- BSI Interface (bsiClk domain) 
-      bsiClk           : out   sl;
-      bsiRst           : out   sl;
-      bsiBus           : in    BsiBusType;
+      diagnosticClk       : out   sl;
+      diagnosticRst       : out   sl;
+      diagnosticBus       : out   DiagnosticBusType;
+      -- Backplane Messaging Interface  (axilClk domain)
+      obBpMsgClientMaster : out   AxiStreamMasterType;
+      obBpMsgClientSlave  : in    AxiStreamSlaveType;
+      ibBpMsgClientMaster : in    AxiStreamMasterType;
+      ibBpMsgClientSlave  : out   AxiStreamSlaveType;
+      obBpMsgServerMaster : out   AxiStreamMasterType;
+      obBpMsgServerSlave  : in    AxiStreamSlaveType;
+      ibBpMsgServerMaster : in    AxiStreamMasterType;
+      ibBpMsgServerSlave  : out   AxiStreamSlaveType;
+      -- Application Debug Interface (axilClk domain)
+      obAppDebugMaster    : out   AxiStreamMasterType;
+      obAppDebugSlave     : in    AxiStreamSlaveType;
+      ibAppDebugMaster    : in    AxiStreamMasterType;
+      ibAppDebugSlave     : out   AxiStreamSlaveType;
       -- MPS Concentrator Interface (ref156MHzClk domain)
-      mpsObMasters     : in    AxiStreamMasterArray(14 downto 0);
-      mpsObSlaves      : out   AxiStreamSlaveArray(14 downto 0);
-      -- Reference Clocks and Resets
-      recTimingClk     : in    sl;
-      recTimingRst     : in    sl;
-      ref125MHzClk     : in    sl;
-      ref125MHzRst     : in    sl;
-      ref156MHzClk     : in    sl;
-      ref156MHzRst     : in    sl;
-      ref312MHzClk     : in    sl;
-      ref312MHzRst     : in    sl;
-      ref625MHzClk     : in    sl;
-      ref625MHzRst     : in    sl;
-      gthFabClk        : in    sl;
-      ethPhyReady      : in    sl;
+      mpsObMasters        : in    AxiStreamMasterArray(14 downto 0);
+      mpsObSlaves         : out   AxiStreamSlaveArray(14 downto 0);
+      -- Misc. Interface
+      ipmiBsi             : in    BsiBusType;
+      gthFabClk           : in    sl;
+      ethPhyReady         : in    sl;
       -----------------------
       -- Application Ports --
       -----------------------      
       -- AMC's JTAG Ports
-      jtagPri          : inout Slv5Array(1 downto 0);
-      jtagSec          : inout Slv5Array(1 downto 0);
+      jtagPri             : inout Slv5Array(1 downto 0);
+      jtagSec             : inout Slv5Array(1 downto 0);
       -- AMC's FPGA Clock Ports
-      fpgaClkP         : inout Slv2Array(1 downto 0);
-      fpgaClkN         : inout Slv2Array(1 downto 0);
+      fpgaClkP            : inout Slv2Array(1 downto 0);
+      fpgaClkN            : inout Slv2Array(1 downto 0);
       -- AMC's System Reference Ports
-      sysRefP          : inout Slv4Array(1 downto 0);
-      sysRefN          : inout Slv4Array(1 downto 0);
+      sysRefP             : inout Slv4Array(1 downto 0);
+      sysRefN             : inout Slv4Array(1 downto 0);
       -- AMC's Sync Ports
-      syncInP          : inout Slv4Array(1 downto 0);
-      syncInN          : inout Slv4Array(1 downto 0);
-      syncOutP         : inout Slv10Array(1 downto 0);
-      syncOutN         : inout Slv10Array(1 downto 0);
+      syncInP             : inout Slv4Array(1 downto 0);
+      syncInN             : inout Slv4Array(1 downto 0);
+      syncOutP            : inout Slv10Array(1 downto 0);
+      syncOutN            : inout Slv10Array(1 downto 0);
       -- AMC's Spare Ports
-      spareP           : inout Slv16Array(1 downto 0);
-      spareN           : inout Slv16Array(1 downto 0);
+      spareP              : inout Slv16Array(1 downto 0);
+      spareN              : inout Slv16Array(1 downto 0);
       -- RTM's Low Speed Ports
-      rtmLsP           : inout slv(53 downto 0);
-      rtmLsN           : inout slv(53 downto 0);
+      rtmLsP              : inout slv(53 downto 0);
+      rtmLsN              : inout slv(53 downto 0);
       -- RTM's High Speed Ports
-      rtmHsRxP         : in    sl;
-      rtmHsRxN         : in    sl;
-      rtmHsTxP         : out   sl;
-      rtmHsTxN         : out   sl;
-      genClkP          : in    sl;
-      genClkN          : in    sl);
+      rtmHsRxP            : in    sl;
+      rtmHsRxN            : in    sl;
+      rtmHsTxP            : out   sl := '0';
+      rtmHsTxN            : out   sl := '1';
+      -- RTM's Clock Reference 
+      genClkP             : in    sl;
+      genClkN             : in    sl);
 end AppCore;
 
 architecture mapping of AppCore is
 
+   constant NUM_AXI_MASTERS_C : natural := 2;
+
+   constant AXI_CONFIG_C : AxiLiteCrossbarMasterConfigArray(NUM_AXI_MASTERS_C-1 downto 0) := genAxiLiteConfig(NUM_AXI_MASTERS_C, AXI_BASE_ADDR_G, 28, 24);  -- [0x8FFFFFFF:0x80000000]
+
+   constant AMC_INDEX_C : natural := 0;
+   constant RTM_INDEX_C : natural := 1;
+
+   signal axilWriteMasters : AxiLiteWriteMasterArray(NUM_AXI_MASTERS_C-1 downto 0);
+   signal axilWriteSlaves  : AxiLiteWriteSlaveArray(NUM_AXI_MASTERS_C-1 downto 0);
+   signal axilReadMasters  : AxiLiteReadMasterArray(NUM_AXI_MASTERS_C-1 downto 0);
+   signal axilReadSlaves   : AxiLiteReadSlaveArray(NUM_AXI_MASTERS_C-1 downto 0);
+
+   signal locDacValids   : Slv7Array(1 downto 0)                         := (others => (others => '0'));
+   signal locDacValues   : sampleDataVectorArray(1 downto 0, 6 downto 0) := (others => (others => x"0000_0000"));
+   signal locDebugValids : Slv4Array(1 downto 0)                         := (others => (others => '0'));
+   signal locDebugValues : sampleDataVectorArray(1 downto 0, 3 downto 0) := (others => (others => x"0000_0000"));
+
 begin
 
-   diagnosticClk    <= '0';
-   diagnosticRst    <= '0';
-   diagnosticBus    <= DIAGNOSTIC_BUS_INIT_C;
-   bpMsgClk         <= '0';
-   bpMsgRst         <= '0';
+   dacValids <= locDacValids;
+   dacValues <= locDacValues;
+
+   debugValids <= locDebugValids;
+   debugValues <= locDebugValues;
+
+   --------------------------
+   -- Terminate usued outputs
+   --------------------------
+   diagnosticClk <= axilClk;
+   diagnosticRst <= axilRst;
+   diagnosticBus <= DIAGNOSTIC_BUS_INIT_C;
+
+   obBpMsgClientMaster <= AXI_STREAM_MASTER_INIT_C;
+   ibBpMsgClientSlave  <= AXI_STREAM_SLAVE_FORCE_C;
+
+   obBpMsgServerMaster <= AXI_STREAM_MASTER_INIT_C;
+   ibBpMsgServerSlave  <= AXI_STREAM_SLAVE_FORCE_C;
+
    obAppDebugMaster <= AXI_STREAM_MASTER_INIT_C;
    ibAppDebugSlave  <= AXI_STREAM_SLAVE_FORCE_C;
-   bsiClk           <= '0';
-   bsiRst           <= '0';
-   mpsObSlaves      <= (others => AXI_STREAM_SLAVE_FORCE_C);
-   dacSigCtrl       <= (others => DAC_SIG_CTRL_INIT_C);
-   timingPhy        <= TIMING_PHY_INIT_C;
+
+   mpsObSlaves <= (others => AXI_STREAM_SLAVE_FORCE_C);
+   dacSigCtrl  <= (others => DAC_SIG_CTRL_INIT_C);
+   timingPhy   <= TIMING_PHY_INIT_C;
 
    freezeHw <= (others => '0');
    userTrig <= (others => '0');
 
-   jesdSysRef <= (others => '0');
-   jesdTxSync <= (others => '0');
 
-   dacValids <= (others => (others => '0'));
-   dacValues <= (others => (others => x"0000_0000"));
-
-   debugValids <= (others => (others => '0'));
-   debugValues <= (others => (others => x"0000_0000"));
-
-   U_AxiLiteEmpty : entity work.AxiLiteEmpty
+   ---------------------
+   -- AXI-Lite Crossbar
+   ---------------------
+   U_XBAR : entity work.AxiLiteCrossbar
       generic map (
-         TPD_G => TPD_G)
+         TPD_G              => TPD_G,
+         DEC_ERROR_RESP_G   => AXI_ERROR_RESP_G,
+         NUM_SLAVE_SLOTS_G  => 1,
+         NUM_MASTER_SLOTS_G => NUM_AXI_MASTERS_C,
+         MASTERS_CONFIG_G   => AXI_CONFIG_C)
       port map (
-         axiClk         => axilClk,
-         axiClkRst      => axilRst,
-         axiReadMaster  => axilReadMaster,
-         axiReadSlave   => axilReadSlave,
-         axiWriteMaster => axilWriteMaster,
-         axiWriteSlave  => axilWriteSlave);
+         axiClk              => axilClk,
+         axiClkRst           => axilRst,
+         sAxiWriteMasters(0) => axilWriteMaster,
+         sAxiWriteSlaves(0)  => axilWriteSlave,
+         sAxiReadMasters(0)  => axilReadMaster,
+         sAxiReadSlaves(0)   => axilReadSlave,
+         mAxiWriteMasters    => axilWriteMasters,
+         mAxiWriteSlaves     => axilWriteSlaves,
+         mAxiReadMasters     => axilReadMasters,
+         mAxiReadSlaves      => axilReadSlaves);
+
+   ----------------
+   -- AMC Interface
+   ----------------
+   U_DualAMC : entity work.AmcGenericAdcDacDualCore
+      generic map (
+         TPD_G            => TPD_G,
+         TRIG_CLK_G       => false,
+         CAL_CLK_G        => false,
+         AXI_CLK_FREQ_G   => AXI_CLK_FREQ_C,
+         AXI_ERROR_RESP_G => AXI_ERROR_RESP_G,
+         AXI_BASE_ADDR_G  => AXI_BASE_ADDR_G)
+      port map (
+         -- JESD SYNC Interface
+         jesdClk         => jesdClk,
+         jesdRst         => jesdRst,
+         jesdSysRef      => jesdSysRef,
+         jesdRxSync      => jesdRxSync,
+         jesdTxSync      => jesdTxSync,
+         -- ADC/DAC Interface (jesdClk domain)
+         adcValids       => adcValids,
+         adcValues       => adcValues,
+         dacValues       => locDacValues,
+         dacVcoCtrl      => (others => x"0000"),
+         -- AXI-Lite Interface
+         axilClk         => axilClk,
+         axilRst         => axilRst,
+         axilReadMaster  => axilReadMasters(AMC_INDEX_C),
+         axilReadSlave   => axilReadSlaves(AMC_INDEX_C),
+         axilWriteMaster => axilWriteMasters(AMC_INDEX_C),
+         axilWriteSlave  => axilWriteSlaves(AMC_INDEX_C),
+         -- Pass through Interfaces
+         fpgaClk         => "00",
+         smaTrig         => "00",
+         adcCal          => "00",
+         lemoDin         => open,
+         lemoDout        => (others => "00"),
+         bcm             => "00",
+         -----------------------
+         -- Application Ports --
+         -----------------------
+         -- AMC's JTAG Ports
+         jtagPri         => jtagPri,
+         jtagSec         => jtagSec,
+         -- AMC's FPGA Clock Ports
+         fpgaClkP        => fpgaClkP,
+         fpgaClkN        => fpgaClkN,
+         -- AMC's System Reference Ports
+         sysRefP         => sysRefP,
+         sysRefN         => sysRefN,
+         -- AMC's Sync Ports
+         syncInP         => syncInP,
+         syncInN         => syncInN,
+         syncOutP        => syncOutP,
+         syncOutN        => syncOutN,
+         -- AMC's Spare Ports
+         spareP          => spareP,
+         spareN          => spareN);
+
+   ----------------
+   -- RTM Interface
+   ----------------
+   U_Rtm : entity work.RtmEmptyCore
+      generic map (
+         TPD_G            => TPD_G,
+         AXI_ERROR_RESP_G => AXI_ERROR_RESP_G)
+      port map (
+         -- AXI-Lite Interface
+         axilClk         => axilClk,
+         axilRst         => axilRst,
+         axilReadMaster  => axilReadMasters(RTM_INDEX_C),
+         axilReadSlave   => axilReadSlaves(RTM_INDEX_C),
+         axilWriteMaster => axilWriteMasters(RTM_INDEX_C),
+         axilWriteSlave  => axilWriteSlaves(RTM_INDEX_C),
+         -----------------------
+         -- Application Ports --
+         -----------------------      
+         -- RTM's Low Speed Ports
+         rtmLsP          => rtmLsP,
+         rtmLsN          => rtmLsN,
+         -- RTM's Clock Reference 
+         genClkP         => genClkP,
+         genClkN         => genClkN);
 
 end mapping;

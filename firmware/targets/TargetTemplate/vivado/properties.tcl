@@ -9,4 +9,4 @@
 ##############################################################################
 
 ## Source the AMC Carrier Core's .TCL file
-source $::env(PROJ_DIR)/../../submodules/amc-carrier-core/core/vivado/properties.tcl
+source $::env(PROJ_DIR)/../../submodules/amc-carrier-core/AmcCarrierCore/vivado/properties.tcl
