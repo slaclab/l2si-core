@@ -10,7 +10,7 @@ HPS common platform documentation can be found here:
 1) Create a github account:
 > https://github.com/
 
-2) Email Ben Reese your github username to add you in the "lcls-hps" github group
+2) Email Ben Reese (https://github.com/bengineerd) your github username and request to be added to the "lcls-hps" github group
 > https://github.com/orgs/slaclab/teams/lcls-hps/repositories
 
 3) On the Linux machine that you will clone the github from, generate a SSH key (if not already done)
