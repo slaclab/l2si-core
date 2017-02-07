@@ -19,6 +19,9 @@ HPS common platform documentation can be found here:
 4) Add a new SSH key to your GitHub account
 > https://help.github.com/articles/adding-a-new-ssh-key-to-your-github-account/
 
+5) Setup for large filesystems on github
+> $ git lfs install
+
 # Clone the GIT repository
 > $ git clone --recursive git@github.com:slaclab/amc-carrier-project-template
 
