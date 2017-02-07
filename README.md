@@ -30,7 +30,7 @@ HPS common platform documentation can be found here:
 > In Bash:    $ source amc-carrier-project-template/firmware/setup_env_slac.sh
 
 2) If not done yet, make a symbolic link to the firmware/
-> $ ln -s /u1/$USER/build amc-carrier-project-template/firmware/build
+> $ ln -s /u1/$USER/build amc-carrier-project-template/firmware/build/build
 
 3) Go to the target directory and make the firmware:
 > $ cd amc-carrier-project-template/firmware/targets/TargetTemplate/
