@@ -4,6 +4,7 @@
 [submodule "fimrware/submodules/ruckus"]
 	path = firmware/submodules/ruckus
 	url = git@github.com:slaclab/ruckus
+	branch = v1.0.0
 [submodule "fimrware/submodules/lcls-timing-core"]
 	path = firmware/submodules/lcls-timing-core
 	url = git@github.com:slaclab/lcls-timing-core
