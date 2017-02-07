@@ -26,6 +26,7 @@ HPS common platform documentation can be found here:
 
 1) Setup Xilinx licensing
 > In C-Shell: $ source amc-carrier-project-template/firmware/setup_env_slac.csh
+
 > In Bash:    $ source amc-carrier-project-template/firmware/setup_env_slac.sh
 
 2) If not done yet, make a symbolic link to the firmware/
