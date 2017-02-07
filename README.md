@@ -20,7 +20,7 @@ HPS common platform documentation can be found here:
 > https://help.github.com/articles/adding-a-new-ssh-key-to-your-github-account/
 
 # Clone the GIT repository
-> $ git clone git@github.com:slaclab/amc-carrier-project-template --recursive
+> $ git clone --progress --recursive -v git@github.com:slaclab/amc-carrier-project-template
 
 # How to build the firmware
 
