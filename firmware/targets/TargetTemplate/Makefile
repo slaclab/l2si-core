@@ -12,7 +12,7 @@
 # Note: (AMC_ADV_BUILD = 1) requires a munch longer build time
 #########################################################################
 # AMC_ADV_BUILD is defined by application
-export AMC_ADV_BUILD = 1
+export AMC_ADV_BUILD = 0
 
 #########################################################################
 # Applications must define if using zone3 (RTM) ETH (instead of zone2 ETH)
@@ -20,7 +20,7 @@ export AMC_ADV_BUILD = 1
 #########################################################################
 
 # RTM_ETH is defined by application
-export RTM_ETH = 1
+export RTM_ETH = 0
 
 #########################################################################
 # Applications must define the application specific hardware that's being used in AppCore.vhd
