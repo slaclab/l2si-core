@@ -41,3 +41,5 @@ HPS common platform documentation can be found here:
 
 4) Optional: Review the results in GUI mode
 > $ make gui
+
+Changed line
