@@ -32,8 +32,11 @@ for i in range(len(tagConfig)):
     check_call(cmd, shell=True)
 
 # Commit the updated submodule tags
-check_call('git ci -m "Updating submodules tags"', shell=True)
-      
+try:
+    check_call('git ci -m "Updating submodules tags"', shell=True)
+except:
+    print "Everything up-to-date and nothing to commit"
+
 ##################################################################################################
 ## Warning: This script does NOT push the commits to github.  You will need to do that manually
 ##################################################################################################
