@@ -10,14 +10,13 @@
 ##############################################################################
 
 import os
-import sys
 from subprocess import check_call
 
 ## Define the GIT submodule path and TAG-ing
-tagConfig = [ ['/firmware/submodules/amc-carrier-core', 'v1.0.2'], TBD
-              ['/firmware/submodules/lcls-timing-core', 'v1.0.1'], TBD
-              ['/firmware/submodules/ruckus',           'v1.0.2'], TBD
-              ['/firmware/submodules/surf',             'v1.0.1'],
+tagConfig = [ ['/firmware/submodules/amc-carrier-core', 'v1.0.2'],
+              ['/firmware/submodules/lcls-timing-core', 'v1.0.1'],
+              ['/firmware/submodules/ruckus',           'v1.0.2'],
+              ['/firmware/submodules/surf',             'v1.0.2'],
               ['/firmware/submodules/sysgen-dsp-lib',   'v1.0.0'] ]
          
 ## Loop through the submodules
@@ -44,3 +43,5 @@ check_call('git ci -m "Updating submodules tags"', shell=True)
 ##       https://help.github.com/articles/generating-a-new-ssh-key-and-adding-it-to-the-ssh-agent/
 ##       https://help.github.com/articles/adding-a-new-ssh-key-to-your-github-account/
 ##################################################################################################
+
+
