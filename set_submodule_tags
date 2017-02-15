@@ -9,7 +9,7 @@
 ## the terms contained in the LICENSE.txt file.
 ##############################################################################
 
-import os
+import os, sys
 from subprocess import check_call
 
 ## Define the GIT submodule path and TAG-ing
@@ -18,7 +18,14 @@ tagConfig = [ ['/firmware/submodules/amc-carrier-core', 'v1.0.2'],
               ['/firmware/submodules/ruckus',           'v1.0.2'],
               ['/firmware/submodules/surf',             'v1.0.2'],
               ['/firmware/submodules/sysgen-dsp-lib',   'v1.0.0'] ]
-         
+
+# Check that the submodule paths exists
+for i in range(len(tagConfig)):
+    path = os.getcwd() + tagConfig[i][0] + '/'
+    if (os.path.isdir(path) != True) :
+        print "Error: " + path + " does NOT exist"
+        sys.exit(-1) 
+              
 ## Loop through the submodules
 for i in range(len(tagConfig)):
     # Generate a list of shell commands
