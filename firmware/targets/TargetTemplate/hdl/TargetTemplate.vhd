@@ -31,7 +31,8 @@ use work.AppTopPkg.all;
 
 entity TargetTemplate is
    generic (
-      TPD_G : time := 1 ns);
+      TPD_G        : time := 1 ns;
+      BUILD_INFO_G : BuildInfoType);
    port (
       -----------------------
       -- Application Ports --
@@ -310,8 +311,9 @@ begin
 
    U_Core : entity work.AmcCarrierCoreBase
       generic map (
-         TPD_G      => TPD_G,
-         APP_TYPE_G => APP_NULL_TYPE_C)  -- Configured by application (refer to AmcCarrierPkg for list of all application types
+         TPD_G        => TPD_G,
+         BUILD_INFO_G => BUILD_INFO_G,
+         APP_TYPE_G   => APP_NULL_TYPE_C)  -- Configured by application (refer to AmcCarrierPkg for list of all application types
       port map (
          ----------------------
          -- Top Level Interface
