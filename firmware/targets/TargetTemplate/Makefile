@@ -1,4 +1,9 @@
 ##########################################################################################
+# Applications must define the 32-bitFirmware Version Number
+##########################################################################################
+export PRJ_VERSION = 0x00000001
+
+##########################################################################################
 # Applications must define if using advance AMC carrier build
 # 
 # AMC_ADV_BUILD = 0: Uses pre-built AmcCarrierCore.vhd image (99% case)
