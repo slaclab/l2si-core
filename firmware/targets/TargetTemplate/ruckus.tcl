@@ -9,6 +9,5 @@ source -quiet $::env(RUCKUS_DIR)/vivado_proc.tcl
 loadRuckusTcl $::env(TOP_DIR)/submodules
 
 # Load target's source code and constraints
-loadSource      -path "$::DIR_PATH/Version.vhd"
 loadSource      -dir  "$::DIR_PATH/hdl/"
 loadConstraints -dir  "$::DIR_PATH/hdl/"
