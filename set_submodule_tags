@@ -28,7 +28,7 @@ for i in range(len(tagConfig)):
 
 # Commit the before modifying submodule tags
 try:
-    check_call('git ci -m "backing up progress via set_submodule_tag script', shell=True)
+    check_call('git ci -m "backing up progress via set_submodule_tag script"', shell=True)
 except:
     print ""
         
