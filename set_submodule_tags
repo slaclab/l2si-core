@@ -13,9 +13,9 @@ import os, sys
 from subprocess import check_call
 
 ## Define the GIT submodule path and TAG-ing
-tagConfig = [ ['/firmware/submodules/amc-carrier-core', 'v1.1.0'],
+tagConfig = [ ['/firmware/submodules/amc-carrier-core', 'v1.1.1'],
               ['/firmware/submodules/lcls-timing-core', 'v1.0.1'],
-              ['/firmware/submodules/ruckus',           'v1.1.0'],
+              ['/firmware/submodules/ruckus',           'v1.1.2'],
               ['/firmware/submodules/surf',             'v1.1.0'],
               ['/firmware/submodules/sysgen-dsp-lib',   'v1.0.0'] ]
 
@@ -25,7 +25,13 @@ for i in range(len(tagConfig)):
     if (os.path.isdir(path) != True) :
         print "Error: " + path + " does NOT exist"
         sys.exit(-1) 
-              
+
+# Commit the before modifying submodule tags
+try:
+    check_call('git ci -m "backing up progress via set_submodule_tag script', shell=True)
+except:
+    print ""
+        
 ## Loop through the submodules
 for i in range(len(tagConfig)):
     # Generate a list of shell commands
