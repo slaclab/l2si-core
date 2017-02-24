@@ -2,7 +2,7 @@
 -- File       : AppCore.vhd
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2017-02-04
--- Last update: 2017-02-06
+-- Last update: 2017-02-23
 -------------------------------------------------------------------------------
 -- Description: Application Core's Top Level
 --
@@ -47,7 +47,7 @@ entity AppCore is
       -- DaqMux/Trig Interface (timingClk domain) 
       freezeHw            : out   slv(1 downto 0);
       evrTrig             : in    AppTopTrigType;
-      userTrig            : out   slv(1 downto 0);
+      trigHw              : out   slv(1 downto 0);
       -- JESD SYNC Interface (jesdClk[1:0] domain)
       jesdSysRef          : out   slv(1 downto 0);
       jesdRxSync          : in    slv(1 downto 0);
@@ -189,7 +189,7 @@ begin
    timingPhy   <= TIMING_PHY_INIT_C;
 
    freezeHw <= (others => '0');
-   userTrig <= (others => '0');
+   trigHw   <= (others => '0');
 
 
    ---------------------
