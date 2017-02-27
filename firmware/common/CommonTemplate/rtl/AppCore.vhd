@@ -224,7 +224,7 @@ begin
          CAL_CLK_G        => false,
          AXI_CLK_FREQ_G   => AXI_CLK_FREQ_C,
          AXI_ERROR_RESP_G => AXI_ERROR_RESP_G,
-         AXI_BASE_ADDR_G  => AXI_BASE_ADDR_G)
+         AXI_BASE_ADDR_G  => AXI_CONFIG_C(AMC_INDEX_C).baseAddr)
       port map (
          -- JESD SYNC Interface
          jesdClk         => jesdClk,
