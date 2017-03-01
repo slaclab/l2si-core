@@ -38,7 +38,7 @@ for i in range(len(tagConfig)):
     cmd  = 'cd ' + (os.getcwd() + tagConfig[i][0]) + '/; '
     cmd += 'pwd; '
     cmd += 'git reset --hard origin/master; '
-    cmd += 'git fetch --rebase; '
+    cmd += 'git pull --rebase; git fetch; '
     cmd += 'git checkout ' + tagConfig[i][1] + '; '
     cmd += 'cd ' + os.getcwd() + '; '
     cmd += 'git add ' + (os.getcwd() + tagConfig[i][0]) + '; '
