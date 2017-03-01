@@ -36,10 +36,9 @@ except:
 for i in range(len(tagConfig)):
     # Generate a list of shell commands
     cmd  = 'cd ' + (os.getcwd() + tagConfig[i][0]) + '/; '
-    cmd += 'pwd; '
-    cmd += 'git reset --hard origin/master; '
-    cmd += 'git pull --rebase; git fetch; '
-    cmd += 'git checkout ' + tagConfig[i][1] + '; '
+    cmd += 'pwd; git reset --hard origin/master; '
+    cmd += 'git checkout master; git pull --rebase; '
+    cmd += 'git fetch; git checkout ' + tagConfig[i][1] + '; '
     cmd += 'cd ' + os.getcwd() + '; '
     cmd += 'git add ' + (os.getcwd() + tagConfig[i][0]) + '; '
     # Execut the list of commands
