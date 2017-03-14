@@ -106,7 +106,9 @@ architecture mapping of QuadAdcEvent is
     start    : sl;
     syncState: SyncStateType;
     adcShift : slv(2 downto 0);
+    trigd    : slv(7 downto 0);
     trig     : Slv8Array(SYNC_BITS_G-1 downto 0);
+    trigCnt  : slv(1 downto 0);
   end record;
 
   constant REG_INIT_C : RegType := (
@@ -126,7 +128,9 @@ architecture mapping of QuadAdcEvent is
     start     => '0',
     syncState => S_SHIFT_S,
     adcShift  => (others=>'0'),
-    trig      => (others=>(others=>'0')) );
+    trigd     => (others=>'0'),
+    trig      => (others=>(others=>'0')),
+    trigCnt   => (others=>'0') );
 
   signal r   : RegType := REG_INIT_C;
   signal rin : RegType;
@@ -275,8 +279,9 @@ begin  -- mapping
   begin  -- process
     v := r;
 
-    v.hdrRd := '0';
+    v.hdrRd   := '0';
     v.rdFifo  := x"0";
+    v.trigd   := trigIn(0);
 
     if configA.enable(3)='1' then
       v.datacnt := fifo(3).data_count;
@@ -419,21 +424,27 @@ begin  -- mapping
       when others => NULL;
     end case;
 
+    if r.trigCnt/="11" then
+      v.trig := r.trigd & r.trig(r.trig'left downto 1);
+      v.trigCnt := r.trigCnt+1;
+    end if;
+    
     v.start := '0';
     case (r.syncState) is
       when S_SHIFT_S =>
-        if trigIn(0)/=toSlv(0,8) then
+        if r.trigd/=toSlv(0,8) then
           v.start := configA.acqEnable;
           for i in 7 downto 0 loop
-            if trigIn(0)(i)='1' then
+            if r.trigd(i)='1' then
               v.adcShift := toSlv(i,3);
             end if;
           end loop;
-          v.trig      := trigIn;
+          v.trig      := r.trigd & r.trig(r.trig'left downto 1);
+          v.trigCnt   := (others=>'0');
           v.syncState := S_WAIT_S;
         end if;
       when S_WAIT_S =>
-        if trigIn(0)=toSlv(0,8) then
+        if r.trigd=toSlv(0,8) then
           v.syncState := S_SHIFT_S;
         end if;
       when others => NULL;

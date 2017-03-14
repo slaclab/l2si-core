@@ -33,6 +33,7 @@ entity AdcSyncCal is
   generic (
     TPD_G         : time    := 1 ns;
     SYNC_BITS_G   : integer := 4;
+    ENABLE_CAL_G  : boolean := false;
     EVR_PERIOD_G  : integer := 14;
     SYNC_PERIOD_G : integer := 147 );
   port (
@@ -161,39 +162,41 @@ begin
 
     axiSlaveDefault(axilWriteMaster, axilReadMaster, v.axilWriteSlave, v.axilReadSlave, axilStatus, AXI_RESP_OK_C);
 
-    case ra.state is
-      when S_IDLE =>
-        if v.calibrate='1' and ra.calibrate='0' then
-          v.match   := (others=>(others=>'0'));
-          v.delay   := (others=>(others=>'0'));
-          v.delayLd := (others=>'1');
-          v.state   := S_SET_DELAY;
-        end if;
-      when S_SET_DELAY =>
-        if ra.count=DELAY_STIME then
-          v.count    := (others=>'0');
-          v.test     := '1';
-          v.state    := S_TEST_DELAY;
-        end if;
-      when S_TEST_DELAY =>
-        if ra.count=ra.matchTime then
-          v.count    := (others=>'0');
-          v.test     := '0';
-          for i in 0 to SYNC_BITS_G-1 loop
-            v.match(i)(conv_integer(ra.delay(i))) := match(i);
-          end loop;
-          if ra.delay(0)=toSlv(511,9) then
-            v.state := S_IDLE;
-          else
-            for i in 0 to SYNC_BITS_G-1 loop
-              v.delay(i) := ra.delay(0)+1;
-            end loop;
+    if ENABLE_CAL_G then
+      case ra.state is
+        when S_IDLE =>
+          if v.calibrate='1' and ra.calibrate='0' then
+            v.match   := (others=>(others=>'0'));
+            v.delay   := (others=>(others=>'0'));
             v.delayLd := (others=>'1');
-            v.state := S_SET_DELAY;
+            v.state   := S_SET_DELAY;
           end if;
-        end if;
-      when others => null;
-    end case;
+        when S_SET_DELAY =>
+          if ra.count=DELAY_STIME then
+            v.count    := (others=>'0');
+            v.test     := '1';
+            v.state    := S_TEST_DELAY;
+          end if;
+        when S_TEST_DELAY =>
+          if ra.count=ra.matchTime then
+            v.count    := (others=>'0');
+            v.test     := '0';
+            for i in 0 to SYNC_BITS_G-1 loop
+              v.match(i)(conv_integer(ra.delay(i))) := match(i);
+            end loop;
+            if ra.delay(0)=toSlv(511,9) then
+              v.state := S_IDLE;
+            else
+              for i in 0 to SYNC_BITS_G-1 loop
+                v.delay(i) := ra.delay(0)+1;
+              end loop;
+              v.delayLd := (others=>'1');
+              v.state := S_SET_DELAY;
+            end if;
+          end if;
+        when others => null;
+      end case;
+    end if;
     
     if axiRst='1' then
       v := AXI_REG_INIT_C;
@@ -209,16 +212,18 @@ begin
     end if;
   end process seqa;
 
-  GEN_CALBIT : for i in 0 to SYNC_BITS_G-1 generate
-    U_CALBIT : entity work.AdcSyncCalBit
-      generic map ( SYNC_PERIOD_G => SYNC_PERIOD_G,
-                    DEBUG_G       => false )
-      port map ( syncClk => syncClk,
-                 enable  => stest,
-                 sync    => sync(i),
-                 match   => match(i) );
-  end generate GEN_CALBIT;
-  
+  GEN_CAL : if ENABLE_CAL_G generate
+    GEN_CALBIT : for i in 0 to SYNC_BITS_G-1 generate
+      U_CALBIT : entity work.AdcSyncCalBit
+        generic map ( SYNC_PERIOD_G => SYNC_PERIOD_G,
+                      DEBUG_G       => false )
+        port map ( syncClk => syncClk,
+                   enable  => stest,
+                   sync    => sync(i),
+                   match   => match(i) );
+    end generate GEN_CALBIT;
+  end generate;
+    
   combe: process (re, trigSlot, trigSel, etest   ) is
     variable v : EvrRegType;
   begin
