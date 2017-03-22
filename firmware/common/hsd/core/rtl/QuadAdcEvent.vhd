@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2016-01-04
--- Last update: 2017-03-13
+-- Last update: 2017-03-19
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -39,19 +39,21 @@ entity QuadAdcEvent is
   generic (
     TPD_G             : time    := 1 ns;
     FIFO_ADDR_WIDTH_C : integer := 10;
+    NFMC_G            : integer := 1;
     SYNC_BITS_G       : integer := 4 );
   port (
     eventClk   :  in sl;
     eventRst   :  in sl;
     configE    :  in QuadAdcConfigType;
     strobe     :  in sl;
+    trigArm    :  in sl;
     eventId    :  in slv(95 downto 0);
     --
     adcClk     :  in sl;
     adcRst     :  in sl;
     configA    :  in QuadAdcConfigType;
     trigIn     :  in Slv8Array(SYNC_BITS_G-1 downto 0);
-    adc        :  in AdcDataArray(3 downto 0);
+    adc        :  in AdcDataArray(4*NFMC_G-1 downto 0);
     --
     dmaClk     :  in sl;
     dmaRst     :  in sl;
@@ -64,10 +66,12 @@ end QuadAdcEvent;
 
 architecture mapping of QuadAdcEvent is
 
+  constant NCHAN_C : integer := 4*NFMC_G;
+  
   type EventStateType is (E_IDLE, E_SYNC);
   -- wait enough timingClks for adcSync to latch and settle
   constant T_SYNC : integer := 10;
-  
+
   type EventRegType is record
     state    : EventStateType;
     delay    : slv( 25 downto 0);
@@ -91,14 +95,15 @@ architecture mapping of QuadAdcEvent is
   
   type RegType is record
     hdrRd    : sl;
-    channel  : integer range 0 to 3;
+    fmc      : integer range 0 to NFMC_G-1;
+    channel  : integer range 0 to NCHAN_C-1;
     index    : integer range 0 to 23;
-    enable   : slv(3 downto 0);
-    rdFifo   : slv(3 downto 0);
+    enable   : slv(NCHAN_C-1 downto 0);
+    rdFifo   : slv(NCHAN_C-1 downto 0);
     flast    : sl;
-    chv      : slv(1 downto 0);
+    chv      : slv(bitSize(NCHAN_C-1)-1 downto 0);
     selv     : sl;
-    ack      : slv(3 downto 0);
+    ack      : slv(NCHAN_C-1 downto 0);
     datacnt  : slv(FIFO_ADDR_WIDTH_C-1 downto 0);
     full     : sl;
     state    : RdStateType;
@@ -106,21 +111,24 @@ architecture mapping of QuadAdcEvent is
     start    : sl;
     syncState: SyncStateType;
     adcShift : slv(2 downto 0);
-    trigd    : slv(7 downto 0);
+    trigd1   : slv(7 downto 0);
+    trigd2   : slv(7 downto 0);
     trig     : Slv8Array(SYNC_BITS_G-1 downto 0);
     trigCnt  : slv(1 downto 0);
+    trigArm  : sl;
   end record;
 
   constant REG_INIT_C : RegType := (
     hdrRd     => '0',
-    channel   => 3,
+    fmc       => 0,
+    channel   => NCHAN_C-1,
     index     => 0,
-    enable    => x"0",
-    rdFifo    => x"0",
+    enable    => (others=>'0'),
+    rdFifo    => (others=>'0'),
     flast     => '0',
-    chv       => "00",
+    chv       => (others=>'0'),
     selv      => '0',
-    ack       => x"0",
+    ack       => (others=>'0'),
     datacnt   => (others=>'0'),
     full      => '0',
     state     => S_IDLE,
@@ -128,19 +136,21 @@ architecture mapping of QuadAdcEvent is
     start     => '0',
     syncState => S_SHIFT_S,
     adcShift  => (others=>'0'),
-    trigd     => (others=>'0'),
+    trigd1    => (others=>'0'),
+    trigd2    => (others=>'0'),
     trig      => (others=>(others=>'0')),
-    trigCnt   => (others=>'0') );
+    trigCnt   => (others=>'0'),
+    trigArm   => '0' );
 
   signal r   : RegType := REG_INIT_C;
   signal rin : RegType;
 
   type DmaDataArray is array (natural range <>) of Slv11Array(7 downto 0);
-  signal iadc        : DmaDataArray(3 downto 0);
+  signal iadc        : DmaDataArray(NCHAN_C-1 downto 0);
 
   type AdcShiftArray is array (natural range<>) of Slv8Array(10 downto 0);
-  signal  adcs : AdcShiftArray(3 downto 0);
-  signal iadcs : AdcShiftArray(3 downto 0);
+  signal  adcs : AdcShiftArray(NCHAN_C-1 downto 0);
+  signal iadcs : AdcShiftArray(NCHAN_C-1 downto 0);
     
   type ChannelFifo is record
     data       : Slv11Array(15 downto 0);
@@ -150,7 +160,7 @@ architecture mapping of QuadAdcEvent is
   end record;
   type ChannelFifoArray is array(natural range<>) of ChannelFifo;
 
-  signal fifo  : ChannelFifoArray(3 downto 0);
+  signal fifo  : ChannelFifoArray(NCHAN_C-1 downto 0);
   
   signal hdrDout  : slv(127 downto 0);
   signal hdrValid : sl;
@@ -159,18 +169,22 @@ architecture mapping of QuadAdcEvent is
   signal fullE    : sl;
 
   signal pllSync   : slv(2 downto 0);
+  signal trigArmS  : sl;
   
   constant XPMV7 : boolean := false;
 
-  signal r_syncstate : sl;
-  
 begin  -- mapping
 
   dmaMaster <= r.master;
   dmaFullS  <= r.full;
   dmaFullQ  <= r.datacnt;
 
-  GEN_CH : for i in 0 to 3 generate
+  U_TRIGARM : entity work.SynchronizerOneShot
+    port map ( clk     => dmaClk,
+               dataIn  => trigArm,
+               dataOut => trigArmS );
+  
+  GEN_CH : for i in 0 to NCHAN_C-1 generate
     GEN_BIT : for j in 0 to 10 generate
       U_Shift : entity work.AdcShift
         port map ( clk   => adcClk,
@@ -234,7 +248,7 @@ begin  -- mapping
         if strobe='1' and fullE='0' then
           v.delay   := (others=>'0');
           v.hdrData(159 downto 0) := eventId &
-                                     x"000" & configE.enable &
+                                     x"00" & configE.enable &
                                      "00" & configE.samples(17 downto 4) &
                                      sz;
           v.state   := E_SYNC;
@@ -270,30 +284,26 @@ begin  -- mapping
     end if;
   end process;
     
-  process (r, dmaRst, configA, fifo, hdrValid, hdrEmpty, hdrDout, dmaSlave, dmaFullThr, trigIn)
+  process (r, dmaRst, configA, fifo, hdrValid, hdrEmpty, hdrDout, dmaSlave, dmaFullThr, trigArmS, trigIn)
     variable v   : RegType;
     variable o   : integer;
-    variable chv  : slv(1 downto 0);
+    variable chv  : slv(bitSize(NCHAN_C-1)-1 downto 0);
     variable selv : sl;
-    variable ack  : slv(3 downto 0);
+    variable ack  : slv(NCHAN_C-1 downto 0);
   begin  -- process
     v := r;
 
     v.hdrRd   := '0';
-    v.rdFifo  := x"0";
-    v.trigd   := trigIn(0);
-
-    if configA.enable(3)='1' then
-      v.datacnt := fifo(3).data_count;
-    elsif configA.enable(2)='1' then
-      v.datacnt := fifo(2).data_count;
-    elsif configA.enable(1)='1' then
-      v.datacnt := fifo(1).data_count;
-    elsif configA.enable(0)='1' then
-      v.datacnt := fifo(0).data_count;
-    else
-      v.datacnt := (others=>'0');
-    end if;
+    v.rdFifo  := (others=>'0');
+    v.trigd1  := trigIn(0);
+    v.trigd2  := (r.trigd1 and configA.trigShift) or (trigIn(0) and not configA.trigShift);
+    
+    v.datacnt := (others=>'0');
+    for i in 0 to NCHAN_C-1 loop
+      if configA.enable(i)='1' then
+        v.datacnt := fifo(i).data_count;
+      end if;
+    end loop;
 
     if r.datacnt > dmaFullThr then
       v.full := '1';
@@ -305,13 +315,13 @@ begin  -- mapping
     --  Pipeline the last sample check for Q_ABCD interleave mode
     --    (last is valid 3 clocks before sampling)
     --
-    v.flast   := fifo(0).last;
+    v.flast   := fifo(4*r.fmc).last;
 
     --
     --  Pipeline the arbitration decision for Q_NONE interleave mode
     --    (enable,channel is valid 1 clock before sampling)
     --
-    arbitrate(r.enable, toSlv(r.channel,2), v.chv, v.selv, v.ack);
+    arbitrate(r.enable, toSlv(r.channel,r.chv'length), v.chv, v.selv, v.ack);
     
     if dmaSlave.tReady='1' then
       v.master.tValid := '0';
@@ -321,7 +331,11 @@ begin  -- mapping
       when S_IDLE =>
         v.index   := 0;
         v.enable  := configA.enable;
-        v.channel := 3;
+        if configA.intlv=Q_ABCD then
+          v.channel := 0;
+        else
+          v.channel := NCHAN_C-1;
+        end if;
         if hdrEmpty='0' then
           v.hdrRd := '1';
           v.state := S_READHDR;
@@ -343,8 +357,9 @@ begin  -- mapping
           v.master.tLast                 := '0';
           v.state := S_WAITCHAN;
           if (configA.intlv=Q_ABCD) then
+            v.fmc := 0;
             if fifo(0).empty='0' then
-              v.rdFifo := x"F";
+              v.rdFifo(3 downto 0) := x"F";
               v.state  := S_READCHAN;
             end if;
           else
@@ -361,8 +376,8 @@ begin  -- mapping
         end if;
       when S_WAITCHAN =>
         if (configA.intlv=Q_ABCD) then
-          if fifo(0).empty='0' then
-            v.rdFifo := x"F";
+          if fifo(4*r.fmc).empty='0' then
+            v.rdFifo(4*r.fmc+3 downto 4*r.fmc+0) := x"F";
             v.state  := S_READCHAN;
           end if;
         elsif fifo(r.channel).empty='0' then
@@ -377,21 +392,30 @@ begin  -- mapping
             v.master.tLast  := '0';
             v.master.tData  := (others=>'0');
             for i in 0 to 3 loop
-              v.master.tData(64*i+10 downto 64*i+ 0) := fifo(0).data(i+r.index);
-              v.master.tData(64*i+26 downto 64*i+16) := fifo(2).data(i+r.index);
-              v.master.tData(64*i+42 downto 64*i+32) := fifo(1).data(i+r.index);
-              v.master.tData(64*i+58 downto 64*i+48) := fifo(3).data(i+r.index);
+              v.master.tData(64*i+10 downto 64*i+ 0) := fifo(0+4*r.fmc).data(i+r.index);  
+              v.master.tData(64*i+26 downto 64*i+16) := fifo(2+4*r.fmc).data(i+r.index);  
+              v.master.tData(64*i+42 downto 64*i+32) := fifo(1+4*r.fmc).data(i+r.index);  
+              v.master.tData(64*i+58 downto 64*i+48) := fifo(3+4*r.fmc).data(i+r.index);
             end loop;
-
+            
             if (r.index<12) then
               v.index := r.index+4;
             elsif (r.flast='1') then
-              v.master.tLast := '1';
-              v.state := S_IDLE;
+              if r.fmc = NFMC_G-1 then
+                v.master.tLast := '1';
+                v.state := S_IDLE;
+              elsif NFMC_G>1 then
+                v.fmc := 1;
+                if fifo(4).empty='0' then
+                  v.rdFifo(7 downto 4) := x"F";
+                else
+                  v.state  := S_WAITCHAN;
+                end if;
+              end if;
             else
               v.index := 0;
-              if fifo(r.channel).empty='0' then
-                v.rdFifo := x"F";
+              if fifo(4*r.fmc).empty='0' then
+                v.rdFifo(4*r.fmc+3 downto 4*r.fmc) := x"F";
               else
                 v.state  := S_WAITCHAN;
               end if;
@@ -425,26 +449,32 @@ begin  -- mapping
     end case;
 
     if r.trigCnt/="11" then
-      v.trig := r.trigd & r.trig(r.trig'left downto 1);
+      v.trig    := r.trigd2 & r.trig(r.trig'left downto 1);
       v.trigCnt := r.trigCnt+1;
     end if;
     
-    v.start := '0';
+   v.start := '0';
     case (r.syncState) is
       when S_SHIFT_S =>
-        if r.trigd/=toSlv(0,8) then
+        if trigArmS = '1' then
+          v.trigArm := '1';
+        end if;
+        if r.trigd2/=toSlv(0,8) then
           v.start := configA.acqEnable;
           for i in 7 downto 0 loop
-            if r.trigd(i)='1' then
+            if r.trigd2(i)='1' then
               v.adcShift := toSlv(i,3);
             end if;
           end loop;
-          v.trig      := r.trigd & r.trig(r.trig'left downto 1);
-          v.trigCnt   := (others=>'0');
+          if r.trigArm='1' then
+            v.trig      := r.trigd2 & r.trig(r.trig'left downto 1);
+            v.trigArm   := '0';
+            v.trigCnt   := (others=>'0');
+          end if;
           v.syncState := S_WAIT_S;
         end if;
       when S_WAIT_S =>
-        if r.trigd=toSlv(0,8) then
+        if r.trigd2=toSlv(0,8) then
           v.syncState := S_SHIFT_S;
         end if;
       when others => NULL;

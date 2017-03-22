@@ -76,7 +76,9 @@ entity ev10aq190_quad_phy is
     axilWriteSlave   : out AxiLiteWriteSlaveType;
     axilReadMaster   : in  AxiLiteReadMasterType;
     axilReadSlave    : out AxiLiteReadSlaveType;
-
+    cmd_reg_o        : out slv(3 downto 0);
+    cmd_reg_i        : in  slv(3 downto 0);
+    
     -- Sync signal to ADC
     sync_p       : out std_logic;
     sync_n       : out std_logic;
@@ -333,10 +335,11 @@ end process;
 ----------------------------------------------------------------------------------------------------
 -- Map commands
 ----------------------------------------------------------------------------------------------------
-delay_reset     <= r.cmd_reg(0) or rst;
-clk_reset       <= r.cmd_reg(1) or rst;
-io_reset        <= r.cmd_reg(2) or rst;
-start_align0    <= r.cmd_reg(3);  -- start align command from sw
+cmd_reg_o       <= r.cmd_reg(cmd_reg_o'range);
+delay_reset     <= cmd_reg_i(0) or rst;
+clk_reset       <= cmd_reg_i(1) or rst;
+io_reset        <= cmd_reg_i(2) or rst;
+start_align0    <= cmd_reg_i(3);  -- start align command from sw
 
 
 pulse2pulse_delay_reset: entity work.pulse2pulse

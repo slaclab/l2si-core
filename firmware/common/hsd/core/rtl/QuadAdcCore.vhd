@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2016-01-04
--- Last update: 2017-03-13
+-- Last update: 2017-03-19
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -38,6 +38,7 @@ entity QuadAdcCore is
   generic (
     TPD_G       : time    := 1 ns;
     LCLSII_G    : boolean := TRUE;
+    NFMC_G      : integer := 1;
     SYNC_BITS_G : integer := 4 );
   port (
     -- AXI-Lite and IRQ Interface
@@ -62,7 +63,7 @@ entity QuadAdcCore is
     gbClk               : in  sl;
     adcClk              : in  sl;
     adcRst              : in  sl;
-    adc                 : in  AdcDataArray(3 downto 0);
+    adc                 : in  AdcDataArray(4*NFMC_G-1 downto 0);
     --
     trigSlot            : out sl;
     trigOut             : out sl;
@@ -112,7 +113,7 @@ architecture mapping of QuadAdcCore is
   signal dmaFullQS           : slv(31 downto 0) := (others=>'0');
   signal iready              : sl;
 
-  signal adcQ, adc_test      : AdcDataArray(3 downto 0);
+  signal adcQ, adc_test      : AdcDataArray(4*NFMC_G-1 downto 0);
   signal adcSyncReg          : slv(31 downto 0);
   signal idmaRst             : sl;
   signal dmaRstS             : sl;
@@ -124,7 +125,7 @@ architecture mapping of QuadAdcCore is
     TDEST_BITS_C  => 0,
     TID_BITS_C    => 0,
     TKEEP_MODE_C  => TKEEP_NORMAL_C,
-    TUSER_BITS_C  => 0,  -- set to 1 to avoid warnings
+    TUSER_BITS_C  => 0,
     TUSER_MODE_C  => TUSER_NONE_C );
 
   constant DMA_STREAM_CONFIG_C : AxiStreamConfigType := (
@@ -136,12 +137,13 @@ architecture mapping of QuadAdcCore is
     TUSER_BITS_C  => 0,
     TUSER_MODE_C  => TUSER_NONE_C );
 
+  constant HIST_DMA : boolean := false;
+  
 begin 
 
   ready   <= iready;
   iready  <= not dmaFullS;
   dmaRst  <= idmaRst;
-  trigOut <= eventSelQ;
   
   eventSelQ <= eventSel and (iready or not configE.inhibit);
 
@@ -151,6 +153,7 @@ begin
                  evrRst     => evrRst,
                  enabled    => configE.acqEnable,
                  eventCode  => configE.rateSel(7 downto 0),
+                 delay      => configE.offset,
                  evrBus     => evrBus,
                  strobe     => trigSlot,
                  oneHz      => open,
@@ -182,7 +185,7 @@ begin
   adcQ <= adc_test when configA.dmaTest='1' else
           adc;
   
-  GEN_TP : for i in 0 to 3 generate
+  GEN_TP : for i in 0 to 4*NFMC_G-1 generate
     U_DATA : entity work.QuadAdcChannelTestPattern
       generic map ( CHANNEL_C => i )
       port map ( clk   => adcClk,
@@ -193,6 +196,7 @@ begin
   U_EventDma : entity work.QuadAdcEvent
     generic map ( TPD_G             => TPD_G,
                   FIFO_ADDR_WIDTH_C => FIFO_ADDR_WIDTH_C,
+                  NFMC_G            => NFMC_G,
                   SYNC_BITS_G       => SYNC_BITS_G )
     port map (    eventClk   => evrClk,
                   eventRst   => evrRst,
@@ -204,6 +208,7 @@ begin
                   adcRst     => adcRst,
                   configA    => configA,
                   adc        => adcQ,
+                  trigArm    => eventSelQ,
                   trigIn     => trigIn,
                   dmaClk     => dmaClk,
                   dmaRst     => dmaRstS,
@@ -213,41 +218,48 @@ begin
                   dmaMaster  => intRxIbMasters(0),
                   dmaSlave   => intRxIbSlaves (0) );
 
-  U_FifoDepthH : entity work.HistogramDma
-    generic map ( TPD_G             => TPD_G,
-                  INPUT_DEPTH_G     => FIFO_ADDR_WIDTH_C,
-                  OUTPUT_DEPTH_G    => 6 )
-    port map ( clk      => dmaClk,
-               rst      => idmaRst,
-               valid    => dmaStrobe,
-               push     => dmaHistDumpS,
-               data     => dmaFullQ,
-               master   => histMaster,
-               slave    => histSlave );
+  GEN_HIST_DMA : if HIST_DMA generate
+    U_FifoDepthH : entity work.HistogramDma
+      generic map ( TPD_G             => TPD_G,
+                    INPUT_DEPTH_G     => FIFO_ADDR_WIDTH_C,
+                    OUTPUT_DEPTH_G    => 6 )
+      port map ( clk      => dmaClk,
+                 rst      => idmaRst,
+                 valid    => dmaStrobe,
+                 push     => dmaHistDumpS,
+                 data     => dmaFullQ,
+                 master   => histMaster,
+                 slave    => histSlave );
 
-  U_FIFO : entity work.AxiStreamFifo
-    generic map ( FIFO_ADDR_WIDTH_G   => 4,
-                  GEN_SYNC_FIFO_G     => true,
-                  SLAVE_AXI_CONFIG_G  => HIST_STREAM_CONFIG_C,
-                  MASTER_AXI_CONFIG_G => DMA_STREAM_CONFIG_C )
-    port map ( sAxisClk    => dmaClk,
-               sAxisRst    => idmaRst,
-               sAxisMaster => histMaster,
-               sAxisSlave  => histSlave,
-               mAxisClk    => dmaClk,
-               mAxisRst    => idmaRst,
-               mAxisMaster => intRxIbMasters(1),
-               mAxisSlave  => intRxIbSlaves (1) );
+    U_FIFO : entity work.AxiStreamFifoV2
+      generic map ( FIFO_ADDR_WIDTH_G   => 4,
+                    GEN_SYNC_FIFO_G     => true,
+                    SLAVE_AXI_CONFIG_G  => HIST_STREAM_CONFIG_C,
+                    MASTER_AXI_CONFIG_G => DMA_STREAM_CONFIG_C )
+      port map ( sAxisClk    => dmaClk,
+                 sAxisRst    => idmaRst,
+                 sAxisMaster => histMaster,
+                 sAxisSlave  => histSlave,
+                 mAxisClk    => dmaClk,
+                 mAxisRst    => idmaRst,
+                 mAxisMaster => intRxIbMasters(1),
+                 mAxisSlave  => intRxIbSlaves (1) );
     
-  U_StreamMux : entity work.AxiStreamMux
-    generic map ( NUM_SLAVES_G => 2 )
-    port map ( sAxisMasters => intRxIbMasters,
-               sAxisSlaves  => intRxIbSlaves,
-               mAxisMaster  => dmaRxIbMaster,
-               mAxisSlave   => dmaRxIbSlave,
-               axisClk      => dmaClk,
-               axisRst      => idmaRst );
+    U_StreamMux : entity work.AxiStreamMux
+      generic map ( NUM_SLAVES_G => 2 )
+      port map ( sAxisMasters => intRxIbMasters,
+                 sAxisSlaves  => intRxIbSlaves,
+                 mAxisMaster  => dmaRxIbMaster,
+                 mAxisSlave   => dmaRxIbSlave,
+                 axisClk      => dmaClk,
+                 axisRst      => idmaRst );
+  end generate;
 
+  NOGEN_HIST_DMA : if not HIST_DMA generate
+    dmaRxIbMaster <= intRxIbMasters(0);
+    intRxIbSlaves(0) <= dmaRxIbSlave;
+  end generate;
+    
   Sync_EvtCount : entity work.SyncStatusVector
     generic map ( TPD_G   => TPD_G,
                   WIDTH_G => 2 )
@@ -334,6 +346,7 @@ begin
   seq: process (evrClk) is
   begin
     if rising_edge(evrClk) then
+      trigOut <= eventSelQ ;
       if dmaFullS='1' then
         dmaCtrlC <= dmaCtrlC+1;
       end if;

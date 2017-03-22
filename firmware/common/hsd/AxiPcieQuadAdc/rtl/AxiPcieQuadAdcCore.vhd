@@ -5,7 +5,7 @@
 -- Author     : Larry Ruckman  <ruckman@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2016-02-12
--- Last update: 2017-03-13
+-- Last update: 2017-03-17
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -185,7 +185,7 @@ architecture mapping of AxiPcieQuadAdcCore is
    signal maxiWriteMaster : AxiLiteWriteMasterType;
    signal maxiWriteSlave  : AxiLiteWriteSlaveType;
 
-   constant DEVICE_MAP_C : I2cAxiLiteDevArray(9 downto 0) := (
+   constant DEVICE_MAP_C : I2cAxiLiteDevArray(11 downto 0) := (
      -- PCA9548A I2C Mux
      0 => MakeI2cAxiLiteDevType( "1110100", 8, 0, '0' ),
      -- SI5338 Local clock synthesizer
@@ -198,8 +198,10 @@ architecture mapping of AxiPcieQuadAdcCore is
      4 => MakeI2cAxiLiteDevType( "1001010", 8, 8, '0' ),
      -- ADT7411 Voltage/Temp Mon 3
      5 => MakeI2cAxiLiteDevType( "1001011", 8, 8, '0' ),
-     --  FMC SPI Bridge configuration
---     6 => MakeI2cAxiLiteDevType( "0101000", 8, 8, '0' ),
+     --  TPS2481 Current Mon 1
+     6 => MakeI2cAxiLiteDevType( "1000000", 8, 8, '0' ),
+     --  TPS2481 Current Mon 2
+     7 => MakeI2cAxiLiteDevType( "1000001", 8, 8, '0' ),
      --  FMC SPI Bridge [1B addressing, 1B payload]
 --     7 => MakeI2cAxiLiteDevType( "0101001", 8, 8, '0' ),
      --  FMC SPI Bridge [1B addressing, 1B payload]
@@ -207,13 +209,13 @@ architecture mapping of AxiPcieQuadAdcCore is
      --  FMC SPI Bridge [1B addressing, 1B payload]
 --     9 => MakeI2cAxiLiteDevType( "0101011", 8, 8, '0' )
      --  ADT7411 Voltage/Temp Mon FMC
-     6 => MakeI2cAxiLiteDevType( "1001000", 8, 8, '0' ),
+     8 => MakeI2cAxiLiteDevType( "1001000", 8, 8, '0' ),
      --  FMC SPI Bridge configuration
-     7 => MakeI2cAxiLiteDevType( "0101000", 8, 8, '0' ),
+     9 => MakeI2cAxiLiteDevType( "0101000", 8, 8, '0' ),
      --  FMC SPI Bridge [1B addressing, 1B payload]
-     8 => MakeI2cAxiLiteDevType( "0101000",16, 8, '0' ),
+     10 => MakeI2cAxiLiteDevType( "0101000",16, 8, '0' ),
      --  FMC SPI Bridge [2B addressing, 1B payload]
-     9 => MakeI2cAxiLiteDevType( "0101000",24, 8, '0' )
+     11 => MakeI2cAxiLiteDevType( "0101000",24, 8, '0' )
    );                                                        
 
    signal flash_clk      : sl;

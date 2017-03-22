@@ -31,7 +31,7 @@ package QuadAdcPkg is
 --  Constants to configue in function of ADC witch is targeted
 -------------------------------------------------------------------------------
   constant PATTERN_WIDTH          : natural := 11; --number of bits by channel 
-  constant CHANNELS_C         : natural := 4;  -- number of channel FIXE DONT CHANGE
+  constant CHANNELS_C         : natural := 8;  -- number of channel FIXE DONT CHANGE
                                                    -- Wite in nb_channel register with SPI register to configure channel number 
   constant SERDES_FACTOR    : natural := 8;  --deserialization factor in SERDES
 
@@ -58,6 +58,12 @@ package QuadAdcPkg is
 
   type QuadAdcFex is ( F_SAMPLE, F_SUM );
 
+  type QuadAdcStatusType is record
+    status    : slv(31 downto 0);
+    countH    : SlVectorArray(15 downto 0, 31 downto 0);
+    countL    : SlVectorArray(15 downto 0, 31 downto 0);
+  end record;
+  
   constant QADC_CONFIG_TYPE_LEN_C : integer := CHANNELS_C+101;
   type QuadAdcConfigType is record
     enable    : slv(CHANNELS_C-1 downto 0);  -- channel mask
@@ -65,12 +71,13 @@ package QuadAdcPkg is
     intlv     : slv( 1 downto 0);
     samples   : slv(17 downto 0);
     prescale  : slv( 5 downto 0);
-    offset    : slv( 9 downto 0);
+    offset    : slv(19 downto 0);
     acqEnable : sl;
     rateSel   : slv(12 downto 0);  -- LCLS: eventCode
     destSel   : slv(18 downto 0);  -- LCLS: not used
     inhibit   : sl;
     dmaTest   : sl;
+    trigShift : slv( 7 downto 0);
   end record;
   constant QUAD_ADC_CONFIG_INIT_C : QuadAdcConfigType := (
     enable    => (others=>'0'),
@@ -78,12 +85,13 @@ package QuadAdcPkg is
     intlv     => Q_NONE,
     samples   => toSlv(0,18),
     prescale  => toSlv(1,6),
-    offset    => toSlv(0,10),
+    offset    => toSlv(0,20),
     acqEnable => '0',
     rateSel   => (others=>'0'),
     destSel   => (others=>'0'),
     inhibit   => '1',
-    dmaTest   => '0' );
+    dmaTest   => '0',
+    trigShift => (others=>'0') );
 
   constant QUAD_ADC_EVENT_TAG : slv(15 downto 0) := X"0000";
   constant QUAD_ADC_DIAG_TAG  : slv(15 downto 0) := X"0001";
@@ -111,6 +119,7 @@ package body QuadAdcPkg is
       assignSlv(i, vector, config.destSel);
       assignSlv(i, vector, config.inhibit);
       assignSlv(i, vector, config.dmaTest);
+      assignSlv(i, vector, config.trigShift);
       return vector;
    end function;
    
@@ -130,6 +139,7 @@ package body QuadAdcPkg is
       assignRecord(i, vector, config.destSel);
       assignRecord(i, vector, config.inhibit);
       assignRecord(i, vector, config.dmaTest);
+      assignRecord(i, vector, config.trigShift);
       return config;
    end function;
    

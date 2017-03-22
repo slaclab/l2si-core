@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2016-01-04
--- Last update: 2017-03-13
+-- Last update: 2017-03-18
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -38,6 +38,7 @@ entity QuadAdcEventV1Select is
     evrRst              : in  sl;
     enabled             : in  sl;
     eventCode           : in  slv(7 downto 0);
+    delay               : in  slv(19 downto 0);
     evrBus              : in  TimingBusType;
     strobe              : out sl;              -- validates following signals
     oneHz               : out sl;
@@ -53,6 +54,7 @@ architecture mapping of QuadAdcEventV1Select is
     strobeO   : sl;
     oneHz     : sl;
     lsb       : sl;
+    delay     : slv(19 downto 0);
     eventWord : slv(15 downto 0);
     eventId   : slv(95 downto 0);
   end record;
@@ -63,6 +65,7 @@ architecture mapping of QuadAdcEventV1Select is
     strobeO   => '0',
     oneHz     => '0',
     lsb       => '0',
+    delay     => (others=>'0'),
     eventWord => (others=>'0'),
     eventId   => (others=>'0') );
 
@@ -73,21 +76,29 @@ begin
 
   strobe   <= r.strobeO;
   oneHz    <= r.oneHz;
-  eventSel <= r.eventSel;
+  eventSel <= r.strobeO;
   eventId  <= r.eventId;
 
-  comb: process ( r, evrRst, enabled, eventCode, evrBus ) is
+  comb: process ( r, evrRst, enabled, eventCode, evrBus, delay ) is
     variable v : RegType;
     variable i : integer;
   begin
     v := r;
 
-    v.eventSel := '0';
     v.oneHz    := '0';
     v.strobe   := '0';
-    v.strobeO  := r.strobe;
+    v.strobeO  := '0';
+
+    v.delay    := r.delay+1;
+
+    if r.eventSel='1' then
+      if r.delay=delay then
+        v.strobeO  := '1';
+        v.eventSel := '0';
+      end if;
+    end if;
     
-    if evrBus.strobe='1' then
+    if evrBus.strobe='1' and r.eventSel='0' then
       v.strobe    := '1';
       v.eventId   := evrBus.stream.pulseId & evrBus.stream.dbuff.epicsTime;
       i := conv_integer(eventCode(7 downto 4));
@@ -98,11 +109,12 @@ begin
       i := conv_integer(eventCode(3 downto 0));
       if (r.eventWord(i)='1' and enabled='1') then
         v.eventSel := '1';
-      end if;
-      if evrBus.stream.dbuff.epicsTime(0)/=r.lsb then
-        v.oneHz := '1';
+        if evrBus.stream.dbuff.epicsTime(0)/=r.lsb then
+          v.oneHz := '1';
         v.lsb   := not r.lsb;
+        end if;
       end if;
+      v.delay := (others=>'0');
     end if;
       
     if evrRst='1' then

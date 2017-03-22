@@ -65,6 +65,8 @@ use work.AxiLitePkg.all;
 use work.StdRtlPkg.all;
 
 entity FmcCore is
+generic (
+  AXIL_BASEADDR : slv(31 downto 0) := (others=>'0') );
 port (
 
   axilClk          : in std_logic;
@@ -73,7 +75,9 @@ port (
   axilWriteSlave   : out AxiLiteWriteSlaveType;
   axilReadMaster   : in  AxiLiteReadMasterType;
   axilReadSlave    : out AxiLiteReadSlaveType;
-
+  cmd_reg_o        : out slv(3 downto 0);
+  cmd_reg_i        : in  slv(3 downto 0);
+  
   phy_clk          : out std_logic; -- 625MHz
   ddr_clk          : in  std_logic; -- 625MHz
   adc_clk          : in  std_logic;
@@ -101,8 +105,9 @@ port (
   adc_in           : in    AdcInputArray(3 downto 0);
   
   pg_m2c           : in    std_logic;
-  prsnt_m2c_l      : in    std_logic
+  prsnt_m2c_l      : in    std_logic;
 
+  cal_clk_en       : out   std_logic
 );
 end FmcCore;
 
@@ -114,11 +119,11 @@ architecture fmc126_if_syn of FmcCore is
   constant NUM_AXI_MASTERS_C : integer := 2;
   constant AXI_CROSSBAR_MASTERS_CONFIG_C : AxiLiteCrossbarMasterConfigArray(NUM_AXI_MASTERS_C-1 downto 0) := (
     0    => (
-      baseAddr        => x"00081000",
+      baseAddr        => AXIL_BASEADDR + x"00000000",
       addrBits        => 10,
       connectivity    => x"FFFF"),
     1    => (
-      baseAddr        => x"00081400",
+      baseAddr        => AXIL_BASEADDR + x"00000400",
       addrBits        => 10,
       connectivity    => x"FFFF") );
   signal mAxilWriteMasters : AxiLiteWriteMasterArray(1 downto 0);
@@ -185,7 +190,8 @@ begin
 
   trigger_cmd         <= r.cmd_reg(3);
   trigger_select      <= r.ctrl_reg(5 downto 4);
-
+  cal_clk_en          <= r.cmd_reg(0);
+  
   comb: process(r, axilRst, mAxilWriteMasters(0), mAxilReadMasters(0), 
                 spi_irq_bus, clock_count, pg_m2c, prsnt_m2c_l) is
     variable v : RegType;
@@ -288,7 +294,9 @@ ev10aq190_quad_phy_inst : entity work.ev10aq190_quad_phy
     axilWriteSlave  => mAxilWriteSlaves (1),
     axilReadMaster  => mAxilReadMasters (1),
     axilReadSlave   => mAxilReadSlaves  (1),
-
+    cmd_reg_o       => cmd_reg_o,
+    cmd_reg_i       => cmd_reg_i,
+    
     sync_p          => sync_from_fpga_p,
     sync_n          => sync_from_fpga_n,
 

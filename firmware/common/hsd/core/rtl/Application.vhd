@@ -62,7 +62,7 @@ end Application;
 -------------------------------------------------------------------------------
 architecture rtl of Application is
 
-  constant NUM_AXI_MASTERS_C : integer := 4;
+  constant NUM_AXI_MASTERS_C : integer := 5;
   constant AXI_CROSSBAR_MASTERS_CONFIG_C : AxiLiteCrossbarMasterConfigArray(NUM_AXI_MASTERS_C-1 downto 0) := (
     0    => (
       baseAddr        => x"00080000",
@@ -74,9 +74,13 @@ architecture rtl of Application is
       connectivity    => x"FFFF"),
     2    => (
       baseAddr        => x"00081000",
-      addrBits        => 12,
+      addrBits        => 11,
       connectivity    => x"FFFF"),
     3    => (
+      baseAddr        => x"00081800",
+      addrBits        => 11,
+      connectivity    => x"FFFF"),
+    4    => (
       baseAddr        => x"00082000",
       addrBits        => 12,
       connectivity    => x"FFFF") );
@@ -89,7 +93,7 @@ architecture rtl of Application is
   signal adcClk            : sl;
   signal adcRst            : sl;
   signal locked            : sl;
-  signal phyClk            : sl;
+  signal phyClk            : slv(NFMC_G-1 downto 0);
   signal idmaClk           : sl;
   signal idmaRst           : sl := '0';
   --signal mmcm_clk          : slv(2 downto 0);
@@ -98,11 +102,14 @@ architecture rtl of Application is
   signal ddrClkInv         : sl;
   signal gbClk             : sl;
   signal pllRefClk         : slv(1 downto 0);
-  signal psClk             : sl;
-  signal psEn              : sl;
-  signal psIncDec          : sl;
-  signal psDone            : sl;
-
+  signal psClk             : slv(1 downto 0);
+  signal psEn              : slv(1 downto 0);
+  signal psIncDec          : slv(1 downto 0);
+  signal psDone            : slv(1 downto 0);
+  signal cmd_reg           : Slv4Array(1 downto 0);
+  signal calClkEn          : slv(1 downto 0);
+  signal calClkEnN         : slv(1 downto 0);
+  
   constant SYNC_BITS : integer := 4;
   signal trigSlot          : sl;
   signal trigSel           : sl;
@@ -117,24 +124,27 @@ architecture rtl of Application is
   signal adcSyncRst        : sl;
   signal adcSyncLocked     : sl;
 
-  component ila_0
-    port ( clk   : in sl;
-           probe0 : in slv(255 downto 0) );
-  end component;
-  
 begin  -- rtl
 
   dmaClk <= idmaClk;
   dmaRst <= idmaRst;
 
+  calClkEnN <= not calClkEn;
+  
   GEN_FRONT_IO : for i in 0 to NFMC_G-1 generate
     U_FRONT_IOBUF0 : IOBUF
       port map ( O  => open,
-                 IO => front_io_fmc(4*i),
+                 IO => front_io_fmc(i)(0),
                  I  => pllRefClk(i),
                  T  => '0' );
+    U_FRONT_IOBUF1 : IOBUF
+      port map ( O  => open,
+                 IO => front_io_fmc(i)(1),
+                 I  => adcClk,     -- 156.25MHz
+--                 I  => ddrClk,     -- 625MHz
+                 T  => calClkEnN(i) );
 
-    front_io_fmc(4*i+3 downto 4*i+1) <= (others => 'Z');
+    front_io_fmc(i)(3 downto 2) <= (others => 'Z');
   end generate;
   
   --------------------------
@@ -161,15 +171,15 @@ begin  -- rtl
   idmaClk <= adcClk;
   
   U_MMCM : entity work.quadadc_mmcm
-    port map ( clk_in1  => phyClk,
+    port map ( clk_in1  => phyClk(0),
                clk_out1 => ddrClk,
                clk_out2 => adcClk,
                clk_out3 => open,
                clk_out4 => gbClk,
-               psclk    => psClk,
-               psen     => psEn,
-               psincdec => psIncDec,
-               psdone   => psDone,
+               psclk    => psClk(0),
+               psen     => psEn(0),
+               psincdec => psIncDec(0),
+               psdone   => psDone(0),
                reset    => '0',
                locked   => locked );
 
@@ -209,7 +219,7 @@ begin  -- rtl
                  CLKDIV            => adcClk,                            -- Slow clock driven by BUFR
                  D                 => adcSin(i),
                  Q                 => adcS(i),
-                 RST               => '0',                           -- 1-bit Asynchronous reset only.
+                 RST               => idmaRst,                           -- 1-bit Asynchronous reset only.
                  FIFO_RD_CLK       => '0',
                  FIFO_RD_EN        => '0',
                  FIFO_EMPTY        => open,
@@ -228,20 +238,23 @@ begin  -- rtl
     
   end generate GEN_ADCSYNC;
 
+  trig <= trigSel;
+  
   U_SyncCal : entity work.AdcSyncCal
     generic map ( SYNC_BITS_G => SYNC_BITS )
     port map (
       axiClk              => axiClk,
       axiRst              => axiRst,
-      axilWriteMaster     => mAxilWriteMasters(3),
-      axilWriteSlave      => mAxilWriteSlaves (3),
-      axilReadMaster      => mAxilReadMasters (3),
-      axilReadSlave       => mAxilReadSlaves  (3),
+      axilWriteMaster     => mAxilWriteMasters(4),
+      axilWriteSlave      => mAxilWriteSlaves (4),
+      axilReadMaster      => mAxilReadMasters (4),
+      axilReadSlave       => mAxilReadSlaves  (4),
       --
       evrClk              => evrClk,
       trigSlot            => trigSlot,
       trigSel             => trigSel,
-      trigOut             => trig,
+--      trigOut             => trig,
+      trigOut             => open,
       --
       syncClk             => adcClk,
       sync                => adcS,
@@ -253,17 +266,23 @@ begin  -- rtl
     -- LCLS   : Fvco = 119M * 10.5 = 1249.5M
     --          Fout = 119M * 10.5/125 = 9.996M
     -- LCLSII : Fvco = 1300M/7 * 6 = 1114.3M
-    --          Fout = 1300M/7 * 6/75 = 14-7/8M
+    --          Fout = 1300M/7 * 6/75 = 14-6/7M
     generic map ( NUM_CLOCKS_G       => 2,
                   CLKIN_PERIOD_G     => ite(LCLSII_G, 5.37, 8.40),
                   CLKFBOUT_MULT_F_G  => ite(LCLSII_G, 6.0, 10.5),
-                  CLKOUT0_DIVIDE_F_G => ite(LCLSII_G, 75.0, 125.0))
+                  CLKOUT0_DIVIDE_F_G => ite(LCLSII_G, 75.0, 125.0),
+                  CLKOUT1_DIVIDE_G   => ite(LCLSII_G, 75  , 125  ),
+                  CLKOUT1_USE_FINE_PS_G => true )
     port map ( clkIn          => evrClk,
                rstIn          => adcSyncRst,
                clkOut(0)      => pllRefClk(0),
                clkOut(1)      => pllRefClk(1),
                rstOut         => open,
                locked         => adcSyncLocked,
+               psClk          => psClk   (1),
+               psEn           => psEn    (1),
+               psIncDec       => psIncDec(1),
+               psDone         => psDone  (1),
                axilClk        => axiClk,
                axilRst        => axiRst,
                axilReadMaster => mAxilReadMasters (1),
@@ -306,44 +325,51 @@ begin  -- rtl
       adcSyncLocked       => adcSyncLocked );
 
   adcRst <= not locked;
+
+  GEN_FMC : for i in 0 to NFMC_G-1 generate
+    U_FMC : entity work.FmcCore
+      generic map ( AXIL_BASEADDR => AXI_CROSSBAR_MASTERS_CONFIG_C(2+i).baseAddr )
+      port map (
+        axilClk          => axiClk,
+        axilRst          => axiRst,
+        axilWriteMaster  => mAxilWriteMasters(2+i),
+        axilWriteSlave   => mAxilWriteSlaves (2+i),
+        axilReadMaster   => mAxilReadMasters (2+i),
+        axilReadSlave    => mAxilReadSlaves  (2+i),
+        cmd_reg_o        => cmd_reg(i),
+        cmd_reg_i        => cmd_reg(0),
+        
+        phy_clk          => phyClk(i),
+        ddr_clk          => ddrClk,
+        adc_clk          => adcClk,
+        adc_out          => adcO(4*i+3 downto 4*i),
+
+        ref_clk          => pllRefClk(0),
+
+        ps_clk           => psClk   (i),
+        ps_en            => psEn    (i),
+        ps_incdec        => psIncDec(i),
+        ps_done          => psDone  (i),
+        
+        trigger_out      => open,
+        irq_out          => open,
+
+        --External signals
+        fmc_to_cpld      => fmc_to_cpld(i),
+
+        clk_to_fpga_p    => clk_to_fpga_p(i),
+        clk_to_fpga_n    => clk_to_fpga_n(i),
+        ext_trigger_p    => ext_trigger_p(i),
+        ext_trigger_n    => ext_trigger_n(i),
+        sync_from_fpga_p => sync_from_fpga_p(i),
+        sync_from_fpga_n => sync_from_fpga_n(i),
+
+        adc_in           => adcInput(4*i+3 downto 4*i),
+
+        pg_m2c           => pg_m2c     (i),
+        prsnt_m2c_l      => prsnt_m2c_l(i),
+
+        cal_clk_en       => calClkEn   (i));
+  end generate;
   
-  U_FMC : entity work.FmcCore
-    port map (
-      axilClk          => axiClk,
-      axilRst          => axiRst,
-      axilWriteMaster  => mAxilWriteMasters(2),
-      axilWriteSlave   => mAxilWriteSlaves (2),
-      axilReadMaster   => mAxilReadMasters (2),
-      axilReadSlave    => mAxilReadSlaves  (2),
-
-      phy_clk          => phyClk,
-      ddr_clk          => ddrClk,
-      adc_clk          => adcClk,
-      adc_out          => adcO,
-
-      ref_clk          => pllRefClk,
-
-      ps_clk           => psClk,
-      ps_en            => psEn,
-      ps_incdec        => psIncDec,
-      ps_done          => psDone,
-      
-      trigger_out      => open,
-      irq_out          => open,
-
-      --External signals
-      fmc_to_cpld      => fmc_to_cpld,
-
-      clk_to_fpga_p    => clk_to_fpga_p,
-      clk_to_fpga_n    => clk_to_fpga_n,
-      ext_trigger_p    => ext_trigger_p,
-      ext_trigger_n    => ext_trigger_n,
-      sync_from_fpga_p => sync_from_fpga_p,
-      sync_from_fpga_n => sync_from_fpga_n,
-
-      adc_in           => adcInput,
-
-      pg_m2c           => pg_m2c,
-      prsnt_m2c_l      => prsnt_m2c_l );
-
 end rtl;

@@ -201,19 +201,6 @@ pins: for pin_count in 0 to SYS_W-1 generate
 end generate pins;
 
 ----------------------------------------------------------------------------------------------------
--- Reorder bits to one parallel bus
-----------------------------------------------------------------------------------------------------
-sys_bits: for p in 0 to SYS_W-1 generate --loop per pin
-
-  ser_bits: for b in 0 to SER_W-1 generate --loop per bit
-
-    data_in_to_device_sig(b*SYS_W+p) <= iserdes_q(p)(b);
-
-  end generate ser_bits;
-
-end generate sys_bits;
-
-----------------------------------------------------------------------------------------------------
 -- Register output
 ----------------------------------------------------------------------------------------------------
 process(clk_div)
@@ -221,6 +208,20 @@ begin
    if rising_edge(clk_div) then
       data_in_to_device_reg   <= data_in_to_device_sig;
       delay_value             <= delay_value_int;
+
+----------------------------------------------------------------------------------------------------
+-- Reorder bits to one parallel bus
+----------------------------------------------------------------------------------------------------
+      sys_bits: for p in 0 to SYS_W-1 loop --loop per pin
+
+        ser_bits: for b in 0 to SER_W-1 loop --loop per bit
+
+          data_in_to_device_sig(b*SYS_W+p) <= iserdes_q(p)(b);
+
+        end loop ser_bits;
+
+      end loop sys_bits;
+
    end if;
 end process;
 

@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2016-01-04
--- Last update: 2016-11-14
+-- Last update: 2017-03-13
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -33,7 +33,7 @@ use work.StdRtlPkg.all;
 
 entity QuadAdcChannelTestPattern is
   generic (
-    CHANNEL_C : integer range 0 to 3 );
+    CHANNEL_C : integer range 0 to 7 );
   port (
     clk        :  in sl;
     rst        :  in sl;
@@ -64,9 +64,8 @@ begin  -- mapping
     v := r;
 
     for i in 0 to 7 loop
-      v.data(i)(10) := '0';
-      v.data(i)(9 downto 8) := toSlv(CHANNEL_C,2);
-      v.data(i)(7 downto 0) := toSlv(r.count+i,8);
+      v.data(i)(10 downto 8) := toSlv(CHANNEL_C,3);
+      v.data(i)( 7 downto 0) := toSlv(r.count+i,8);
     end loop;
     v.count := r.count+8;
     

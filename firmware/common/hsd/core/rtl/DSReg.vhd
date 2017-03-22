@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2016-01-04
--- Last update: 2017-03-13
+-- Last update: 2017-03-19
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -81,13 +81,13 @@ architecture mapping of DSReg is
     dmaHistEna     => '0',
     config         => QUAD_ADC_CONFIG_INIT_C,
     adcSyncRst     => '0',
-    dmaRst         => '0' );
+    dmaRst         => '1' );
   
   signal r   : RegType := REG_INIT_C;
   signal rin : RegType;
 
   signal adcSyncRegS : slv(31 downto 0);
-  
+
 begin  -- mapping
 
   config         <= r.config;
@@ -99,7 +99,7 @@ begin  -- mapping
   dmaHistEna     <= r.dmaHistEna;
   adcSyncRst     <= r.adcSyncRst;
   dmaRst         <= r.dmaRst;
-  
+
   process (axiClk)
   begin  -- process
     if rising_edge(axiClk) then
@@ -153,6 +153,7 @@ begin  -- mapping
     axilSlaveRegisterW(toSlv(16,12),  2, v.config.dmaTest);
     axilSlaveRegisterW(toSlv(16,12),  3, v.adcSyncRst);
     axilSlaveRegisterW(toSlv(16,12),  4, v.dmaRst);
+    axilSlaveRegisterW(toSlv(16,12),  8, v.config.trigShift);
     axilSlaveRegisterW(toSlv(16,12), 31, v.config.acqEnable);
     axilSlaveRegisterW(toSlv(20,12),  0, v.config.rateSel);
     axilSlaveRegisterW(toSlv(20,12), 13, v.config.destSel);
@@ -169,7 +170,7 @@ begin  -- mapping
     axilSlaveRegisterR(toSlv(48,12), dmaCtrlCount);
     axilSlaveRegisterR(toSlv(52,12), dmaFullQ);
     axilSlaveRegisterR(toSlv(56,12), adcSyncRegS);
-    
+
     axilSlaveDefault(AXI_RESP_OK_C);
     
     rin <= v;
