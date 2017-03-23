@@ -2,6 +2,7 @@
 #define HSD_Module_hh
 
 #include <stdint.h>
+#include <stdio.h>
 
 namespace Pds {
   namespace HSD {
@@ -17,11 +18,17 @@ namespace Pds {
       
       ~Module();
 
+      void board_status();
+
+      void flash_write(FILE*);
+
       //  Initialize busses
       void init();
 
       //  Initialize clock tree and IO training
       void fmc_init();
+      void fmc_clksynth_setup();
+      void fmc_dump();
 
       int  train_io(unsigned);
 
@@ -45,7 +52,7 @@ namespace Pds {
       void stop       ();
 
       const Pds::HSD::AxiVersion& version() const;
-      const Pds::HSD::TprCore&    tpr    () const;
+      Pds::HSD::TprCore&    tpr    ();
 
       void setRxAlignTarget(unsigned);
       void setRxResetLength(unsigned);

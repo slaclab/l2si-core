@@ -54,7 +54,7 @@ namespace Pds {
       //
     public:
       Pds::HSD::AxiVersion version;
-      uint32_t rsvd_to_0x08000[(0x8000-sizeof(version))/4];
+      uint32_t rsvd_to_0x08000[(0x8000-sizeof(Pds::HSD::AxiVersion))/4];
 
       FlashController      flash;
       uint32_t rsvd_to_0x10000[(0x8000-sizeof(FlashController))/4];
@@ -81,7 +81,7 @@ namespace Pds {
 
       // Timing
       Pds::HSD::TprCore  tpr;     // 0x40000
-      uint32_t rsvd_to_0x50000  [(0x10000-sizeof(tpr))/4];
+      uint32_t rsvd_to_0x50000  [(0x10000-sizeof(Pds::HSD::TprCore))/4];
 
       RingBuffer         ring0;   // 0x50000
       uint32_t rsvd_to_0x60000  [(0x10000-sizeof(RingBuffer))/4];
@@ -441,6 +441,81 @@ void Module::init() { p->init(); }
 
 void Module::fmc_init() { p->fmc_init(); }
 
+void Module::fmc_dump() {
+  if (p->fmca_core.present())
+    for(unsigned i=0; i<8; i++) {
+      p->fmca_core.selectClock(i);
+      usleep(100000);
+      printf("Clock [%i]: rate %f MHz\n", i, p->fmca_core.clockRate()*1.e-6);
+    }
+  
+  if (p->fmcb_core.present())
+    for(unsigned i=0; i<8; i++) {
+      p->fmcb_core.selectClock(i);
+      usleep(100000);
+      printf("Clock [%i]: rate %f MHz\n", i, p->fmcb_core.clockRate()*1.e-6);
+    }
+}
+
+void Module::fmc_clksynth_setup()
+{
+  p->i2c_sw_control.select(I2cSwitch::LocalBus);  // ClkSynth is on local bus
+  p->clksynth.setup();
+  p->clksynth.dump ();
+}
+
+void Module::board_status()
+{
+  printf("Axi Version [%p]: BuildStamp[%p]: %s\n", 
+         &(p->version), &(p->version.BuildStamp[0]), p->version.buildStamp().c_str());
+
+  p->i2c_sw_control.select(I2cSwitch::LocalBus);
+  p->i2c_sw_control.dump();
+  
+  printf("Local CPLD revision: 0x%x\n", p->local_cpld.revision());
+  printf("Local CPLD GAaddr  : 0x%x\n", p->local_cpld.GAaddr  ());
+  p->local_cpld.GAaddr(0);
+
+  printf("vtmon1 mfg:dev %x:%x\n", p->vtmon1.manufacturerId(), p->vtmon1.deviceId());
+  printf("vtmon2 mfg:dev %x:%x\n", p->vtmon2.manufacturerId(), p->vtmon2.deviceId());
+  printf("vtmon3 mfg:dev %x:%x\n", p->vtmon3.manufacturerId(), p->vtmon3.deviceId());
+
+  p->vtmon1.dump();
+  p->vtmon2.dump();
+  p->vtmon3.dump();
+
+  p->imona.dump();
+  p->imonb.dump();
+
+  bool fmca_present = p->fmca_core.present();
+  printf("FMC A [%p]: %s present power %s\n",
+         &p->fmca_core,
+         p->fmca_core.present() ? "":"not",
+         p->fmca_core.powerGood() ? "up":"down");
+
+  bool fmcb_present = p->fmcb_core.present();
+  printf("FMC B [%p]: %s present power %s\n",
+         &p->fmcb_core,
+         p->fmcb_core.present() ? "":"not",
+         p->fmcb_core.powerGood() ? "up":"down");
+
+  p->i2c_sw_control.select(I2cSwitch::PrimaryFmc); 
+  p->i2c_sw_control.dump();
+
+  printf("vtmona mfg:dev %x:%x\n", p->vtmona.manufacturerId(), p->vtmona.deviceId());
+
+
+  p->i2c_sw_control.select(I2cSwitch::SecondaryFmc); 
+  p->i2c_sw_control.dump();
+
+  printf("vtmonb mfg:dev %x:%x\n", p->vtmona.manufacturerId(), p->vtmona.deviceId());
+}
+
+void Module::flash_write(FILE* f)
+{
+  p->flash.write(f);
+}
+
 int  Module::train_io(unsigned v) { return p->train_io(v); }
 
 void Module::enable_test_pattern(TestPattern t) { p->enable_test_pattern(t); }
@@ -456,7 +531,7 @@ void Module::setAdcMux(bool     interleave,
 { p->setAdcMux(interleave, channels); }
 
 const Pds::HSD::AxiVersion& Module::version() const { return p->version; }
-const Pds::HSD::TprCore&    Module::tpr    () const { return p->tpr; }
+Pds::HSD::TprCore&    Module::tpr    () { return p->tpr; }
 
 void Module::setRxAlignTarget(unsigned v) { p->setRxAlignTarget(v); }
 void Module::setRxResetLength(unsigned v) { p->setRxResetLength(v); }
