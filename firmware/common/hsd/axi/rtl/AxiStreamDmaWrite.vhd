@@ -5,7 +5,7 @@
 -- File       : AxiStreamDmaWrite.vhd
 -- Author     : Ryan Herbst, rherbst@slac.stanford.edu
 -- Created    : 2014-04-25
--- Last update: 2017-03-13
+-- Last update: 2017-04-06
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -117,12 +117,42 @@ architecture rtl of AxiStreamDmaWrite is
    attribute dont_touch      : string;
    attribute dont_touch of r : signal is "true";
    
-   constant DEBUG_G : boolean := true;
-   
+   constant DEBUG_C : boolean := true;
+
+   component ila_0
+     port ( clk : in sl;
+            probe0 : in slv(255 downto 0) );
+   end component;
+  
    signal r_state : slv(2 downto 0);
    
 begin
 
+  GEN_DEBUG : if DEBUG_C generate
+    r_state <= "000" when r.state = IDLE_S else
+               "001" when r.state = FIRST_S else
+               "010" when r.state = NEXT_S else
+               "011" when r.state = MOVE_S else
+               "100" when r.state = DUMP_S else
+               "101" when r.state = WAIT_S else
+               "110" when r.state = DONE_S else
+               "111";
+    U_ILA : ila_0
+      port map ( clk       => axiClk,
+                 probe0(2 downto 0) => r_state,
+                 probe0(3)          => r.last,
+                 probe0(4)          => intAxisMaster.tValid,
+                 probe0(5)          => intAxisMaster.tLast,
+                 probe0(6)          => intAxisSlave .tReady,
+                 probe0(7)          => axisMaster   .tValid,
+                 probe0(8)          => axisMaster   .tLast,
+                 probe0(9)          => taxisSlave   .tReady,
+                 probe0(73 downto 10) => axisMaster.tData(63 downto 0),
+                 probe0(255 downto 74) => (others=>'0') );
+    intAxisMaster <= axisMaster;
+    taxisSlave    <= intAxisSlave;
+  end generate;
+  
     assert AXIS_CONFIG_G.TDATA_BYTES_C = AXI_CONFIG_G.DATA_BYTES_C
       report "AXIS (" & integer'image(AXIS_CONFIG_G.TDATA_BYTES_C) & ") and AXI ("
       & integer'image(AXI_CONFIG_G.DATA_BYTES_C) & ") must have equal data widths" severity failure;
@@ -131,6 +161,7 @@ begin
     
    pause <= '0' when (AXI_READY_EN_G) else axiWriteCtrl.pause;
 
+   GEN_NODEBUG : if not DEBUG_C generate
    U_AxiStreamShift : entity work.AxiStreamShift
       generic map (
          TPD_G         => TPD_G,
@@ -146,7 +177,8 @@ begin
          sAxisSlave  => taxisSlave,
          mAxisMaster => intAxisMaster,
          mAxisSlave  => intAxisSlave);
-
+   end generate;
+   
    comb : process (axiRst, axiWriteSlave, dmaReq, intAxisMaster, pause, r) is
       variable v     : RegType;
       variable bytes : natural;

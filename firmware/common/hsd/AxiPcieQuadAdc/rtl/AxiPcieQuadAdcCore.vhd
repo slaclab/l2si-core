@@ -5,7 +5,7 @@
 -- Author     : Larry Ruckman  <ruckman@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2016-02-12
--- Last update: 2017-03-17
+-- Last update: 2017-04-04
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -224,9 +224,61 @@ architecture mapping of AxiPcieQuadAdcCore is
    signal flash_data_tri : sl;
    signal flash_data_dts : slv(3 downto 0);
    signal flash_nce : sl;
+
+   constant DEBUG_C : boolean := false;
+
+   component ila_0
+     port ( clk : in sl;
+            probe0 : in slv(255 downto 0) );
+   end component;
    
 begin
 
+   GEN_DBUG : if DEBUG_C generate
+     U_ILA : ila_0
+       port map ( clk  => axiClk,
+                  probe0(0) => dmaWriteMaster.awvalid,
+                  probe0(1) => dmaWriteSlave .awready,
+                  probe0(2) => dmaWriteMaster.wvalid,
+                  probe0(3) => dmaWriteSlave .wready,
+                  probe0(4) => dmaWriteMaster.wlast,
+                  probe0(5) => dmaWriteMaster.bready,
+                  probe0(6) => dmaWriteSlave .bvalid,
+                  probe0( 8 downto  7) => dmaWriteSlave .bresp,
+                  probe0(16 downto  9) => dmaWriteMaster.awlen,
+                  probe0(48 downto 17) => dmaWriteMaster.awaddr(31 downto 0),
+                  probe0(80 downto 49) => dmaWriteMaster.wdata (31 downto 0),
+
+                  probe0(81) => regWriteMaster.awvalid,
+                  probe0(82) => regWriteSlave .awready,
+                  probe0(83) => regWriteMaster.wvalid,
+                  probe0(84) => regWriteSlave .wready,
+                  probe0(85) => regWriteMaster.wlast,
+                  probe0(86) => regWriteMaster.bready,
+                  probe0(87) => regWriteSlave .bvalid,
+                  probe0( 89 downto  88) => regWriteSlave .bresp,
+                  probe0( 97 downto  90) => regWriteMaster.awlen,
+                  probe0(129 downto  98) => regWriteMaster.awaddr(31 downto 0),
+                  probe0(161 downto 130) => regWriteMaster.wdata (31 downto 0),
+                  
+                  probe0(162) => regReadMaster.arvalid,
+                  probe0(163) => regReadSlave .arready,
+                  probe0(164) => '0',
+                  probe0(165) => regReadSlave .rvalid,
+                  probe0(166) => '0',
+                  probe0(167) => regReadMaster.rready,
+                  probe0(168) => regReadSlave .rlast,
+                  probe0(170 downto 169) => regReadSlave .rresp,
+                  probe0(178 downto 171) => regReadMaster.arlen,
+                  probe0(210 downto 179) => regReadMaster.araddr(31 downto 0),
+                  probe0(242 downto 211) => regReadSlave .rdata (31 downto 0),
+
+                  probe0(243) => dmaIrq,
+                  probe0(244) => dmaIrqAck,
+
+                  probe0(255 downto 245) => (others=>'0') );
+   end generate;
+   
    sysClk <= axiClk;
    sysRst <= axiRst;
    regClk <= axilClk;
@@ -582,3 +634,4 @@ begin
                 axiRst         => axiRst );
    
 end mapping;
+

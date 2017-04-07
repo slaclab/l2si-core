@@ -5,7 +5,7 @@
 -- Author     : Larry Ruckman  <ruckman@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2016-02-12
--- Last update: 2016-10-24
+-- Last update: 2017-04-06
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -110,8 +110,38 @@ architecture mapping of AxiPcieDma is
    signal axilReadSlaves   : AxiLiteReadSlaveArray((2*DMA_SIZE_G)-1 downto 0);
    signal axilWriteMasters : AxiLiteWriteMasterArray((2*DMA_SIZE_G)-1 downto 0);
    signal axilWriteSlaves  : AxiLiteWriteSlaveArray((2*DMA_SIZE_G)-1 downto 0);
+
+   constant DEBUG_C : boolean := true;
+
+   component ila_0
+     port ( clk : in sl;
+            probe0 : in slv(255 downto 0) );
+   end component;
+
+   signal idmaIbSlaves : AxiStreamSlaveArray(DMA_SIZE_G-1 downto 0);
    
 begin
+
+   dmaIbSlaves <= idmaIbSlaves;
+   
+   GEN_DBUG : if DEBUG_C generate
+     U_ILA0 : ila_0
+       port map ( clk  => dmaClk(0),
+                  probe0(0) => dmaIbMasters(0).tValid,
+                  probe0(1) => dmaIbMasters(0).tLast,
+                  probe0(65 downto 2) => dmaIbMasters(0).tData(63 downto 0),
+                  probe0(66) => idmaIbSlaves(0).tReady,
+                  probe0(67) => dmaRst(0),
+                  probe0(255 downto 68) => (others=>'0') );
+     U_ILA1 : ila_0
+       port map ( clk  => axiClk,
+                  probe0(0) => sAxisMasters(0).tValid,
+                  probe0(1) => sAxisMasters(0).tLast,
+                  probe0(65 downto 2) => sAxisMasters(0).tData(63 downto 0),
+                  probe0(66) => sAxisSlaves(0).tReady,
+                  probe0(67) => axiRst,
+                  probe0(255 downto 68) => (others=>'0') );
+   end generate;
 
    GEN_IP_CORE : if (USE_IP_CORE_G = true) generate
       U_AxiCrossbar : entity work.AxiPcieCrossbarIpCoreWrapper
@@ -241,7 +271,9 @@ begin
          generic map (
             DEBUG_G             => false,
             TPD_G               => TPD_G,
-            PIPE_STAGES_G       => 1,
+--            PIPE_STAGES_G       => 1,
+--  Seeing incorrect response to mAxisSlave.tReady            
+            PIPE_STAGES_G       => 0,
             SLAVE_READY_EN_G    => true,
             VALID_THOLD_G       => 1,
             BRAM_EN_G           => true,
@@ -260,7 +292,7 @@ begin
             sAxisClk        => dmaClk(i),
             sAxisRst        => dmaRst(i),
             sAxisMaster     => dmaIbMasters(i),
-            sAxisSlave      => dmaIbSlaves(i),
+            sAxisSlave      => idmaIbSlaves(i),
             sAxisCtrl       => open,
             fifoPauseThresh => (others => '1'),
             mAxisClk        => axiClk,

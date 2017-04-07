@@ -5,7 +5,7 @@
 -- File       : AxiStreamDma.vhd
 -- Author     : Ryan Herbst, rherbst@slac.stanford1.edu
 -- Created    : 2014-04-25
--- Last update: 2017-03-13
+-- Last update: 2017-04-06
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -175,9 +175,10 @@ architecture structure of AxiStreamDmaDaq is
       popFifoDin   : slv(31 downto 0);
       pushFifoRead : sl;
       dmaCount     : slv(31 downto 0);
-      saxisMaster  : AxiStreamMasterType;
+      tData        : slv(31 downto 0);
+      master       : AxiStreamMasterType;
+      slave        : AxiStreamSlaveType;
       latch        : sl;
-      disableSel   : slv(1 downto 0);
    end record IbType;
 
    constant IB_INIT_C : IbType := (
@@ -188,9 +189,10 @@ architecture structure of AxiStreamDmaDaq is
       popFifoDin   => (others=>'0'),
       pushFifoRead => '0',
       dmaCount     => (others=>'0'),
-      saxisMaster  => AXI_STREAM_MASTER_INIT_C,
-      latch        => '1',
-      disableSel   => "10"
+      tData        => (others=>'0'),
+      master       => AXI_STREAM_MASTER_INIT_C,
+      slave        => AXI_STREAM_SLAVE_INIT_C,
+      latch        => '1'
       );
 
    signal ib   : IbType := IB_INIT_C;
@@ -244,7 +246,7 @@ architecture structure of AxiStreamDmaDaq is
    signal intAxisSlaves      : AxiStreamSlaveArray (1 downto 0);
    signal ibsMaster          : AxiStreamMasterType;
    signal ibsSlave           : AxiStreamSlaveType;
-     
+
 begin
 
    U_CrossEnGen: if AXIL_COUNT_G = 1 generate
@@ -469,26 +471,6 @@ begin
 
    end process;
 
-   ---
-   --  Rewrite the header word after a transfer is complete
-   ---
-   intAxisMasters(0) <= sAxisMaster;
-   intAxisMasters(1) <= ib.saxisMaster;
-   sAxisSlave        <= intAxisSlaves(0);
-   
-   U_SMux : entity work.AxiStreamMux
-     generic map (
-       TPD_G          => TPD_G,
-       NUM_SLAVES_G   => 2 )
-     port map (
-       sAxisMasters    => intAxisMasters,
-       disableSel      => ib.disableSel,
-       sAxisSlaves     => intAxisSlaves,
-       mAxisMaster     => ibsMaster,
-       mAxisSlave      => ibsSlave,
-       axisClk         => axiClk,
-       axisRst         => axiRst );
-
    -------------------------------------
    -- Inbound Controller
    -------------------------------------
@@ -522,60 +504,54 @@ begin
    end process;
 
    -- Async
-   process (ib, r, axiRst, ibAck, pushFifoValid, pushFifoDout, intAxisSlaves, sAxisMaster, pushFifoCount, ibsMaster ) is
+   process (ib, r, axiRst, ibAck, pushFifoValid, pushFifoDout, ibsSlave, sAxisMaster, pushFifoCount ) is
       variable v : IbType;
    begin
       v := ib;
 
       v.pushFifoRead := '0';
       v.popFifoWrite := '0';
-      v.saxisMaster.tKeep  := toSlv(15,v.saxisMaster.tKeep'length);
-      v.saxisMaster.tLast  := '1';
-
-      if intAxisSlaves(1).tReady = '1' then
-        v.saxisMaster.tValid := '0';
-      end if;
 
       if ib.latch='1' and saxisMaster.tValid='1' then
         v.latch := '0';
-        v.saxisMaster.tData(31 downto 0)  := '1' & sAxisMaster.tData(102 downto 96) & sAxisMaster.tData(23 downto 0);
-      elsif ib.latch='0' and saxisMaster.tLast='1' and intAxisSlaves(0).tReady='1' then
+        v.tData := '1' & sAxisMaster.tData(102 downto 96) & sAxisMaster.tData(23 downto 0);
+      elsif ib.latch='0' and ib.state=S_FIFO_C then
         v.latch := '1';
       end if;
         
-      if ib.state = S_INIT_C then
-        v.disableSel := "10";
-      elsif ibsMaster.tValid = '1' then
-        v.disableSel := "01";
-      end if;
+      v.slave.tReady := '0';
       
       case ib.state is
 
          when S_INIT_C =>
             v.ibReq.address(31 downto 0) := pushFifoDout(IB_FIFO_C)(31 downto 0);
             v.ibReq.maxSize := r.sizeInHdr & toSlv(0,7) & r.maxRxSize;
-            
+            v.slave  := ibsSlave;
+            v.master := sAxisMaster;   
             if pushFifoValid(IB_FIFO_C) = '1' then
                v.ibReq.request := '1';
                v.state         := S_ACK_C;
             end if;
 
          when S_ACK_C =>
-
+            v.slave  := ibsSlave;
+            v.master := sAxisMaster;
             if ibAck.done = '1' then
                v.state         := S_REWRITE_C;
                v.ibReq.request := '0';
             end if;
 
          when S_REWRITE_C =>
-            if v.saxisMaster.tValid = '0' then
-              v.saxisMaster.tValid := '1';
-              v.ibReq.request := '1';
-              v.state            := S_RACK_C;
-            end if;
+           v.master.tValid := '1';
+           v.master.tData(31 downto 0) := ib.tData;
+           v.master.tLast  := '1';
+           v.master.tKeep  := toSlv(15,v.master.tKeep'length);
+           v.ibReq.request := '1';
+           v.state         := S_RACK_C;
 
          when S_RACK_C =>
-            if v.saxisMaster.tValid='0' and ibAck.done = '1' then
+           
+            if ibAck.done = '1' then
               v.ibReq.request  := '0';
               v.pushFifoRead   := '1';
               v.dmaCount       := ib.dmaCount+1;
@@ -606,6 +582,11 @@ begin
       ibReq                   <= ib.ibReq;
       popFifoWrite(IB_FIFO_C) <= '0';
       pushFifoRead(IB_FIFO_C) <= ib.pushFifoRead;
+      ---
+      --  Rewrite the header word after a transfer is complete
+      ---
+      ibsMaster               <= v.master;
+      sAxisSlave              <= v.slave;
 
    end process;
 

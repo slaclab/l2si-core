@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2016-01-04
--- Last update: 2017-03-19
+-- Last update: 2017-04-06
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -90,8 +90,10 @@ architecture mapping of QuadAdcEvent is
   signal re_in : EventRegType;
 
   type RdStateType is (S_IDLE, S_READHDR, S_WRITEHDR,
-                       S_WAITCHAN, S_READCHAN);
+                       S_WAITCHAN, S_READCHAN, S_DUMP);
   type SyncStateType is (S_SHIFT_S, S_WAIT_S);
+
+  constant TMO_VAL_C : integer := 4095;
   
   type RegType is record
     hdrRd    : sl;
@@ -116,6 +118,7 @@ architecture mapping of QuadAdcEvent is
     trig     : Slv8Array(SYNC_BITS_G-1 downto 0);
     trigCnt  : slv(1 downto 0);
     trigArm  : sl;
+    tmo      : integer range 0 to TMO_VAL_C;
   end record;
 
   constant REG_INIT_C : RegType := (
@@ -140,7 +143,8 @@ architecture mapping of QuadAdcEvent is
     trigd2    => (others=>'0'),
     trig      => (others=>(others=>'0')),
     trigCnt   => (others=>'0'),
-    trigArm   => '0' );
+    trigArm   => '0',
+    tmo       => TMO_VAL_C );
 
   signal r   : RegType := REG_INIT_C;
   signal rin : RegType;
@@ -173,7 +177,55 @@ architecture mapping of QuadAdcEvent is
   
   constant XPMV7 : boolean := false;
 
+  constant DEBUG_C : boolean := true;
+
+  component ila_0
+    port ( clk : in sl;
+           probe0 : in slv(255 downto 0) );
+  end component;
+
+  signal r_state : slv(2 downto 0);
+  signal r_syncstate : sl;
+  signal r_intlv : sl;
+  
 begin  -- mapping
+
+  GEN_DBUG : if DEBUG_C generate
+    r_state <= "000" when r.state=S_IDLE else
+               "001" when r.state=S_READHDR else
+               "010" when r.state=S_WRITEHDR else
+               "011" when r.state=S_WAITCHAN else
+               "100" when r.state=S_READCHAN else
+               "101" when r.state=S_DUMP else
+               "111";
+    r_syncstate <= '0' when r.syncState=S_SHIFT_S else
+                   '1';
+    r_intlv <= '1' when configA.intlv=Q_ABCD else
+               '0';
+    U_ILA : ila_0
+      port map ( clk  => dmaClk,
+                 probe0(0) => r.master.tValid,
+                 probe0(1) => r.master.tLast,
+                 probe0(65 downto 2) => r.master.tData(63 downto 0),
+                 probe0(66) => dmaSlave.tReady,
+                 probe0(67) => r.hdrRd,
+                 probe0(75 downto 68) => r.enable,
+                 probe0(83 downto 76) => r.rdFifo,
+                 probe0(86 downto 84) => r_state,
+                 probe0(87) => r.flast,
+                 probe0(90 downto 88) => r.chv,
+                 probe0(91) => r.selv,
+                 probe0(99 downto 92) => r.ack,
+                 probe0(113 downto 100) => r.datacnt,
+                 probe0(114) => r.full,
+                 probe0(115) => r.start,
+                 probe0(116) => r_syncstate,
+                 probe0(118 downto 117) => r.trigCnt,
+                 probe0(119) => r.trigArm,
+                 probe0(120) => r_intlv,
+                 probe0(121) => dmaRst,
+                 probe0(255 downto 122) => (others=>'0') );
+  end generate;
 
   dmaMaster <= r.master;
   dmaFullS  <= r.full;
@@ -286,10 +338,6 @@ begin  -- mapping
     
   process (r, dmaRst, configA, fifo, hdrValid, hdrEmpty, hdrDout, dmaSlave, dmaFullThr, trigArmS, trigIn)
     variable v   : RegType;
-    variable o   : integer;
-    variable chv  : slv(bitSize(NCHAN_C-1)-1 downto 0);
-    variable selv : sl;
-    variable ack  : slv(NCHAN_C-1 downto 0);
   begin  -- process
     v := r;
 
@@ -298,13 +346,14 @@ begin  -- mapping
     v.trigd1  := trigIn(0);
     v.trigd2  := (r.trigd1 and configA.trigShift) or (trigIn(0) and not configA.trigShift);
     
-    v.datacnt := (others=>'0');
-    for i in 0 to NCHAN_C-1 loop
-      if configA.enable(i)='1' then
-        v.datacnt := fifo(i).data_count;
-      end if;
-    end loop;
-
+    --v.datacnt := (others=>'0');
+    --for i in 0 to NCHAN_C-1 loop
+    --  if configA.enable(i)='1' then
+    --    v.datacnt := fifo(i).data_count;
+    --  end if;
+    --end loop;
+    v.datacnt := fifo(r.channel).data_count;
+    
     if r.datacnt > dmaFullThr then
       v.full := '1';
     else
@@ -327,6 +376,12 @@ begin  -- mapping
       v.master.tValid := '0';
     end if;
 
+    if r.state = S_READCHAN and r.master.tValid='0' then
+      v.tmo := r.tmo-1;
+    else
+      v.tmo := TMO_VAL_C;
+    end if;
+    
     case r.state is
       when S_IDLE =>
         v.index   := 0;
@@ -339,6 +394,7 @@ begin  -- mapping
         if hdrEmpty='0' then
           v.hdrRd := '1';
           v.state := S_READHDR;
+          v.tmo   := TMO_VAL_C;
         end if;
       when S_READHDR =>
         if v.master.tValid='0' then
@@ -385,7 +441,7 @@ begin  -- mapping
           v.state           := S_READCHAN;
         end if; -- config.intlv
       when S_READCHAN =>
-        if r.master.tValid='0' or dmaSlave.tReady='1' then
+        if v.master.tValid='0' then
           v.master.tKeep := genTKeep(32);
           if (configA.intlv=Q_ABCD) then
             v.master.tValid := '1';
@@ -445,9 +501,19 @@ begin  -- mapping
             end if;
           end if; -- config.intlv
         end if;
+      when S_DUMP =>
+        if v.master.tValid='0' then
+          v.state := S_IDLE;
+        end if;
       when others => NULL;
     end case;
 
+    if r.tmo = 0 then
+      v.state := S_DUMP;
+      v.master.tValid := '1';
+      v.master.tLast  := '1';
+    end if;
+    
     if r.trigCnt/="11" then
       v.trig    := r.trigd2 & r.trig(r.trig'left downto 1);
       v.trigCnt := r.trigCnt+1;
