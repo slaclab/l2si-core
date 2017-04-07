@@ -398,25 +398,27 @@ char FmcSpi::_cardId() const
 
 unsigned FmcSpi::get_offset(unsigned channel)
 {
-  _writeADC(0x0F,channel);
-  return _readADC(0x20);
+  _writeADC(0x0F,channel+1);
+  return _readADC(0x21);
 }
 
 unsigned FmcSpi::get_gain  (unsigned channel)
 {
-  _writeADC(0x0F,channel);
-  return _readADC(0x22);
+  _writeADC(0x0F,channel+1);
+  return _readADC(0x23);
 }
 
 void     FmcSpi::set_offset(unsigned channel, unsigned value)
 {
-  _writeADC(0x0F,channel);
+  _writeADC(0x0F,channel+1);
   _writeADC(0x20,value);
+  _writeADC(0x10,0x8);
 }
 
 void     FmcSpi::set_gain  (unsigned channel, unsigned value)
 {
-  _writeADC(0x0F,channel);
+  _writeADC(0x0F,channel+1);
   _writeADC(0x22,value);
+  _writeADC(0x10,0x20);
 }
 
