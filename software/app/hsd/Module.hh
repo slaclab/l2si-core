@@ -37,6 +37,7 @@ namespace Pds {
       void disable_test_pattern();
       void enable_cal ();
       void disable_cal();
+      void setAdcMux(unsigned channels);
       void setAdcMux(bool     interleave,
                      unsigned channels);
 
@@ -50,6 +51,12 @@ namespace Pds {
 
       void start      ();
       void stop       ();
+
+      //  Calibration
+      unsigned get_offset(unsigned channel);
+      unsigned get_gain  (unsigned channel);
+      void     set_offset(unsigned channel, unsigned value);
+      void     set_gain  (unsigned channel, unsigned value);
 
       const Pds::HSD::AxiVersion& version() const;
       Pds::HSD::TprCore&    tpr    ();

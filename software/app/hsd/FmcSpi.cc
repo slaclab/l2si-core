@@ -361,6 +361,21 @@ void FmcSpi::adc_disable_cal()
   _writeCPLD(1,r);
 }
 
+void FmcSpi::setAdcMux(unsigned channels)
+{
+  unsigned v = _readADC(1);
+
+  v &= ~0xf;
+
+  for(unsigned i=0; i<4; i++)
+    if (channels & (1<<i)) {
+      v |= (3<<2) | i;
+      break;
+    }
+
+  _writeADC(1,v);
+}
+
 void FmcSpi::setAdcMux(bool     interleave,
                        unsigned channels)
 {
@@ -380,3 +395,28 @@ void FmcSpi::setAdcMux(bool     interleave,
 
 char FmcSpi::_cardId() const
 { return (reinterpret_cast<uint64_t>(this)&0x400ULL) ? 'A':'B'; }
+
+unsigned FmcSpi::get_offset(unsigned channel)
+{
+  _writeADC(0x0F,channel);
+  return _readADC(0x20);
+}
+
+unsigned FmcSpi::get_gain  (unsigned channel)
+{
+  _writeADC(0x0F,channel);
+  return _readADC(0x22);
+}
+
+void     FmcSpi::set_offset(unsigned channel, unsigned value)
+{
+  _writeADC(0x0F,channel);
+  _writeADC(0x20,value);
+}
+
+void     FmcSpi::set_gain  (unsigned channel, unsigned value)
+{
+  _writeADC(0x0F,channel);
+  _writeADC(0x22,value);
+}
+

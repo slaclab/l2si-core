@@ -408,7 +408,7 @@ void Module::PrivateData::dumpRxAlign     () const
 }
 
 void Module::PrivateData::setAdcMux(bool     interleave,
-                       unsigned channels)
+                                    unsigned channels)
 {
   if (interleave) {
     base.setChannels(channels);
@@ -487,13 +487,11 @@ void Module::board_status()
   p->imona.dump();
   p->imonb.dump();
 
-  bool fmca_present = p->fmca_core.present();
   printf("FMC A [%p]: %s present power %s\n",
          &p->fmca_core,
          p->fmca_core.present() ? "":"not",
          p->fmca_core.powerGood() ? "up":"down");
 
-  bool fmcb_present = p->fmcb_core.present();
   printf("FMC B [%p]: %s present power %s\n",
          &p->fmcb_core,
          p->fmcb_core.present() ? "":"not",
@@ -525,6 +523,24 @@ void Module::disable_test_pattern() { p->disable_test_pattern(); }
 void Module::enable_cal () { p->enable_cal(); }
 
 void Module::disable_cal() { p->disable_cal(); }
+
+void Module::setAdcMux(unsigned channels)
+{
+  if (p->fmcb_core.present()) {
+    p->base.setChannels(0xff);
+    p->base.setMode( QABase::Q_NONE );
+    p->i2c_sw_control.select(I2cSwitch::PrimaryFmc); 
+    p->fmc_spi.setAdcMux((channels>>0)&0xf);
+    p->i2c_sw_control.select(I2cSwitch::SecondaryFmc); 
+    p->fmc_spi.setAdcMux((channels>>4)&0xf);
+  }
+  else {
+    p->base.setChannels(0xf);
+    p->base.setMode( QABase::Q_NONE );
+    p->i2c_sw_control.select(I2cSwitch::PrimaryFmc); 
+    p->fmc_spi.setAdcMux(channels&0xf);
+  }
+}
 
 void Module::setAdcMux(bool     interleave,
                        unsigned channels) 
@@ -600,4 +616,36 @@ void Module::stop()
 {
   p->base.stop();
   p->dma_core.dump();
+}
+
+unsigned Module::get_offset(unsigned channel)
+{
+  p->i2c_sw_control.select((channel&0x4)==0 ? 
+                           I2cSwitch::PrimaryFmc :
+                           I2cSwitch::SecondaryFmc); 
+  return p->fmc_spi.get_offset(channel&0x3);
+}
+
+unsigned Module::get_gain(unsigned channel)
+{
+  p->i2c_sw_control.select((channel&0x4)==0 ? 
+                           I2cSwitch::PrimaryFmc :
+                           I2cSwitch::SecondaryFmc); 
+  return p->fmc_spi.get_gain(channel&0x3);
+}
+
+void Module::set_offset(unsigned channel, unsigned value)
+{
+  p->i2c_sw_control.select((channel&0x4)==0 ? 
+                           I2cSwitch::PrimaryFmc :
+                           I2cSwitch::SecondaryFmc); 
+  p->fmc_spi.set_offset(channel&0x3,value);
+}
+
+void Module::set_gain(unsigned channel, unsigned value)
+{
+  p->i2c_sw_control.select((channel&0x4)==0 ? 
+                           I2cSwitch::PrimaryFmc :
+                           I2cSwitch::SecondaryFmc); 
+  p->fmc_spi.set_gain(channel&0x3,value);
 }

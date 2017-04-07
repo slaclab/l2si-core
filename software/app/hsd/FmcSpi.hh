@@ -24,8 +24,14 @@ namespace Pds {
       void adc_enable_cal  ();
       void adc_disable_cal ();
 
+      void setAdcMux(unsigned channels);
       void setAdcMux(bool     interleave,
                      unsigned channels);
+
+      unsigned get_offset(unsigned channel);
+      unsigned get_gain  (unsigned channel);
+      void     set_offset(unsigned channel, unsigned value);
+      void     set_gain  (unsigned channel, unsigned value);
     private:
       void     _writeAD9517(unsigned addr, unsigned value);
       void     _writeADC   (unsigned addr, unsigned value);
