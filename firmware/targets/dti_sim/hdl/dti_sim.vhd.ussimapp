@@ -1,0 +1,175 @@
+-------------------------------------------------------------------------------
+-- Title      : 
+-------------------------------------------------------------------------------
+-- File       : xpm_sim.vhd
+-- Author     : Matt Weaver <weaver@slac.stanford.edu>
+-- Company    : SLAC National Accelerator Laboratory
+-- Created    : 2015-07-10
+-- Last update: 2017-04-08
+-- Platform   : 
+-- Standard   : VHDL'93/02
+-------------------------------------------------------------------------------
+-- Description: XpmApp's Top Level
+-- 
+-- Note: Common-to-XpmApp interface defined here (see URL below)
+--       https://confluence.slac.stanford.edu/x/rLyMCw
+-------------------------------------------------------------------------------
+-- This file is part of 'LCLS2 DAQ Software'.
+-- It is subject to the license terms in the LICENSE.txt file found in the 
+-- top-level directory of this distribution and at: 
+--    https://confluence.slac.stanford.edu/display/ppareg/LICENSE.html. 
+-- No part of 'LCLS2 DAQ Software', including this file, 
+-- may be copied, modified, propagated, or distributed except according to 
+-- the terms contained in the LICENSE.txt file.
+-------------------------------------------------------------------------------
+
+library ieee;
+use ieee.std_logic_1164.all;
+use ieee.std_logic_unsigned.all;
+
+use work.StdRtlPkg.all;
+use work.AxiStreamPkg.all;
+use work.TimingPkg.all;
+use work.XpmPkg.all;
+use work.DtiPkg.all;
+use work.DtiSimPkg.all;
+
+entity dti_sim is
+end dti_sim;
+
+architecture top_level_app of dti_sim is
+
+  signal clk156, rst156 : sl;
+  signal clk186, rst186 : sl;
+  signal fifoRst : sl;
+
+  signal ibMaster, obMaster : AxiStreamMasterType;
+  signal ibSlave , obSlave  : AxiStreamSlaveType;
+  signal obTrig : XpmPartitionDataType;
+  
+begin
+
+   process is
+   begin
+     rst156 <= '1';
+     wait for 20 ns;
+     rst156 <= '0';
+     wait;
+   end process;
+   
+   process is
+   begin
+      clk156 <= '1';
+      wait for 3.2 ns;
+      clk156 <= '0';
+      wait for 3.2 ns;
+   end process;
+
+   process is
+   begin
+     fifoRst <= '1';
+     rst186 <= '1';
+     wait for 30 ns;
+     rst186 <= '0';
+     wait for 20 ns;
+     fifoRst <= '0';
+     wait;
+   end process;
+   
+   process is
+   begin
+     clk186 <= '1';
+     wait for 2.7 ns;
+     clk186 <= '0';
+     wait for 2.7 ns;
+   end process;
+
+   ibSlave  <= AXI_STREAM_SLAVE_FORCE_C;
+
+   process is
+     procedure waitClk is
+     begin
+       wait until clk186 = '1';
+       wait until clk186 = '0';
+     end procedure;
+     procedure l0a(tag : integer) is
+     begin
+       waitClk;
+       obTrig.l0a   <= '1';
+       obTrig.l0tag <= toSlv(tag,5);
+       waitClk;
+       obTrig.l0a   <= '0';
+     end procedure;
+     procedure l1a(tag : integer) is
+     begin
+       waitClk;
+       obTrig.l1e   <= '1';
+       obTrig.l1a   <= '1';
+       obTrig.l1tag <= toSlv(tag,5);
+       waitClk;
+       obTrig.l1e   <= '0';
+     end procedure;
+     procedure l1r(tag : integer) is
+     begin
+       waitClk;
+       obTrig.l1e   <= '1';
+       obTrig.l1a   <= '0';
+       obTrig.l1tag <= toSlv(tag,5);
+       waitClk;
+       obTrig.l1e   <= '0';
+     end procedure;
+     procedure regWr(addr : integer; val : slv(31 downto 0)) is
+       variable x : RegTransactionType;
+     begin
+       waitClk;
+       x.rnw := '0';
+       x.address := toSlv(addr,31);
+       x.data    := val;
+       obMaster.tValid <= '1';
+       obMaster.tLast  <= '1';
+       obMaster.tData(63 downto 0)  <= toSlv(x);
+       waitClk;
+       obMaster.tValid <= '0';
+       waitClk;
+     end procedure;
+   begin
+     obMaster <= AXI_STREAM_MASTER_INIT_C;
+     obTrig <= XPM_PARTITION_DATA_INIT_C;
+     wait for 100 ns;
+     regWr(8,x"ABCD0123");
+     wait for 20 ns;
+     l0a(1);
+     wait for 20 ns;
+     l1a(1);
+     wait for 80 ns;
+     l0a(2);
+     wait for 1000 ns;
+     regWr(4,toSlv(64,32)); 
+     wait for 20 ns;
+     l0a(3);
+     wait for 40 ns;
+     l1a(2);
+     wait for 600 ns;
+     l1a(3);
+     wait;
+   end process;
+   
+   U_DUT : entity work.DtiUsSimApp
+     generic map ( SERIAL_ID_G => x"ABADCAFE" )
+     port map ( amcClk   => clk156,
+                amcRst   => rst156,
+                --
+                fifoRst  => fifoRst,
+                --
+                ibClk    => clk156,
+                ibRst    => rst156,
+                ibMaster => ibMaster,
+                ibSlave  => ibSlave,
+                --
+                obClk    => clk186,
+                obRst    => rst186,
+                obTrig   => obTrig,
+                obMaster => obMaster,
+                obSlave  => obSlave );
+
+end top_level_app;
