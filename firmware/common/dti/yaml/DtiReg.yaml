@@ -1,0 +1,251 @@
+##############################################################################
+## This file is part of 'SLAC Firmware Standard Library'.
+## It is subject to the license terms in the LICENSE.txt file found in the 
+## top-level directory of this distribution and at: 
+##    https://confluence.slac.stanford.edu/display/ppareg/LICENSE.html. 
+## No part of 'SLAC Firmware Standard Library', including this file, 
+## may be copied, modified, propagated, or distributed except according to 
+## the terms contained in the LICENSE.txt file.
+##############################################################################
+#schemaversion 3.0.0
+#once DtiReg.yaml
+
+DtiReg: &DtiReg
+  class: MMIODev
+  configPrio: 1
+  description: Status of timing frame reception
+  size: 0x10000
+  metadata:
+    numUsLinks: &numUsLinks 7
+  children:
+    #########################################################
+    usLinkEnable:
+      at:
+        offset: 0x0000
+        stride: 16
+        nelms: *numUsLinks
+      class: IntField
+      name: usLinkEnable
+      sizeBits: 1
+      lsBit: 0
+      mode: RW
+      description: Enable link
+    #########################################################
+    usLinkTagEnable:
+      at:
+        offset: 0x0000
+        stride: 16
+        nelms: *numUsLinks
+      class: IntField
+      name: usLinkTagEnable
+      sizeBits: 1
+      lsBit: 1
+      mode: RW
+      description: Enable link event tag support
+    #########################################################
+    usLinkL1Enable:
+      at:
+        offset: 0x0000
+        stride: 16
+        nelms: *numUsLinks
+      class: IntField
+      name: usLinkL1Enable
+      sizeBits: 1
+      lsBit: 2
+      mode: RW
+      description: Enable L1 trigger support
+    #########################################################
+    usLinkPartition:
+      at:
+        offset: 0x0000
+        stride: 16
+        nelms: *numUsLinks
+      class: IntField
+      name: usLinkPartition
+      sizeBits: 4
+      lsBit: 4
+      mode: RW
+      description: Upstream link partition
+    #########################################################
+    usLinkTrigDelay:
+      at:
+        offset: 0x0000
+        stride: 16
+        nelms: *numUsLinks
+      class: IntField
+      name: usLinkTrigDelay
+      sizeBits: 8
+      lsBit: 8
+      mode: RW
+      description: Timing frame trigger delay
+    #########################################################
+    usLinkFwdMask:
+      at:
+        offset: 0x0000
+        stride: 16
+        nelms: *numUsLinks
+      class: IntField
+      name: usLinkFwdMask
+      sizeBits: 13
+      lsBit: 16
+      mode: RW
+      description: Upstream link forwarding mask
+    #########################################################
+    usLinkFwdMode:
+      at:
+        offset: 0x0000
+        stride: 16
+        nelms: *numUsLinks
+      class: IntField
+      name: usLinkFwdMode
+      sizeBits: 1
+      lsBit: 31
+      mode: RW
+      description: Upstream link forwarding mode (RR, RR+full)
+    #########################################################
+    usLinkDataSource:
+      at:
+        offset: 0x0004
+        stride: 16
+        nelms: *numUsLinks
+      class: IntField
+      name: usLinkDataSource
+      sizeBits: 32
+      mode: RW
+      description: Data source identifier
+    #########################################################
+    usLinkDataType:
+      at:
+        offset: 0x0008
+        stride: 16
+        nelms: *numUsLinks
+      class: IntField
+      name: usLinkDataType
+      sizeBits: 32
+      mode: RW
+      description: Data type identifier
+    #########################################################
+    usLinkUp:
+      at:
+        offset: 0x0070
+      class: IntField
+      name: usLinkUp
+      sizeBits: 7
+      lsBit: 0
+      mode: RO
+      description: Upstream link status
+    #########################################################
+    dsLinkUp:
+      at:
+        offset: 0x0070
+      class: IntField
+      name: dsLinkUp
+      sizeBits: 13
+      lsBit: 16
+      mode: RO
+      description: Downstream link status
+    #########################################################
+    bpLinkUp:
+      at:
+        offset: 0x0070
+      class: IntField
+      name: bpLinkUp
+      sizeBits: 1
+      lsBit: 15
+      mode: RO
+      description: Backplane link status
+    #########################################################
+    usLinkIndex:
+      at:
+        offset: 0x0074
+      class: IntField
+      name: usLinkIndex
+      sizeBits: 4
+      lsBit: 0
+      mode: RW
+      description: Upstream link index
+    #########################################################
+    dsLinkIndex:
+      at:
+        offset: 0x0074
+      class: IntField
+      name: dsLinkIndex
+      sizeBits: 4
+      lsBit: 16
+      mode: RW
+      description: Downstream link index
+    #########################################################
+    countClear:
+      at:
+        offset: 0x0074
+      class: IntField
+      name: countClear
+      sizeBits: 1
+      lsBit: 30
+      mode: RW
+      description: Clear link counters
+    #########################################################
+    countUpdate:
+      at:
+        offset: 0x0074
+      class: IntField
+      name: countUpdate
+      sizeBits: 1
+      lsBit: 31
+      mode: RW
+      description: Update link counters
+    #########################################################
+    usRxErrs:
+      at:
+        offset: 0x0080
+      class: IntField
+      name: usRxErrs
+      sizeBits: 32
+      mode: RO
+      description: Indexed upstream link rx errors count
+    #########################################################
+    usRxFull:
+      at:
+        offset: 0x0084
+      class: IntField
+      name: usRxFull
+      sizeBits: 32
+      mode: RO
+      description: Indexed upstream link rx full count
+    #########################################################
+    usIbReceived:
+      at:
+        offset: 0x0088
+      class: IntField
+      name: usIbReceived
+      sizeBits: 48
+      mode: RO
+      description: Indexed upstream link rx bytes count
+    #########################################################
+    dsRxErrs:
+      at:
+        offset: 0x0090
+      class: IntField
+      name: dsRxErrs
+      sizeBits: 32
+      mode: RO
+      description: Indexed downstream link rx errors count
+    #########################################################
+    dsRxFull:
+      at:
+        offset: 0x0094
+      class: IntField
+      name: dsRxFull
+      sizeBits: 32
+      mode: RO
+      description: Indexed downstream link rx full count
+    #########################################################
+    dsObSent:
+      at:
+        offset: 0x0098
+      class: IntField
+      name: dsObSent
+      sizeBits: 48
+      mode: RO
+      description: Indexed downstream link tx bytes count
+    #########################################################
