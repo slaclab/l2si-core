@@ -609,6 +609,7 @@ void Module::trig_daq   (unsigned partition)
 
 void Module::start()
 {
+  p->base.resetDma();
   p->base.start();
 }
 
