@@ -5,7 +5,7 @@
 -- Author     : Larry Ruckman  <ruckman@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2016-02-12
--- Last update: 2017-04-04
+-- Last update: 2017-06-01
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -545,7 +545,8 @@ begin
    
    U_TimingGth : entity work.TimingGthCoreWrapper
       generic map (
-         EXTREF_G => LCLSII_G )  -- because Si5338 can't generate 371MHz
+         EXTREF_G         => LCLSII_G,  -- because Si5338 can't generate 371MHz
+         AXIL_BASE_ADDR_G => AXI_CROSSBAR_MASTERS_CONFIG_C(GTH_INDEX_C).baseAddr )
       port map (
          axilClk         => axilClk,
          axilRst         => axilRst,

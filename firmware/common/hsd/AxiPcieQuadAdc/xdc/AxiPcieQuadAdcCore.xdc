@@ -150,11 +150,6 @@ set_property PACKAGE_PIN N41 [get_ports timingRxP]
 set_property PACKAGE_PIN N42 [get_ports timingRxN]
 set_property PACKAGE_PIN M38 [get_ports timingTxP]
 
-#LCLSII (185.7 MHz)
-#create_clock -name timingRefClkP -period 5.38 [get_ports timingRefClkP]
-#LCLS (238 MHz)
-create_clock -period 4.200 -name timingRefClkP [get_ports timingRefClkP]
-
 create_clock -period 10.000 -name pciRefClkP [get_ports pciRefClkP]
 
 #create_generated_clock -name serdesClk [get_pins {U_APP/U_FMC/ev10aq190_quad_phy_inst/serdes_mmcm_inst/clk_in1}]
@@ -166,7 +161,6 @@ create_generated_clock -name flashClk [get_pins {U_Core/U_Clk/ClkOutGen[0].U_Buf
 
 set_clock_groups -asynchronous -group [get_clocks dnaClk] -group [get_clocks pciClk]
 set_clock_groups -asynchronous -group [get_clocks flashClk] -group [get_clocks pciClk]
-set_clock_groups -asynchronous -group [get_clocks -include_generated_clocks pciRefClkP] -group [get_clocks -include_generated_clocks timingRefClkP] -group [get_clocks -include_generated_clocks adr_p]
 
 set_property LOC PCIE_3_1_X0Y0 [get_cells U_Core/U_AxiPciePhy/U_AxiPcie/inst/pcie3_ip_i/U0/pcie3_uscale_top_inst/pcie3_uscale_wrapper_inst/PCIE_3_1_inst]
 set_property PACKAGE_PIN AP28 [get_ports pciRstL]
