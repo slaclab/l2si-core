@@ -69,37 +69,37 @@ DtiReg: &DtiReg
     #########################################################
     usLinkTrigDelay:
       at:
-        offset: 0x0000
+        offset: 0x0001
         stride: 16
         nelms: *numUsLinks
       class: IntField
       name: usLinkTrigDelay
       sizeBits: 8
-      lsBit: 8
+      lsBit: 0
       mode: RW
       description: Timing frame trigger delay
     #########################################################
     usLinkFwdMask:
       at:
-        offset: 0x0000
+        offset: 0x0002
         stride: 16
         nelms: *numUsLinks
       class: IntField
       name: usLinkFwdMask
       sizeBits: 13
-      lsBit: 16
+      lsBit: 0
       mode: RW
       description: Upstream link forwarding mask
     #########################################################
     usLinkFwdMode:
       at:
-        offset: 0x0000
+        offset: 0x0003
         stride: 16
         nelms: *numUsLinks
       class: IntField
       name: usLinkFwdMode
       sizeBits: 1
-      lsBit: 31
+      lsBit: 7
       mode: RW
       description: Upstream link forwarding mode (RR, RR+full)
     #########################################################
@@ -131,27 +131,25 @@ DtiReg: &DtiReg
       class: IntField
       name: usLinkUp
       sizeBits: 7
-      lsBit: 0
       mode: RO
       description: Upstream link status
     #########################################################
     dsLinkUp:
       at:
-        offset: 0x0070
+        offset: 0x0072
       class: IntField
       name: dsLinkUp
       sizeBits: 13
-      lsBit: 16
       mode: RO
       description: Downstream link status
     #########################################################
     bpLinkUp:
       at:
-        offset: 0x0070
+        offset: 0x0071
       class: IntField
       name: bpLinkUp
       sizeBits: 1
-      lsBit: 15
+      lsBit: 7
       mode: RO
       description: Backplane link status
     #########################################################
@@ -161,37 +159,35 @@ DtiReg: &DtiReg
       class: IntField
       name: usLinkIndex
       sizeBits: 4
-      lsBit: 0
       mode: RW
       description: Upstream link index
     #########################################################
     dsLinkIndex:
       at:
-        offset: 0x0074
+        offset: 0x0076
       class: IntField
       name: dsLinkIndex
       sizeBits: 4
-      lsBit: 16
       mode: RW
       description: Downstream link index
     #########################################################
     countClear:
       at:
-        offset: 0x0074
+        offset: 0x0077
       class: IntField
       name: countClear
       sizeBits: 1
-      lsBit: 30
+      lsBit: 6
       mode: RW
       description: Clear link counters
     #########################################################
     countUpdate:
       at:
-        offset: 0x0074
+        offset: 0x0077
       class: IntField
       name: countUpdate
       sizeBits: 1
-      lsBit: 31
+      lsBit: 7
       mode: RW
       description: Update link counters
     #########################################################
@@ -213,14 +209,23 @@ DtiReg: &DtiReg
       mode: RO
       description: Indexed upstream link rx full count
     #########################################################
-    usIbReceived:
+    usIbRecv:
       at:
         offset: 0x0088
       class: IntField
-      name: usIbReceived
-      sizeBits: 48
+      name: usIbRecv
+      sizeBits: 32
       mode: RO
       description: Indexed upstream link rx bytes count
+    #########################################################
+    usIbEvt:
+      at:
+        offset: 0x008C
+      class: IntField
+      name: usIbEvt
+      sizeBits: 32
+      mode: RO
+      description: Indexed upstream link rx events count
     #########################################################
     dsRxErrs:
       at:
@@ -248,4 +253,79 @@ DtiReg: &DtiReg
       sizeBits: 48
       mode: RO
       description: Indexed downstream link tx bytes count
+    #########################################################
+    usAppObReceived:
+      at:
+        offset: 0x00A0
+      class: IntField
+      name: usAppObReceived
+      sizeBits: 32
+      mode: RO
+      description: Indexed upstream app tx input bytes
+    #########################################################
+    usAppObSent:
+      at:
+        offset: 0x00A8
+      class: IntField
+      name: usAppObSent
+      sizeBits: 32
+      mode: RO
+      description: Indexed upstream app tx output bytes
+    #########################################################
+    qpllLock:
+      at:
+        offset: 0x00B0
+      class: IntField
+      name: qpllLock
+      sizeBits: 2
+      mode: RO
+      description: Lock status of QPLLs
+    #########################################################
+    monClkRate:
+      at:
+        offset: 0x00B4
+        stride: 4
+        nelms: 4
+      class: IntField
+      name: monClkRate
+      sizeBits: 29
+      lsBit: 0
+      mode: RO
+      description: Monitor clock rate
+    #########################################################
+    monClkSlow:
+      at:
+        offset: 0x00B7
+        stride: 4
+        nelms: 4
+      class: IntField
+      name: monClkSlow
+      sizeBits: 1
+      lsBit: 5
+      mode: RO
+      description: Monitor clock too slow
+    #########################################################
+    monClkFast:
+      at:
+        offset: 0x00B7
+        stride: 4
+        nelms: 4
+      class: IntField
+      name: monClkFast
+      sizeBits: 1
+      lsBit: 6
+      mode: RO
+      description: Monitor clock too fast
+    #########################################################
+    monClkLock:
+      at:
+        offset: 0x00B7
+        stride: 4
+        nelms: 4
+      class: IntField
+      name: monClkLock
+      sizeBits: 1
+      lsBit: 7
+      mode: RO
+      description: Monitor clock locked
     #########################################################

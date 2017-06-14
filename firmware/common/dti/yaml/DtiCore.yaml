@@ -16,7 +16,8 @@
 #include AxiSy56040.yaml
 #include GenericMemory.yaml
 #include AmcCarrierBsi.yaml
-#include XpmTiming.yaml
+#include DtiTiming.yaml
+#include DtiHSRepeater.yaml
 #include EthMacPhy.yaml
 #include UdpEngineClient.yaml
 #include UdpEngineServer.yaml
@@ -126,16 +127,18 @@ DtiCore: &DtiCore
       at:
         offset: 0x07000000      
     ##################################################  
-    XpmTiming:
-      <<: *XpmTiming
+    DtiTiming:
+      <<: *DtiTiming
       at:
         offset: 0x08000000      
-#    ##################################################
-#    AmcCarrierBsa:
-#      <<: *AmcCarrierBsa
-#      at:
-#        offset: 0x09000000    
-#    ##################################################
+    ##################################################
+    DtiHSRepeater:
+      <<: *DtiHSRepeater
+      at:
+        offset: 0x09000000    
+        nelms: 6
+        stride: 0x10000
+    ##################################################
     EthMacPhy:
       <<: *EthMacPhy
       at:
@@ -158,12 +161,37 @@ DtiCore: &DtiCore
         stride: 8
       description: "ServerConfig[8:0]"      
     ##################################################
+    DhcpIp:
+      at:
+        offset: 0x0A010FF4
+      class: IntField
+      name: DhcpIp
+      sizeBits: 32
+      mode: RO
+      description: IP address
+    ##################################################
+    LocalMAC:
+      at:
+        offset: 0x0A010FF8
+      class: IntField
+      name: LocalMAC
+      sizeBits: 48
+      mode: RO
+      description: MAC address
+    ##################################################
     RssiServerSw:
       <<: *RssiCore
       at:
         offset: 0x0A020000 
-        nelms: 7
         stride: 0x10000   
+      description: Server RSSI Software
+    ##################################################
+    RssiAppServerSw:
+      <<: *RssiCore
+      at:
+        offset: 0x0A030000
+        nelms: 7 
+        stride: 0x100   
       description: Server RSSI Software
     ##################################################
     AxiMemTester:

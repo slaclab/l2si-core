@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2016-01-04
--- Last update: 2016-12-16
+-- Last update: 2017-06-01
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -91,7 +91,7 @@ begin
                   exptIn        => exptBus,
                   selectOut     => eventSel );
 
-  comb: process ( r, evrRst, config, evrBus ) is
+  comb: process ( r, evrRst, config, evrBus, exptBus ) is
     variable v : RegType;
     variable i : integer;
   begin
