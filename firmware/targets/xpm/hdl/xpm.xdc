@@ -125,8 +125,14 @@ set_property PACKAGE_PIN AM21  [get_ports {los[1]}]
 
 
 
-set_property PACKAGE_PIN AD16 [get_ports {fpgaclk_P}]
-set_property PACKAGE_PIN AD15 [get_ports {fpgaclk_N}]
+set_property PACKAGE_PIN AD16 [get_ports {fpgaclk_P[0]}]
+set_property PACKAGE_PIN AD15 [get_ports {fpgaclk_N[0]}]
+set_property PACKAGE_PIN AE17 [get_ports {fpgaclk_P[1]}]
+set_property PACKAGE_PIN AF17 [get_ports {fpgaclk_N[1]}]
+set_property PACKAGE_PIN AE16 [get_ports {fpgaclk_P[2]}]
+set_property PACKAGE_PIN AE15 [get_ports {fpgaclk_N[2]}]
+set_property PACKAGE_PIN AE18 [get_ports {fpgaclk_P[3]}]
+set_property PACKAGE_PIN AF18 [get_ports {fpgaclk_N[3]}]
 
 
 # Backplane BP Ports
@@ -230,6 +236,10 @@ set_clock_groups -asynchronous \
                  -group [get_clocks -include_generated_clocks ethRef] \
                  -group [get_clocks -include_generated_clocks dsClk0] \
                  -group [get_clocks -include_generated_clocks dsClk1]
+
+set_clock_groups -asynchronous -group [get_clocks fabClk] -group [get_clocks bpClk125MHz]
+set_clock_groups -asynchronous -group [get_clocks fabClk] -group [get_clocks bpClk312MHz]
+set_clock_groups -asynchronous -group [get_clocks fabClk] -group [get_clocks bpClk625MHz]
 
 set_false_path -to [get_cells -hierarchical -filter {NAME =~ *GEN_ULTRA_SCALE.IprogUltraScale_Inst/RstSync_Inst/syncRst_reg}]
 set_false_path -to [get_cells -hierarchical -filter {NAME =~ *GEN_ULTRA_SCALE.IprogUltraScale_Inst/RstSync_Inst/Synchronizer_1/GEN.ASYNC_RST.crossDomainSyncReg_reg[0]}]

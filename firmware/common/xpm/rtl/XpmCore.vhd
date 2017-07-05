@@ -5,7 +5,7 @@
 -- Author     : Larry Ruckman  <ruckman@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-07-08
--- Last update: 2017-03-28
+-- Last update: 2017-06-29
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -190,7 +190,8 @@ architecture mapping of XpmCore is
 
    signal bsiMac     : slv(47 downto 0);
    signal bsiIp      : slv(31 downto 0);
-
+   signal ethPhyRdy  : sl;
+   
    signal localMac   : slv(47 downto 0);
    signal localIp    : slv(31 downto 0);
    signal localAppId : slv(15 downto 0);
@@ -246,7 +247,7 @@ begin
          -- Local Configuration
          localMac          => localMac,
          localIp           => localIp,
-         ethPhyReady       => open,
+         ethPhyReady       => ethPhyRdy,
          -- Master AXI-Lite Interface
          mAxilReadMasters  => axilReadMasters,
          mAxilReadSlaves   => axilReadSlaves,
@@ -333,7 +334,7 @@ begin
          -- Local Configuration
          localMac          => bsiMac,
          localIp           => bsiIp,
---         localAppId        => localAppId,
+         ethLinkUp         => ethPhyRdy,
          ----------------------
          -- Top Level Interface
          ----------------------              

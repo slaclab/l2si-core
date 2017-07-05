@@ -119,7 +119,8 @@ end hsd_dual;
 architecture rtl of hsd_dual is
 
   --  Set timing specific clock parameters
-  constant LCLSII_C : boolean := false;
+--  constant LCLSII_C : boolean := false;
+  constant LCLSII_C : boolean := true;
   constant NFMC_C   : integer := 2;
   
   signal regReadMaster  : AxiLiteReadMasterType;

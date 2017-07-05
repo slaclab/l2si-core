@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-12-14
--- Last update: 2017-04-13
+-- Last update: 2017-04-21
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -387,17 +387,19 @@ begin
         ODIV2 => gtRefClk,
         O     => open);
 
-    AMCCLK_BUFG_GT : BUFG_GT
-      port map ( I       => gtRefClk,
-                 CE      => '1',
-                 CEMASK  => '1',
-                 CLR     => '0',
-                 CLRMASK => '1',
-                 DIV     => "000",
-                 O       => amcClk );
-
+    --AMCCLK_BUFG_GT : BUFG_GT
+    --  port map ( I       => gtRefClk,
+    --             CE      => '1',
+    --             CEMASK  => '1',
+    --             CLR     => '0',
+    --             CLRMASK => '1',
+    --             DIV     => "000",
+    --             O       => amcClk );
+    amcClk  <= regClk;
+  
     GEN_US : for i in 0 to MaxUsLinks-1 generate
       U_Core : entity work.DtiUsCore
+        generic map ( DEBUG_G => ite(i>0, false, true) )
         port map ( sysClk        => regClk,
                    sysRst        => regRst,
                    clear         => regClear,
@@ -436,9 +438,11 @@ begin
                    obSlave       => usObSlave (i) );
 
       U_App : entity work.DtiUsSimApp
-        generic map ( SERIAL_ID_G => x"ABADCAFE" )
+        generic map ( SERIAL_ID_G => x"ABADCAFE",
+                      DEBUG_G => ite(i>0, false, true) )
         port map ( amcClk   => amcClk,
                    amcRst   => '0',
+                   status   => status.usApp(i),
                    --
                    fifoRst  => regClear,
                    --

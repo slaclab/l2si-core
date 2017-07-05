@@ -5,7 +5,7 @@
 -- Author     : Larry Ruckman  <ruckman@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2016-02-12
--- Last update: 2016-11-20
+-- Last update: 2017-06-27
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -36,7 +36,8 @@ entity AxiPcieReg is
       AXI_CLK_FREQ_G   : real                   := 125.0E+6;   -- units of Hz
       AXI_ERROR_RESP_G : slv(1 downto 0)        := AXI_RESP_OK_C;
       XIL_DEVICE_G     : string                 := "7SERIES";  -- Either "7SERIES" or "ULTRASCALE"
-      DMA_SIZE_G       : positive range 1 to 16 := 1);
+      DMA_SIZE_G       : positive range 1 to 16 := 1;
+      BUILD_INFO_G     : BuildInfoType );
    port (
       -- AXI4 Interfaces
       axiClk             : in  sl;
@@ -227,7 +228,8 @@ begin
          TPD_G            => TPD_G,
          AXI_ERROR_RESP_G => AXI_ERROR_RESP_G,
          EN_DEVICE_DNA_G  => true,
-         XIL_DEVICE_G     => XIL_DEVICE_G)
+         XIL_DEVICE_G     => XIL_DEVICE_G,
+         BUILD_INFO_G     => BUILD_INFO_G )
       port map (
          -- AXI-Lite Interface
          axiClk         => mclk,
@@ -280,23 +282,6 @@ begin
    timReadMaster                <= axilReadMasters(TIM_INDEX_C);
    axilReadSlaves(TIM_INDEX_C)  <= timReadSlave;
 
-   --U_TIMASYNC : entity work.AxiLiteAsync
-   --  port map (
-   --   sAxiClk         => mclk,
-   --   sAxiClkRst      => mrst,
-   --   sAxiReadMaster  => axilReadMasters (TIM_INDEX_C),
-   --   sAxiReadSlave   => axilReadSlaves  (TIM_INDEX_C),
-   --   sAxiWriteMaster => axilWriteMasters(TIM_INDEX_C),
-   --   sAxiWriteSlave  => axilWriteSlaves (TIM_INDEX_C),
-   --   -- Master Port
-   --   mAxiClk         => axilClk,
-   --   mAxiClkRst      => axilRst,
-   --   mAxiReadMaster  => timReadMaster,
-   --   mAxiReadSlave   => timReadSlave,
-   --   mAxiWriteMaster => timWriteMaster,
-   --   mAxiWriteSlave  => timWriteSlave );
-
-
    -------------------------------
    -- Map the AXI-Lite to APP
    -------------------------------
@@ -305,20 +290,4 @@ begin
    appReadMaster                <= axilReadMasters(APP_INDEX_C);
    axilReadSlaves(APP_INDEX_C)  <= appReadSlave;
 
-   --U_APPASYNC : entity work.AxiLiteAsync
-   --  port map (
-   --   sAxiClk         => mclk,
-   --   sAxiClkRst      => mrst,
-   --   sAxiReadMaster  => axilReadMasters (APP_INDEX_C),
-   --   sAxiReadSlave   => axilReadSlaves  (APP_INDEX_C),
-   --   sAxiWriteMaster => axilWriteMasters(APP_INDEX_C),
-   --   sAxiWriteSlave  => axilWriteSlaves (APP_INDEX_C),
-   --   -- Master Port
-   --   mAxiClk         => axilClk,
-   --   mAxiClkRst      => axilRst,
-   --   mAxiReadMaster  => appReadMaster,
-   --   mAxiReadSlave   => appReadSlave,
-   --   mAxiWriteMaster => appWriteMaster,
-   --   mAxiWriteSlave  => appWriteSlave );
-   
 end mapping;

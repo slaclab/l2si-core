@@ -9,6 +9,7 @@ namespace Pds {
     class AxiVersion {
     public:
       std::string buildStamp() const;
+      std::string serialID() const;
     public:
       volatile uint32_t FpgaVersion; 
       volatile uint32_t ScratchPad; 
@@ -23,7 +24,9 @@ namespace Pds {
       volatile uint32_t FpgaReloadHalt; 
       volatile uint32_t reserved_11[0x100-11];
       volatile uint32_t UserConstants[64];
-      volatile uint32_t reserved_0x140[0x200-0x140];
+      volatile uint32_t reserved_0x140[0x1c0-0x140];
+      volatile uint32_t dnaValue[4];
+      volatile uint32_t reserved_0x1c4[0x200-0x1c4];
       volatile uint32_t BuildStamp[64];
     };
   };

@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-07-08
--- Last update: 2016-09-11
+-- Last update: 2017-06-22
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -35,6 +35,7 @@ entity XpmTimingFb is
       rst            : in  sl;
       l1input        : in  XpmL1InputArray(NPartitions-1 downto 0);
       full           : in  slv            (NPartitions-1 downto 0);
+      l1ack          : out slv            (NPartitions-1 downto 0);
       phy            : out TimingPhyType );
 end XpmTimingFb;
 
@@ -70,6 +71,7 @@ architecture rtl of XpmTimingFb is
 
 begin
 
+  l1ack       <= r.strobe;
   phy.data    <= r.txData;
   phy.dataK   <= r.txDataK;
   phy.control <= TIMING_PHY_CONTROL_INIT_C;
@@ -82,7 +84,7 @@ begin
     v.txDataK := "01";
     v.strobe  := (others=>'0');
     v.ready   := '0';
-
+    
     if (r.full/=full) then
       v.ready := '1';
     end if;

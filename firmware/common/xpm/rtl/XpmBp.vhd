@@ -2,7 +2,7 @@
 -- File       : XpmBp.vhd
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-09-04
--- Last update: 2017-03-31
+-- Last update: 2017-06-30
 -------------------------------------------------------------------------------
 -- Description: 
 -------------------------------------------------------------------------------
@@ -32,62 +32,66 @@ use work.SsiPkg.all;
 use work.XpmPkg.all;
 
 entity XpmBp is
-   generic ( TPD_G : time := 1 ns );
+   generic ( TPD_G    : time    := 1 ns;
+             NBpLinks : integer := 14 );
    port (
       ----------------------
       -- Top Level Interface
       ----------------------
-      ref156MHzClk    : in  sl;
-      ref156MHzRst    : in  sl;
-      rxFull          : out Slv16Array        (14 downto 1);
-      rxLinkUp        : out slv               (14 downto 1);
+      ref125MHzClk    : in  sl;
+      ref125MHzRst    : in  sl;
+      rxFull          : out Slv16Array        (NBpLinks downto 1);
+      rxLinkUp        : out slv               (NBpLinks downto 1);
+      monClk          : out sl;
       ----------------
       -- Core Ports --
       ----------------
       -- Backplane Ports
       bpClkIn         : in  sl;
       bpClkOut        : out sl;
-      bpBusRxP        : in  slv(14 downto 1);
-      bpBusRxN        : in  slv(14 downto 1) );
+      bpBusRxP        : in  slv(NBpLinks downto 1);
+      bpBusRxN        : in  slv(NBpLinks downto 1) );
 end XpmBp;
 
 architecture mapping of XpmBp is
 
-   signal bp125MHzClk : sl;
-   signal bp125MHzRst : sl;
-   signal bp312MHzClk : sl;
-   signal bp312MHzRst : sl;
-   signal bp625MHzClk : sl;
-   signal bp625MHzRst : sl;
+   signal bp100MHzClk : sl;
+   signal bp100MHzRst : sl;
+   signal bp250MHzClk : sl;
+   signal bp250MHzRst : sl;
+   signal bp500MHzClk : sl;
+   signal bp500MHzRst : sl;
    signal bpPllLocked : sl;
 
    constant BP_CONFIG_C : AxiStreamConfigType := ssiAxiStreamConfig(2);
    
-   signal bpMaster : AxiStreamMasterArray(14 downto 1);
+   signal bpMaster : AxiStreamMasterArray(NBpLinks downto 1);
 
    signal iDelayCtrlRdy : sl;
-   signal linkUp        : slv(14 downto 1);
+   signal linkUp        : slv(NBpLinks downto 1);
 
 begin
 
+  monClk <= bp100MHzClk;
+  
    ------------------------------
    -- Backplane Clocks and Resets
    ------------------------------
-   U_Clk : entity work.AppMpsClk
+   U_Clk : entity work.XpmBpClk
       generic map (
          TPD_G         => TPD_G,
          MPS_SLOT_G    => true )
       port map (
          -- Stable Clock and Reset 
-         axilClk      => ref156MHzClk,
-         axilRst      => ref156MHzRst,
+         refClk       => ref125MHzClk,
+         refRst       => ref125MHzRst,
          -- BP Clocks and Resets
-         mps125MHzClk => bp125MHzClk,
-         mps125MHzRst => bp125MHzRst,
-         mps312MHzClk => bp312MHzClk,
-         mps312MHzRst => bp312MHzRst,
-         mps625MHzClk => bp625MHzClk,
-         mps625MHzRst => bp625MHzRst,
+         mps100MHzClk => bp100MHzClk,
+         mps100MHzRst => bp100MHzRst,
+         mps250MHzClk => bp250MHzClk,
+         mps250MHzRst => bp250MHzRst,
+         mps500MHzClk => bp500MHzClk,
+         mps500MHzRst => bp500MHzRst,
          mpsPllLocked => bpPllLocked,
          ----------------
          -- Core Ports --
@@ -103,11 +107,11 @@ begin
        IODELAY_GROUP_G => "BP_IODELAY_GRP")
      port map (
        iDelayCtrlRdy => iDelayCtrlRdy,
-       refClk        => bp625MHzClk,
-       refRst        => bp625MHzRst);
+       refClk        => bp500MHzClk,
+       refRst        => bp500MHzRst);
 
    GEN_VEC :
-   for i in 14 downto 1 generate
+   for i in NBpLinks downto 1 generate
      U_SaltUltraScale : entity work.SaltUltraScale
        generic map (
          TPD_G               => TPD_G,
@@ -125,30 +129,30 @@ begin
          rxP           => bpBusRxP(i),
          rxN           => bpBusRxN(i),
          -- Reference Signals
-         clk125MHz     => bp125MHzClk,
-         rst125MHz     => bp125MHzRst,
-         clk312MHz     => bp312MHzClk,
-         clk625MHz     => bp625MHzClk,
+         clk125MHz     => bp100MHzClk,
+         rst125MHz     => bp100MHzRst,
+         clk312MHz     => bp250MHzClk,
+         clk625MHz     => bp500MHzClk,
          iDelayCtrlRdy => iDelayCtrlRdy,
          linkUp        => rxLinkUp(i),
          -- Slave Port
-         sAxisClk      => ref156MHzClk,
-         sAxisRst      => ref156MHzRst,
+         sAxisClk      => ref125MHzClk,
+         sAxisRst      => ref125MHzRst,
          sAxisMaster   => AXI_STREAM_MASTER_INIT_C,
          sAxisSlave    => open,
          -- Master Port
-         mAxisClk      => ref156MHzClk,
-         mAxisRst      => ref156MHzRst,
+         mAxisClk      => ref125MHzClk,
+         mAxisRst      => ref125MHzRst,
          mAxisMaster   => bpMaster(i),
          mAxisSlave    => AXI_STREAM_SLAVE_FORCE_C );
 
    end generate GEN_VEC;
 
-   seq: process (ref156MHzClk) is
+   seq: process (ref125MHzClk) is
    begin
-     if rising_edge(ref156MHzClk) then
-       for i in 1 to 14 loop
-         if ref156MHzRst='1' then
+     if rising_edge(ref125MHzClk) then
+       for i in 1 to NBpLinks loop
+         if ref125MHzRst='1' then
            rxFull(i) <= (others=>'0');
          elsif bpMaster(i).tValid='1' then
            rxFull(i) <= bpMaster(i).tData(15 downto 0);

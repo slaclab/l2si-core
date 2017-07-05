@@ -641,3 +641,51 @@ XpmReg: &XpmReg
       lsBit:    0
       mode:     RO
       description: Inhibited L0s per link for indexed partition
+    #########################################################
+    MonClkRate:
+      at:
+        offset: 0x0110
+        stride: 4
+        nelms: 4
+      class:    IntField
+      name: MonClkRate
+      sizeBits: 29
+      lsBit:    0
+      mode:     RO
+      description: Monitor clock rate
+    #########################################################
+    MonClkLock:
+      at:
+        offset: 0x0113
+        stride: 4
+        nelms: 4
+      class:    IntField
+      name: MonClkRate
+      sizeBits: 1
+      lsBit:    7
+      mode:     RO
+      description: Monitor clock rate
+    #########################################################
+    MonClkSlow:
+      at:
+        offset: 0x0113
+        stride: 4
+        nelms: 4
+      class:    IntField
+      name: MonClkRate
+      sizeBits: 1
+      lsBit:    5
+      mode:     RO
+      description: Monitor clock rate
+    #########################################################
+    MonClkFast:
+      at:
+        offset: 0x0113
+        stride: 4
+        nelms: 4
+      class:    IntField
+      name: MonClkRate
+      sizeBits: 1
+      lsBit:    6
+      mode:     RO
+      description: Monitor clock rate

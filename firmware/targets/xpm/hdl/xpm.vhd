@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-12-14
--- Last update: 2017-03-31
+-- Last update: 2017-05-26
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -27,6 +27,9 @@ library ieee;
 use ieee.std_logic_1164.all;
 use ieee.std_logic_unsigned.all;
 use ieee.std_logic_arith.all;
+
+library unisim;
+use unisim.vcomponents.all;
 
 use work.StdRtlPkg.all;
 use work.AxiStreamPkg.all;
@@ -102,8 +105,8 @@ entity xpm is
       timingClkSel     : out   sl;
       timingClkScl     : inout sl;  -- jitter cleaner (unused)
       timingClkSda     : inout sl;
-      fpgaclk_P        : out   sl;
-      fpgaclk_N        : out   sl;
+      fpgaclk_P        : out   slv(3 downto 0);
+      fpgaclk_N        : out   slv(3 downto 0);
       -- Crossbar Ports
       xBarSin          : out   slv(1 downto 0);
       xBarSout         : out   slv(1 downto 0);
@@ -169,11 +172,13 @@ architecture top_level of xpm is
    signal timingPhyClk : sl;
    signal recTimingClk : sl;
    signal recTimingRst : sl;
+   signal ref125MHzClk : sl;
+   signal ref125MHzRst : sl;
    signal ref156MHzClk : sl;
    signal ref156MHzRst : sl;
 
    constant NDsLinks : integer := 14;
-   constant NBpLinks : integer := 14;
+   constant NBpLinks : integer := 6;
    
    signal xpmConfig : XpmConfigType;
    signal xpmStatus : XpmStatusType;
@@ -219,16 +224,31 @@ architecture top_level of xpm is
 
    signal dsClkBuf         : slv(1 downto 0);
 
+   signal bpMonClk         : sl;
+   
 begin
 
-  U_FPGACLK : entity work.ClkOutBufDiff
+  U_FPGACLK0 : entity work.ClkOutBufDiff
     generic map (
       XIL_DEVICE_G => "ULTRASCALE")
       port map (
         clkIn   => recTimingClk,
-        clkOutP => fpgaclk_P,
-        clkOutN => fpgaclk_N);
+        clkOutP => fpgaclk_P(0),
+        clkOutN => fpgaclk_N(0));
 
+  U_FPGACLK2 : entity work.ClkOutBufDiff
+    generic map (
+      XIL_DEVICE_G => "ULTRASCALE")
+      port map (
+        clkIn   => recTimingClk,
+        clkOutP => fpgaclk_P(2),
+        clkOutN => fpgaclk_N(2));
+
+  fpgaclk_P(1) <= '0';
+  fpgaclk_N(1) <= '1';
+  fpgaclk_P(3) <= '0';
+  fpgaclk_N(3) <= '1';
+  
    regClk <= ref156MHzClk;
    regRst <= ref156MHzRst;
 
@@ -344,23 +364,32 @@ begin
          timingFb        => timingPhy );
 
    U_Backplane : entity work.XpmBp
+     generic map ( NBpLinks => NBpLinks )
      port map (
       ----------------------
       -- Top Level Interface
       ----------------------
-      ref156MHzClk    => regClk,
-      ref156MHzRst    => regRst,
+      ref125MHzClk    => ref125MHzClk,
+      ref125MHzRst    => ref125MHzRst,
       rxFull          => bpRxLinkFull,
       rxLinkUp        => bpRxLinkUp,
+      monClk          => bpMonClk,
       ----------------
       -- Core Ports --
       ----------------
       -- Backplane MPS Ports
       bpClkIn         => bpClkIn,
       bpClkOut        => bpClkOut,
-      bpBusRxP        => bpBusRxP,
-      bpBusRxN        => bpBusRxN );
+      bpBusRxP        => bpBusRxP(NBpLinks downto 1),
+      bpBusRxN        => bpBusRxN(NBpLinks downto 1) );
 
+   GEN_BPRX : for i in NBpLinks+1 to 14 generate
+     U_RX : IBUFDS
+       port map ( I  => bpBusRxP(i),
+                  IB => bpBusRxN(i),
+                  O  => open );
+   end generate;
+  
    U_Core : entity work.XpmCore
       generic map (
         BUILD_INFO_G         => BUILD_INFO_G )
@@ -387,8 +416,8 @@ begin
          timingPhyClk      => timingPhyClk,
          recTimingClk      => recTimingClk,
          recTimingRst      => recTimingRst,
-         ref125MHzClk      => open,
-         ref125MHzRst      => open,
+         ref125MHzClk      => ref125MHzClk,
+         ref125MHzRst      => ref125MHzRst,
          ref156MHzClk      => ref156MHzClk,
          ref156MHzRst      => ref156MHzRst,
          ref312MHzClk      => open,
@@ -475,6 +504,10 @@ begin
                staClk          => recTimingClk,
                pllStatus       => pllStatus,
                status          => xpmStatus,
+               monClk(0)       => bpMonClk,
+               monClk(1)       => timingPhyClk,
+               monClk(2)       => recTimingClk,
+               monClk(3)       => bpMonClk,
                config          => xpmConfig,
                dbgChan         => dbgChan );
 

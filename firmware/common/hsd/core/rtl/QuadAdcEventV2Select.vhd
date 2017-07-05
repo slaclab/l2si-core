@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2016-01-04
--- Last update: 2017-06-01
+-- Last update: 2017-06-17
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -30,6 +30,7 @@ use work.StdRtlPkg.all;
 use work.TimingPkg.all;
 use work.QuadAdcPkg.all;
 use work.EvrV2Pkg.all;
+use work.XpmPkg.all;
 
 entity QuadAdcEventV2Select is
   generic (
@@ -44,7 +45,10 @@ entity QuadAdcEventV2Select is
     strobe              : out sl;                -- validates following signals
     oneHz               : out sl;
     eventSel            : out sl;
-    eventId             : out slv(95 downto 0) );
+    eventId             : out slv(95 downto 0);
+    l1v                 : out sl;
+    l1a                 : out sl;
+    l1tag               : out slv( 4 downto 0) );
 end QuadAdcEventV2Select;
 
 architecture mapping of QuadAdcEventV2Select is
@@ -54,6 +58,9 @@ architecture mapping of QuadAdcEventV2Select is
     oneHz     : sl;
     lsb       : sl;
     eventId   : slv(95 downto 0);
+    l1v       : sl;
+    l1a       : sl;
+    l1tag     : slv(4 downto 0);
     msg       : TimingMessageType;
   end record;
 
@@ -62,6 +69,9 @@ architecture mapping of QuadAdcEventV2Select is
     oneHz     => '0',
     lsb       => '0',
     eventId   => (others=>'0'),
+    l1v       => '0',
+    l1a       => '0',
+    l1tag     => (others=>'0'),
     msg       => TIMING_MESSAGE_INIT_C );
 
   signal r    : RegType := REG_INIT_C;
@@ -69,7 +79,7 @@ architecture mapping of QuadAdcEventV2Select is
 
   signal evrConfig : EvrV2ChannelConfig := EVRV2_CHANNEL_CONFIG_INIT_C;
 
-  constant XPMV7 : boolean := false;
+  constant XPMV7 : boolean := true;
   
 begin
 
@@ -94,6 +104,7 @@ begin
   comb: process ( r, evrRst, config, evrBus, exptBus ) is
     variable v : RegType;
     variable i : integer;
+    variable w : XpmPartitionDataType;
   begin
     v := r;
 
@@ -103,8 +114,11 @@ begin
     if evrBus.strobe='1' then
       v.msg       := evrBus.message;
       if XPMV7 then
-        v.eventId := evrBus.message.pulseId &
-                     exptBus.message.partitionWord(conv_integer(config.partition))(47 downto 16);
+        w         := toPartitionWord(exptBus.message.partitionWord(conv_integer(config.partition)));
+        v.eventId := evrBus.message.pulseId & w.anatag;
+        v.l1v     := w.l1e;
+        v.l1a     := w.l1a;
+        v.l1tag   := w.l1tag;
       else
         v.eventId := evrBus.message.pulseId &
                      exptBus.message.partitionWord(conv_integer(config.partition))(31 downto 0);

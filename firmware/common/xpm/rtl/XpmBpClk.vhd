@@ -2,7 +2,7 @@
 -- File       : XpmBpClk.vhd
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-07-08
--- Last update: 2017-05-17
+-- Last update: 2017-06-30
 -------------------------------------------------------------------------------
 -- Description: 
 -------------------------------------------------------------------------------
@@ -48,7 +48,7 @@ entity XpmBpClk is
       mpsPllLocked : out sl;
       ----------------
       -- Core Ports --
-      ----------------   
+      ----------------
       mpsClkOut    : out sl);
 end XpmBpClk;
 
@@ -64,8 +64,8 @@ architecture mapping of XpmBpClk is
 
 begin
 
-   mpsClk <= refClk;
-   mpsRst <= refRst;
+  mpsClk <= refClk;
+  mpsRst <= refRst;
 
    U_ClkManagerMps : entity work.ClockManagerUltraScale
       generic map(

@@ -5,7 +5,7 @@
 -- Author     : Larry Ruckman  <ruckman@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2016-02-12
--- Last update: 2017-06-01
+-- Last update: 2017-06-27
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -44,7 +44,8 @@ entity AxiPcieQuadAdcCore is
       AXI_APP_BUS_EN_G : boolean                := false;
       DMA_SIZE_G       : positive range 1 to 16 := 1;
       AXIS_CONFIG_G    : AxiStreamConfigArray;
-      LCLSII_G         : boolean                := true);
+      LCLSII_G         : boolean                := true;
+      BUILD_INFO_G     : BuildInfoType );
    port (
       -- System Clock and Reset
       sysClk         : out   sl;        -- 250 MHz
@@ -358,7 +359,8 @@ begin
          AXI_CLK_FREQ_G   => 125.0E+6,  -- units of Hz
          AXI_ERROR_RESP_G => AXI_ERROR_RESP_C,
          XIL_DEVICE_G     => "ULTRASCALE",
-         DMA_SIZE_G       => DMA_SIZE_G)
+         DMA_SIZE_G       => DMA_SIZE_G,
+         BUILD_INFO_G     => BUILD_INFO_G )
       port map (
          -- AXI4 Interfaces
          axiClk             => axiClk,

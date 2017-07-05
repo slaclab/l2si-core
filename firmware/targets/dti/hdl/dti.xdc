@@ -43,8 +43,12 @@ set_property PACKAGE_PIN AL3 [get_ports {amcTxN[0][6]}]
 set_property PACKAGE_PIN AK2 [get_ports {amcRxP[0][6]}]
 set_property PACKAGE_PIN AK1 [get_ports {amcRxN[0][6]}]
 # MGTREFCLK1 Bank 224
-set_property PACKAGE_PIN AD6  [get_ports {amcClkP[0][0]}]
-set_property PACKAGE_PIN AD5  [get_ports {amcClkN[0][0]}]
+#  DEVCLK2
+#set_property PACKAGE_PIN AD6  [get_ports {amcClkP[0][0]}]
+#set_property PACKAGE_PIN AD5  [get_ports {amcClkN[0][0]}]
+#  DEVCLK2
+set_property PACKAGE_PIN AF6  [get_ports {amcClkP[0][0]}]
+set_property PACKAGE_PIN AF5  [get_ports {amcClkN[0][0]}]
 # MGTREFCLK1 Bank 127
 #set_property PACKAGE_PIN N29  [get_ports {amcClkP[0][1]}]
 #set_property PACKAGE_PIN N30  [get_ports {amcClkN[0][1]}]
@@ -159,6 +163,9 @@ set_property -dict { PACKAGE_PIN AN16 IOSTANDARD LVDS DIFF_TERM_ADV TERM_NONE } 
 set_property -dict { PACKAGE_PIN AN19 IOSTANDARD LVDS DIFF_TERM_ADV TERM_NONE } [get_ports {bpRxP[14]}]
 set_property -dict { PACKAGE_PIN AP18 IOSTANDARD LVDS DIFF_TERM_ADV TERM_NONE } [get_ports {bpRxN[14]}]
 
+set_property -dict { PACKAGE_PIN AP11 IOSTANDARD LVDS_25 } [get_ports {bpTxP}]
+set_property -dict { PACKAGE_PIN AP10 IOSTANDARD LVDS_25 } [get_ports {bpTxN}]
+
 set_property -dict { PACKAGE_PIN AF10 IOSTANDARD LVCMOS25 }           [get_ports {bpClkIn}]
 set_property -dict { PACKAGE_PIN AG10 IOSTANDARD LVCMOS25 SLEW FAST } [get_ports {bpClkOut}]
 
@@ -184,6 +191,9 @@ set_property -dict { PACKAGE_PIN N23 IOSTANDARD LVCMOS25 } [get_ports {calSda}]
 # DDR3L SO-DIMM Ports
 set_property -dict { PACKAGE_PIN L19 IOSTANDARD LVCMOS15 } [get_ports {ddrScl}] 
 set_property -dict { PACKAGE_PIN L18 IOSTANDARD LVCMOS15 } [get_ports {ddrSda}] 
+
+set_property -dict { PACKAGE_PIN V12 } [get_ports {vPIn}] 
+set_property -dict { PACKAGE_PIN W11 } [get_ports {vNIn}] 
 
 
 ####################################

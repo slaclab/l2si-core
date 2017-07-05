@@ -96,8 +96,7 @@ architecture rtl of XpmL1Select is
 begin
    enable  <= '0';
    accept  <= '0';
-   GEN_TAG: for i in 0 to 4 generate
-     tag(i) <= uOr(
+   
    linkrd  <= r.rd_en;
    
    GEN_RAM : for i in 0 to NLTriggers-1 generate

@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-07-10
--- Last update: 2017-06-14
+-- Last update: 2017-06-16
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -74,28 +74,8 @@ architecture top_level_app of hsd_dualv2_sim is
    
    constant AXIS_CONFIG_C : AxiStreamConfigType := ssiAxiStreamConfig(16);
 
-   component hsd_fex_wrapper
-     generic ( AXIS_CONFIG_G : AxiStreamConfigType );
-     port (
-       clk             :  in sl;
-       rst             :  in sl;
-       din             :  in Slv11Array(7 downto 0);
-       lopen           :  in sl;
-       lclose          :  in sl;
-       lphase          :  in slv(2 downto 0);
-       l1in            :  in sl;
-       l1a             :  in sl;
-       -- readout interface
-       axisMaster      : out AxiStreamMasterType;
-       axisSlave       :  in AxiStreamSlaveType;
-       -- configuration interface
-       axilReadMaster  :  in AxiLiteReadMasterType;
-       axilReadSlave   : out AxiLiteReadSlaveType;
-       axilWriteMaster :  in AxiLiteWriteMasterType;
-       axilWriteSlave  : out AxiLiteWriteSlaveType );
-   end component;
-
    signal dmaData           : slv(127 downto 0);
+   signal axilDone : sl;
    
 begin
 
@@ -106,6 +86,8 @@ begin
      variable s : slv(7 downto 0) := (others=>'0');
      variable d : slv(2 downto 0) := (others=>'0');
      variable t : integer         := 0;
+--     constant PERIOD_C : integer := 1348;
+     constant PERIOD_C : integer := 13480;
    begin
      for ch in 0 to NCHAN_C-1 loop
        adcInput(ch).clkp <= phyclk;
@@ -119,7 +101,7 @@ begin
          adcI(ch).data(6 downto 0) <= adcI(ch).data(7 downto 1);
        end loop;
 
-       if t = 1347 then
+       if t = PERIOD_C-1 then
          adcI(2).data(7)(10) <= '1';
        else
          adcI(2).data(7)(10) <= '0';
@@ -129,7 +111,7 @@ begin
          adcI(ch).data(7)(10) <= adcI(ch+1).data(0)(10);
        end loop;
        
-       if t = 1347 then
+       if t = PERIOD_C-1 then
          t := 0;
        else
          t := t+1;
@@ -174,19 +156,9 @@ begin
      r_in.l1in   <= '0';
      r_in.l1a    <= '0';
 
-     wait until adcI(2).data(0)(10)='1';
-     wait until dmaClk='0';
-     r_in.lopen <= '1';
-     for j in 0 to 7 loop
-       if adcO(2).data(j)(10)='1' then
-         r_in.lphase <= toSlv(j,3);
-       end if;
-     end loop;
-     wait until dmaClk='1';
-     wait until dmaClk='0';
-     r_in.lopen <= '0';
-     
-     for i in 0 to 10 loop
+     wait until axilDone='1';
+
+     for k in 0 to 15 loop
        wait until adcI(2).data(0)(10)='1';
        wait until dmaClk='0';
        r_in.lopen <= '1';
@@ -199,25 +171,43 @@ begin
        wait until dmaClk='0';
        r_in.lopen <= '0';
        
-       wait for 100 ns;
-       wait until dmaClk='0';
-       r_in.lclose <= '1';
-       r_in.l1in   <= '1';
-       lcount := lcount+1;
-       if lcount = toSlv(0,lcount'length) then
-         r_in.l1a    <= '0';
-       else
-         r_in.l1a    <= '1';
-       end if;
-       if lcount(0)='1' then
-         r_in.lphase <= toSlv(0,3);
-       else
-         r_in.lphase <= toSlv(4,3);
-       end if;
-       wait until dmaClk='1';
-       wait until dmaClk='0';
-       r_in.lclose <= '0';
-       r_in.l1in   <= '0';
+       for i in 0 to 3 loop
+         wait until adcI(2).data(0)(10)='1';
+         wait until dmaClk='0';
+         if i<3 then
+           r_in.lopen <= '1';
+           for j in 0 to 7 loop
+             if adcO(2).data(j)(10)='1' then
+               r_in.lphase <= toSlv(j,3);
+             end if;
+           end loop;
+         end if;
+         wait until dmaClk='1';
+         wait until dmaClk='0';
+         r_in.lopen <= '0';
+         
+         wait for 100 ns;
+         wait until dmaClk='0';
+         r_in.lclose <= '1';
+         r_in.l1in   <= '1';
+         lcount := lcount+1;
+         if lcount = toSlv(0,lcount'length) then
+           r_in.l1a    <= '0';
+         else
+           r_in.l1a    <= '1';
+         end if;
+         if lcount(0)='1' then
+           r_in.lphase <= toSlv(0,3);
+         else
+           r_in.lphase <= toSlv(4,3);
+         end if;
+         wait until dmaClk='1';
+         wait until dmaClk='0';
+         r_in.lclose <= '0';
+         r_in.l1in   <= '0';
+       end loop;
+       
+       wait for 200 us;
      end loop;
    end process;
 
@@ -237,33 +227,53 @@ begin
    end process;
    
    regRst <= rst;
-   regClk <= dmaClk;
-   --process is
-   --begin
-   --  regClk <= '1';
-   --  wait for 4.0 ns;
-   --  regClk <= '0';
-   --  wait for 4.0 ns;
-   --end process;
+
+   process is
+   begin
+     regClk <= '0';
+     wait for 3.2 ns;
+     regClk <= '1';
+     wait for 3.2 ns;
+   end process;
      
---   U_DUT : entity work.hsd_fex_wrapper
-   U_DUT : configuration work.raw_cfg 
-     generic map ( AXIS_CONFIG_G => AXIS_CONFIG_C )
+   --U_DUT : configuration work.raw_cfg 
+   --  generic map ( AXIS_CONFIG_G => AXIS_CONFIG_C )
+   --  port map ( clk              => dmaClk,
+   --             rst              => dmaRst,
+   --             din              => adcO(0).data,
+   --             lopen            => r.lopen,
+   --             lclose           => r.lclose,
+   --             lphase           => r.lphase,
+   --             l1in             => r.l1in,
+   --             l1a              => r.l1a,
+   --             axisMaster       => dmaIbMaster,
+   --             axisSlave        => dmaIbSlave,
+   --             axilReadMaster   => regReadMaster,
+   --             axilReadSlave    => regReadSlave,
+   --             axilWriteMaster  => regWriteMaster,
+   --             axilWriteSlave   => regWriteSlave );
+
+--   U_DUT : configuration work.raw_chfifo_cfg
+   U_DUT : entity work.QuadAdcChannelFifov2
      port map ( clk              => dmaClk,
                 rst              => dmaRst,
+                clear            => dmaRst,
+                start            => r.lopen,
+                shift            => r.lphase,
                 din              => adcO(0).data,
-                lopen            => r.lopen,
-                lclose           => r.lclose,
-                lphase           => r.lphase,
                 l1in             => r.l1in,
-                l1a              => r.l1a,
+                l1ina            => r.l1a,
+                l1a              => open,
+                l1v              => open,
                 axisMaster       => dmaIbMaster,
                 axisSlave        => dmaIbSlave,
+                axilClk          => regClk,
+                axilRst          => regRst,
                 axilReadMaster   => regReadMaster,
                 axilReadSlave    => regReadSlave,
                 axilWriteMaster  => regWriteMaster,
                 axilWriteSlave   => regWriteSlave );
-                
+
 process is
   procedure wreg(addr : integer; data : slv(31 downto 0)) is
      begin
@@ -274,27 +284,28 @@ process is
        regWriteMaster.wvalid  <= '1';
        regWriteMaster.bready  <= '1';
        wait until regClk='1';
-       wait until regClk='0';
        wait until regWriteSlave.bvalid='1';
+       wait until regClk='0';
        wait until regClk='1';
        wait until regClk='0';
        regWriteMaster.awvalid <= '0';
        regWriteMaster.wvalid  <= '0';
        regWriteMaster.bready  <= '0';
-       wait until regClk='1';
-       wait until regClk='0';
-       wait until regClk='1';
+       wait for 50 ns;
      end procedure;
   begin
+    axilDone <= '0';
     wait until regRst='0';
-    wreg(16,x"00000000"); -- stop
-    wreg(20,x"00000009"); -- rateSel
-    wreg(24,x"000000ff"); -- channels, noninterleave
-    wreg(28,x"00000100"); -- samples
-    wreg(32,x"00000001"); -- prsecale
-    wreg(16,x"00000001"); -- reset counters
-    wreg(16,x"80000000"); -- start
-    wreg( 0,x"00000001"); -- irq enable
+    wait for 200 ns;
+    wreg(16,x"00000001"); -- prescale
+    wreg(20,x"08000004"); -- fexLength/Delay
+    wreg(24,x"00040C00"); -- almostFull
+    wreg(32,x"00000000"); -- prescale
+    wreg(36,x"00800784"); -- fexLength/Delay
+    wreg(40,x"00040100"); -- almostFull
+    wreg( 0,x"00000003"); -- fexEnable
+    wait for 600 ns;
+    axilDone <= '1';
     wait;
   end process;
    

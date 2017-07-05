@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-12-14
--- Last update: 2017-03-31
+-- Last update: 2017-05-16
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -49,6 +49,7 @@ entity XpmReg is
       staClk           : in  sl;
       pllStatus        : in  XpmPllStatusArray(NAmcs-1 downto 0);
       status           : in  XpmStatusType;
+      monClk           : in  slv(3 downto 0) := (others=>'0');
       config           : out XpmConfigType;
       dbgChan          : out slv(4 downto 0) );
 end XpmReg;
@@ -119,7 +120,11 @@ architecture rtl of XpmReg is
   
   signal s    : XpmStatusType;
   signal sbpLinkUp : slv(NBPLinks downto 0);
-  
+
+  signal monClkRate : Slv32Array(3 downto 0);
+  signal monClkLock : slv       (3 downto 0);
+  signal monClkSlow : slv       (3 downto 0);
+  signal monClkFast : slv       (3 downto 0);
 begin
 
   dbgChan        <= r.linkDebug(dbgChan'range);
@@ -127,6 +132,21 @@ begin
   axilReadSlave  <= r.axilReadSlave;
   axilWriteSlave <= r.axilWriteSlave;
   axilUpdate     <= r.axilRdEn;
+
+  GEN_MONCLK : for i in 0 to 3 generate
+    U_SYNC : entity work.SyncClockFreq
+      generic map ( REF_CLK_FREQ_G => 156.25E+6,
+                    CLK_LOWER_LIMIT_G =>  95.0E+6,
+                    CLK_UPPER_LIMIT_G => 186.0E+6 )
+      port map ( freqOut     => monClkRate(i),
+                 freqUpdated => open,
+                 locked      => monClkLock(i),
+                 tooFast     => monClkFast(i),
+                 tooSlow     => monClkSlow(i),
+                 clkIn       => monClk(i),
+                 locClk      => axilClk,
+                 refClk      => axilClk );
+  end generate;
 
   --
   --  Still need to cross clock-domains for register readout of:
@@ -136,7 +156,7 @@ begin
   
   GEN_BPLINK : entity work.SynchronizerVector
     generic map ( WIDTH_G => sbpLinkUp'length )
-    port map ( clk     => regClk,
+    port map ( clk     => axilClk,
                dataIn  => status.bpLinkUp,
                dataOut => sbpLinkUp );
   
@@ -208,7 +228,8 @@ begin
                mAxisSlave   => r_in.tagSlave );
 
   comb : process (r, axilReadMaster, axilWriteMaster, tagMaster, status, s, axilRst,
-                  pllStatus, pllCount, pllStat, anaRdCount, sbpLinkUp) is
+                  pllStatus, pllCount, pllStat, anaRdCount, sbpLinkUp,
+                  monClkRate, monClkLock, monClkFast, monClkSlow) is
     variable v          : RegType;
     variable axilStatus : AxiLiteStatusType;
     variable ip         : integer;
@@ -380,6 +401,13 @@ begin
     for j in 0 to 31 loop
       axilRegR (toSlv(144+j*4,12), 0, r.partitionStat.inhibit.counts(j));
     end loop;
+
+    for j in 0 to 3 loop
+      axilRegR (toSlv(272+j*4, 12),  0, monClkRate(j)(28 downto 0));
+      axilRegR (toSlv(272+j*4, 12), 29, monClkSlow(j));
+      axilRegR (toSlv(272+j*4, 12), 30, monClkFast(j));
+      axilRegR (toSlv(272+j*4, 12), 31, monClkLock(j));
+   end loop;
 
     if r.partitionCfg.analysis.rst(1)='1' then
       v.anaWrCount(ip) := (others=>'0');
