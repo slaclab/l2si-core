@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-12-14
--- Last update: 2017-04-12
+-- Last update: 2017-07-03
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -45,7 +45,8 @@ entity DtiReg is
       axilReadSlave    : out AxiLiteReadSlaveType;
       --
       status           : in  DtiStatusType;
-      config           : out DtiConfigType );
+      config           : out DtiConfigType;
+      monclk           : in  slv(3 downto 0) );
 end DtiReg;
 
 architecture rtl of DtiReg is
@@ -76,10 +77,16 @@ architecture rtl of DtiReg is
 
   signal usStatus, iusStatus : DtiUsLinkStatusType;
   signal dsStatus, idsStatus : DtiDsLinkStatusType;
+  signal usApp   , iusApp    : DtiUsAppStatusType;
   signal usLinkUp : slv(MaxUsLinks-1 downto 0);
   signal dsLinkUp : slv(MaxDsLinks-1 downto 0);
   signal bpLinkUp : sl;
-  
+  signal qplllock : slv(status.qplllock'range);
+
+  signal monClkRate : Slv32Array(3 downto 0);
+  signal monClkLock : slv       (3 downto 0);
+  signal monClkFast : slv       (3 downto 0);
+  signal monClkSlow : slv       (3 downto 0);
 begin
 
   config         <= r.config;
@@ -90,6 +97,7 @@ begin
 
   iusStatus      <= status.usLink(conv_integer(r.usLink));
   idsStatus      <= status.dsLink(conv_integer(r.dsLink));
+  iusApp         <= status.usApp (conv_integer(r.usLink));
 
   GEN_USLINKUP : for i in 0 to MaxUsLinks-1 generate
     U_SYNC : entity work.Synchronizer
@@ -125,8 +133,32 @@ begin
   U_UsIbReceived : entity work.SynchronizerVector
     generic map ( WIDTH_G => 48 )
     port map ( clk     => axilClk,
-               dataIn  => iusStatus.ibReceived,
-               dataOut => usStatus.ibReceived );
+               dataIn  => iusStatus.ibRecv,
+               dataOut => usStatus.ibRecv );
+  
+  U_UsIbEvt : entity work.SynchronizerVector
+    generic map ( WIDTH_G => 32 )
+    port map ( clk     => axilClk,
+               dataIn  => iusStatus.ibEvt,
+               dataOut => usStatus.ibEvt );
+  
+  U_UsObL0 : entity work.SynchronizerVector
+    generic map ( WIDTH_G => 20 )
+    port map ( clk     => axilClk,
+               dataIn  => iusStatus.obL0,
+               dataOut => usStatus.obL0 );
+  
+  U_UsObL1A : entity work.SynchronizerVector
+    generic map ( WIDTH_G => 20 )
+    port map ( clk     => axilClk,
+               dataIn  => iusStatus.obL1A,
+               dataOut => usStatus.obL1A );
+  
+  U_UsObL1R : entity work.SynchronizerVector
+    generic map ( WIDTH_G => 20 )
+    port map ( clk     => axilClk,
+               dataIn  => iusStatus.obL1R,
+               dataOut => usStatus.obL1R );
   
   U_DsRxErrs : entity work.SynchronizerVector
     generic map ( WIDTH_G => 32 )
@@ -146,8 +178,42 @@ begin
                dataIn  => idsStatus.obSent,
                dataOut => dsStatus.obSent );
   
-  comb : process (r, axilRst, axilReadMaster, axilWriteMaster,
-                  usLinkUp, dsLinkUp, usStatus, dsStatus, bpLinkUp ) is
+  U_AppObRecd : entity work.SynchronizerVector
+    generic map ( WIDTH_G => 32 )
+    port map ( clk     => axilClk,
+               dataIn  => iusApp.obReceived,
+               dataOut => usApp.obReceived );
+  
+  U_AppObSent : entity work.SynchronizerVector
+    generic map ( WIDTH_G => 32 )
+    port map ( clk     => axilClk,
+               dataIn  => iusApp.obSent,
+               dataOut => usApp.obSent );
+
+  U_QpllLock : entity work.SynchronizerVector
+    generic map ( WIDTH_G => status.qplllock'length )
+    port map ( clk     => axilClk,
+               dataIn  => status.qplllock,
+               dataOut => qplllock );
+
+  GEN_MONCLK : for i in 0 to 3 generate
+    U_SYNC : entity work.SyncClockFreq
+      generic map ( REF_CLK_FREQ_G => 156.25E+6,
+                    CLK_LOWER_LIMIT_G =>  95.0E+6,
+                    CLK_UPPER_LIMIT_G => 186.0E+6 )
+      port map ( freqOut     => monClkRate(i),
+                 freqUpdated => open,
+                 locked      => monClkLock(i),
+                 tooFast     => monClkFast(i),
+                 tooSlow     => monClkSlow(i),
+                 clkIn       => monClk(i),
+                 locClk      => axilClk,
+                 refClk      => axilClk );
+  end generate;
+    
+  comb : process (r, axilRst, axilReadMaster, axilWriteMaster, usApp,
+                  usLinkUp, dsLinkUp, usStatus, dsStatus, bpLinkUp, qplllock,
+                  monClkRate, monClkLock, monClkFast, monClkSlow ) is
     variable v          : RegType;
     variable axilStatus : AxiLiteStatusType;
 
@@ -210,14 +276,30 @@ begin
 
     axilRegR (toSlv( 16*8+0 ,12),  0, usStatus.rxErrs );
     axilRegR (toSlv( 16*8+4 ,12),  0, usStatus.rxFull );
-    axilRegR (toSlv( 16*8+8 ,12),  0, usStatus.ibReceived(31 downto 0));
-    axilRegR (toSlv( 16*8+12,12),  0, usStatus.ibReceived(47 downto 32));
+    axilRegR (toSlv( 16*8+8 ,12),  0, usStatus.ibRecv (31 downto 0));
+    axilRegR (toSlv( 16*8+12,12),  0, usStatus.ibEvt );
 
     axilRegR (toSlv( 16*9+0 ,12),  0, dsStatus.rxErrs);
     axilRegR (toSlv( 16*9+4 ,12),  0, dsStatus.rxFull);
     axilRegR (toSlv( 16*9+8 ,12),  0, dsStatus.obSent(31 downto 0));
     axilRegR (toSlv( 16*9+12,12),  0, dsStatus.obSent(47 downto 32));
 
+    axilRegR (toSlv( 16*10+0 ,12),  0, usApp.obReceived);
+    axilRegR (toSlv( 16*10+8 ,12),  0, usApp.obSent);
+
+    axilRegR (toSlv( 16*11+0, 12),  0, qplllock);
+
+    for i in 0 to 3 loop
+      axilRegR (toSlv( 16*11+4*i+4, 12),  0, monClkRate(i)(28 downto 0));
+      axilRegR (toSlv( 16*11+4*i+4, 12), 29, monClkSlow(i));
+      axilRegR (toSlv( 16*11+4*i+4, 12), 30, monClkFast(i));
+      axilRegR (toSlv( 16*11+4*i+4, 12), 31, monClkLock(i));
+    end loop;
+
+    --axilRegR (toSlv( 16*12+0 ,12),  0, usStatus.obL0 );
+    --axilRegR (toSlv( 16*12+4 ,12),  0, usStatus.obL1A );
+    --axilRegR (toSlv( 16*12+8 ,12),  0, usStatus.obL1R );
+    
     -- Set the status
     axiSlaveDefault(axilWriteMaster, axilReadMaster, v.axilWriteSlave, v.axilReadSlave, axilStatus, AXI_RESP_OK_C);
 

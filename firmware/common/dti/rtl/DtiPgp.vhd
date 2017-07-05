@@ -43,7 +43,7 @@ entity DtiPgp is
       pgpTxP         : out sl;
       pgpTxN         : out sl;
       pgpClkP        : in  sl;
-      pgpClkN        : in  sl);
+      pgpClkN        : in  sl;
       -- AXI-Lite Interface
       axilClk           : in  sl;
       axilRst           : in  sl;

@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-07-10
--- Last update: 2017-04-10
+-- Last update: 2017-07-03
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -44,6 +44,10 @@ entity DtiHeaderCache is
      partition       : in  slv(2 downto 0);
      l0delay         : in  slv(7 downto 0);
      pdata           : out XpmPartitionDataType;
+     pdataV          : out sl;
+     cntL0           : out slv(19 downto 0);
+     cntL1A          : out slv(19 downto 0);
+     cntL1R          : out slv(19 downto 0);
      --  Cache Output
      rdclk           : in  sl;
      entag           : in  sl;
@@ -59,13 +63,21 @@ architecture rtl of DtiHeaderCache is
     wren   : sl;
     rdaddr : slv(7 downto 0);
     pword  : XpmPartitionDataType;
+    pwordV : sl;
+    cntL0  : slv(19 downto 0);
+    cntL1A : slv(19 downto 0);
+    cntL1R : slv(19 downto 0);
   end record;
 
   constant WR_REG_INIT_C : WrRegType := (
     rden   => '0',
     wren   => '0',
     rdaddr => (others=>'0'),
-    pword  => XPM_PARTITION_DATA_INIT_C );
+    pword  => XPM_PARTITION_DATA_INIT_C,
+    pwordV => '0',
+    cntL0  => (others=>'0'),
+    cntL1A => (others=>'0'),
+    cntL1R => (others=>'0') );
 
   signal wr    : WrRegType := WR_REG_INIT_C;
   signal wr_in : WrRegType;
@@ -83,6 +95,11 @@ architecture rtl of DtiHeaderCache is
 begin
 
   pdata            <= wr.pword;
+  pdataV           <= wr.pwordV;
+  cntL0            <= wr.cntL0;
+  cntL1A           <= wr.cntL1A;
+  cntL1R           <= wr.cntL1R;
+  
   hdrOut.timeStamp <= doutb( 63 downto   0);
   hdrOut.pulseId   <= doutb(127 downto  64);
   hdrOut.evttag    <= doutb(159 downto 128);
@@ -172,7 +189,7 @@ begin
 
     v.rden      := '0';
     v.wren      := '0';
-    v.pword.l0a := '0';
+    v.pwordV    := '0';
     
     ip := conv_integer(spartition);
     
@@ -180,6 +197,7 @@ begin
       v.rden   := '1';
       v.rdaddr := timingBus.message.pulseId(7 downto 0) - sdelay;
       v.pword  := toPartitionWord(exptBus.message.partitionWord(ip));
+      v.pwordV := '1';
     end if;
 
     if wr.rden = '1' then
@@ -190,6 +208,20 @@ begin
       v := WR_REG_INIT_C;
     end if;
 
+    if wr.pwordV = '1' then
+      if wr.pword.l0a = '1' then
+        v.cntL0 := wr.cntL0 + 1;
+      end if;
+
+      if wr.pword.l1e = '1' then
+        if wr.pword.l1a = '1' then
+          v.cntL1A := wr.cntL1A + 1;
+        else
+          v.cntL1R := wr.cntL1R + 1;
+        end if;
+      end if;
+    end if;
+    
     wr_in <= v;
   end process;
   

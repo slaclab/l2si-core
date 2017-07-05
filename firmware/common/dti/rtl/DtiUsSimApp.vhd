@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-07-10
--- Last update: 2017-04-12
+-- Last update: 2017-05-15
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -32,15 +32,19 @@ use work.AxiStreamPkg.all;
 use work.XpmPkg.all;
 use work.DtiPkg.all;
 use work.DtiSimPkg.all;
+use work.SsiPkg.all;
 
 entity DtiUsSimApp is
    generic (
       TPD_G               : time                := 1 ns;
       SERIAL_ID_G         : slv(31 downto 0)    := (others=>'0');
-      ENABLE_TAG_G        : boolean             := false );
+      ENABLE_TAG_G        : boolean             := false ;
+      DEBUG_G             : boolean             := false );
+
    port (
      amcClk          : in  sl;
      amcRst          : in  sl;
+     status          : out DtiUsAppStatusType;
      --amcRxP          : in  sl;
      --amcRxN          : in  sl;
      --amcTxP          : out sl;
@@ -67,6 +71,7 @@ architecture top_level_app of DtiUsSimApp is
   
   type RegType is record
     state    : StateType;
+    status   : DtiUsAppStatusType;
     payload  : slv(31 downto 0);
     scratch  : slv(31 downto 0);
     localts  : slv(63 downto 0);
@@ -79,6 +84,7 @@ architecture top_level_app of DtiUsSimApp is
   
   constant REG_INIT_C : RegType := (
     state    => S_IDLE,
+    status   => DTI_US_APP_STATUS_INIT_C,
     payload  => toSlv(32,32),
     scratch  => x"DEADBEEF",
     localts  => (others=>'0'),
@@ -94,11 +100,11 @@ architecture top_level_app of DtiUsSimApp is
   constant AXIS_CONFIG_C : AxiStreamConfigType := (
     TSTRB_EN_C    => false,
     TDATA_BYTES_C => 8,
-    TDEST_BITS_C  => 0,
     TID_BITS_C    => 5,
-    TKEEP_MODE_C  => TKEEP_NORMAL_C,
-    TUSER_BITS_C  => 0,
-    TUSER_MODE_C  => TUSER_NORMAL_C );
+    TDEST_BITS_C  => 1,
+    TKEEP_MODE_C  => TKEEP_COMP_C,
+    TUSER_BITS_C  => 2,
+    TUSER_MODE_C  => TUSER_FIRST_LAST_C );
   
   signal amcIbMaster, amcObMaster : AxiStreamMasterType;
   signal amcIbSlave , amcObSlave  : AxiStreamSlaveType;
@@ -108,9 +114,62 @@ architecture top_level_app of DtiUsSimApp is
   signal tagdout : slv(4 downto 0);
   signal tsdout  : slv(63 downto 0);
   signal tagValid : sl;
+
+  component ila_0
+    port ( clk    : sl;
+           probe0 : slv(255 downto 0) );
+  end component;
+
+  signal iobSlave  : AxiStreamSlaveType;
+  signal iibMaster : AxiStreamMasterType;
+  signal r_state   : slv(1 downto 0);
   
 begin
 
+  linkUp  <= '1';
+  obSlave <= iobSlave;
+  
+  GEN_DEBUG : if DEBUG_G generate
+    U_ILA_OB : ila_0
+      port map ( clk                 => obClk,
+                 probe0(0)           => obMaster.tValid, 
+                 probe0(1)           => obMaster.tLast,
+                 probe0(2)           => iobSlave.tReady,
+                 probe0( 6 downto 3) => obMaster.tDest( 3 downto 0),
+                 probe0(70 downto 7) => obMaster.tData(63 downto 0),
+                 probe0(255 downto 71) => (others=>'0') );
+    U_ILA_IB : ila_0
+      port map ( clk                 => ibClk,
+                 probe0(0)           => iibMaster.tValid, 
+                 probe0(1)           => iibMaster.tLast,
+                 probe0(2)           => ibSlave.tReady,
+                 probe0( 6 downto 3) => iibMaster.tDest( 3 downto 0),
+                 probe0(70 downto 7) => iibMaster.tData(63 downto 0),
+                 probe0(255 downto 71) => (others=>'0') );
+
+    r_state <= "00" when r.state = S_IDLE else
+               "01" when r.state = S_READTAG else
+               "10" when r.state = S_READOUT else
+               "11";
+    
+    U_ILA_AMC : ila_0
+      port map ( clk                 => amcClk,
+                 probe0(0)           => amcIbMaster.tValid, 
+                 probe0(1)           => amcIbMaster.tLast,
+                 probe0(2)           => amcIbSlave.tReady,
+                 probe0( 6 downto 3) => amcIbMaster.tDest( 3 downto 0),
+                 probe0(70 downto 7) => amcIbMaster.tData(63 downto 0),
+                 probe0(72 downto 71) => r_state,
+                 probe0(73)          => amcObMaster.tValid, 
+                 probe0(74)          => amcObMaster.tLast,
+                 probe0(75)          => amcObSlave.tReady,
+                 probe0(79 downto 76) => amcObMaster.tDest( 3 downto 0),
+                 probe0(143 downto 80) => amcObMaster.tData(63 downto 0),
+                 probe0(255 downto 144) => (others=>'0') );
+  end generate;
+
+  ibMaster <= iibMaster;
+  
   U_IbFifo : entity work.AxiStreamFifo
     generic map ( SLAVE_AXI_CONFIG_G  => AXIS_CONFIG_C,
                   MASTER_AXI_CONFIG_G => US_IB_CONFIG_C )
@@ -120,7 +179,7 @@ begin
                sAxisSlave  => amcIbSlave,
                mAxisClk    => ibClk,
                mAxisRst    => ibRst,
-               mAxisMaster => ibMaster,
+               mAxisMaster => iibMaster,
                mAxisSlave  => ibSlave );
 
   U_ObFifo : entity work.AxiStreamFifo
@@ -129,7 +188,7 @@ begin
     port map ( sAxisClk    => obClk,
                sAxisRst    => obRst,
                sAxisMaster => obMaster,
-               sAxisSlave  => obSlave,
+               sAxisSlave  => iobSlave,
                mAxisClk    => amcClk,
                mAxisRst    => amcRst,
                mAxisMaster => amcObMaster,
@@ -180,7 +239,7 @@ begin
   --
   --  Parse amcOb stream for register transactions or obTrig
   --
-  comb : process ( fifoRst, r, amcObMaster, amcIbSlave, l1S, l1aS, tagValid, tagdout, tsdout ) is
+  comb : process ( fifoRst, r, amcObMaster, amcObSlave, amcIbSlave, l1S, l1aS, tagValid, tagdout, tsdout ) is
     variable v   : RegType;
     variable reg : RegTransactionType;
   begin
@@ -188,7 +247,15 @@ begin
 
     v.tagRd   := '0';
     v.localts := r.localts+1;
-    v.slave.tReady := '0';
+    v.slave.tReady := '1';
+    
+    if amcObMaster.tValid = '1' and amcObSlave.tReady = '1' then
+      v.status.obReceived := r.status.obReceived+1;
+    end if;
+
+    if v.master.tValid = '1' and amcIbSlave.tReady = '1' then
+      v.status.obSent := r.status.obSent+1;
+    end if;
     
     if amcIbSlave.tReady='1' then
       v.master.tValid := '0';
@@ -199,10 +266,12 @@ begin
     case r.state is
       when S_IDLE =>
         if v.master.tValid='0' and amcObMaster.tValid='1' then -- register transaction
-          v.slave .tReady := '1';
           v.master.tValid := '1';
           v.master.tLast  := '1';
           v.master.tData  := amcObMaster.tData;
+          v.master.tDest(0) := '1';
+          ssiSetUserSof (AXIS_CONFIG_C,v.master,'1');
+          ssiSetUserEofe(AXIS_CONFIG_C,v.master,'0');
           if reg.rnw='1' then
             case conv_integer(reg.address) is
               when      0 => v.master.tData(63 downto 32) := SERIAL_ID_G;
@@ -230,10 +299,13 @@ begin
 
       when S_READOUT =>
         if v.master.tValid='0' and tagValid='1' then
+          v.slave .tReady := '0';
           v.tagRd := '1';
           v.master.tId(4 downto 0) := tagdout;
+          v.master.tDest(0) := '0';
           v.master.tValid := '1';
           v.master.tLast  := '0';
+          ssiSetUserSof (AXIS_CONFIG_C,v.master,'1');
           v.master.tData(63 downto 0) := tsdout;
           v.wordcnt       := r.wordcnt+1;
           v.state         := S_PAYLOAD;
@@ -241,12 +313,14 @@ begin
 
       when S_PAYLOAD =>
         if v.master.tValid='0' then
+          v.slave .tReady := '0';
           v.master.tValid := '1';
           v.master.tLast  := '0';
           v.master.tData(63 downto 0) := r.localts(31 downto 0) & r.wordcnt;
           v.wordcnt       := r.wordcnt+1;
           v.state         := S_PAYLOAD;
           if r.wordcnt = r.payload then
+            ssiSetUserEofe(AXIS_CONFIG_C,v.master,'0');
             v.master.tLast := '1';
             v.state        := S_IDLE;
           end if;
@@ -256,10 +330,15 @@ begin
         null;
     end case;
 
+    if fifoRst = '1' then
+      v := REG_INIT_C;
+    end if;
+    
     rin <= v;
 
     amcIbMaster <= r.master;
-    amcObSlave  <= v.slave;
+    amcObSlave  <= r.slave;
+    status      <= r.status;
     
   end process;
             

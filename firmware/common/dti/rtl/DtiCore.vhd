@@ -5,7 +5,7 @@
 -- Author     : Larry Ruckman  <ruckman@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-07-08
--- Last update: 2017-04-12
+-- Last update: 2017-07-01
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -30,6 +30,7 @@ use work.AxiLitePkg.all;
 use work.AxiPkg.all;
 use work.TimingPkg.all;
 use work.XpmPkg.all;
+use work.AmcCarrierSysRegPkg.all;
 use work.AmcCarrierPkg.all;
 
 library unisim;
@@ -66,19 +67,18 @@ entity DtiCore is
       timingData        : out   TimingRxType;
       timingBus         : out   TimingBusType;
       exptBus           : out   ExptBusType;
+      fullOut           : in    slv(15 downto 0);
       -- BSI Interface (bsiClk domain) 
       bsiBus            : out   BsiBusType;
       -- Reference Clocks and Resets
       recTimingClk      : out   sl;
       recTimingRst      : out   sl;
+      ref62MHzClk       : out   sl;
+      ref62MHzRst       : out   sl;
       ref125MHzClk      : out   sl;
       ref125MHzRst      : out   sl;
       ref156MHzClk      : out   sl;
       ref156MHzRst      : out   sl;
-      ref312MHzClk      : out   sl;
-      ref312MHzRst      : out   sl;
-      ref625MHzClk      : out   sl;
-      ref625MHzRst      : out   sl;
       gthFabClk         : out   sl;
       ----------------
       -- Core Ports --
@@ -117,6 +117,9 @@ entity DtiCore is
       -- Configuration PROM Ports
       calScl            : inout sl;
       calSda            : inout sl;
+      --
+      hsrScl            : inout Slv3Array(1 downto 0);
+      hsrSda            : inout Slv3Array(1 downto 0);
       -- DDR3L SO-DIMM Ports
       ddrClkP           : in    sl;
       ddrClkN           : in    sl;
@@ -181,10 +184,15 @@ architecture mapping of DtiCore is
    signal ddrMemError    : sl;
  
    signal mpsReadMaster  : AxiLiteReadMasterType;
-   signal mpsReadSlave   : AxiLiteReadSlaveType;
+   signal mpsReadSlave   : AxiLiteReadSlaveType := AXI_LITE_READ_SLAVE_INIT_C;
    signal mpsWriteMaster : AxiLiteWriteMasterType;
-   signal mpsWriteSlave  : AxiLiteWriteSlaveType;
+   signal mpsWriteSlave  : AxiLiteWriteSlaveType := AXI_LITE_WRITE_SLAVE_INIT_C;
 
+   signal hsrReadMaster  : AxiLiteReadMasterType;
+   signal hsrReadSlave   : AxiLiteReadSlaveType;
+   signal hsrWriteMaster : AxiLiteWriteMasterType;
+   signal hsrWriteSlave  : AxiLiteWriteSlaveType;
+   
    signal bsiMac     : slv(47 downto 0);
    signal bsiIp      : slv(31 downto 0);
 
@@ -192,21 +200,13 @@ architecture mapping of DtiCore is
    signal localIp    : slv(31 downto 0);
    signal linkUp     : sl;
 
-   signal refClk : slv(3 downto 0);
-   signal refRst : slv(3 downto 0);
+   signal timingFb    : TimingPhyType;
+   signal timingFbClk : sl;
+   signal timingFbRst : sl;
 begin
 
   regClk       <= axilClk;
   regRst       <= axilRst;
-  
-  ref125MHzClk <= refClk(0);
-  ref125MHzRst <= refRst(0);
-  ref156MHzClk <= refClk(1);
-  ref156MHzRst <= refRst(1);
-  ref312MHzClk <= refClk(2);
-  ref312MHzRst <= refRst(2);
-  ref625MHzClk <= refClk(3);
-  ref625MHzRst <= refRst(3);
   
   GEN_BSI_OVERRIDE: if OVERRIDE_BSI_G=true generate
     localIp    <= IP_ADDR_G;
@@ -221,19 +221,17 @@ begin
    --------------------------------
    -- Common Clock and Reset Module
    -------------------------------- 
-   U_ClkAndRst : entity work.XpmClkAndRst
+   U_ClkAndRst : entity work.DtiClkAndRst
       generic map (
          TPD_G         => TPD_G )
       port map (
          -- Reference Clocks and Resets
-         ref125MHzClk => refClk(0),
-         ref125MHzRst => refRst(0),
-         ref156MHzClk => refClk(1),
-         ref156MHzRst => refRst(1),
-         ref312MHzClk => refClk(2),
-         ref312MHzRst => refRst(2),
-         ref625MHzClk => refClk(3),
-         ref625MHzRst => refRst(3),
+         ref62MHzClk  => ref62MHzClk,
+         ref62MHzRst  => ref62MHzRst,
+         ref125MHzClk => ref125MHzClk,
+         ref125MHzRst => ref125MHzRst,
+         ref156MHzClk => ref156MHzClk,
+         ref156MHzRst => ref156MHzRst,
          gthFabClk    => gthFabClk,
          -- AXI-Lite Clocks and Resets
          axilClk      => axilClk,
@@ -252,6 +250,7 @@ begin
       generic map (
          TPD_G             => TPD_G,
          NAPP_LINKS_G      => NAPP_LINKS_G,
+         ETH_ADDR_C        => x"0A000000",
          AXI_ERROR_RESP_G  => AXI_ERROR_RESP_C)
       port map (
          -- Local Configuration
@@ -314,10 +313,10 @@ begin
          timingWriteMaster => timingWriteMaster,
          timingWriteSlave  => timingWriteSlave,
          -- BSA AXI-Lite Interface
-         bsaReadMaster     => open,
-         bsaReadSlave      => AXI_LITE_READ_SLAVE_INIT_C,
-         bsaWriteMaster    => open,
-         bsaWriteSlave     => AXI_LITE_WRITE_SLAVE_INIT_C,
+         bsaReadMaster     => hsrReadMaster,
+         bsaReadSlave      => hsrReadSlave,
+         bsaWriteMaster    => hsrWriteMaster,
+         bsaWriteSlave     => hsrWriteSlave,
          -- ETH PHY AXI-Lite Interface
          ethReadMaster     => ethReadMaster,
          ethReadSlave      => ethReadSlave,
@@ -373,6 +372,13 @@ begin
          vPIn              => vPIn,
          vNIn              => vNIn);
 
+  U_TimingFb : entity work.XpmTimingFb
+    port map ( clk        => timingFbClk,
+               rst        => timingFbRst,
+               l1input    => (others=>XPM_L1_INPUT_INIT_C),
+               full       => fullOut(7 downto 0),
+               phy        => timingFb );
+  
    --------------
    -- Timing Core
    --------------
@@ -398,10 +404,10 @@ begin
          recTimingBus     => timingBus,
          recExptBus       => exptBus,
          recData          => timingData,
-         
-         appTimingPhy     => TIMING_PHY_INIT_C,
-         appTimingPhyClk  => open,
-         appTimingPhyRst  => open,
+
+         appTimingPhy     => timingFb,
+         appTimingPhyClk  => timingFbClk,
+         appTimingPhyRst  => timingFbRst,
          ----------------
          -- Core Ports --
          ----------------   
@@ -417,6 +423,21 @@ begin
          timingRecClkOutN => timingRecClkOutN,
          timingClkSel     => timingClkSel);
 
+   U_HS_Repeater : entity work.DtiHSRepeater
+     generic map (
+       AXI_ERROR_RESP_G => AXI_ERROR_RESP_C,
+       AXI_BASEADDR_G   => BSA_ADDR_C )
+     port map (
+       axilClk         => axilClk,
+       axilRst         => axilRst,
+       axilReadMaster  => hsrReadMaster,
+       axilReadSlave   => hsrReadSlave,
+       axilWriteMaster => hsrWriteMaster,
+       axilWriteSlave  => hsrWriteSlave,
+       --
+       hsrScl          => hsrScl,
+       hsrSda          => hsrSda );
+  
    ------------------
    -- DDR Memory Core
    ------------------

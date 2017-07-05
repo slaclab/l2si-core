@@ -1,0 +1,275 @@
+------------------------------------------------------------------------------
+-- Title      : 
+-------------------------------------------------------------------------------
+-- File       : DtiUsPgp5Gb.vhd
+-- Author     : Matt Weaver <weaver@slac.stanford.edu>
+-- Company    : SLAC National Accelerator Laboratory
+-- Created    : 2015-07-10
+-- Last update: 2017-07-03
+-- Platform   : 
+-- Standard   : VHDL'93/02
+-------------------------------------------------------------------------------
+-- Description: DtiApp's Top Level
+-- 
+--   Application interface to JungFrau.  Uses 10GbE.  Trigger is external TTL
+--   (L0 only?). Control register access is external 1GbE link.
+--
+--   Intercept out-bound messages as register transactions for 10GbE core.
+--   Use simulation embedding: ADDR(31:1) & RNW & DATA(31:0).
+-------------------------------------------------------------------------------
+-- This file is part of 'LCLS2 DAQ Software'.
+-- It is subject to the license terms in the LICENSE.txt file found in the 
+-- top-level directory of this distribution and at: 
+--    https://confluence.slac.stanford.edu/display/ppareg/LICENSE.html. 
+-- No part of 'LCLS2 DAQ Software', including this file, 
+-- may be copied, modified, propagated, or distributed except according to 
+-- the terms contained in the LICENSE.txt file.
+-------------------------------------------------------------------------------
+
+library ieee;
+use ieee.std_logic_1164.all;
+use ieee.std_logic_unsigned.all;
+
+use work.StdRtlPkg.all;
+use work.AxiLitePkg.all;
+use work.AxiStreamPkg.all;
+use work.XpmPkg.all;
+use work.DtiPkg.all;
+use work.DtiSimPkg.all;
+use work.Pgp2bPkg.all;
+use work.SsiPkg.all;
+
+entity DtiUsPgp5Gb is
+   generic (
+      TPD_G               : time                := 1 ns;
+      ID_G                : slv(7 downto 0)     := (others=>'0');
+      ENABLE_TAG_G        : boolean             := false ;
+      DEBUG_G             : boolean             := false );
+   port (
+     coreClk         : in  sl;
+     coreRst         : in  sl;
+     gtRefClk        : in  sl;
+     status          : out DtiUsAppStatusType;
+     amcRxP          : in  sl;
+     amcRxN          : in  sl;
+     amcTxP          : out sl;
+     amcTxN          : out sl;
+     fifoRst         : in  sl;
+     --
+     axilClk         : in  sl;
+     axilRst         : in  sl;
+     axilReadMaster  : in  AxiLiteReadMasterType;
+     axilReadSlave   : out AxiLiteReadSlaveType;
+     axilWriteMaster : in  AxiLiteWriteMasterType;
+     axilWriteSlave  : out AxiLiteWriteSlaveType;
+     --
+     ibClk           : in  sl;
+     ibRst           : in  sl;
+     ibMaster        : out AxiStreamMasterType;
+     ibSlave         : in  AxiStreamSlaveType;
+     linkUp          : out sl;
+     rxErr           : out sl;
+     --
+     obClk           : in  sl;
+     obRst           : in  sl;
+     obMaster        : in  AxiStreamMasterType;
+     obSlave         : out AxiStreamSlaveType;
+     --
+     timingClk       : in  sl;
+     timingRst       : in  sl;
+     obTrig          : in  XpmPartitionDataType;
+     obTrigValid     : in  sl );
+end DtiUsPgp5Gb;
+
+architecture top_level_app of DtiUsPgp5Gb is
+
+  type RegType is record
+    --  Event state
+    opCodeEn   : sl;
+    opCode     : slv(7 downto 0);
+  end record;
+  
+  constant REG_INIT_C : RegType := (
+    opCodeEn   => '0',
+    opCode     => (others=>'0') );
+
+  signal r    : RegType := REG_INIT_C;
+  signal r_in : RegType;
+
+  signal pgpTrig      : slv(2 downto 0);
+  signal pgpTrigValid : sl;
+
+  signal dmaIbMaster    : AxiStreamMasterType;
+  signal dmaIbSlave     : AxiStreamSlaveType;
+  signal dmaIbCtrl      : AxiStreamCtrlType;
+  signal dmaObMaster    : AxiStreamMasterType;
+  signal dmaObSlave     : AxiStreamSlaveType;
+
+  signal locTxIn        : Pgp2bTxInType;
+  signal pgpTxIn        : Pgp2bTxInType;
+  signal pgpTxOut       : Pgp2bTxOutType;
+  signal pgpRxIn        : Pgp2bRxInType;
+  signal pgpRxOut       : Pgp2bRxOutType;
+  signal pgpTxMasters   : AxiStreamMasterArray(3 downto 0) := (others=>AXI_STREAM_MASTER_INIT_C);
+  signal pgpTxSlaves    : AxiStreamSlaveArray (3 downto 0);
+  signal pgpRxMasters   : AxiStreamMasterArray(3 downto 0);
+  signal pgpRxCtrls     : AxiStreamCtrlArray  (3 downto 0) := (others=>AXI_STREAM_CTRL_UNUSED_C);
+
+  signal pgpClk         : sl;
+  signal pgpRst         : sl;
+
+begin
+
+  pgpRst <= ibRst;
+
+  linkUp                   <= pgpRxOut.linkReady;
+
+  locTxIn.flush            <= '0';
+  locTxIn.opCodeEn         <= r.opCodeEn;
+  locTxIn.opCode           <= r.opCode;
+  locTxIn.locData          <= x"00";
+  locTxIn.flowCntlDis      <= '1';
+  
+  pgpTxMasters(0)          <= dmaObMaster;
+  dmaObSlave               <= pgpTxSlaves(0);
+  dmaIbMaster              <= pgpRxMasters(0);
+  pgpRxCtrls(0)            <= dmaIbCtrl;
+  
+  --  How to connect dmaIbSlave?
+  
+  -- assuming 156.25MHz ref clk
+  --U_Pgp2b : entity work.Pgp2bGth7VarLatWrapper
+  --  generic map ( CPLL_FBDIV_G    => 4,
+  --                CPLL_FBDIV_45_G => 4,
+  --                RXOUT_DIV_G     => 1,
+  --                TXOUT_DIV_G     => 1,
+  --                RXCDR_CFG_G     => x"0001107FE206021041010",
+  --                NUM_VC_EN_G     => 4 )
+  --  port map ( pgpClk       => amcClk,
+  --             pgpRst       => amcRst,
+  --             pgpTxIn      => pgpTxIn,
+  --             pgpTxOut     => pgpTxOut,
+  --             pgpRxIn      => pgpRxIn,
+  --             pgpRxOut     => pgpRxOut,
+  --             -- Frame TX Interface
+  --             pgpTxMasters => pgpTxMasters,
+  --             pgpTxSlaves  => pgpTxSlaves,
+  --             -- Frame RX Interface
+  --             pgpRxMasters => pgpRxMasters,
+  --             pgpRxCtrl    => pgpRxCtrls,
+  --             -- GT Pins
+  --             gtTxP        => amcTxP,
+  --             gtTxN        => amcTxN,
+  --             gtRxP        => amcRxP,
+  --             gtRxN        => amcRxN );
+  U_Pgp2b : entity work.MpsPgpFrontEnd
+    port map ( pgpClk       => pgpClk,
+               pgpRst       => pgpRst,
+               stableClk    => axilClk,
+               gtRefClk     => gtRefClk,
+               txOutClk     => pgpClk,
+               --
+               pgpTxIn      => pgpTxIn,
+               pgpTxOut     => pgpTxOut,
+               pgpRxIn      => pgpRxIn,
+               pgpRxOut     => pgpRxOut,
+               -- Frame TX Interface
+               pgpTxMasters => pgpTxMasters,
+               pgpTxSlaves  => pgpTxSlaves,
+               -- Frame RX Interface
+               pgpRxMasters => pgpRxMasters,
+               pgpRxCtrl    => pgpRxCtrls,
+               -- GT Pins
+               gtTxP        => amcTxP,
+               gtTxN        => amcTxN,
+               gtRxP        => amcRxP,
+               gtRxN        => amcRxN );
+    
+  U_Axi : entity work.Pgp2bAxi
+    generic map ( AXI_CLK_FREQ_G => 156.25E+6 )
+    port map ( -- TX PGP Interface (pgpTxClk)
+               pgpTxClk         => pgpClk,
+               pgpTxClkRst      => pgpRst,
+               pgpTxIn          => pgpTxIn,
+               pgpTxOut         => pgpTxOut,
+               locTxIn          => locTxIn,
+               -- RX PGP Interface (pgpRxClk)
+               pgpRxClk         => pgpClk,
+               pgpRxClkRst      => pgpRst,
+               pgpRxIn          => pgpRxIn,
+               pgpRxOut         => pgpRxOut,
+               -- AXI-Lite Register Interface (axilClk domain)
+               axilClk          => axilClk,
+               axilRst          => axilRst,
+               axilReadMaster   => axilReadMaster,
+               axilReadSlave    => axilReadSlave,
+               axilWriteMaster  => axilWriteMaster,
+               axilWriteSlave   => axilWriteSlave );
+
+  U_ObToAmc : entity work.AxiStreamFifo
+    generic map ( SLAVE_AXI_CONFIG_G  => US_OB_CONFIG_C,
+                  MASTER_AXI_CONFIG_G => SSI_PGP2B_CONFIG_C )
+    port map ( sAxisClk    => obClk,
+               sAxisRst    => obRst,
+               sAxisMaster => obMaster,
+               sAxisSlave  => obSlave,
+               mAxisClk    => pgpClk,
+               mAxisRst    => pgpRst,
+               mAxisMaster => dmaObMaster,
+               mAxisSlave  => dmaObSlave );
+  
+  U_AmcToIb : entity work.AxiStreamFifo
+    generic map ( SLAVE_AXI_CONFIG_G  => SSI_PGP2B_CONFIG_C,
+                  MASTER_AXI_CONFIG_G => US_OB_CONFIG_C )
+    port map ( sAxisClk    => pgpClk,
+               sAxisRst    => pgpRst,
+               sAxisMaster => dmaIbMaster,
+               sAxisSlave  => dmaIbSlave,
+               sAxisCtrl   => dmaIbCtrl,
+               mAxisClk    => ibClk,
+               mAxisRst    => ibRst,
+               mAxisMaster => ibMaster,
+               mAxisSlave  => ibSlave );
+
+  U_SyncObTrig : entity work.SynchronizerFifo
+    generic map ( DATA_WIDTH_G  => 3 )
+    port map ( rst     => timingRst,
+               wr_clk  => timingClk,
+               wr_en   => obTrigValid,
+               din(0)  => obTrig.l0a,
+               din(1)  => obTrig.l1e,
+               din(2)  => obTrig.l1a,
+               rd_clk  => pgpClk,
+               valid   => pgpTrigValid,
+               dout    => pgpTrig );
+  
+  comb : process ( fifoRst, r, pgpTrig, pgpTrigValid ) is
+    variable v   : RegType;
+  begin
+    v := r;
+
+    -- Need to transmit three bits: L0 and L1(A/R)
+    v.opCodeEn := '0';
+    if pgpTrigValid = '1' then
+      if pgpTrig /= 0 then
+        v.opCodeEn := '1';
+      end if;
+      v.opCode(7)          := '1';  -- currently required by pgpcard
+      v.opCode(2 downto 0) := pgpTrig;
+    end if;
+
+    if fifoRst = '1' then
+      v := REG_INIT_C;
+    end if;
+
+    r_in <= v;
+  end process;
+            
+  seq : process (pgpClk) is
+  begin
+    if rising_edge(pgpClk) then
+      r <= r_in;
+    end if;
+  end process;
+  
+end top_level_app;

@@ -2,7 +2,7 @@
 -- File       : DtiBp.vhd
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-09-04
--- Last update: 2017-04-13
+-- Last update: 2017-05-17
 -------------------------------------------------------------------------------
 -- Description: 
 -------------------------------------------------------------------------------
@@ -44,6 +44,7 @@ entity DtiBp is
       ref156MHzRst    : in  sl;
       rxFull          : in  Slv16Array(0 downto 0);
       linkUp          : out sl;
+      monClk          : out slv(1 downto 0);
       ----------------
       -- Core Ports --
       ----------------
@@ -72,44 +73,56 @@ architecture mapping of DtiBp is
    signal r     : RegType := REG_INIT_C;
    signal rin   : RegType;
    
-   signal bp125MHzClk : sl;
-   signal bp125MHzRst : sl;
-   signal bp312MHzClk : sl;
-   signal bp312MHzRst : sl;
-   signal bp625MHzClk : sl;
-   signal bp625MHzRst : sl;
+   signal bp100MHzClk : sl;
+   signal bp100MHzRst : sl;
+   signal bp250MHzClk : sl;
+   signal bp250MHzRst : sl;
+   signal bp500MHzClk : sl;
+   signal bp500MHzRst : sl;
    signal bpPllLocked : sl;
-
+   signal bpClkBuf    : sl;
+   signal bpRefClk    : sl;
+   
    constant BP_CONFIG_C : AxiStreamConfigType := ssiAxiStreamConfig(2);
    
    signal bpSlave  : AxiStreamSlaveType;
 
 begin
 
+  monClk(0) <= bpRefClk;
+  monClk(1) <= bp100MHzClk;
+  
+   U_IBUF : IBUF
+      port map ( I => bpClkIn,
+                 O => bpClkBuf);
+
+   U_BUFG : BUFG
+     port map ( I => bpClkBuf,
+                O => bpRefClk );
+
    ------------------------------
    -- Backplane Clocks and Resets
    ------------------------------
-   U_Clk : entity work.AppMpsClk
+   U_Clk : entity work.XpmBpClk
       generic map (
          TPD_G         => TPD_G,
          MPS_SLOT_G    => false )
       port map (
          -- Stable Clock and Reset 
-         axilClk      => ref156MHzClk,
-         axilRst      => ref156MHzRst,
+         refClk       => bpRefClk,
+         refRst       => '0',
          -- BP Clocks and Resets
-         mps125MHzClk => bp125MHzClk,
-         mps125MHzRst => bp125MHzRst,
-         mps312MHzClk => bp312MHzClk,
-         mps312MHzRst => bp312MHzRst,
-         mps625MHzClk => bp625MHzClk,
-         mps625MHzRst => bp625MHzRst,
+         mps100MHzClk => bp100MHzClk,
+         mps100MHzRst => bp100MHzRst,
+         mps250MHzClk => bp250MHzClk,
+         mps250MHzRst => bp250MHzRst,
+         mps500MHzClk => bp500MHzClk,
+         mps500MHzRst => bp500MHzRst,
          mpsPllLocked => bpPllLocked,
          ----------------
          -- Core Ports --
          ----------------   
          -- Backplane BP Ports
-         mpsClkIn     => bpClkIn,
          mpsClkOut    => bpClkOut);
 
    U_SaltUltraScale : entity work.SaltUltraScale
@@ -129,10 +142,10 @@ begin
        rxP           => '1',
        rxN           => '0',
        -- Reference Signals
-       clk125MHz     => bp125MHzClk,
-       rst125MHz     => bp125MHzRst,
-       clk312MHz     => bp312MHzClk,
-       clk625MHz     => bp625MHzClk,
+       clk125MHz     => bp100MHzClk,
+       rst125MHz     => bp100MHzRst,
+       clk312MHz     => bp250MHzClk,
+       clk625MHz     => bp500MHzClk,
        iDelayCtrlRdy => '1',
        linkUp        => linkUp,
        -- Slave Port

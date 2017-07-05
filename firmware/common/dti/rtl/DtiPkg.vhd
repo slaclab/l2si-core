@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2016-03-25
--- Last update: 2017-04-12
+-- Last update: 2017-07-05
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -38,36 +38,47 @@ package DtiPkg is
    constant MAX_RETRANS_CNT_C  : positive := ite((WINDOW_ADDR_SIZE_C > 1), WINDOW_ADDR_SIZE_C-1, 1);
 
    constant MaxUsLinks     : integer := 7;
-   constant MaxDsLinks     : integer := 13;
+--   constant MaxDsLinks     : integer := 13;
+   constant MaxDsLinks     : integer := 7;
 
    constant US_IB_CONFIG_C : AxiStreamConfigType := (
      TSTRB_EN_C    => false,
      TDATA_BYTES_C => 8,                -- 10Gbps
-     TDEST_BITS_C  => 0,
+     TDEST_BITS_C  => 1,                -- Event/Control
      TID_BITS_C    => 5,                -- L0Tag
-     TKEEP_MODE_C  => TKEEP_NORMAL_C,
-     TUSER_BITS_C  => 0,
-     TUSER_MODE_C  => TUSER_NORMAL_C );
+     TKEEP_MODE_C  => TKEEP_COMP_C,
+     TUSER_BITS_C  => 2,
+     TUSER_MODE_C  => TUSER_FIRST_LAST_C );
    
    constant US_OB_CONFIG_C : AxiStreamConfigType := (
      TSTRB_EN_C    => false,
      TDATA_BYTES_C => 8,                -- 10Gbps
      TDEST_BITS_C  => 0,
      TID_BITS_C    => 5,                -- L0Tag
-     TKEEP_MODE_C  => TKEEP_NORMAL_C,
-     TUSER_BITS_C  => 0,
-     TUSER_MODE_C  => TUSER_NORMAL_C );
+     TKEEP_MODE_C  => TKEEP_COMP_C,
+     TUSER_BITS_C  => 2,
+     TUSER_MODE_C  => TUSER_FIRST_LAST_C );
 
    constant CTLS_CONFIG_C : AxiStreamConfigType := (
      TSTRB_EN_C    => false,
-     TDATA_BYTES_C => 4,                -- 10Gbps
-     TDEST_BITS_C  => 0,
+     TDATA_BYTES_C => 8,                -- 10Gbps
+     TDEST_BITS_C  => 1,
      TID_BITS_C    => 0,
-     TKEEP_MODE_C  => TKEEP_NORMAL_C,
-     TUSER_BITS_C  => 0,
-     TUSER_MODE_C  => TUSER_NORMAL_C );
+     TKEEP_MODE_C  => TKEEP_COMP_C,
+     TUSER_BITS_C  => 2,
+     TUSER_MODE_C  => TUSER_FIRST_LAST_C );
 
    constant DTI_US_LINK_CONFIG_BITS_C : integer := MaxDsLinks+72;
+
+   type QuadType is record
+     amcClk           : sl;
+     qplllock         : sl;
+     qplloutclk       : sl;
+     qplloutrefclk    : sl;
+   end record;
+
+   type QuadArray is array(natural range<>) of QuadType;
+   type AmcQuadArray is array(natural range<>) of QuadArray(1 downto 0);
    
    type DtiUsLinkConfigType is record
      enable     : sl;
@@ -99,17 +110,36 @@ package DtiPkg is
      linkUp     : sl;
      rxErrs     : slv(31 downto 0);
      rxFull     : slv(31 downto 0);
-     ibReceived : slv(47 downto 0);
+     ibRecv     : slv(47 downto 0);
+     ibEvt      : slv(31 downto 0);
+     obL0       : slv(19 downto 0);
+     obL1A      : slv(19 downto 0);
+     obL1R      : slv(19 downto 0);
    end record;
 
    constant DTI_US_LINK_STATUS_INIT_C : DtiUsLinkStatusType := (
      linkUp     => '0',
      rxErrs     => (others=>'0'),
      rxFull     => (others=>'0'),
-     ibReceived => (others=>'0') );
+     ibRecv     => (others=>'0'),
+     ibEvt      => (others=>'0'),
+     obL0       => (others=>'0'),
+     obL1A      => (others=>'0'),
+     obL1R      => (others=>'0') );
    
    type DtiUsLinkStatusArray is array (natural range<>) of DtiUsLinkStatusType;
 
+   type DtiUsAppStatusType is record
+     obReceived : slv(31 downto 0);
+     obSent     : slv(31 downto 0);
+   end record;
+
+   constant DTI_US_APP_STATUS_INIT_C : DtiUsAppStatusType := (
+     obReceived => (others=>'0'),
+     obSent     => (others=>'0') );
+   
+   type DtiUsAppStatusArray is array (natural range<>) of DtiUsAppStatusType;
+   
 
    type DtiDsLinkStatusType is record
      linkUp     : sl;
@@ -138,12 +168,16 @@ package DtiPkg is
      usLink     : DtiUsLinkStatusArray   (MaxUsLinks-1 downto 0);
      dsLink     : DtiDsLinkStatusArray   (MaxDsLinks-1 downto 0);
      bpLinkUp   : sl;
+     usApp      : DtiUsAppStatusArray    (MaxUsLinks-1 downto 0);
+     qplllock   : slv(3 downto 0);
    end record;
 
    constant DTI_STATUS_INIT_C : DtiStatusType := (
      usLink     => (others=>DTI_US_LINK_STATUS_INIT_C),
      dsLink     => (others=>DTI_DS_LINK_STATUS_INIT_C),
-     bpLinkUp   => '0' );
+     bpLinkUp   => '0',
+     usApp      => (others=>DTI_US_APP_STATUS_INIT_C),
+     qplllock   => "00" );
 
    type DtiEventHeaderType is record
      timeStamp  : slv(63 downto 0);

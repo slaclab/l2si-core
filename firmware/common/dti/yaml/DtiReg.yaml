@@ -329,3 +329,33 @@ DtiReg: &DtiReg
       mode: RO
       description: Monitor clock locked
     #########################################################
+    usLinkObL0:
+      at:
+        offset: 0x00C0
+      class: IntField
+      name: usLinkObL0
+      sizeBits: 20
+      lsBit: 0
+      mode: RO
+      description: Count of outbound L0 triggers
+    #########################################################
+    usLinkObL1A:
+      at:
+        offset: 0x00C4
+      class: IntField
+      name: usLinkObL1A
+      sizeBits: 20
+      lsBit: 0
+      mode: RO
+      description: Count of outbound L1A triggers
+    #########################################################
+    usLinkObL1R:
+      at:
+        offset: 0x00C8
+      class: IntField
+      name: usLinkObL1R
+      sizeBits: 20
+      lsBit: 0
+      mode: RO
+      description: Count of outbound L1R triggers
+    #########################################################

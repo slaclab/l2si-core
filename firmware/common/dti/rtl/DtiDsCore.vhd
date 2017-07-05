@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-07-10
--- Last update: 2017-04-11
+-- Last update: 2017-07-05
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -36,7 +36,8 @@ use unisim.vcomponents.all;
 
 entity DtiDsCore is
    generic (
-      TPD_G               : time                := 1 ns );
+      TPD_G               : time                := 1 ns;
+      DEBUG_G             : boolean             := false );
    port (
      --  Core Interface
      clear           : in  sl := '0';
@@ -80,12 +81,32 @@ architecture rtl of DtiDsCore is
 
   signal tMaster : AxiStreamMasterType;
 
+  component ila_0
+    port ( clk  : in sl;
+           probe0 : in slv(255 downto 0) );
+  end component;
+  
 begin
 
-  status   <= r.statusO;
+  status   <= r.status;
   fullOut  <= fullIn;
   obClk    <= eventClk;
   obMaster <= tMaster;
+
+  GEN_DEBUG : if DEBUG_G generate
+    U_ILA : ila_0
+      port map ( clk                    => eventClk,
+                 probe0( 63 downto   0) => tMaster.tData(63 downto 0),
+                 probe0( 71 downto  64) => tMaster.tKeep( 7 downto 0),
+                 probe0( 72 )           => tMaster.tValid,
+                 probe0( 73 )           => tMaster.tLast,
+                 probe0( 77 downto  74) => tMaster.tDest(3 downto 0),
+                 probe0( 81 downto  78) => tMaster.tId  (3 downto 0),
+                 probe0( 89 downto  82) => tMaster.tUser(7 downto 0),
+                 probe0( 90 )           => obSlave.tReady,
+                 probe0(255 downto  91) => (others=>'0') );
+
+  end generate;
   
   U_SLinkUp : entity work.Synchronizer
     port map ( clk     => eventClk,

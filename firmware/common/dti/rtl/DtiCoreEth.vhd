@@ -5,7 +5,7 @@
 -- Author     : Larry Ruckman  <ruckman@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-09-21
--- Last update: 2017-04-12
+-- Last update: 2017-04-21
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -410,7 +410,8 @@ begin
        generic map (
          TPD_G            => TPD_G,
          AXI_ERROR_RESP_G => AXI_ERROR_RESP_G,
-         AXI_BASE_ADDR_G  => AXI_CONFIG_C(APP_INDEX_C+i).baseAddr) 
+         AXI_BASE_ADDR_G  => AXI_CONFIG_C(APP_INDEX_C+i).baseAddr,
+         DEBUG_G          => ite(i>0, false, true) ) 
        port map (
          -- Slave AXI-Lite Interface
          axilClk          => axilClk,
