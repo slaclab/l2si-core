@@ -98,7 +98,6 @@ void showUsage(const char* p) {
 int main (int argc, char **argv) {
   int           fd;
   int           ret;
-  unsigned      enable=0;
   unsigned      lane=0;
   unsigned      opCode=0;
   unsigned      size  =512;
@@ -161,10 +160,10 @@ int main (int argc, char **argv) {
       pgpCardTx.cmd = IOCTL_Set_Debug;
       pgpCardTx.model = sizeof(&pgpCardTx);
       pgpCardTx.size = sizeof(PgpCardTx);
-      pgpCardTx.data = (__u32*)debug;
+      pgpCardTx.data = reinterpret_cast<__u32*>(debug);
 
       printf("Setting debug\n");
-      int ret = write(fd,&pgpCardTx,sizeof(PgpCardTx));
+      write(fd,&pgpCardTx,sizeof(PgpCardTx));
     }
 
     { 
@@ -174,7 +173,7 @@ int main (int argc, char **argv) {
       pgpCardTx.data = (__u32*)(1UL<<lane);
 
       printf("Clearing Tx for lane %x\n",lane);
-      int ret = write(fd,&pgpCardTx,sizeof(PgpCardTx));
+      write(fd,&pgpCardTx,sizeof(PgpCardTx));
     }
 
     pgpCardTx.model   = (sizeof(data));
@@ -201,7 +200,7 @@ int main (int argc, char **argv) {
     free(data);
   }
 
-    printf("mapStart[%x]: %p\n", sizeof(*pgpReg), mapStart);
+    printf("mapStart[%zx]: %p\n", sizeof(*pgpReg), mapStart);
 
     printf("Version  : %08x\n", pgpReg->version);
 

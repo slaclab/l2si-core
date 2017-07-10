@@ -12,7 +12,7 @@
 #include <string.h>
 #include <stdlib.h>
 
-#include "../include/PgpCardMod.h"
+#include "../../kernel/pgpcardG3/PgpCardMod.h"
 
 #define DEVNAME "/dev/PgpCardG3_0"
 
@@ -43,7 +43,7 @@ int main (int argc, char **argv) {
        cout << "Usage: xloop device {set|clear}" << endl;
        return(0);      
     }
-    p->data  = (__u32*)i;
+    p->data  = reinterpret_cast<__u32*>(i);
     write(s, p, sizeof(PgpCardTx));
   }
   close(s);   

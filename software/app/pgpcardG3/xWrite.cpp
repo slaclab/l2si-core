@@ -12,7 +12,7 @@
 #include <string.h>
 #include <stdlib.h>
 
-#include "../include/PgpCardMod.h"
+#include "../../kernel/pgpcardG3/PgpCardMod.h"
 
 using namespace std;
 

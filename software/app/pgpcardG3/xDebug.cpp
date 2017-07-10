@@ -11,7 +11,7 @@
 #include <iomanip>
 #include <iostream>
 
-#include "../include/PgpCardMod.h"
+#include "../../kernel/pgpcardG3/PgpCardMod.h"
 
 using namespace std;
 
@@ -31,7 +31,7 @@ int main (int argc, char **argv) {
 
    t.model = sizeof(PgpCardTx*);
    t.cmd   = IOCTL_Set_Debug;
-   t.data  = (__u32*) level;
+   t.data  = reinterpret_cast<__u32*>(level);
 
    if ( (fd = open(argv[1], O_RDWR)) <= 0 ) {
       cout << "Error opening file" << endl;

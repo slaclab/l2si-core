@@ -24,7 +24,7 @@ void sigHandler( int signal ) {
 }
 
 
-#include "../include/PgpCardMod.h"
+#include "../../kernel/pgpcardG3/PgpCardMod.h"
 
 using namespace std;
 
@@ -34,7 +34,6 @@ void printUsage(char* name) {
       "    -P      Set pgpcard device name  (REQUIRED)\n"
       "    -c      number of times to read\n"
       "    -l      lane\n"
-      "    -r      Loop reading data until interrupted or count exceeded\n"
       "    -o      Print out up to maxPrint words when reading data\n"
 //      "    -s      Save to file when reading data\n"
       "    -D      Set debug value           [Default: 0]\n"
@@ -45,9 +44,7 @@ void printUsage(char* name) {
 
 void* countThread(void*);
 
-static unsigned count = 0;
-
-enum Commands{none, writeCommand,readCommand,readAsyncCommand,dumpCommand,testCommand,loopWriteCommand,numberOfCommands};
+static int count = 0;
 
 int main (int argc, char **argv) {
   PgpCardRx     pgpCardRx;
@@ -60,20 +57,15 @@ int main (int argc, char **argv) {
   uint          *data;
   char          err[128];
   char          pgpcard[128]              = "";
-  unsigned            d                   = 0;
-  unsigned            command             = none;
-  unsigned            addr                = 0;
-  unsigned            maxPrint            = 1024;
+  int                 maxPrint            = 1024;
   bool                cardGiven           = false;
   unsigned            debug               = 0;
   ::signal( SIGINT, sigHandler );
-  char                runTimeConfigname[256] = {""};
-  char                writeFileName[256] = {""};
 
-  char*               endptr;
+  //  char*               endptr;
   extern char*        optarg;
   int c;
-  while( ( c = getopt( argc, argv, "hP:D:r:c:l:o:" ) ) != EOF ) {
+  while( ( c = getopt( argc, argv, "hP:D:c:l:o:" ) ) != EOF ) {
     switch(c) {
       case 'P':
         strcpy(pgpcard, optarg);
@@ -82,12 +74,6 @@ int main (int argc, char **argv) {
       case 'D':
         debug = strtoul(optarg, NULL, 0);
         if (debug & 1) print = true;
-        break;
-      case 'r':
-        command = readCommand;
-        d = strtoul(optarg  ,&endptr,0);
-        addr = strtoul(endptr+1,&endptr,0);
-        if (debug & 1) printf("\t read %u,0x%x\n", d, addr);
         break;
       case 'c':
         numb = strtoul(optarg  ,NULL,0);
@@ -123,7 +109,7 @@ int main (int argc, char **argv) {
   pgpCardTx.cmd = IOCTL_Set_Debug;
   pgpCardTx.model = sizeof(&pgpCardTx);
   pgpCardTx.size = sizeof(PgpCardTx);
-  pgpCardTx.data = (__u32*)debug;
+  pgpCardTx.data = reinterpret_cast<__u32*>(debug);
 
   ret = write(fd,&pgpCardTx,sizeof(PgpCardTx));
 
@@ -132,7 +118,7 @@ int main (int argc, char **argv) {
   data = (uint *)malloc(sizeof(uint)*maxSize);
 
   pgpCardRx.maxSize = maxSize;
-  pgpCardRx.data    = (__u32*)data;
+  pgpCardRx.data    = reinterpret_cast<__u32*>(data);
   pgpCardRx.model   = sizeof(data);
 
   pthread_attr_t tattr;
@@ -198,4 +184,5 @@ void* countThread(void* args)
 
     ocount = ncount;
   }
+  return 0;
 }

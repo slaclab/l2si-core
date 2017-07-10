@@ -10,7 +10,7 @@
 #include <iomanip>
 #include <iostream>
 
-#include "../include/PgpCardMod.h"
+#include "../../kernel/pgpcardG3/PgpCardMod.h"
 
 #define DEVNAME "/dev/pgpcardG3_0_0"
 
@@ -34,27 +34,27 @@ int main (int argc, char **argv) {
    for (x=0; x<8; x++) {
       cout << "PGP: TX Reset " << dec << x << endl;
       t.cmd   = IOCTL_Set_Tx_Reset;;
-      t.data  = (__u32*) x;
+      t.data  = reinterpret_cast<__u32*>(x);
       ret |= write(fd, &t, sizeof(&t));
       t.cmd   = IOCTL_Clr_Tx_Reset;
-      t.data  = (__u32*) x;
+      t.data  = reinterpret_cast<__u32*>(x);
       ret |= write(fd, &t, sizeof(&t));
    }
 
    for (x=0; x<8; x++) {
       cout << "PGP: RX Reset " << dec << x << endl;
       t.cmd   = IOCTL_Set_Rx_Reset;;
-      t.data  = (__u32*) x;
+      t.data  = reinterpret_cast<__u32*>(x);
       ret |= write(fd, &t, sizeof(&t));
       t.cmd   = IOCTL_Clr_Rx_Reset;
-      t.data  = (__u32*) x;
+      t.data  = reinterpret_cast<__u32*>(x);
       ret |= write(fd, &t, sizeof(&t));
    }
    
    cout << "EVR: Reset " << endl;
    
    t.cmd   = IOCTL_Evr_Set_PLL_RST;;
-   t.data  = (__u32*) 0;
+   t.data  = reinterpret_cast<__u32*>(0);
    ret |= write(fd, &t, sizeof(&t));
    t.cmd   = IOCTL_Evr_Clr_PLL_RST;
    ret |= write(fd, &t, sizeof(&t));

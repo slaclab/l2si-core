@@ -11,19 +11,6 @@ all:
 	$(CC) $(CFLAGS) xLoopTest.cpp -o xLoopTest
 	$(CC) $(CFLAGS) xWrite.cpp -o xWrite
 	$(CC) $(CFLAGS) xRead.cpp -o xRead
-	$(CC) $(CFLAGS) evrRunDelay.cpp -o evrRunDelay
-	$(CC) $(CFLAGS) evrRunCode.cpp -o evrRunCode
-	$(CC) $(CFLAGS) evrReset.cpp -o evrReset
-	$(CC) $(CFLAGS) evrLaneMode.cpp -o evrLaneMode
-	$(CC) $(CFLAGS) evrLaneEnable.cpp -o evrLaneEnable
-	$(CC) $(CFLAGS) evrHdrChk.cpp -o evrHdrChk
-	$(CC) $(CFLAGS) evrEnable.cpp -o evrEnable
-	$(CC) $(CFLAGS) evrAcceptCode.cpp -o evrAcceptCode
-	$(CC) $(CFLAGS) evrFiducial.cpp -o evrFiducial
-	$(CC) $(CFLAGS) evrDisable.cpp -o evrDisable
-	$(CC) $(CFLAGS) evrConfig.cpp -o evrConfig
-	$(CC) $(CFLAGS) evrClearFrameCount.cpp -o evrClearFrameCount
-	$(CC) $(CFLAGS) evrAcceptDelay.cpp -o evrAcceptDelay
 	$(CC) -c $(CFLAGS) McsRead.cpp -o McsRead.o
 	$(CC) -c $(CFLAGS) PgpCardG3Prom.cpp -o PgpCardG3Prom.o
 	$(CC) $(CFLAGS) McsRead.o PgpCardG3Prom.o xPromLoad.cpp -o xPromLoad
@@ -41,16 +28,3 @@ clean:
 	rm -f PgpCardG3Prom.o
 	rm -f xPromLoad
 	rm -f xPromVerify
-	rm -f evrRunDelay
-	rm -f evrRunCode
-	rm -f evrReset
-	rm -f evrLaneMode
-	rm -f evrLaneEnable
-	rm -f evrHdrChk
-	rm -f evrEnable
-	rm -f evrAcceptCode
-	rm -f evrFiducial
-	rm -f evrDisable
-	rm -f evrConfig
-	rm -f evrClearFrameCount
-	rm -f evrAcceptDelay
