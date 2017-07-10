@@ -67,6 +67,12 @@ set_property PACKAGE_PIN V21   [get_ports {frqSel[0][3]}]
 set_property PACKAGE_PIN AN23  [get_ports {lol[0]}]     
 set_property PACKAGE_PIN AP24  [get_ports {los[0]}]     
 
+set_property -dict { PACKAGE_PIN AN8  IOSTANDARD LVCMOS25 } [get_ports {hsrScl[0][0]}] 
+set_property -dict { PACKAGE_PIN AK10 IOSTANDARD LVCMOS25 } [get_ports {hsrScl[0][1]}] 
+set_property -dict { PACKAGE_PIN AN9  IOSTANDARD LVCMOS25 } [get_ports {hsrScl[0][2]}] 
+set_property -dict { PACKAGE_PIN AP8  IOSTANDARD LVCMOS25 } [get_ports {hsrSda[0][0]}] 
+set_property -dict { PACKAGE_PIN AL9  IOSTANDARD LVCMOS25 } [get_ports {hsrSda[0][1]}] 
+set_property -dict { PACKAGE_PIN AJ8  IOSTANDARD LVCMOS25 } [get_ports {hsrSda[0][2]}] 
 
 # AMC Bay 1
 set_property PACKAGE_PIN N4  [get_ports {dsTxP[1][0]}]
@@ -122,6 +128,12 @@ set_property PACKAGE_PIN AD25  [get_ports {frqSel[1][3]}]
 set_property PACKAGE_PIN AM22  [get_ports {lol[1]}]
 set_property PACKAGE_PIN AM21  [get_ports {los[1]}]
 
+set_property -dict { PACKAGE_PIN AD9  IOSTANDARD LVCMOS25 } [get_ports {hsrScl[1][0]}] 
+set_property -dict { PACKAGE_PIN AD10 IOSTANDARD LVCMOS25 } [get_ports {hsrScl[1][1]}] 
+set_property -dict { PACKAGE_PIN AE8  IOSTANDARD LVCMOS25 } [get_ports {hsrScl[1][2]}] 
+set_property -dict { PACKAGE_PIN AD8  IOSTANDARD LVCMOS25 } [get_ports {hsrSda[1][0]}] 
+set_property -dict { PACKAGE_PIN AE10 IOSTANDARD LVCMOS25 } [get_ports {hsrSda[1][1]}] 
+set_property -dict { PACKAGE_PIN AH8  IOSTANDARD LVCMOS25 } [get_ports {hsrSda[1][2]}] 
 
 
 

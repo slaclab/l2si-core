@@ -12,6 +12,7 @@ loadRuckusTcl $::env(TOP_DIR)/submodules
 #loadRuckusTcl /u1/weaver/lcls-timing-core
 #loadRuckusTcl /u1/weaver/surf
 
+loadRuckusTcl "$::DIR_PATH/../../common/base"
 loadRuckusTcl "$::DIR_PATH/../../common/xpm"
 loadRuckusTcl "$::DIR_PATH/../../common/dti"
 

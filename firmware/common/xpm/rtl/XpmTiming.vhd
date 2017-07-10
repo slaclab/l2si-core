@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-07-08
--- Last update: 2017-04-13
+-- Last update: 2017-07-07
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -163,8 +163,6 @@ architecture mapping of XpmTiming is
    signal txUsrClk       : sl;
    signal txUsrRst       : sl;
    signal txUsrClkActive : sl;
-   signal timingPhy      : TimingPhyType;
-   signal coreTimingPhy  : TimingPhyType;
    signal txOutClk       : sl;
    signal loopback       : slv(2 downto 0);
    signal rxRst          : sl;
@@ -196,8 +194,6 @@ begin
    recTimingClk     <= rxOutClk;
    recTimingRst     <= rxRst;
 
-   timingPhy        <= coreTimingPhy;
-   
    txUsrRst         <= not (txStatus.resetDone);
    appTimingPhyClk  <= txUsrClk;
    appTimingPhyRst  <= txUsrRst;
@@ -251,12 +247,12 @@ begin
          rxDispErr      => rxDispErr,
          rxDecErr       => rxDecErr,
          rxOutClk       => rxOutClk,
-         txControl      => timingPhy.control,
+         txControl      => appTimingPhy.control,
          txStatus       => txStatus,
          txUsrClk       => txUsrClk,
          txUsrClkActive => txUsrClkActive,
-         txData         => timingPhy.data,
-         txDataK        => timingPhy.dataK,
+         txData         => appTimingPhy.data,
+         txDataK        => appTimingPhy.dataK,
          txOutClk       => txUsrClk,  -- will this be source synchronous?
          loopback       => loopback);
 
@@ -292,7 +288,7 @@ begin
          appTimingRst    => rxRst,
          appTimingBus    => recTimingBus,
          exptBus         => recExptBus,
-         timingPhy       => coreTimingPhy,
+         timingPhy       => open,
          axilClk         => axilClk,
          axilRst         => axilRst,
          axilReadMaster  => axilReadMasters(0),

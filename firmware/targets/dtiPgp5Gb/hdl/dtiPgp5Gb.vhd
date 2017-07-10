@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-12-14
--- Last update: 2017-07-05
+-- Last update: 2017-07-08
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -176,6 +176,7 @@ architecture top_level of dtiPgp5Gb is
   signal usObSlave    : AxiStreamSlaveArray (MaxUsLinks-1 downto 0);
   signal usObClk      : slv                 (MaxUsLinks-1 downto 0);
   signal usFull       : Slv16Array          (MaxUsLinks-1 downto 0);
+  signal usFullIn     : slv                 (MaxUsLinks-1 downto 0);
   signal usObTrig     : XpmPartitionDataArray(MaxUsLinks-1 downto 0);
   signal usObTrigV    : slv                  (MaxUsLinks-1 downto 0);
 
@@ -222,18 +223,21 @@ architecture top_level of dtiPgp5Gb is
   signal iamcTxP          : slv(13 downto 0);
   signal iamcTxN          : slv(13 downto 0);
 
-  signal mAxilReadMasters  : AxiLiteReadMasterArray (14 downto 0);
-  signal mAxilReadSlaves   : AxiLiteReadSlaveArray  (14 downto 0);
-  signal mAxilWriteMasters : AxiLiteWriteMasterArray(14 downto 0);
-  signal mAxilWriteSlaves  : AxiLiteWriteSlaveArray (14 downto 0);
+--  constant NPGPAXI_C : integer := 7;
+  constant NPGPAXI_C : integer := 1;
+
+  signal mAxilReadMasters  : AxiLiteReadMasterArray (2*NPGPAXI_C downto 0);
+  signal mAxilReadSlaves   : AxiLiteReadSlaveArray  (2*NPGPAXI_C downto 0);
+  signal mAxilWriteMasters : AxiLiteWriteMasterArray(2*NPGPAXI_C downto 0);
+  signal mAxilWriteSlaves  : AxiLiteWriteSlaveArray (2*NPGPAXI_C downto 0);
 
   function crossBarConfig return AxiLiteCrossbarMasterConfigArray is
-    variable ret : AxiLiteCrossbarMasterConfigArray(14 downto 0);
+    variable ret : AxiLiteCrossbarMasterConfigArray(2*NPGPAXI_C downto 0);
   begin
     ret(0).baseAddr := x"80000000";
     ret(0).addrBits := 24;
     ret(0).connectivity := x"FFFF";
-    for i in 0 to 13 loop
+    for i in 0 to 2*NPGPAXI_C-1 loop
       ret(i+1).baseAddr := x"90000000"+toSlv(i*256,32);
       ret(i+1).addrBits := 8;
       ret(i+1).connectivity := x"FFFF";
@@ -241,8 +245,18 @@ architecture top_level of dtiPgp5Gb is
     return ret;
   end function crossBarConfig;
   
-  constant AXI_CROSSBAR_MASTERS_CONFIG_C : AxiLiteCrossbarMasterConfigArray(14 downto 0) := crossBarConfig;
+  constant AXI_CROSSBAR_MASTERS_CONFIG_C : AxiLiteCrossbarMasterConfigArray(2*NPGPAXI_C downto 0) := crossBarConfig;
 
+  signal dsAxilReadMasters  : AxiLiteReadMasterArray (MaxDsLinks-1 downto 0) := (others=>AXI_LITE_READ_MASTER_INIT_C);
+  signal dsAxilReadSlaves   : AxiLiteReadSlaveArray  (MaxDsLinks-1 downto 0);
+  signal dsAxilWriteMasters : AxiLiteWriteMasterArray(MaxDsLinks-1 downto 0) := (others=>AXI_LITE_WRITE_MASTER_INIT_C);
+  signal dsAxilWriteSlaves  : AxiLiteWriteSlaveArray (MaxDsLinks-1 downto 0);
+
+  signal usAxilReadMasters  : AxiLiteReadMasterArray (MaxUsLinks-1 downto 0) := (others=>AXI_LITE_READ_MASTER_INIT_C);
+  signal usAxilReadSlaves   : AxiLiteReadSlaveArray  (MaxUsLinks-1 downto 0);
+  signal usAxilWriteMasters : AxiLiteWriteMasterArray(MaxUsLinks-1 downto 0) := (others=>AXI_LITE_WRITE_MASTER_INIT_C);
+  signal usAxilWriteSlaves  : AxiLiteWriteSlaveArray (MaxUsLinks-1 downto 0);
+  
   signal bpMonClk : slv(1 downto 0);
 
 begin
@@ -500,11 +514,12 @@ begin
                  eventRst      => ref156MHzRst,
                  eventMasters  => usEvtMasters(i),
                  eventSlaves   => usEvtSlaves (i),
-                 full          => dsFull,
+                 dsFull        => dsFull,
                  --
                  ibClk         => usIbClk   (i),
                  ibLinkUp      => usLinkUp  (i),
                  ibErrs        => (others=>'0'),
+                 ibFull        => usFullIn  (i),
                  ibMaster      => usIbMaster(i),
                  ibSlave       => usIbSlave (i),
                  --
@@ -515,8 +530,9 @@ begin
                  obSlave       => usObSlave (i) );
 
     U_App : entity work.DtiUsPgp5Gb
-      generic map ( ID_G    => toSlv(i,8),
-                    DEBUG_G => ite(i>0, false, true) )
+      generic map ( ID_G           => toSlv(i,8),
+                    DEBUG_G        => ite(i>0, false, true),
+                    INCLUDE_AXIL_G => ite(i<NPGPAXI_C, true, false) )
       port map ( coreClk  => coreClk(i),
                  coreRst  => coreRst(i),
                  gtRefClk => gtRefClk(i),
@@ -529,10 +545,10 @@ begin
                  --
                  axilClk          => regClk,
                  axilRst          => regRst,
-                 axilReadMaster   => mAxilReadMasters (i+1),
-                 axilReadSlave    => mAxilReadSlaves  (i+1),
-                 axilWriteMaster  => mAxilWriteMasters(i+1),
-                 axilWriteSlave   => mAxilWriteSlaves (i+1),
+                 axilReadMaster   => usAxilReadMasters (i),
+                 axilReadSlave    => usAxilReadSlaves  (i),
+                 axilWriteMaster  => usAxilWriteMasters(i),
+                 axilWriteSlave   => usAxilWriteSlaves (i),
                  --
                  ibClk    => usIbClk   (i),
                  ibRst    => regRst,
@@ -540,6 +556,7 @@ begin
                  ibSlave  => usIbSlave (i),
                  linkUp   => usLinkUp  (i),
                  rxErr    => open,
+                 txFull   => usFullIn  (i),
                  --
                  obClk       => usObClk   (i),
                  obRst       => recTimingRst,
@@ -550,6 +567,12 @@ begin
                  timingRst   => recTimingRst,
                  obTrig      => usObTrig  (i),
                  obTrigValid => usObTrigV (i) );
+    GEN_AXIL : if i < NPGPAXI_C generate
+      usAxilReadMasters (i)   <= mAxilReadMasters (i+1);
+      usAxilWriteMasters(i)   <= mAxilWriteMasters(i+1);
+      mAxilReadSlaves   (i+1) <= usAxilReadSlaves (i);
+      mAxilWriteSlaves  (i+1) <= usAxilWriteSlaves (i);
+    end generate;
   end generate;
   
   GEN_DS : for i in 0 to MaxDsLinks-1 generate
@@ -574,7 +597,8 @@ begin
                  obSlave        => dsObSlave (i) );
     
     U_App : entity work.DtiDsPgp5Gb
-      generic map ( ID_G => i )
+      generic map ( ID_G           => i,
+                    INCLUDE_AXIL_G => ite(i<NPGPAXI_C, true, false) )
       port map ( coreClk       => coreClk (13-i),
                  coreRst       => coreRst (13-i),
                  gtRefClk      => gtRefClk(13-i),
@@ -586,10 +610,10 @@ begin
                  --
                  axilClk          => regClk,
                  axilRst          => regRst,
-                 axilReadMaster   => mAxilReadMasters (MaxUsLinks+i+1),
-                 axilReadSlave    => mAxilReadSlaves  (MaxUsLinks+i+1),
-                 axilWriteMaster  => mAxilWriteMasters(MaxUsLinks+i+1),
-                 axilWriteSlave   => mAxilWriteSlaves (MaxUsLinks+i+1),
+                 axilReadMaster   => dsAxilReadMasters (i),
+                 axilReadSlave    => dsAxilReadSlaves  (i),
+                 axilWriteMaster  => dsAxilWriteMasters(i),
+                 axilWriteSlave   => dsAxilWriteSlaves (i),
                  --
                  ibRst         => '0',
                  --
@@ -599,6 +623,13 @@ begin
                  obClk         => dsObClk     (i),
                  obMaster      => dsObMaster  (i),
                  obSlave       => dsObSlave   (i));
+
+    GEN_AXIL : if i < NPGPAXI_C generate
+      dsAxilReadMasters (i)   <= mAxilReadMasters (i+NPGPAXI_C+1);
+      dsAxilWriteMasters(i)   <= mAxilWriteMasters(i+NPGPAXI_C+1);
+      mAxilReadSlaves   (i+NPGPAXI_C+1) <= dsAxilReadSlaves (i);
+      mAxilWriteSlaves  (i+NPGPAXI_C+1) <= dsAxilWriteSlaves(i);
+    end generate;
 
     GEN_USDS : for j in 0 to MaxUsLinks-1 generate
       usEvtSlaves (j)(i) <= dsEvtSlaves (i)(j);
@@ -621,3 +652,4 @@ begin
   end process;
   
 end top_level;
+

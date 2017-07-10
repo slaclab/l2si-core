@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-12-14
--- Last update: 2017-05-26
+-- Last update: 2017-07-07
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -65,6 +65,8 @@ entity xpm is
       pllRst      : out   slv      (1 downto 0);
       lol         : in    slv      (1 downto 0);
       los         : in    slv      (1 downto 0);
+      hsrScl      : inout Slv3Array(1 downto 0);
+      hsrSda      : inout Slv3Array(1 downto 0);
       ----------------
       -- Core Ports --
       ----------------   
@@ -184,6 +186,13 @@ architecture top_level of xpm is
    signal xpmStatus : XpmStatusType;
    signal pllStatus : XpmPllStatusArray ( 1 downto 0);
 
+   signal dsClockP     :   slv(1 downto 0);
+   signal dsClockN     :   slv(1 downto 0);
+   signal idsRxP       :   Slv7Array(1 downto 0);
+   signal idsRxN       :   Slv7Array(1 downto 0);
+   signal idsTxP       :   Slv7Array(1 downto 0);
+   signal idsTxN       :   Slv7Array(1 downto 0);
+
    signal dsLinkStatus : XpmLinkStatusArray(NDsLinks-1 downto 0);
    signal dsTxData  : Slv16Array(NDsLinks-1 downto 0);
    signal dsTxDataK : Slv2Array (NDsLinks-1 downto 0);
@@ -192,7 +201,6 @@ architecture top_level of xpm is
    signal dsRxClk   : slv       (NDsLinks-1 downto 0);
    signal dsRxRst   : slv       (NDsLinks-1 downto 0);
    signal dsRxErr   : slv       (NDsLinks-1 downto 0);
-   signal dsClk     : slv       (NDsLinks-1 downto 0);
 
    signal bpRxLinkUp     : slv               (NBpLinks-1 downto 0);
    signal bpRxLinkFull   : Slv16Array        (NBpLinks-1 downto 0);
@@ -228,6 +236,38 @@ architecture top_level of xpm is
    
 begin
 
+  --
+  --  The AMC SFP channels are reordered - the mapping to MGT quads is non-trivial
+  --    amcTx/Rx indexed by MGT
+  --    iamcTx/Rx indexed by SFP
+  --
+  reorder_p : process (dsClkP,dsClkN,dsRxP,dsRxN,idsTxP,idsTxN) is
+  begin
+    for i in 0 to 1 loop
+      dsClockP(i)  <= dsClkP(i)(0);
+      dsClockN(i)  <= dsClkN(i)(0);
+      for j in 0 to 3 loop
+        dsTxP(i)(j) <= idsTxP(i)(j+2);
+        dsTxN(i)(j) <= idsTxN(i)(j+2);
+        idsRxP (i)(j+2) <= dsRxP(i)(j);
+        idsRxN (i)(j+2) <= dsRxN(i)(j);
+      end loop;
+      for j in 4 to 5 loop
+        dsTxP(i)(j) <= idsTxP(i)(j-4);
+        dsTxN(i)(j) <= idsTxN(i)(j-4);
+        idsRxP (i)(j-4) <= dsRxP(i)(j);
+        idsRxN (i)(j-4) <= dsRxN(i)(j);
+      end loop;
+      for j in 6 to 6 loop
+        dsTxP(i)(j) <= idsTxP(i)(j);
+        dsTxN(i)(j) <= idsTxN(i)(j);
+        idsRxP (i)(j) <= dsRxP(i)(j);
+        idsRxN (i)(j) <= dsRxN(i)(j);
+      end loop;
+    end loop;
+  end process;
+
+  
   U_FPGACLK0 : entity work.ClkOutBufDiff
     generic map (
       XIL_DEVICE_G => "ULTRASCALE")
@@ -460,6 +500,9 @@ begin
          -- IPMC Ports
          ipmcScl           => ipmcScl,
          ipmcSda           => ipmcSda,
+         -- AMC SMBus Ports
+         hsrScl            => hsrScl,
+         hsrSda            => hsrSda,
          -- Configuration PROM Ports
          calScl            => calScl,
          calSda            => calSda,
@@ -517,14 +560,13 @@ begin
                     NLINKS_G   => 7,
                     USE_IBUFDS => true)
       port map ( stableClk       => ref156MHzClk,
-                 gtTxP           => dsTxP   (i),
-                 gtTxN           => dsTxN   (i),
-                 gtRxP           => dsRxP   (i),
-                 gtRxN           => dsRxN   (i),
-                 devClkP         => dsClkP  (i)(0),
-                 devClkN         => dsClkN  (i)(0),
-                 devClkOut       => dsClkBuf(i),
-                 --gtRefClk        => timingRefClk,
+                 gtTxP           => idsTxP   (i),
+                 gtTxN           => idsTxN   (i),
+                 gtRxP           => idsRxP   (i),
+                 gtRxN           => idsRxN   (i),
+                 devClkP         => dsClockP (i),
+                 devClkN         => dsClockN (i),
+                 devClkOut       => dsClkBuf (i),
                  txData          => dsTxData  (7*i+6 downto 7*i),
                  txDataK         => dsTxDataK (7*i+6 downto 7*i),
                  rxData          => dsRxData  (7*i+6 downto 7*i),

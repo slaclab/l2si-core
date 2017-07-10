@@ -1,11 +1,11 @@
 -------------------------------------------------------------------------------
 -- Title      : 
 -------------------------------------------------------------------------------
--- File       : DtiHSRepeater.vhd
+-- File       : HSRepeater.vhd
 -- Author     : Matt Weaver  <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-07-08
--- Last update: 2017-05-15
+-- Last update: 2017-07-07
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -29,7 +29,7 @@ use work.StdRtlPkg.all;
 use work.AxiLitePkg.all;
 use work.i2cPkg.all;
 
-entity DtiHSRepeater is
+entity HSRepeater is
    generic (
      AXI_ERROR_RESP_G : slv(1 downto 0) := AXI_RESP_DECERR_C;
      AXI_BASEADDR_G   : slv(31 downto 0) := (others=>'0') );
@@ -46,9 +46,9 @@ entity DtiHSRepeater is
       --
       hsrScl             : inout Slv3Array(1 downto 0);
       hsrSda             : inout Slv3Array(1 downto 0) );
-end DtiHSRepeater;
+end HSRepeater;
 
-architecture mapping of DtiHSRepeater is
+architecture mapping of HSRepeater is
 
   constant DEVICE_MAP_C : I2cAxiLiteDevArray(0 downto 0) := (
     0 => MakeI2cAxiLiteDevType( "1011000", 8, 8, '0' ) );

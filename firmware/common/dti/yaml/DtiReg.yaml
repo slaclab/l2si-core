@@ -198,7 +198,7 @@ DtiReg: &DtiReg
       name: usRxErrs
       sizeBits: 32
       mode: RO
-      description: Indexed upstream link rx errors count
+      description: Indexed upstream link - rx errors count
     #########################################################
     usRxFull:
       at:
@@ -207,7 +207,7 @@ DtiReg: &DtiReg
       name: usRxFull
       sizeBits: 32
       mode: RO
-      description: Indexed upstream link rx full count
+      description: Indexed upstream link - rx full count
     #########################################################
     usIbRecv:
       at:
@@ -216,7 +216,7 @@ DtiReg: &DtiReg
       name: usIbRecv
       sizeBits: 32
       mode: RO
-      description: Indexed upstream link rx bytes count
+      description: Indexed upstream link - rx words count
     #########################################################
     usIbEvt:
       at:
@@ -225,7 +225,7 @@ DtiReg: &DtiReg
       name: usIbEvt
       sizeBits: 32
       mode: RO
-      description: Indexed upstream link rx events count
+      description: Indexed upstream link - rx events count
     #########################################################
     dsRxErrs:
       at:
@@ -234,7 +234,7 @@ DtiReg: &DtiReg
       name: dsRxErrs
       sizeBits: 32
       mode: RO
-      description: Indexed downstream link rx errors count
+      description: Indexed downstream link - rx errors count
     #########################################################
     dsRxFull:
       at:
@@ -243,7 +243,7 @@ DtiReg: &DtiReg
       name: dsRxFull
       sizeBits: 32
       mode: RO
-      description: Indexed downstream link rx full count
+      description: Indexed downstream link - rx full count
     #########################################################
     dsObSent:
       at:
@@ -252,7 +252,7 @@ DtiReg: &DtiReg
       name: dsObSent
       sizeBits: 48
       mode: RO
-      description: Indexed downstream link tx bytes count
+      description: Indexed downstream link - tx words count
     #########################################################
     usAppObReceived:
       at:
@@ -261,7 +261,7 @@ DtiReg: &DtiReg
       name: usAppObReceived
       sizeBits: 32
       mode: RO
-      description: Indexed upstream app tx input bytes
+      description: Indexed upstream link - rx control words count
     #########################################################
     usAppObSent:
       at:
@@ -270,7 +270,7 @@ DtiReg: &DtiReg
       name: usAppObSent
       sizeBits: 32
       mode: RO
-      description: Indexed upstream app tx output bytes
+      description: Indexed upstream link - tx control words count
     #########################################################
     qpllLock:
       at:

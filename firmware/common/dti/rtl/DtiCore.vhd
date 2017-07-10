@@ -5,7 +5,7 @@
 -- Author     : Larry Ruckman  <ruckman@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-07-08
--- Last update: 2017-07-01
+-- Last update: 2017-07-07
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -423,7 +423,7 @@ begin
          timingRecClkOutN => timingRecClkOutN,
          timingClkSel     => timingClkSel);
 
-   U_HS_Repeater : entity work.DtiHSRepeater
+   U_HSRepeater : entity work.HSRepeater
      generic map (
        AXI_ERROR_RESP_G => AXI_ERROR_RESP_C,
        AXI_BASEADDR_G   => BSA_ADDR_C )

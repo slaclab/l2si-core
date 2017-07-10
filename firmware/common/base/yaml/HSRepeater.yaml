@@ -8,11 +8,11 @@
 ## the terms contained in the LICENSE.txt file.
 ##############################################################################
 #schemaversion 3.0.0
-#once DtiHSRepeater.yaml
-#include DtiHSChannel.yaml
+#once HSRepeater.yaml
+#include HSChannel.yaml
 
-DtiHSRepeater: &DtiHSRepeater 
-  name: DtiHSRepeater
+HSRepeater: &HSRepeater 
+  name: HSRepeater
   class: MMIODev
   configPrio: 1
   description: High speed digital repeater
@@ -63,22 +63,22 @@ DtiHSRepeater: &DtiHSRepeater
       description: Signal detect monitor
     ##################################################
     CH0:
-      <<: *DtiHSChannel
+      <<: *HSChannel
       at: 
         offset: 0x0034
     ##################################################
     CH1:
-      <<: *DtiHSChannel
+      <<: *HSChannel
       at: 
         offset: 0x0050
     ##################################################
     CH2:
-      <<: *DtiHSChannel
+      <<: *HSChannel
       at: 
         offset: 0x006C
     ##################################################
     CH3:
-      <<: *DtiHSChannel
+      <<: *HSChannel
       at: 
         offset: 0x0088
     ##################################################
@@ -91,22 +91,22 @@ DtiHSRepeater: &DtiHSRepeater
       description: Signal detect control
     ##################################################
     CH4:
-      <<: *DtiHSChannel
+      <<: *HSChannel
       at: 
         offset: 0x00A8
     ##################################################
     CH5:
-      <<: *DtiHSChannel
+      <<: *HSChannel
       at: 
         offset: 0x00C4
     ##################################################
     CH6:
-      <<: *DtiHSChannel
+      <<: *HSChannel
       at: 
         offset: 0x00E0
     ##################################################
     CH7:
-      <<: *DtiHSChannel
+      <<: *HSChannel
       at: 
         offset: 0x00FC
     ##################################################

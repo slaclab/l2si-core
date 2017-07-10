@@ -17,6 +17,7 @@ loadSource      -dir  "/u1/weaver/amc-carrier-core/AppMps/rtl/"
 loadRuckusTcl /u1/weaver/lcls-timing-core
 loadRuckusTcl /u1/weaver/surf
 
+loadRuckusTcl "$::DIR_PATH/../../common/base"
 loadRuckusTcl "$::DIR_PATH/../../common/xpm"
 loadRuckusTcl "$::DIR_PATH/../../common/gthUltraScale"
 

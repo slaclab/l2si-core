@@ -17,6 +17,7 @@
 #include GenericMemory.yaml
 #include AmcCarrierBsi.yaml
 #include XpmTiming.yaml
+#include HSRepeater.yaml
 #include EthMacPhy.yaml
 #include UdpEngineClient.yaml
 #include UdpEngineServer.yaml
@@ -130,12 +131,14 @@ XpmCore: &XpmCore
       <<: *XpmTiming
       at:
         offset: 0x08000000      
-#    ##################################################
-#    AmcCarrierBsa:
-#      <<: *AmcCarrierBsa
-#      at:
-#        offset: 0x09000000    
-#    ##################################################
+    ##################################################
+    HSRepeater:
+      <<: *HSRepeater
+      at:
+        offset: 0x09000000    
+        nelms: 6
+        stride: 0x10000
+    ##################################################
     EthMacPhy:
       <<: *EthMacPhy
       at:

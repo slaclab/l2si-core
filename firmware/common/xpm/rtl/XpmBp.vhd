@@ -2,7 +2,7 @@
 -- File       : XpmBp.vhd
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-09-04
--- Last update: 2017-06-30
+-- Last update: 2017-07-07
 -------------------------------------------------------------------------------
 -- Description: 
 -------------------------------------------------------------------------------
@@ -97,7 +97,6 @@ begin
          -- Core Ports --
          ----------------   
          -- Backplane BP Ports
-         mpsClkIn     => bpClkIn,
          mpsClkOut    => bpClkOut);
 
    U_SaltDelayCtrl : entity work.SaltDelayCtrl

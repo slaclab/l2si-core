@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-07-10
--- Last update: 2017-07-05
+-- Last update: 2017-07-08
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -64,12 +64,13 @@ entity DtiUsCore is
      eventRst        : in  sl;
      eventMasters    : out AxiStreamMasterArray(MaxDsLinks-1 downto 0);
      eventSlaves     : in  AxiStreamSlaveArray (MaxDsLinks-1 downto 0);
-     full            : in  slv(MaxDsLinks-1 downto 0);
+     dsFull          : in  slv(MaxDsLinks-1 downto 0);
      --  App Interface
      --  In from detector
      ibClk           : out sl;
      ibLinkUp        : in  sl;
      ibErrs          : in  slv(31 downto 0) := (others=>'0');
+     ibFull          : in  sl;
      ibMaster        : in  AxiStreamMasterType;
      ibSlave         : out AxiStreamSlaveType;
      --  Out to detector
@@ -137,12 +138,11 @@ architecture rtl of DtiUsCore is
   signal iictlTxMaster : AxiStreamMasterType;
   signal ictlTxSlave   : AxiStreamSlaveType;
 
-  signal urst : sl;
-  signal supdate : sl;
+  signal urst    : sl;
+  signal supdate : sl := '0';
   signal sclear  : sl;
+  signal senable : sl;
 
-  constant DEBUG_C : boolean := false;
-  
   component ila_0
     port ( clk    : sl;
            probe0 : slv(255 downto 0) );
@@ -155,11 +155,7 @@ architecture rtl of DtiUsCore is
   
 begin
 
-  GEN_DEBUG : if DEBUG_C generate
-    status.obL0   <= cntL0;
-    status.obL1A  <= cntL1A;
-    status.obL1R  <= cntL1R;
-    
+  GEN_DEBUG : if DEBUG_G generate
     r_state <= "000" when r.state = S_IDLE else
                "001" when r.state = S_EVHDR1 else
                "010" when r.state = S_EVHDR2 else
@@ -185,12 +181,10 @@ begin
                  probe0(255 downto 147) => (others=>'0') );
   end generate;
 
-  GEN_NODEBUG : if not DEBUG_G generate
-    status.obL0  <= (others=>'0');
-    status.obL1A <= (others=>'0');
-    status.obL1R <= (others=>'0');
-  end generate;
-
+  status.obL0   <= cntL0;
+  status.obL1A  <= cntL1A;
+  status.obL1R  <= cntL1R;
+  
   obClk         <= timingClk;
   ibClk         <= eventClk;
   obTrig        <= pdata;
@@ -200,8 +194,8 @@ begin
 
   status.linkUp     <= ibLinkUp;
   status.rxErrs     <= ibErrs;
-  status.rxFull     <= r.rxFullO;
-  status.ibRecv     <= r.ibRecvO;
+  status.rxFull     <= r.rxFull;
+  status.ibRecv     <= r.ibRecv;
   status.ibEvt      <= r.ibEvt;
   
   eventTag      <= ibMaster.tId(eventTag'range);
@@ -250,9 +244,9 @@ begin
                axisRst                             => eventRst );
 
   U_HdrCache : entity work.DtiHeaderCache
-    generic map ( DEBUG_G => DEBUG_G )
     port map ( rst       => urst,
                wrclk     => timingClk,
+               enable    => senable,
                timingBus => timingBus,
                exptBus   => exptBus,
                partition => config.partition(2 downto 0),
@@ -283,12 +277,17 @@ begin
                dataIn  => clear,
                dataOut => sclear );
   
+  U_EnableS : entity work.Synchronizer
+    port map ( clk     => timingClk,
+               dataIn  => config.enable,
+               dataOut => senable );
+  
   --
   --  For event traffic:
   --    Arbitrate through forwarding mask
   --    Add event header
   --
-  comb : process ( r, ibMaster, tSlave, configS, eventRst, sclear, supdate, eventHeader, full,
+  comb : process ( r, ibMaster, tSlave, configS, eventRst, sclear, supdate, eventHeader, dsfull, ibFull,
                    ictlTxMaster, ictlTxSlave, rin) is
     variable v : RegType;
     variable selv : sl;
@@ -389,18 +388,19 @@ begin
     v.full := (others=>'0');
     if configS.fwdMode = '0' then    -- Round robin mode
       v.mask := configS.fwdMask;
-      isFull := full(conv_integer(fwd)) or not selv;
+      isFull := dsFull(conv_integer(fwd)) or not selv;
     else                             -- Next not full
-      v.mask := configS.fwdMask and not full;
+      v.mask := configS.fwdMask and not dsFull;
       isFull := not selv;
     end if;
-
+    isFull := isFull or ibFull;
+    
     if isFull='1' and r.ena='1' then
       v.full(conv_integer(configS.partition)) := isFull;
       v.rxFull  := r.rxFull+1;
     end if;
 
-    if r.slave.tReady='1' then
+    if r.slave.tReady='1' and r.state/=S_IDLE then
       v.ibRecv := r.ibRecv+1;
     end if;
 

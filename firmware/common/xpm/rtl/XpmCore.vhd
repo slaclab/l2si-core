@@ -5,7 +5,7 @@
 -- Author     : Larry Ruckman  <ruckman@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-07-08
--- Last update: 2017-06-29
+-- Last update: 2017-07-07
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -30,6 +30,7 @@ use work.AxiLitePkg.all;
 use work.AxiPkg.all;
 use work.TimingPkg.all;
 use work.XpmPkg.all;
+use work.AmcCarrierSysRegPkg.all;
 use work.AmcCarrierPkg.all;
 
 library unisim;
@@ -125,6 +126,9 @@ entity XpmCore is
       -- Configuration PROM Ports
       calScl            : inout sl;
       calSda            : inout sl;
+      --
+      hsrScl            : inout Slv3Array(1 downto 0);
+      hsrSda            : inout Slv3Array(1 downto 0);
       -- DDR3L SO-DIMM Ports
       ddrClkP           : in    sl;
       ddrClkN           : in    sl;
@@ -187,6 +191,11 @@ architecture mapping of XpmCore is
    signal ddrWriteSlave  : AxiLiteWriteSlaveType;
    signal ddrMemReady    : sl;
    signal ddrMemError    : sl;
+
+   signal hsrReadMaster  : AxiLiteReadMasterType;
+   signal hsrReadSlave   : AxiLiteReadSlaveType;
+   signal hsrWriteMaster : AxiLiteWriteMasterType;
+   signal hsrWriteSlave  : AxiLiteWriteSlaveType;
 
    signal bsiMac     : slv(47 downto 0);
    signal bsiIp      : slv(31 downto 0);
@@ -310,10 +319,10 @@ begin
          timingWriteMaster => timingWriteMaster,
          timingWriteSlave  => timingWriteSlave,
          -- BSA AXI-Lite Interface
-         bsaReadMaster     => open,
-         bsaReadSlave      => AXI_LITE_READ_SLAVE_INIT_C,
-         bsaWriteMaster    => open,
-         bsaWriteSlave     => AXI_LITE_WRITE_SLAVE_INIT_C,
+         bsaReadMaster     => hsrReadMaster,
+         bsaReadSlave      => hsrReadSlave,
+         bsaWriteMaster    => hsrWriteMaster,
+         bsaWriteSlave     => hsrWriteSlave,
          -- ETH PHY AXI-Lite Interface
          ethReadMaster    => ethReadMaster,
          ethReadSlave     => ethReadSlave,
@@ -413,6 +422,21 @@ begin
          timingRecClkOutN => timingRecClkOutN,
          timingClkSel     => open);
 
+    U_HSRepeater : entity work.HSRepeater
+     generic map (
+       AXI_ERROR_RESP_G => AXI_ERROR_RESP_C,
+       AXI_BASEADDR_G   => BSA_ADDR_C )
+     port map (
+       axilClk         => axilClk,
+       axilRst         => axilRst,
+       axilReadMaster  => hsrReadMaster,
+       axilReadSlave   => hsrReadSlave,
+       axilWriteMaster => hsrWriteMaster,
+       axilWriteSlave  => hsrWriteSlave,
+       --
+       hsrScl          => hsrScl,
+       hsrSda          => hsrSda );
+  
    ------------------
    -- DDR Memory Core
    ------------------

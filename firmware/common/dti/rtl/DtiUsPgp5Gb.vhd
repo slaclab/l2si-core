@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-07-10
--- Last update: 2017-07-03
+-- Last update: 2017-07-08
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -44,6 +44,7 @@ entity DtiUsPgp5Gb is
       TPD_G               : time                := 1 ns;
       ID_G                : slv(7 downto 0)     := (others=>'0');
       ENABLE_TAG_G        : boolean             := false ;
+      INCLUDE_AXIL_G      : boolean             := false ;
       DEBUG_G             : boolean             := false );
    port (
      coreClk         : in  sl;
@@ -69,6 +70,7 @@ entity DtiUsPgp5Gb is
      ibSlave         : in  AxiStreamSlaveType;
      linkUp          : out sl;
      rxErr           : out sl;
+     txFull          : out sl;
      --
      obClk           : in  sl;
      obRst           : in  sl;
@@ -134,34 +136,13 @@ begin
   dmaObSlave               <= pgpTxSlaves(0);
   dmaIbMaster              <= pgpRxMasters(0);
   pgpRxCtrls(0)            <= dmaIbCtrl;
-  
-  --  How to connect dmaIbSlave?
-  
-  -- assuming 156.25MHz ref clk
-  --U_Pgp2b : entity work.Pgp2bGth7VarLatWrapper
-  --  generic map ( CPLL_FBDIV_G    => 4,
-  --                CPLL_FBDIV_45_G => 4,
-  --                RXOUT_DIV_G     => 1,
-  --                TXOUT_DIV_G     => 1,
-  --                RXCDR_CFG_G     => x"0001107FE206021041010",
-  --                NUM_VC_EN_G     => 4 )
-  --  port map ( pgpClk       => amcClk,
-  --             pgpRst       => amcRst,
-  --             pgpTxIn      => pgpTxIn,
-  --             pgpTxOut     => pgpTxOut,
-  --             pgpRxIn      => pgpRxIn,
-  --             pgpRxOut     => pgpRxOut,
-  --             -- Frame TX Interface
-  --             pgpTxMasters => pgpTxMasters,
-  --             pgpTxSlaves  => pgpTxSlaves,
-  --             -- Frame RX Interface
-  --             pgpRxMasters => pgpRxMasters,
-  --             pgpRxCtrl    => pgpRxCtrls,
-  --             -- GT Pins
-  --             gtTxP        => amcTxP,
-  --             gtTxN        => amcTxN,
-  --             gtRxP        => amcRxP,
-  --             gtRxN        => amcRxN );
+
+  U_PgpFb : entity work.DtiPgpFb
+    port map ( pgpClk       => pgpClk,
+               pgpRst       => pgpRst,
+               pgpRxOut     => pgpRxOut,
+               txAlmostFull => txFull );
+
   U_Pgp2b : entity work.MpsPgpFrontEnd
     port map ( pgpClk       => pgpClk,
                pgpRst       => pgpRst,
@@ -184,28 +165,37 @@ begin
                gtTxN        => amcTxN,
                gtRxP        => amcRxP,
                gtRxN        => amcRxN );
-    
-  U_Axi : entity work.Pgp2bAxi
-    generic map ( AXI_CLK_FREQ_G => 156.25E+6 )
-    port map ( -- TX PGP Interface (pgpTxClk)
-               pgpTxClk         => pgpClk,
-               pgpTxClkRst      => pgpRst,
-               pgpTxIn          => pgpTxIn,
-               pgpTxOut         => pgpTxOut,
-               locTxIn          => locTxIn,
-               -- RX PGP Interface (pgpRxClk)
-               pgpRxClk         => pgpClk,
-               pgpRxClkRst      => pgpRst,
-               pgpRxIn          => pgpRxIn,
-               pgpRxOut         => pgpRxOut,
-               -- AXI-Lite Register Interface (axilClk domain)
-               axilClk          => axilClk,
-               axilRst          => axilRst,
-               axilReadMaster   => axilReadMaster,
-               axilReadSlave    => axilReadSlave,
-               axilWriteMaster  => axilWriteMaster,
-               axilWriteSlave   => axilWriteSlave );
 
+  GEN_AXIL : if INCLUDE_AXIL_G generate
+    U_Axi : entity work.Pgp2bAxi
+      generic map ( AXI_CLK_FREQ_G => 156.25E+6 )
+      port map ( -- TX PGP Interface (pgpTxClk)
+        pgpTxClk         => pgpClk,
+        pgpTxClkRst      => pgpRst,
+        pgpTxIn          => pgpTxIn,
+        pgpTxOut         => pgpTxOut,
+        locTxIn          => locTxIn,
+        -- RX PGP Interface (pgpRxClk)
+        pgpRxClk         => pgpClk,
+        pgpRxClkRst      => pgpRst,
+        pgpRxIn          => pgpRxIn,
+        pgpRxOut         => pgpRxOut,
+        -- AXI-Lite Register Interface (axilClk domain)
+        axilClk          => axilClk,
+        axilRst          => axilRst,
+        axilReadMaster   => axilReadMaster,
+        axilReadSlave    => axilReadSlave,
+        axilWriteMaster  => axilWriteMaster,
+        axilWriteSlave   => axilWriteSlave );
+  end generate;
+
+  NOGEN_AXIL : if not INCLUDE_AXIL_G generate
+    pgpTxIn        <= locTxIn;
+    pgpRxIn        <= PGP2B_RX_IN_INIT_C;
+    axilReadSlave  <= AXI_LITE_READ_SLAVE_INIT_C;
+    axilWriteSlave <= AXI_LITE_WRITE_SLAVE_INIT_C;
+  end generate;
+    
   U_ObToAmc : entity work.AxiStreamFifo
     generic map ( SLAVE_AXI_CONFIG_G  => US_OB_CONFIG_C,
                   MASTER_AXI_CONFIG_G => SSI_PGP2B_CONFIG_C )

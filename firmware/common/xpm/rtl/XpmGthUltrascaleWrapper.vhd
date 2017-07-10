@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-12-14
--- Last update: 2017-03-28
+-- Last update: 2017-07-07
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -182,8 +182,8 @@ begin
     status    (i).rxresetDone <= rxPmaResetDone(i);
     status    (i).rxErr       <= rxErrS(i);
     status    (i).rxErrCnts   <= rxErrCnts(i);
-    txReset   (i)             <= config(i).txReset;
-    rxReset   (i)             <= config(i).rxReset;
+    txReset   (i)             <= '0';
+    rxReset   (i)             <= rxResetDone(i) and rxErrIn(i);
     
     U_STATUS : entity work.SynchronizerOneShotCnt
       generic map ( CNT_WIDTH_G => 32 )
@@ -231,10 +231,10 @@ begin
         gtwiz_buffbypass_rx_error_out        => open,  -- Might need this
         gtwiz_reset_clk_freerun_in(0)        => stableClk,
         gtwiz_reset_all_in                   => "0",
-        gtwiz_reset_tx_pll_and_datapath_in(0)=> txReset(i),
-        gtwiz_reset_tx_datapath_in           => "0",
-        gtwiz_reset_rx_pll_and_datapath_in(0)=> rxReset(i),
-        gtwiz_reset_rx_datapath_in           => "0",
+        gtwiz_reset_tx_pll_and_datapath_in(0)=> config(i).txReset,
+        gtwiz_reset_tx_datapath_in        (0)=> txReset(i),
+        gtwiz_reset_rx_pll_and_datapath_in(0)=> config(i).rxReset,
+        gtwiz_reset_rx_datapath_in        (0)=> rxReset(i),
         gtwiz_reset_rx_cdr_stable_out        => open,
         gtwiz_reset_tx_done_out           (0)=> txResetDone(i),
         gtwiz_reset_rx_done_out           (0)=> rxResetDone(i),

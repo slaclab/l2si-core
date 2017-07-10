@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-07-10
--- Last update: 2017-07-03
+-- Last update: 2017-07-08
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -39,6 +39,7 @@ entity DtiHeaderCache is
      rst             : in  sl;
      --  Cache Input
      wrclk           : in  sl;
+     enable          : in  sl;
      timingBus       : in  TimingBusType;
      exptBus         : in  ExptBusType;
      partition       : in  slv(2 downto 0);
@@ -91,7 +92,7 @@ architecture rtl of DtiHeaderCache is
   signal il1a         : sl;
   signal sdelay       : slv(l0delay'range);
   signal spartition   : slv(partition'range);
-  
+
 begin
 
   pdata            <= wr.pword;
@@ -107,7 +108,7 @@ begin
   daddr <= l0tag when entagr='1' else
            doutf;
 
-  il1a  <= wr.pword.l1e and wr.pword.l1a;
+  il1a  <= wr.pword.l1e and wr.pword.l1a and wr.pwordV;
   
   U_RstIn  : entity work.RstSync
     port map ( clk      => wrclk,
@@ -166,7 +167,7 @@ begin
                dina(159 downto 128) => wr.pword.anatag,
                clkb   => rdclk,
                enb    => '1',
-               addrb  => l0tag,
+               addrb  => daddr,
                doutb  => doutb );
 
   U_TagFifo : entity work.FifoAsync
@@ -181,7 +182,7 @@ begin
                rd_en     => advance,
                dout      => doutf );
 
-  comb : process( wr, wrrst, timingBus, exptBus, sdelay, spartition ) is
+  comb : process( wr, wrrst, timingBus, exptBus, sdelay, spartition, enable ) is
     variable v  : WrRegType;
     variable ip : integer;
   begin
@@ -197,7 +198,7 @@ begin
       v.rden   := '1';
       v.rdaddr := timingBus.message.pulseId(7 downto 0) - sdelay;
       v.pword  := toPartitionWord(exptBus.message.partitionWord(ip));
-      v.pwordV := '1';
+      v.pwordV := enable;
     end if;
 
     if wr.rden = '1' then
