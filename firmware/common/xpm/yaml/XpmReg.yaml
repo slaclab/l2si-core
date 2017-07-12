@@ -1,10 +1,10 @@
 ##############################################################################
 ## This file is part of 'SLAC Firmware Standard Library'.
-## It is subject to the license terms in the LICENSE.txt file found in the 
-## top-level directory of this distribution and at: 
-##    https://confluence.slac.stanford.edu/display/ppareg/LICENSE.html. 
-## No part of 'SLAC Firmware Standard Library', including this file, 
-## may be copied, modified, propagated, or distributed except according to 
+## It is subject to the license terms in the LICENSE.txt file found in the
+## top-level directory of this distribution and at:
+##    https://confluence.slac.stanford.edu/display/ppareg/LICENSE.html.
+## No part of 'SLAC Firmware Standard Library', including this file,
+## may be copied, modified, propagated, or distributed except according to
 ## the terms contained in the LICENSE.txt file.
 ##############################################################################
 #schemaversion 3.0.0
@@ -62,16 +62,6 @@ XpmReg: &XpmReg
       mode: RW
       description: Link number for input to ring buffer
     #########################################################
-    TagStream:
-      at:
-        offset: 0x0007
-      class: IntField
-      name: TagStream
-      sizeBits: 1
-      lsBit: 0
-      mode: RW
-      description: Enable tag FIFO streaming input
-    #########################################################
     AmcIndex:
       at:
         offset: 0x0006
@@ -80,7 +70,7 @@ XpmReg: &XpmReg
       sizeBits: 1
       lsBit: 0
       mode: RW
-      description: Amc selection for indexed registers
+      description: AMC selection for indexed registers
     #########################################################
     InhibitIndex:
       at:
@@ -91,6 +81,16 @@ XpmReg: &XpmReg
       lsBit: 4
       mode: RW
       description: Unused
+    #########################################################
+    TagStream:
+      at:
+        offset: 0x0007
+      class: IntField
+      name: TagStream
+      sizeBits: 1
+      lsBit: 0
+      mode: RW
+      description: Enable tag FIFO streaming input
     #########################################################
     LinkTxDelay:
       at:
@@ -488,7 +488,7 @@ XpmReg: &XpmReg
       class:    IntField
       name: PartitionL1TriggerWord
       sizeBits: 9
-      lsBit:    0
+      lsBit:    4
       mode:     RW
       description: L1 trigger word for indexed partition
     #########################################################
@@ -496,7 +496,7 @@ XpmReg: &XpmReg
       at:
         offset: 0x0052
       class:    IntField
-      name: PartitionL1SelectClear
+      name: PartitionL1TriggerWr
       sizeBits: *numL1Triggers
       lsBit:    0
       mode:     RW
@@ -564,16 +564,6 @@ XpmReg: &XpmReg
       mode:     RW
       description: Pipeline depth for indexed partition
     #########################################################
-    PartitionMessageInsert:
-      at:
-        offset: 0x006D
-      class:    IntField
-      name: PartitionMessageInsert
-      sizeBits: 1
-      lsBit:    7
-      mode:     RW
-      description: Insert message for indexed partition
-    #########################################################
     PartitionMessageHeader:
       at:
         offset: 0x006c
@@ -583,6 +573,16 @@ XpmReg: &XpmReg
       lsBit:    0
       mode:     RW
       description: Message header for indexed partition
+    #########################################################
+    PartitionMessageInsert:
+      at:
+        offset: 0x006d
+      class:    IntField
+      name: PartitionMessageInsert
+      sizeBits: 1
+      lsBit:    7
+      mode:     RW
+      description: Insert message for indexed partition
     #########################################################
     PartitionMessagePayload:
       at:
@@ -660,11 +660,11 @@ XpmReg: &XpmReg
         stride: 4
         nelms: 4
       class:    IntField
-      name: MonClkRate
+      name: MonClkLock
       sizeBits: 1
       lsBit:    7
       mode:     RO
-      description: Monitor clock rate
+      description: Monitor clock lock
     #########################################################
     MonClkSlow:
       at:
@@ -672,11 +672,11 @@ XpmReg: &XpmReg
         stride: 4
         nelms: 4
       class:    IntField
-      name: MonClkRate
+      name: MonClkSlow
       sizeBits: 1
       lsBit:    5
       mode:     RO
-      description: Monitor clock rate
+      description: Monitor slow clock
     #########################################################
     MonClkFast:
       at:
@@ -684,8 +684,8 @@ XpmReg: &XpmReg
         stride: 4
         nelms: 4
       class:    IntField
-      name: MonClkRate
+      name: MonClkFast
       sizeBits: 1
       lsBit:    6
       mode:     RO
-      description: Monitor clock rate
+      description: Monitor fast clock
