@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-12-14
--- Last update: 2017-07-07
+-- Last update: 2017-07-21
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -52,6 +52,7 @@ entity XpmGthUltrascaleWrapper is
       rxRst            : out slv       (NLINKS_G-1 downto 0);
       rxErr            : out slv       (NLINKS_G-1 downto 0);
       txClk            : out sl;
+      txClkIn          : in  sl;
       config           : in  XpmLinkConfigArray(NLINKS_G-1 downto 0);
       status           : out XpmLinkStatusArray(NLINKS_G-1 downto 0) );
 end XpmGthUltrascaleWrapper;
@@ -137,6 +138,9 @@ END COMPONENT;
   signal rxFifoRst : slv(NLINKS_G-1 downto 0);
   signal rxErrIn   : slv(NLINKS_G-1 downto 0);
 
+  signal rxbypassrst  : slv(NLINKS_G-1 downto 0);
+  signal txbypassrst  : slv(NLINKS_G-1 downto 0);
+
   signal loopback  : Slv3Array(NLINKS_G-1 downto 0);
 
   component ila_1x256x1024
@@ -183,7 +187,8 @@ begin
     status    (i).rxErr       <= rxErrS(i);
     status    (i).rxErrCnts   <= rxErrCnts(i);
     txReset   (i)             <= '0';
-    rxReset   (i)             <= rxResetDone(i) and rxErrIn(i);
+--    rxReset   (i)             <= rxResetDone(i) and rxErrIn(i);
+    rxReset   (i)             <= '0';
     
     U_STATUS : entity work.SynchronizerOneShotCnt
       generic map ( CNT_WIDTH_G => 32 )
@@ -193,7 +198,7 @@ begin
                  cntOut       => rxErrCnts(i),
                  wrClk        => rxUsrClk (i),
                  rdClk        => stableClk );
-    
+
     U_BUFG  : BUFG_GT
       port map (  I       => rxOutClk(i),
                   CE      => '1',
@@ -203,29 +208,40 @@ begin
                   DIV     => "000",
                   O       => rxUsrClk(i) );
 
-    U_TXBUFG  : BUFG_GT
-      port map (  I       => txOutClk(0),
-                  CE      => '1',
-                  CEMASK  => '1',
-                  CLR     => '0',
-                  CLRMASK => '1',
-                  DIV     => "000",
-                  O       => txUsrClk(i) );
-
+    --U_TXBUFG  : BUFG_GT
+    --  port map (  I       => txOutClk(0),
+    --              CE      => '1',
+    --              CEMASK  => '1',
+    --              CLR     => '0',
+    --              CLRMASK => '1',
+    --              DIV     => "000",
+    --              O       => txUsrClk(i) );
+    txUsrClk(i) <= txClkIn;
+    
     rxErrL (i)  <= rxErrIn(i);
     rxClk  (i)  <= rxUsrClk(i);
     rxRst  (i)  <= rxFifoRst(i);
     rxDataK(i)  <= rxCtrl0Out(i);
 
+    U_RstSyncTx : entity work.RstSync
+      port map ( clk      => txUsrClk(i),
+                 asyncRst => config(i).txReset,
+                 syncRst  => txbypassrst(i) );
+
+    U_RstSyncRx : entity work.RstSync
+      port map ( clk      => rxUsrClk(i),
+                 asyncRst => config(i).rxReset,
+                 syncRst  => rxbypassrst(i) );
+
     U_GthCore : gt_dslink_ss_nophase_amc0 -- 1 RTM link
       PORT MAP (
         gtwiz_userclk_tx_active_in           => "1",
         gtwiz_userclk_rx_active_in           => "1",
-        gtwiz_buffbypass_tx_reset_in         => "0",
+        gtwiz_buffbypass_tx_reset_in     (0) => txbypassrst(i),
         gtwiz_buffbypass_tx_start_user_in    => "0",
         gtwiz_buffbypass_tx_done_out         => open,
         gtwiz_buffbypass_tx_error_out        => open,
-        gtwiz_buffbypass_rx_reset_in         => "0",
+        gtwiz_buffbypass_rx_reset_in     (0) => rxbypassrst(i),
         gtwiz_buffbypass_rx_start_user_in    => "0",
         gtwiz_buffbypass_rx_done_out         => open,  -- Might need this
         gtwiz_buffbypass_rx_error_out        => open,  -- Might need this

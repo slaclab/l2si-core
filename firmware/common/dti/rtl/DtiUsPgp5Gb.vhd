@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-07-10
--- Last update: 2017-07-08
+-- Last update: 2017-07-21
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -50,6 +50,7 @@ entity DtiUsPgp5Gb is
      coreClk         : in  sl;
      coreRst         : in  sl;
      gtRefClk        : in  sl;
+     remLinkID       : out slv(7 downto 0);
      status          : out DtiUsAppStatusType;
      amcRxP          : in  sl;
      amcRxN          : in  sl;
@@ -69,7 +70,7 @@ entity DtiUsPgp5Gb is
      ibMaster        : out AxiStreamMasterType;
      ibSlave         : in  AxiStreamSlaveType;
      linkUp          : out sl;
-     rxErr           : out sl;
+     rxErrs          : out slv(31 downto 0);
      txFull          : out sl;
      --
      obClk           : in  sl;
@@ -120,16 +121,18 @@ architecture top_level_app of DtiUsPgp5Gb is
   signal pgpClk         : sl;
   signal pgpRst         : sl;
 
+  signal itxfull        : sl;
 begin
 
   pgpRst <= ibRst;
 
   linkUp                   <= pgpRxOut.linkReady;
+  remLinkID                <= pgpRxOut.remLinkData;
 
   locTxIn.flush            <= '0';
   locTxIn.opCodeEn         <= r.opCodeEn;
   locTxIn.opCode           <= r.opCode;
-  locTxIn.locData          <= x"00";
+  locTxIn.locData          <= ID_G;
   locTxIn.flowCntlDis      <= '1';
   
   pgpTxMasters(0)          <= dmaObMaster;
@@ -141,7 +144,7 @@ begin
     port map ( pgpClk       => pgpClk,
                pgpRst       => pgpRst,
                pgpRxOut     => pgpRxOut,
-               txAlmostFull => txFull );
+               txAlmostFull => itxFull );
 
   U_Pgp2b : entity work.MpsPgpFrontEnd
     port map ( pgpClk       => pgpClk,
@@ -166,9 +169,25 @@ begin
                gtRxP        => amcRxP,
                gtRxN        => amcRxN );
 
+  U_RXERR : entity work.SynchronizerOneShotCnt
+    generic map ( CNT_WIDTH_G => 32 )
+    port map ( wrClk   => pgpClk,
+               rdClk   => ibClk,
+               cntRst  => fifoRst,
+               rollOverEn => '1',
+               dataIn  => pgpRxOut.linkError,
+               dataOut => open,
+               cntOut  => rxErrs );
+  
+  U_TXFULL : entity work.Synchronizer
+    port map ( clk     => ibClk,
+               dataIn  => itxFull,
+               dataOut => txFull );
+  
   GEN_AXIL : if INCLUDE_AXIL_G generate
     U_Axi : entity work.Pgp2bAxi
-      generic map ( AXI_CLK_FREQ_G => 156.25E+6 )
+      generic map ( AXI_CLK_FREQ_G    => 156.25E+6,
+                    ERROR_CNT_WIDTH_G => 32 )
       port map ( -- TX PGP Interface (pgpTxClk)
         pgpTxClk         => pgpClk,
         pgpTxClkRst      => pgpRst,
@@ -210,7 +229,7 @@ begin
   
   U_AmcToIb : entity work.AxiStreamFifo
     generic map ( SLAVE_AXI_CONFIG_G  => SSI_PGP2B_CONFIG_C,
-                  MASTER_AXI_CONFIG_G => US_OB_CONFIG_C )
+                  MASTER_AXI_CONFIG_G => US_IB_CONFIG_C )
     port map ( sAxisClk    => pgpClk,
                sAxisRst    => pgpRst,
                sAxisMaster => dmaIbMaster,

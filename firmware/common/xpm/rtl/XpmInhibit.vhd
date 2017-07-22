@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-12-14
--- Last update: 2017-03-28
+-- Last update: 2017-07-21
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -35,6 +35,7 @@ entity XpmInhibit is
       -- register clock domain
       regclk           : in  sl;
       update           : in  sl;
+      clear            : in  sl;                    -- clear statistics
       config           : in  XpmPartInhConfigType;  -- programmable parameters
       status           : out XpmInhibitStatusType;  -- statistics
       --  timing clock domain
@@ -80,7 +81,7 @@ begin
    U_Status : entity work.SyncStatusVector
      generic map ( WIDTH_G => 32 )
      port map ( statusIn     => inhSrc,
-                cntRstIn     => '0',
+                cntRstIn     => clear,
                 rollOverEnIn => (others=>'1'),
                 cntOut       => counts,
                 wrClk        => clk,
@@ -96,7 +97,7 @@ begin
                   inhibit    => trigfull    (i) );
    end generate;
 
-   process (r, counts, update) is
+   process (r, clear, counts, update) is
      variable v : RegType;
    begin
      v := r;
@@ -107,6 +108,10 @@ begin
        end loop;
      end if;
 
+     if clear='1' then
+       v := REG_INIT_C;
+     end if;
+     
      r_in <= v;
    end process;
    

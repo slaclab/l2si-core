@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-12-14
--- Last update: 2017-07-03
+-- Last update: 2017-07-21
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -80,7 +80,7 @@ architecture rtl of DtiReg is
   signal usApp   , iusApp    : DtiUsAppStatusType;
   signal usLinkUp : slv(MaxUsLinks-1 downto 0);
   signal dsLinkUp : slv(MaxDsLinks-1 downto 0);
-  signal bpLinkUp : sl;
+  signal bpStatus : DtiBpLinkStatusType;
   signal qplllock : slv(status.qplllock'range);
 
   signal monClkRate : Slv32Array(3 downto 0);
@@ -115,14 +115,26 @@ begin
 
   U_BPLINKUP : entity work.Synchronizer
     port map ( clk     => axilClk,
-               dataIn  => status.bpLinkUp,
-               dataOut => bpLinkUp );
+               dataIn  => status.bpLink.linkUp,
+               dataOut => bpStatus.linkUp );
+
+  U_BPSent : entity work.SynchronizerVector
+    generic map ( WIDTH_G => 32 )
+    port map ( clk     => axilClk,
+               dataIn  => status.bpLink.obSent,
+               dataOut => bpStatus.obSent );
 
   U_UsRxErrs : entity work.SynchronizerVector
     generic map ( WIDTH_G => 32 )
     port map ( clk     => axilClk,
                dataIn  => iusStatus.rxErrs,
                dataOut => usStatus.rxErrs );
+  
+  U_UsRemLinkID : entity work.SynchronizerVector
+    generic map ( WIDTH_G => 8 )
+    port map ( clk     => axilClk,
+               dataIn  => iusStatus.remLinkID,
+               dataOut => usStatus.remLinkID );
   
   U_UsRxFull : entity work.SynchronizerVector
     generic map ( WIDTH_G => 32 )
@@ -141,6 +153,12 @@ begin
     port map ( clk     => axilClk,
                dataIn  => iusStatus.ibEvt,
                dataOut => usStatus.ibEvt );
+  
+  U_UsIbDump : entity work.SynchronizerVector
+    generic map ( WIDTH_G => 32 )
+    port map ( clk     => axilClk,
+               dataIn  => iusStatus.ibDump,
+               dataOut => usStatus.ibDump );
   
   U_UsObL0 : entity work.SynchronizerVector
     generic map ( WIDTH_G => 20 )
@@ -165,6 +183,12 @@ begin
     port map ( clk     => axilClk,
                dataIn  => idsStatus.rxErrs,
                dataOut => dsStatus.rxErrs );
+  
+  U_DsRemLinkID : entity work.SynchronizerVector
+    generic map ( WIDTH_G => 8 )
+    port map ( clk     => axilClk,
+               dataIn  => idsStatus.remLinkID,
+               dataOut => dsStatus.remLinkID );
   
   U_DsRxFull : entity work.SynchronizerVector
     generic map ( WIDTH_G => 32 )
@@ -212,7 +236,7 @@ begin
   end generate;
     
   comb : process (r, axilRst, axilReadMaster, axilWriteMaster, usApp,
-                  usLinkUp, dsLinkUp, usStatus, dsStatus, bpLinkUp, qplllock,
+                  usLinkUp, dsLinkUp, usStatus, dsStatus, bpStatus, qplllock,
                   monClkRate, monClkLock, monClkFast, monClkSlow ) is
     variable v          : RegType;
     variable axilStatus : AxiLiteStatusType;
@@ -264,7 +288,7 @@ begin
     for i in 0 to MaxUsLinks-1 loop
       axilRegR (toSlv( 16*7+0,12),  i, usLinkUp(i) );
     end loop;    
-    axilRegR (toSlv( 16*7+0,12),  15, bpLinkUp);
+    axilRegR (toSlv( 16*7+0,12),  15, bpStatus.linkUp);
     for i in 0 to MaxDsLinks-1 loop
       axilRegR (toSlv( 16*7+0,12), 16+i, dsLinkUp(i) );
     end loop;    
@@ -274,12 +298,17 @@ begin
     axilRegRW (toSlv( 16*7+4,12), 30, v.clear );
     axilRegRW (toSlv( 16*7+4,12), 31, v.update);
 
-    axilRegR (toSlv( 16*8+0 ,12),  0, usStatus.rxErrs );
+    axilRegR (toSlv( 16*7+8,12), 0, bpStatus.obSent);
+    
+    axilRegR (toSlv( 16*8+0 ,12),  0, usStatus.rxErrs(23 downto 0) );
+    axilRegR (toSlv( 16*8+0 ,12), 24, usStatus.remLinkID);
     axilRegR (toSlv( 16*8+4 ,12),  0, usStatus.rxFull );
-    axilRegR (toSlv( 16*8+8 ,12),  0, usStatus.ibRecv (31 downto 0));
+--    axilRegR (toSlv( 16*8+8 ,12),  0, usStatus.ibRecv (31 downto 0));
+    axilRegR (toSlv( 16*8+8 ,12),  0, usStatus.ibDump );
     axilRegR (toSlv( 16*8+12,12),  0, usStatus.ibEvt );
 
-    axilRegR (toSlv( 16*9+0 ,12),  0, dsStatus.rxErrs);
+    axilRegR (toSlv( 16*9+0 ,12),  0, dsStatus.rxErrs(23 downto 0));
+    axilRegR (toSlv( 16*9+0 ,12), 24, dsStatus.remLinkID);
     axilRegR (toSlv( 16*9+4 ,12),  0, dsStatus.rxFull);
     axilRegR (toSlv( 16*9+8 ,12),  0, dsStatus.obSent(31 downto 0));
     axilRegR (toSlv( 16*9+12,12),  0, dsStatus.obSent(47 downto 32));
@@ -288,7 +317,8 @@ begin
     axilRegR (toSlv( 16*10+8 ,12),  0, usApp.obSent);
 
     axilRegR (toSlv( 16*11+0, 12),  0, qplllock);
-
+    axilRegRW(toSlv( 16*11+0 ,12), 16, v.config.bpPeriod );
+    
     for i in 0 to 3 loop
       axilRegR (toSlv( 16*11+4*i+4, 12),  0, monClkRate(i)(28 downto 0));
       axilRegR (toSlv( 16*11+4*i+4, 12), 29, monClkSlow(i));
@@ -296,10 +326,6 @@ begin
       axilRegR (toSlv( 16*11+4*i+4, 12), 31, monClkLock(i));
     end loop;
 
-    --axilRegR (toSlv( 16*12+0 ,12),  0, usStatus.obL0 );
-    --axilRegR (toSlv( 16*12+4 ,12),  0, usStatus.obL1A );
-    --axilRegR (toSlv( 16*12+8 ,12),  0, usStatus.obL1R );
-    
     -- Set the status
     axiSlaveDefault(axilWriteMaster, axilReadMaster, v.axilWriteSlave, v.axilReadSlave, axilStatus, AXI_RESP_OK_C);
 

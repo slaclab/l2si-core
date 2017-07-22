@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-12-14
--- Last update: 2017-05-16
+-- Last update: 2017-07-20
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -119,7 +119,7 @@ architecture rtl of XpmReg is
   signal anaRdCount  : AnaRdArray(NPartitions-1 downto 0);
   
   signal s    : XpmStatusType;
-  signal sbpLinkUp : slv(NBPLinks downto 0);
+  signal linkStat, slinkStat  : XpmLinkStatusType;
 
   signal monClkRate : Slv32Array(3 downto 0);
   signal monClkLock : slv       (3 downto 0);
@@ -135,7 +135,7 @@ begin
 
   GEN_MONCLK : for i in 0 to 3 generate
     U_SYNC : entity work.SyncClockFreq
-      generic map ( REF_CLK_FREQ_G => 156.25E+6,
+      generic map ( REF_CLK_FREQ_G    => 125.00E+6,
                     CLK_LOWER_LIMIT_G =>  95.0E+6,
                     CLK_UPPER_LIMIT_G => 186.0E+6 )
       port map ( freqOut     => monClkRate(i),
@@ -153,13 +153,24 @@ begin
   --    link status (32 links)
   --    partition inhibit counts (from 32 links for each partition)
   --
-  
-  GEN_BPLINK : entity work.SynchronizerVector
-    generic map ( WIDTH_G => sbpLinkUp'length )
-    port map ( clk     => axilClk,
-               dataIn  => status.bpLinkUp,
-               dataOut => sbpLinkUp );
-  
+
+  GEN_BP : for i in 0 to NBpLinks generate
+    U_LinkUp : entity work.Synchronizer
+      port map ( clk     => axilClk,
+                 dataIn  => status.bpLink(i).linkUp,
+                 dataOut => s.bpLink(i).linkUp );
+    U_IbRecv : entity work.SynchronizerVector
+      generic map ( WIDTH_G => 32 )
+      port map ( clk     => axilClk,
+                 dataIn  => status.bpLink(i).ibRecv,
+                 dataOut => s.bpLink(i).ibRecv );
+    U_RxLate : entity work.SynchronizerVector
+      generic map ( WIDTH_G => 16 )
+      port map ( clk     => axilClk,
+                 dataIn  => status.bpLink(i).rxLate,
+                 dataOut => s.bpLink(i).rxLate );
+  end generate;
+               
   GEN_PART : for i in 0 to NPartitions-1 generate
     U_Sync64_ena : entity work.SynchronizerFifo
       generic map ( DATA_WIDTH_G => 64 )
@@ -228,7 +239,7 @@ begin
                mAxisSlave   => r_in.tagSlave );
 
   comb : process (r, axilReadMaster, axilWriteMaster, tagMaster, status, s, axilRst,
-                  pllStatus, pllCount, pllStat, anaRdCount, sbpLinkUp,
+                  pllStatus, pllCount, pllStat, anaRdCount,
                   monClkRate, monClkLock, monClkFast, monClkSlow) is
     variable v          : RegType;
     variable axilStatus : AxiLiteStatusType;
@@ -294,13 +305,17 @@ begin
     end if;
 
     if r.link(4)='0' then
-      v.linkStat         := status.dsLink (il);
-    elsif r.link(3 downto 0)=toSlv(NBPLinks,4) then
+      v.linkStat         := status.dsLink (il);  -- clock-domain?
+    elsif r.link(3 downto 0)=toSlv(0,4) then
       v.linkStat         := XPM_LINK_STATUS_INIT_C;
-      v.linkStat.txReady := sbpLinkUp(il);
+      v.linkStat.txReady := s.bpLink (il).linkUp;
+    elsif r.link(3)='0' then
+      v.linkStat           := XPM_LINK_STATUS_INIT_C;
+      v.linkStat.rxReady   := s.bpLink (il).linkUp;
+      v.linkStat.rxErrCnts := s.bpLink (il).ibRecv(15 downto 0);
     else
-      v.linkStat         := XPM_LINK_STATUS_INIT_C;
-      v.linkStat.rxReady := sbpLinkUp(il);
+      v.linkStat           := XPM_LINK_STATUS_INIT_C;
+      v.linkStat.rxErrCnts := s.bpLink (conv_integer(r.link(2 downto 0))).rxLate;
     end if;
     v.partitionStat := status.partition(ip);
     v.pllStat       := pllStatus       (ia);
@@ -415,14 +430,15 @@ begin
       v.anaWrCount(ip) := r.anaWrCount(ip)+1;
     end if;
       
-    if r.config.tagstream='0' then
-      v.tagSlave.tReady := '0';
-    elsif tagMaster.tValid='1' then
-      ip := conv_integer(tagMaster.tDest(3 downto 0));
-      v.config.partition(ip).analysis.tag  := tagMaster.tData(31 downto  0);
-      v.config.partition(ip).analysis.push := tagMaster.tData(35 downto 34);
-    end if;
-
+    --if r.config.tagstream='0' then
+    --  v.tagSlave.tReady := '0';
+    --elsif tagMaster.tValid='1' then
+    --  ip := conv_integer(tagMaster.tDest(3 downto 0));
+    --  v.config.partition(ip).analysis.tag  := tagMaster.tData(31 downto  0);
+    --  v.config.partition(ip).analysis.push := tagMaster.tData(35 downto 34);
+    --end if;
+    v.tagSlave.tReady := '0';
+    
     -- Set the status
     axiSlaveDefault(axilWriteMaster, axilReadMaster, v.axilWriteSlave, v.axilReadSlave, axilStatus, AXI_RESP_OK_C);
 

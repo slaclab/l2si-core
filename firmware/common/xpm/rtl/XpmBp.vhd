@@ -2,7 +2,7 @@
 -- File       : XpmBp.vhd
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-09-04
--- Last update: 2017-07-07
+-- Last update: 2017-07-20
 -------------------------------------------------------------------------------
 -- Description: 
 -------------------------------------------------------------------------------
@@ -30,6 +30,7 @@ use work.StdRtlPkg.all;
 use work.AxiStreamPkg.all;
 use work.SsiPkg.all;
 use work.XpmPkg.all;
+use work.TimingPkg.all;
 
 entity XpmBp is
    generic ( TPD_G    : time    := 1 ns;
@@ -40,9 +41,14 @@ entity XpmBp is
       ----------------------
       ref125MHzClk    : in  sl;
       ref125MHzRst    : in  sl;
-      rxFull          : out Slv16Array        (NBpLinks downto 1);
-      rxLinkUp        : out slv               (NBpLinks downto 1);
+      rxFull          : out Slv16Array          (NBpLinks downto 1);
+      config          : in  XpmLinkConfigArray  (NBpLinks downto 1);
+      status          : out XpmBpLinkStatusArray(NBpLinks downto 1);
       monClk          : out sl;
+      --
+      timingClk       : in  sl;
+      timingRst       : in  sl;
+      timingBus       : in  TimingBusType;
       ----------------
       -- Core Ports --
       ----------------
@@ -63,13 +69,14 @@ architecture mapping of XpmBp is
    signal bp500MHzRst : sl;
    signal bpPllLocked : sl;
 
-   constant BP_CONFIG_C : AxiStreamConfigType := ssiAxiStreamConfig(2);
+   constant BP_CONFIG_C : AxiStreamConfigType := ssiAxiStreamConfig(4);
    
    signal bpMaster : AxiStreamMasterArray(NBpLinks downto 1);
 
    signal iDelayCtrlRdy : sl;
-   signal linkUp        : slv(NBpLinks downto 1);
-
+   signal timeRef       : slv(7 downto 0);
+   signal timeStrobe    : sl;
+   
 begin
 
   monClk <= bp100MHzClk;
@@ -119,7 +126,8 @@ begin
          COMMON_TX_CLK_G     => false,
          COMMON_RX_CLK_G     => false,
          SLAVE_AXI_CONFIG_G  => BP_CONFIG_C,
-         MASTER_AXI_CONFIG_G => BP_CONFIG_C)
+         MASTER_AXI_CONFIG_G => BP_CONFIG_C,
+         DEBUG_G             => ite(i>1,false,true) )
        port map (
          -- TX Serial Stream
          txP           => open,
@@ -133,7 +141,7 @@ begin
          clk312MHz     => bp250MHzClk,
          clk625MHz     => bp500MHzClk,
          iDelayCtrlRdy => iDelayCtrlRdy,
-         linkUp        => rxLinkUp(i),
+         linkUp        => status(i).linkUp,
          -- Slave Port
          sAxisClk      => ref125MHzClk,
          sAxisRst      => ref125MHzRst,
@@ -147,14 +155,39 @@ begin
 
    end generate GEN_VEC;
 
+   U_Timing : entity work.SynchronizerVector
+     generic map ( WIDTH_G => 8 )
+     port map ( clk     => ref125MHzClk,
+                dataIn  => timingBus.message.pulseId(7 downto 0),
+                dataOut => timeRef );
+
+  U_TimingStrobe : entity work.SynchronizerOneShot
+     port map ( clk     => ref125MHzClk,
+                dataIn  => timingBus.strobe,
+                dataOut => timeStrobe );
+  
    seq: process (ref125MHzClk) is
+     variable rxLate : Slv16Array(NBpLinks downto 1) := (others=>(others=>'0'));
+     variable ibRecv : Slv32Array(NBpLinks downto 1) := (others=>(others=>'0'));
+     variable ticks  : slv(7 downto 0);
    begin
      if rising_edge(ref125MHzClk) then
        for i in 1 to NBpLinks loop
-         if ref125MHzRst='1' then
+         status(i).ibRecv <= ibRecv(i);
+         status(i).rxLate <= rxLate(i);
+         if ref125MHzRst='1' or config(i).enable='0' then
+           rxLate(i) := (others=>'0');
            rxFull(i) <= (others=>'0');
+           ibRecv(i) := (others=>'0');
          elsif bpMaster(i).tValid='1' then
+           rxLate(i) := (timeRef - bpMaster(i).tData(31 downto 24)) &
+                        (ticks   - bpMaster(i).tData(23 downto 16));
            rxFull(i) <= bpMaster(i).tData(15 downto 0);
+           ibRecv(i) := ibRecv(i)+1;
+         end if;
+         ticks := ticks + 1;
+         if timeStrobe='1' then
+           ticks := (others=>'0');
          end if;
        end loop;
      end if;

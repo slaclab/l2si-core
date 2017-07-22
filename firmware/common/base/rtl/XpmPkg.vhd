@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2016-03-25
--- Last update: 2017-04-09
+-- Last update: 2017-07-21
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -33,7 +33,7 @@ package XpmPkg is
    -----------------------------------------------------------
    constant NAmcs       : integer := 2;
    constant NDSLinks    : integer := 14;
-   constant NBPLinks    : integer := 14;
+   constant NBPLinks    : integer := 6;
    constant NPartitions : integer := 8;
    constant NTagBytes   : integer := 4;
    constant NL1Triggers : integer := 1;
@@ -92,6 +92,17 @@ package XpmPkg is
       rxErrCnts   => (others=>'0'),
       rxIsXpm     => '0' );
 
+   type XpmBpLinkStatusType is record
+     linkUp   : sl;
+     ibRecv   : slv(31 downto 0);
+     rxLate   : slv(15 downto 0);
+   end record;
+   type XpmBpLinkStatusArray is array (natural range<>) of XpmBpLinkStatusType;
+   constant XPM_BP_LINK_STATUS_INIT_C : XpmBpLinkStatusType := (
+      linkUp => '0',
+      ibRecv => (others=>'0'),
+      rxLate => (others=>'0') );
+   
    --
    --  Partition status
    --
@@ -138,15 +149,15 @@ package XpmPkg is
    type XpmPartitionStatusArray is array(natural range<>) of XpmPartitionStatusType;
    
    type XpmStatusType is record
-      dsLink    : XpmLinkStatusArray(NDSLinks-1 downto 0);
-      bpLinkUp  : slv               (NBPLinks downto 0);
+      dsLink    : XpmLinkStatusArray  (NDSLinks-1 downto 0);
+      bpLink    : XpmBpLinkStatusArray(NBPLinks   downto 0);
       partition : XpmPartitionStatusArray(NPartitions-1 downto 0);
       paddr     : slv(PADDR_LEN-1 downto 0);
    end record;
 
    constant XPM_STATUS_INIT_C : XpmStatusType := (
       dsLink    => (others => XPM_LINK_STATUS_INIT_C),
-      bpLinkUp  => (others => '0'),
+      bpLink    => (others => XPM_BP_LINK_STATUS_INIT_C),
       partition => (others => XPM_PARTITION_STATUS_INIT_C),
       paddr     => (others => '1'));
 
@@ -186,7 +197,7 @@ package XpmPkg is
    type XpmLinkConfigArray is array (natural range<>) of XpmLinkConfigType;
    constant XPM_LINK_CONFIG_INIT_C : XpmLinkConfigType := (
      enable     => '0',
-     loopback   => '1',
+     loopback   => '0',
      txReset    => '0',
      rxReset    => '0',
      txDelayRst => '0',
@@ -308,7 +319,7 @@ package XpmPkg is
    
    type XpmConfigType is record
       dsLink     : XpmLinkConfigArray(NDSLinks-1 downto 0);
-      bpLink     : XpmLinkConfigArray(NBPLinks-1 downto 0);
+      bpLink     : XpmLinkConfigArray(NBPLinks   downto 0);
       pll        : XpmPllConfigArray(NAmcs-1 downto 0);
       partition  : XpmPartitionConfigArray(NPartitions-1 downto 0);
       tagstream  : sl;

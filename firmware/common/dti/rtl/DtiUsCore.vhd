@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-07-10
--- Last update: 2017-07-08
+-- Last update: 2017-07-21
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -45,6 +45,7 @@ entity DtiUsCore is
      clear           : in  sl := '0';
      update          : in  sl := '1';
      config          : in  DtiUsLinkConfigType;
+     remLinkID       : in  slv(7 downto 0);
      status          : out DtiUsLinkStatusType;
      fullOut         : out slv(15 downto 0);
      --  Ethernet control interface
@@ -85,7 +86,7 @@ architecture rtl of DtiUsCore is
 
   constant MAX_BIT : integer := bitSize(MaxDsLinks)-1;
 
-  type StateType is (S_IDLE, S_EVHDR1, S_EVHDR2, S_EVHDR3, S_EVHDR4, S_FIRST_PAYLOAD, S_PAYLOAD);
+  type StateType is (S_IDLE, S_EVHDR1, S_EVHDR2, S_EVHDR3, S_EVHDR4, S_FIRST_PAYLOAD, S_PAYLOAD, S_DUMP);
   
   type RegType is record
     ena     : sl;
@@ -102,6 +103,7 @@ architecture rtl of DtiUsCore is
     ibRecv  : slv(47 downto 0);
     ibRecvO : slv(47 downto 0);
     ibEvt   : slv(31 downto 0);
+    ibDump  : slv(31 downto 0);
   end record;
   
   constant REG_INIT_C : RegType := (
@@ -118,7 +120,8 @@ architecture rtl of DtiUsCore is
     rxFullO => (others=>'0'),
     ibRecv  => (others=>'0'),
     ibRecvO => (others=>'0'),
-    ibEvt   => (others=>'0') );
+    ibEvt   => (others=>'0'),
+    ibDump  => (others=>'0') );
   
   signal r   : RegType := REG_INIT_C;
   signal rin : RegType;
@@ -193,10 +196,12 @@ begin
   urst          <= clear and not r.ena;
 
   status.linkUp     <= ibLinkUp;
+  status.remLinkID  <= remLinkID;
   status.rxErrs     <= ibErrs;
   status.rxFull     <= r.rxFull;
   status.ibRecv     <= r.ibRecv;
   status.ibEvt      <= r.ibEvt;
+  status.ibDump     <= r.ibDump;
   
   eventTag      <= ibMaster.tId(eventTag'range);
   
@@ -296,7 +301,7 @@ begin
   begin
     v := r;
 
-    v.slave.tReady := '1';
+    v.slave.tReady := '0';
     v.ena  := configS.enable;
     v.hdrRd          := '0';
     
@@ -310,6 +315,7 @@ begin
       when S_IDLE =>
         if v.master.tValid='0' and ibMaster.tValid='1' then
           if ibMaster.tDest(0)='1' then
+            v.slave.tReady := '1';
             v.master       := ibMaster;
             v.master.tDest := toSlv(MaxDsLinks,r.master.tDest'length);
             if ibMaster.tLast='1' then
@@ -317,14 +323,15 @@ begin
             else
               v.state      := S_PAYLOAD;
             end if;
+          elsif selv = '0' then
+            v.state        := S_DUMP;
+            v.ibDump       := r.ibDump+1;
           else
-            v.slave.tReady := '0';
             v.state        := S_EVHDR1;
             v.ibEvt        := r.ibEvt+1;
           end if;
         end if;
       when S_EVHDR1 =>
-        v.slave.tReady := '0';
         if v.master.tValid='0' and ibMaster.tValid='1' then
           v.dest          := fwd;
           v.master.tValid := '1';
@@ -337,7 +344,6 @@ begin
           v.state         := S_EVHDR2;
         end if;
       when S_EVHDR2 =>
-        v.slave.tReady := '0';
         if v.master.tValid='0' then
           v.master.tValid := '1';
           v.master.tData(63 downto 0) := eventHeader.pulseId;
@@ -346,37 +352,42 @@ begin
           v.state         := S_EVHDR3;
         end if;
       when S_EVHDR3 =>
-        v.slave.tReady := '0';
         if v.master.tValid='0' then
           v.master.tValid := '1';
           v.master.tData(63 downto 0) := eventHeader.evttag & toSlv(0,32);
           v.state         := S_EVHDR4;
         end if;
       when S_EVHDR4 =>
-        v.slave.tReady := '0';
         if v.master.tValid='0' then
           v.master.tValid := '1';
           v.master.tData(63 downto 0) := configS.dataSrc & configS.dataType;
           v.state         := S_FIRST_PAYLOAD;
         end if;
       when S_FIRST_PAYLOAD =>
-        if v.master.tValid='0' then
+        if v.master.tValid='0' and ibMaster.tValid='1' then
           -- preserve tDest
+          v.slave.tReady  := '1';
           v.master        := ibMaster;
           v.master.tUser  := (others=>'0');  -- already in EVHDR1
           v.master.tDest  := r.master.tDest;
-          v.slave.tReady  := '1';
           v.state         := S_PAYLOAD;
           if ibMaster.tLast='1' then -- maybe missing EOFE
             v.state  := S_IDLE;
           end if;
         end if;
       when S_PAYLOAD =>
-        if v.master.tValid='0' then
+        if v.master.tValid='0' and ibMaster.tValid='1' then
           -- preserve tDest
+          v.slave.tReady  := '1';
           v.master        := ibMaster;
           v.master.tDest  := r.master.tDest;
-          v.slave.tReady  := '1';
+          if ibMaster.tLast='1' then
+            v.state  := S_IDLE;
+          end if;
+        end if;
+      when S_DUMP =>
+        if ibMaster.tValid='1' then
+          v.slave.tReady := '1';
           if ibMaster.tLast='1' then
             v.state  := S_IDLE;
           end if;
@@ -408,6 +419,7 @@ begin
       v.rxFull := (others=>'0');
       v.ibRecv := (others=>'0');
       v.ibEvt  := (others=>'0');
+      v.ibDump := (others=>'0');
     end if;
     
     if eventRst = '1' then

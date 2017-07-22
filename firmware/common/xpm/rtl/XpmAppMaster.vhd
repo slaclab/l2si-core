@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-07-10
--- Last update: 2017-04-09
+-- Last update: 2017-07-19
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -82,14 +82,14 @@ architecture rtl of XpmAppMaster is
   --  L0 trigger output
   signal l0Accept       : sl;
   signal l0Reject       : sl;
-  signal l0Tag          : slv(7 downto 0);
+  signal l0Tag          : slv(8*NTagBytes-1 downto 0);
   --  L1 trigger output
   signal l1Out          : sl;
   signal l1Accept       : sl;
   signal l1AcceptTag    : slv(7 downto 0);
   signal l1AcceptFrame  : XpmAcceptFrameType;
   --  Analysis tag (key)
-  signal analysisTag    : slv(8*NTagBytes-1 downto 0);
+--  signal analysisTag    : slv(8*NTagBytes-1 downto 0);
   
   signal frame         : slv(16*TIMING_MESSAGE_WORDS_C-1 downto 0);
   signal timingBus_strobe : sl;
@@ -141,6 +141,7 @@ begin
   U_Inhibit : entity work.XpmInhibit
     port map ( regclk         => regclk,
                update         => update,
+               clear          => config.l0Select.reset,
                config         => config.inhibit,
                status         => status.inhibit,
                --
@@ -165,6 +166,7 @@ begin
                status         => status.l0Select );
 
   U_L0Tag : entity work.XpmL0Tag
+    generic map ( TAG_WIDTH_G => l0Tag'length )
     port map ( clk            => timingClk,
                rst            => timingRst,
                config         => config.l0Tag,
@@ -187,14 +189,14 @@ begin
   --             accept         => open,
   --             tag            => open );
 
-  U_AnalysisTag : entity work.XpmAnalysisTag
-    port map ( wrclk          => regclk,
-               config         => config.analysis,
-               rdclk          => timingClk,
-               rden           => l1Accept,
-               rddone         => r.partStrobe,
-               rdvalid        => status.anaRd,
-               tag            => analysisTag );
+  --U_AnalysisTag : entity work.XpmAnalysisTag
+  --  port map ( wrclk          => regclk,
+  --             config         => config.analysis,
+  --             rdclk          => timingClk,
+  --             rden           => l1Accept,
+  --             rddone         => r.partStrobe,
+  --             rdvalid        => status.anaRd,
+  --             tag            => analysisTag );
 
   U_SyncMsgPayload : entity work.SynchronizerVector
     generic map ( WIDTH_G => config.message.payload'length )
@@ -219,7 +221,8 @@ begin
   presult.l1e    <= l0Accept;
   presult.l0tag  <= l0Tag(presult.l0tag'range);
   presult.l1tag  <= l0Tag(presult.l1tag'range);
-  presult.anatag <= analysisTag;
+--  presult.anatag <= analysisTag;
+  presult.anatag <= l0Tag(presult.anatag'range);
   
   comb : process ( r, timingRst, frame, timingBus_strobe, timingBus_valid, msgConfig,
                    presult ) is

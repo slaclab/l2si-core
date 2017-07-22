@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-07-10
--- Last update: 2017-04-09
+-- Last update: 2017-07-19
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -44,7 +44,7 @@ entity XpmApp is
       -----------------------
       -- XpmApp Ports --
       -----------------------
-      sysclk            : in  sl;
+      regclk            : in  sl;
       update            : in  slv(NPartitions-1 downto 0);
       config            : in  XpmConfigType;
       status            : out XpmStatusType;
@@ -58,13 +58,10 @@ entity XpmApp is
       dsRxClk           : in  slv               (NDsLinks-1 downto 0);
       dsRxRst           : in  slv               (NDsLinks-1 downto 0);
       --  BP DS Ports
-      bpTxLinkUp        : in  sl;
       bpTxData          : out slv(15 downto 0);
       bpTxDataK         : out slv( 1 downto 0);
-      bpRxLinkUp        : in  slv               (NBpLinks-1 downto 0);
-      bpRxLinkFull      : in  Slv16Array        (NBpLinks-1 downto 0);
-      bpClk             : in  sl;
-      bpClkRst          : in  sl;
+      bpStatus          : in  XpmBpLinkStatusArray(NBpLinks   downto 0);
+      bpRxLinkFull      : in  Slv16Array          (NBpLinks-1 downto 0);
       -- Timing Interface (timingClk domain) 
       timingClk         : in  sl;
       timingRst         : in  sl;
@@ -134,10 +131,35 @@ architecture top_level_app of XpmApp is
   signal isXpm       : slv(NDsLinks-1 downto 0);
   signal pmaster     : slv(NPartitions-1 downto 0);
   signal expWord     : Slv48Array(NPartitions-1 downto 0);
+
+  constant DEBUG_C : boolean := true;
   
+  component ila_0
+    port ( clk    : in sl;
+           probe0 : in slv(255 downto 0) );
+  end component;
+
 begin
 
-  linkstatp: process (bpTxLinkUp, bpRxLinkUp, dsLinkStatus, isXpm) is
+  GEN_DEBUG : if DEBUG_C generate
+    U_ILA : ila_0
+      port map ( clk    => timingClk,
+                 probe0( 15 downto  0) => timingIn.data,
+                 probe0( 17 downto 16) => timingIn.dataK,
+                 probe0( 18 )          => sof,
+                 probe0( 19 )          => eof,
+                 probe0( 20 )          => fiducial,
+                 probe0( 22 downto 21) => advance,
+                 probe0( 24 downto 23) => r.advance,
+                 probe0( 25 )          => r.source,
+                 probe0( 26 )          => streams(0).ready,
+                 probe0( 27 )          => streams(1).ready,
+                 probe0( 28 )          => r.streams(0).ready,
+                 probe0( 29 )          => r.streams(1).ready,
+                 probe0(255 downto 30) => (others=>'0') );
+  end generate;
+  
+  linkstatp: process (bpStatus, dsLinkStatus, isXpm) is
     variable linkStat : XpmLinkStatusType;
   begin
     for i in 0 to NDsLinks-1 loop
@@ -145,7 +167,7 @@ begin
       linkStat.rxIsXpm := isXpm(i);
       status.dsLink(i) <= linkStat;
     end loop;
-    status.bpLinkUp <= bpTxLinkUp & bpRxLinkUp;
+    status.bpLink <= bpStatus;
   end process;
 
   GEN_SYNCBP : for i in 0 to NBpLinks-1 generate
@@ -158,7 +180,7 @@ begin
   
   U_SyncPaddr : entity work.SynchronizerVector
     generic map ( WIDTH_G => status.paddr'length )
-    port map ( clk     => sysclk,
+    port map ( clk     => regclk,
                dataIn  => r.paddr,
                dataOut => status.paddr );
   
@@ -234,7 +256,7 @@ begin
 
     U_Master : entity work.XpmAppMaster
       generic map ( NDsLinks   => NDsLinks )
-      port map ( regclk        => sysclk,
+      port map ( regclk        => regclk,
                  update        => update          (i),
                  config        => config.partition(i),
                  status        => status.partition(i),

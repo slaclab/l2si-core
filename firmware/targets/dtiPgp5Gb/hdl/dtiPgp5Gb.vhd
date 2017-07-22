@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-12-14
--- Last update: 2017-07-08
+-- Last update: 2017-07-21
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -169,9 +169,12 @@ architecture top_level of dtiPgp5Gb is
 
   signal usConfig     : DtiUsLinkConfigArray(MaxUsLinks-1 downto 0) := (others=>DTI_US_LINK_CONFIG_INIT_C);
   signal usStatus     : DtiUsLinkStatusArray(MaxUsLinks-1 downto 0);
+  signal usRemLinkID  : Slv8Array           (MaxUsLinks-1 downto 0);
   signal usIbMaster   : AxiStreamMasterArray(MaxUsLinks-1 downto 0);
   signal usIbSlave    : AxiStreamSlaveArray (MaxUsLinks-1 downto 0);
   signal usIbClk      : slv                 (MaxUsLinks-1 downto 0);
+  signal usLinkUp     : slv                 (MaxUsLinks-1 downto 0);
+  signal usRxErrs     : Slv32Array          (MaxUsLinks-1 downto 0);
   signal usObMaster   : AxiStreamMasterArray(MaxUsLinks-1 downto 0);
   signal usObSlave    : AxiStreamSlaveArray (MaxUsLinks-1 downto 0);
   signal usObClk      : slv                 (MaxUsLinks-1 downto 0);
@@ -182,7 +185,8 @@ architecture top_level of dtiPgp5Gb is
 
   signal fullOut      : slv(15 downto 0);
   
-  signal dsStatus : DtiDsLinkStatusArray(MaxDsLinks-1 downto 0);
+  signal dsStatus     : DtiDsLinkStatusArray(MaxDsLinks-1 downto 0);
+  signal dsRemLinkID  : Slv8Array           (MaxDsLinks-1 downto 0);
   
   signal ctlRxM, ctlTxM : AxiStreamMasterArray(MaxUsLinks-1 downto 0) := (others=>AXI_STREAM_MASTER_INIT_C);
   signal ctlRxS, ctlTxS : AxiStreamSlaveArray (MaxUsLinks-1 downto 0) := (others=>AXI_STREAM_SLAVE_INIT_C);
@@ -214,8 +218,6 @@ architecture top_level of dtiPgp5Gb is
   signal coreRst     : slv        (13 downto 0);
   signal gtRefClk    : slv        (13 downto 0);
   
-  signal usLinkUp         : slv(MaxUsLinks-1 downto 0);
-
   signal iquad            : QuadArray(13 downto 0);
   signal iamcRst          : slv(13 downto 0) := (others=>'0');
   signal iamcRxP          : slv(13 downto 0);
@@ -225,14 +227,15 @@ architecture top_level of dtiPgp5Gb is
 
 --  constant NPGPAXI_C : integer := 7;
   constant NPGPAXI_C : integer := 1;
-
-  signal mAxilReadMasters  : AxiLiteReadMasterArray (2*NPGPAXI_C downto 0);
-  signal mAxilReadSlaves   : AxiLiteReadSlaveArray  (2*NPGPAXI_C downto 0);
-  signal mAxilWriteMasters : AxiLiteWriteMasterArray(2*NPGPAXI_C downto 0);
-  signal mAxilWriteSlaves  : AxiLiteWriteSlaveArray (2*NPGPAXI_C downto 0);
+  constant NMASTERS_C : integer := 2*NPGPAXI_C+2;
+  
+  signal mAxilReadMasters  : AxiLiteReadMasterArray (NMASTERS_C-1 downto 0);
+  signal mAxilReadSlaves   : AxiLiteReadSlaveArray  (NMASTERS_C-1 downto 0);
+  signal mAxilWriteMasters : AxiLiteWriteMasterArray(NMASTERS_C-1 downto 0);
+  signal mAxilWriteSlaves  : AxiLiteWriteSlaveArray (NMASTERS_C-1 downto 0);
 
   function crossBarConfig return AxiLiteCrossbarMasterConfigArray is
-    variable ret : AxiLiteCrossbarMasterConfigArray(2*NPGPAXI_C downto 0);
+    variable ret : AxiLiteCrossbarMasterConfigArray(NMASTERS_C-1 downto 0);
   begin
     ret(0).baseAddr := x"80000000";
     ret(0).addrBits := 24;
@@ -242,10 +245,13 @@ architecture top_level of dtiPgp5Gb is
       ret(i+1).addrBits := 8;
       ret(i+1).connectivity := x"FFFF";
     end loop;
+    ret(2*NPGPAXI_C+1).baseAddr := x"A0000000";
+    ret(2*NPGPAXI_C+1).addrBits := 24;
+    ret(2*NPGPAXI_C+1).connectivity := x"FFFF";
     return ret;
   end function crossBarConfig;
   
-  constant AXI_CROSSBAR_MASTERS_CONFIG_C : AxiLiteCrossbarMasterConfigArray(2*NPGPAXI_C downto 0) := crossBarConfig;
+  constant AXI_CROSSBAR_MASTERS_CONFIG_C : AxiLiteCrossbarMasterConfigArray(NMASTERS_C-1 downto 0) := crossBarConfig;
 
   signal dsAxilReadMasters  : AxiLiteReadMasterArray (MaxDsLinks-1 downto 0) := (others=>AXI_LITE_READ_MASTER_INIT_C);
   signal dsAxilReadSlaves   : AxiLiteReadSlaveArray  (MaxDsLinks-1 downto 0);
@@ -257,8 +263,9 @@ architecture top_level of dtiPgp5Gb is
   signal usAxilWriteMasters : AxiLiteWriteMasterArray(MaxUsLinks-1 downto 0) := (others=>AXI_LITE_WRITE_MASTER_INIT_C);
   signal usAxilWriteSlaves  : AxiLiteWriteSlaveArray (MaxUsLinks-1 downto 0);
   
-  signal bpMonClk : slv(1 downto 0);
+  signal bpMonClk : slv( 1 downto 0);
 
+  signal ringData : slv(19 downto 0);
 begin
 
   --
@@ -312,6 +319,29 @@ begin
       clkIn   => recTimingClk,
       clkOutP => fpgaclk_P,
       clkOutN => fpgaclk_N);
+
+  ringData(15 downto  0) <= recTimingData.data;
+  ringData(17 downto 16) <= recTimingData.dataK;
+  ringData(19 downto 18) <= recTimingData.dspErr or recTimingData.decErr;
+  
+  AxiLiteRingBuffer_1 : entity work.AxiLiteRingBuffer
+     generic map (
+       TPD_G            => TPD_G,
+       BRAM_EN_G        => true,
+       REG_EN_G         => true,
+       DATA_WIDTH_G     => 20,
+       RAM_ADDR_WIDTH_G => 13)
+     port map (
+       dataClk                 => recTimingClk,
+       dataRst                 => '0',
+       dataValid               => '1',
+       dataValue               => ringData,
+       axilClk                 => regClk,
+       axilRst                 => regRst,
+       axilReadMaster          => mAxilReadMasters (NMASTERS_C-1),
+       axilReadSlave           => mAxilReadSlaves  (NMASTERS_C-1),
+       axilWriteMaster         => mAxilWriteMasters(NMASTERS_C-1),
+       axilWriteSlave          => mAxilWriteSlaves (NMASTERS_C-1));
 
   U_Core : entity work.DtiCore
     generic map (
@@ -416,11 +446,16 @@ begin
       vNIn              => vNIn);
 
   U_Backplane : entity work.DtiBp
-    port map ( ref156MHzClk => ref156MHzClk,
-               ref156MHzRst => ref156MHzRst,
+    port map ( ref125MHzClk => ref125MHzClk,
+               ref125MHzRst => ref125MHzRst,
                rxFull(0)    => fullOut,
-               linkUp       => status.bpLinkUp,
+               bpPeriod     => config.bpPeriod,
+               status       => status.bpLink,
                monClk       => bpMonClk,
+               --
+               timingClk    => recTimingClk,
+               timingRst    => recTimingRst,
+               timingBus    => recTimingBus,
                ----------------
                -- Core Ports --
                ----------------
@@ -489,13 +524,14 @@ begin
 
   GEN_US_PGP : for i in 0 to MaxUsLinks-1 generate
     U_Core : entity work.DtiUsCore
---      generic map ( DEBUG_G     => ite(i>0, false, true) )
+      generic map ( DEBUG_G     => ite(i>0, false, true) )
       port map ( sysClk        => regClk,
                  sysRst        => regRst,
                  clear         => regClear,
                  update        => regUpdate,
                  config        => config.usLink(i),
                  status        => status.usLink(i),
+                 remLinkID     => usRemLinkID  (i),
                  fullOut       => usFull       (i),
                  --
                  ctlClk        => regClk,
@@ -518,7 +554,7 @@ begin
                  --
                  ibClk         => usIbClk   (i),
                  ibLinkUp      => usLinkUp  (i),
-                 ibErrs        => (others=>'0'),
+                 ibErrs        => usRxErrs  (i),
                  ibFull        => usFullIn  (i),
                  ibMaster      => usIbMaster(i),
                  ibSlave       => usIbSlave (i),
@@ -530,12 +566,13 @@ begin
                  obSlave       => usObSlave (i) );
 
     U_App : entity work.DtiUsPgp5Gb
-      generic map ( ID_G           => toSlv(i,8),
+      generic map ( ID_G           => x"0" & toSlv(i,4),
                     DEBUG_G        => ite(i>0, false, true),
                     INCLUDE_AXIL_G => ite(i<NPGPAXI_C, true, false) )
       port map ( coreClk  => coreClk(i),
                  coreRst  => coreRst(i),
                  gtRefClk => gtRefClk(i),
+                 remLinkID => usRemLinkID(i),
                  status   => status.usApp(i),
                  amcRxP   => iamcRxP(i),
                  amcRxN   => iamcRxN(i),
@@ -555,7 +592,7 @@ begin
                  ibMaster => usIbMaster(i),
                  ibSlave  => usIbSlave (i),
                  linkUp   => usLinkUp  (i),
-                 rxErr    => open,
+                 rxErrs   => usRxErrs  (i),
                  txFull   => usFullIn  (i),
                  --
                  obClk       => usObClk   (i),
@@ -580,6 +617,7 @@ begin
       generic map ( DEBUG_G => ite(i>5, true, false) )
       port map ( clear          => regClear,
                  update         => regUpdate,
+                 remLinkID      => dsRemLinkID  (i),
                  status         => status.dsLink(i),
                  --
                  eventClk       => ref156MHzClk,
@@ -597,7 +635,7 @@ begin
                  obSlave        => dsObSlave (i) );
     
     U_App : entity work.DtiDsPgp5Gb
-      generic map ( ID_G           => i,
+      generic map ( ID_G           => x"1" & toSlv(i,4),
                     INCLUDE_AXIL_G => ite(i<NPGPAXI_C, true, false) )
       port map ( coreClk       => coreClk (13-i),
                  coreRst       => coreRst (13-i),
@@ -618,6 +656,7 @@ begin
                  ibRst         => '0',
                  --
                  linkUp        => dsLinkUp    (i),
+                 remLinkID     => dsRemLinkID (i),
                  rxErr         => dsRxErr     (i),
                  full          => dsFullIn    (i),
                  obClk         => dsObClk     (i),

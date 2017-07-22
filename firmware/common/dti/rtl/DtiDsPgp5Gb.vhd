@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-07-10
--- Last update: 2017-07-08
+-- Last update: 2017-07-20
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -39,7 +39,7 @@ use work.Pgp2bPkg.all;
 entity DtiDsPgp5Gb is
    generic (
       TPD_G               : time                := 1 ns;
-      ID_G                : integer             := 0;
+      ID_G                : slv(7 downto 0)     := x"00";
       INCLUDE_AXIL_G      : boolean             := false );
    port (
      coreClk         : in  sl;
@@ -60,6 +60,7 @@ entity DtiDsPgp5Gb is
      --  App Interface
      ibRst           : in  sl;
      linkUp          : out sl;
+     remLinkID       : out slv(7 downto 0);
      rxErr           : out sl;
      full            : out sl;
      --
@@ -70,11 +71,10 @@ end DtiDsPgp5Gb;
 
 architecture rtl of DtiDsPgp5Gb is
 
-  constant ID_C    : slv( 7 downto 0) := toSlv(ID_G,8);
-
   signal amcObMaster : AxiStreamMasterType;
   signal amcObSlave  : AxiStreamSlaveType;
 
+  signal locTxIn        : Pgp2bTxInType;
   signal pgpTxIn        : Pgp2bTxInType;
   signal pgpTxOut       : Pgp2bTxOutType;
   signal pgpRxIn        : Pgp2bRxInType;
@@ -92,6 +92,9 @@ architecture rtl of DtiDsPgp5Gb is
 begin
 
   pgpRst <= ibRst;
+
+  locTxIn.locData          <= ID_G;
+  remLinkID                <= pgpRxOut.remLinkData;
   
   U_Fifo : entity work.AxiStreamFifo
     generic map (
@@ -153,6 +156,7 @@ begin
         pgpTxClkRst      => pgpRst,
         pgpTxIn          => pgpTxIn,
         pgpTxOut         => pgpTxOut,
+        locTxIn          => locTxIn,
         -- RX PGP Interface (pgpRxClk)
         pgpRxClk         => pgpClk,
         pgpRxClkRst      => pgpRst,

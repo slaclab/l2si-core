@@ -2,7 +2,7 @@
 -- File       : DtiBp.vhd
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-09-04
--- Last update: 2017-05-17
+-- Last update: 2017-07-21
 -------------------------------------------------------------------------------
 -- Description: 
 -------------------------------------------------------------------------------
@@ -30,6 +30,7 @@ use work.StdRtlPkg.all;
 use work.AxiStreamPkg.all;
 use work.SsiPkg.all;
 use work.DtiPkg.all;
+use work.TimingPkg.all;
 
 library unisim;
 use unisim.vcomponents.all;
@@ -40,11 +41,16 @@ entity DtiBp is
       ----------------------
       -- Top Level Interface
       ----------------------
-      ref156MHzClk    : in  sl;
-      ref156MHzRst    : in  sl;
+      ref125MHzClk    : in  sl;
+      ref125MHzRst    : in  sl;
       rxFull          : in  Slv16Array(0 downto 0);
-      linkUp          : out sl;
+      bpPeriod        : in  slv(7 downto 0);
+      status          : out DtiBpLinkStatusType;
       monClk          : out slv(1 downto 0);
+      --
+      timingClk       : in  sl;
+      timingRst       : in  sl;
+      timingBus       : in  TimingBusType;
       ----------------
       -- Core Ports --
       ----------------
@@ -63,12 +69,16 @@ architecture mapping of DtiBp is
      master : AxiStreamMasterType;
      full   : slv(31 downto 0);
      sent   : slv(47 downto 0);
+     ticks  : slv( 7 downto 0);
+     cnt    : slv( 7 downto 0);
    end record;
 
    constant REG_INIT_C : RegType := (
      master => AXI_STREAM_MASTER_INIT_C,
      full   => (others=>'0'),
-     sent   => (others=>'0') );
+     sent   => (others=>'0'),
+     ticks  => (others=>'0'),
+     cnt    => (others=>'0') );
 
    signal r     : RegType := REG_INIT_C;
    signal rin   : RegType;
@@ -82,8 +92,13 @@ architecture mapping of DtiBp is
    signal bpPllLocked : sl;
    signal bpClkBuf    : sl;
    signal bpRefClk    : sl;
+
+   signal txHeaderT   : slv(7 downto 0);
+   signal txHeader    : slv(7 downto 0);
+   signal txStrobe    : sl;
+   signal sbpPeriod   : slv(7 downto 0);
    
-   constant BP_CONFIG_C : AxiStreamConfigType := ssiAxiStreamConfig(2);
+   constant BP_CONFIG_C : AxiStreamConfigType := ssiAxiStreamConfig(4);
    
    signal bpSlave  : AxiStreamSlaveType;
 
@@ -133,7 +148,8 @@ begin
        COMMON_TX_CLK_G     => false,
        COMMON_RX_CLK_G     => false,
        SLAVE_AXI_CONFIG_G  => BP_CONFIG_C,
-       MASTER_AXI_CONFIG_G => BP_CONFIG_C)
+       MASTER_AXI_CONFIG_G => BP_CONFIG_C,
+       DEBUG_G             => true )
      port map (
        -- TX Serial Stream
        txP           => bpBusTxP,
@@ -147,15 +163,15 @@ begin
        clk312MHz     => bp250MHzClk,
        clk625MHz     => bp500MHzClk,
        iDelayCtrlRdy => '1',
-       linkUp        => linkUp,
+       linkUp        => status.linkUp,
        -- Slave Port
-       sAxisClk      => ref156MHzClk,
-       sAxisRst      => ref156MHzRst,
+       sAxisClk      => ref125MHzClk,
+       sAxisRst      => ref125MHzRst,
        sAxisMaster   => r.master,
        sAxisSlave    => bpSlave,
        -- Master Port
-       mAxisClk      => ref156MHzClk,
-       mAxisRst      => ref156MHzRst,
+       mAxisClk      => ref125MHzClk,
+       mAxisRst      => ref125MHzRst,
        mAxisMaster   => open,
        mAxisSlave    => AXI_STREAM_SLAVE_FORCE_C );
 
@@ -167,25 +183,67 @@ begin
        IB => bpBusRxN,
        O  => open);
 
-   comb: process ( r, ref156MHzRst, rxFull ) is
+   U_TxHeader : entity work.SynchronizerVector
+     generic map ( WIDTH_G => 8 )
+     port map ( clk     => ref125MHzClk,
+                dataIn  => txHeaderT,
+                dataOut => txHeader );
+
+   U_TxStrobe : entity work.SynchronizerOneShot
+     port map ( clk     => ref125MHzClk,
+                dataIn  => timingBus.strobe,
+                dataOut => txStrobe );
+
+   tstrobe : process ( timingClk ) is
+   begin
+     if rising_edge(timingClk) then
+       txHeaderT <= timingBus.message.pulseId(7 downto 0);
+     end if;
+   end process;
+
+   U_BpPeriod : entity work.SynchronizerVector
+     generic map ( WIDTH_G => 8 )
+     port map ( clk     => ref125MHzClk,
+                dataIn  => bpPeriod,
+                dataOut => sbpPeriod );
+  
+   comb: process ( r, ref125MHzRst, rxFull, txHeader, txStrobe, bpSlave, sbpPeriod ) is
      variable v : RegType;
    begin
      v := r;
 
-     v.master.tValid := '1';
-     v.master.tLast  := '1';
-     v.master.tData  := rxFull(0);
+     v.master.tValid := '0';
+     v.ticks         := r.ticks + 1;
+     v.cnt           := r.cnt + 1;
 
-     if ref156MHzRst='1' then
+     if r.cnt = sbpPeriod then
+       v.master.tValid := '1';
+       v.cnt := (others=>'0');
+     end if;
+     v.master.tLast  := '1';
+     v.master.tData  := txHeader & r.ticks & rxFull(0);
+     ssiSetUserSof(BP_CONFIG_C, v.master, '1');
+
+     if r.master.tValid = '1' and bpSlave.tReady = '1' then
+       v.sent := r.sent + 1;
+     end if;
+
+     if txStrobe = '1' then
+       v.ticks := (others=>'0');
+     end if;
+     
+     if ref125MHzRst='1' then
        v := REG_INIT_C;
      end if;
      
      rin <= v;
+
+     status.obSent <= r.sent;
    end process;
    
-   seq: process (ref156MHzClk) is
+   seq: process (ref125MHzClk) is
    begin
-     if rising_edge(ref156MHzClk) then
+     if rising_edge(ref125MHzClk) then
        r <= rin;
      end if;
    end process;

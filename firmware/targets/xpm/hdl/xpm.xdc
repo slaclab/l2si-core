@@ -245,6 +245,7 @@ set_clock_groups -asynchronous \
                  -group [get_clocks -include_generated_clocks timingRef] \
                  -group [get_clocks -include_generated_clocks ddrClkIn] \
                  -group [get_clocks -include_generated_clocks fabClk] \
+                 -group [get_clocks -include_generated_clocks axilClk] \
                  -group [get_clocks -include_generated_clocks ethRef] \
                  -group [get_clocks -include_generated_clocks dsClk0] \
                  -group [get_clocks -include_generated_clocks dsClk1]

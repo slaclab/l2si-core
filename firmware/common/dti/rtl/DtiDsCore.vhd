@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-07-10
--- Last update: 2017-07-05
+-- Last update: 2017-07-20
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -43,6 +43,7 @@ entity DtiDsCore is
      clear           : in  sl := '0';
      update          : in  sl := '1';
 --     config          : in  DtiUsLinkConfigType,
+     remLinkID       : in  slv(7 downto 0);
      status          : out DtiDsLinkStatusType;
      --
      eventClk        : in  sl;
@@ -64,7 +65,6 @@ architecture rtl of DtiDsCore is
 
   signal srxFull : sl;
   signal srxErr  : sl;
-  signal slinkUp : sl;
   signal supdate : sl;
   signal sclear  : sl;
   
@@ -88,7 +88,12 @@ architecture rtl of DtiDsCore is
   
 begin
 
-  status   <= r.status;
+  status.linkUp    <= linkUp;
+  status.remLinkID <= remLinkID;
+  status.rxFull    <= r.status.rxFull;
+  status.rxErrs    <= r.status.rxErrs;
+  status.obSent    <= r.status.obSent;
+
   fullOut  <= fullIn;
   obClk    <= eventClk;
   obMaster <= tMaster;
@@ -107,11 +112,6 @@ begin
                  probe0(255 downto  91) => (others=>'0') );
 
   end generate;
-  
-  U_SLinkUp : entity work.Synchronizer
-    port map ( clk     => eventClk,
-               dataIn  => linkUp,
-               dataOut => slinkUp );
   
   U_SRxErr : entity work.Synchronizer
     port map ( clk     => eventClk,
@@ -142,12 +142,10 @@ begin
                mAxisMaster  => tMaster,
                mAxisSlave   => obSlave );
 
-  comb : process ( r, eventRst, clear, supdate, slinkUp, srxErr, srxFull, tMaster, obSlave ) is
+  comb : process ( r, eventRst, clear, supdate, srxErr, srxFull, tMaster, obSlave ) is
     variable v : RegType;
   begin
     v := r;
-
-    v.status.linkUp := slinkUp;
 
     if supdate = '1' then
       if srxFull = '1' then

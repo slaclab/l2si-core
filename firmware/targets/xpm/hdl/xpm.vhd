@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-12-14
--- Last update: 2017-07-07
+-- Last update: 2017-07-21
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -184,6 +184,7 @@ architecture top_level of xpm is
    
    signal xpmConfig : XpmConfigType;
    signal xpmStatus : XpmStatusType;
+   signal bpStatus  : XpmBpLinkStatusArray(NBpLinks downto 0);
    signal pllStatus : XpmPllStatusArray ( 1 downto 0);
 
    signal dsClockP     :   slv(1 downto 0);
@@ -210,7 +211,9 @@ architecture top_level of xpm is
    
    signal dbgChan   : slv( 4 downto 0);
    signal dbgChanS  : slv( 4 downto 0);
-   signal ringData  : slv(17 downto 0);
+   signal ringData  : slv(19 downto 0);
+   signal ringDataI : Slv19Array(NDsLinks-1 downto 0);
+   signal ringDataV : slv       (NDsLinks-1 downto 0);
    
    constant AXI_CROSSBAR_MASTERS_CONFIG_C : AxiLiteCrossbarMasterConfigArray(1 downto 0) := (
      1              => (
@@ -289,8 +292,8 @@ begin
   fpgaclk_P(3) <= '0';
   fpgaclk_N(3) <= '1';
   
-   regClk <= ref156MHzClk;
-   regRst <= ref156MHzRst;
+   regClk <= ref125MHzClk;
+   regRst <= ref125MHzRst;
 
    U_XBAR : entity work.AxiLiteCrossbar
       generic map (
@@ -315,13 +318,25 @@ begin
      port map ( clk     => recTimingClk,
                 dataIn  => dbgChan,
                 dataOut => dbgChanS );
-  
+
+   GEN_RINGD : for i in 0 to NDSLinks-1 generate
+     U_Sync : entity work.SynchronizerFifo
+       generic map ( DATA_WIDTH_G => 19 )
+       port map ( wr_clk => dsRxClk(i),
+                  din(18)           => dsRxErr  (i),
+                  din(17 downto 16) => dsRxDataK(i),
+                  din(15 downto  0) => dsRxData (i),
+                  rd_clk            => recTimingClk,
+                  valid             => ringDataV(i),
+                  dout              => ringDataI(i) );
+   end generate;
+       
    process (recTimingClk) is
      variable iLink     : integer;
    begin
      if rising_edge(recTimingClk) then
        iLink := conv_integer(dbgChanS);
-       ringData <= dsRxDataK(iLink) & dsRxData(iLink);
+       ringData <= ringDataV(iLink) & ringDataI(iLink);
      end if;
    end process;
    
@@ -330,7 +345,7 @@ begin
        TPD_G            => TPD_G,
        BRAM_EN_G        => true,
        REG_EN_G         => true,
-       DATA_WIDTH_G     => 18,
+       DATA_WIDTH_G     => 20,
        RAM_ADDR_WIDTH_G => 13)
      port map (
        dataClk                 => recTimingClk,
@@ -347,7 +362,6 @@ begin
    GEN_PLL : for i in 0 to 1 generate
      U_Pll : entity work.XpmPll
        port map (
-         clk         => regClk,
          config      => xpmConfig.pll(i),
          status      => pllStatus    (i),
          frqTbl      => frqTbl       (i),
@@ -381,17 +395,14 @@ begin
          dsRxRst         => dsRxRst,
          dsRxErr         => dsRxErr,
          --  BP DS Ports
-         bpTxLinkUp      => bpTxLinkStatus.txReady,
          bpTxData        => bpTxData (0),
          bpTxDataK       => bpTxDataK(0),
-         bpRxLinkUp      => bpRxLinkUp,
+         bpStatus        => bpStatus,
          bpRxLinkFull    => bpRxLinkFull,
-         bpClk           => regClk,
-         bpClkRst        => regRst,
          ----------------------
          -- Top Level Interface
          ----------------------
-         sysclk          => regClk,
+         regclk          => regClk,
          update          => regUpdate,
          status          => xpmStatus,
          config          => xpmConfig,
@@ -412,8 +423,13 @@ begin
       ref125MHzClk    => ref125MHzClk,
       ref125MHzRst    => ref125MHzRst,
       rxFull          => bpRxLinkFull,
-      rxLinkUp        => bpRxLinkUp,
+      config          => xpmConfig.bpLink(NBpLinks downto 1),
+      status          => bpStatus(NBpLinks downto 1),
       monClk          => bpMonClk,
+      --
+      timingClk       => recTimingClk,
+      timingRst       => recTimingRst,
+      timingBus       => recTimingBus,
       ----------------
       -- Core Ports --
       ----------------
@@ -449,7 +465,7 @@ begin
          ibDebugSlave      => ibDebugSlave,
          -- Timing Interface (timingClk domain)
          timingData        => recTimingData,
-         timingBus         => open,
+         timingBus         => recTimingBus,
          exptBus           => recExptBus,
          timingPhy         => timingPhy,
          -- Reference Clocks and Resets
@@ -575,6 +591,7 @@ begin
                  rxRst           => dsRxRst   (7*i+6 downto 7*i),
                  rxErr           => dsRxErr   (7*i+6 downto 7*i),
                  txClk           => open,
+                 txClkIn         => recTimingClk,
                  config          => xpmConfig.dsLink(7*i+6 downto 7*i),
                  status          => dsLinkStatus    (7*i+6 downto 7*i) );
   end generate;
@@ -597,7 +614,11 @@ begin
                rxRst       (0) => open,
                rxErr       (0) => open,
                txClk           => open,
+               txClkIn         => recTimingClk,
                config      (0) => xpmConfig.bpLink(0),
                status      (0) => bpTxLinkStatus );
-  
+
+  bpStatus(0).linkUp  <= bpTxLinkStatus.txReady;
+  bpStatus(0).ibRecv  <= (others=>'0');
+    
 end top_level;

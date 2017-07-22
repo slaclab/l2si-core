@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-12-14
--- Last update: 2016-04-27
+-- Last update: 2017-07-19
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -36,6 +36,7 @@ use work.TimingPkg.all;
 use work.XpmPkg.all;
 
 entity XpmL0Tag is
+   generic ( TAG_WIDTH_G : integer := 32 );
    port (
       clk              : in  sl;
       rst              : in  sl;
@@ -43,7 +44,7 @@ entity XpmL0Tag is
       enabled          : in  sl;
       timingBus        : in  TimingBusType;
       push             : in  sl;
-      push_tag         : out slv(7 downto 0);
+      push_tag         : out slv(TAG_WIDTH_G-1 downto 0);
       pop              : in  sl;
       pop_tag          : in  slv(7 downto 0);
       pop_frame        : out XpmAcceptFrameType );
@@ -51,7 +52,7 @@ end XpmL0Tag;
 
 architecture rtl of XpmL0Tag is
    type RegType is record
-      tag    : slv(7 downto 0);
+      tag    : slv(TAG_WIDTH_G-1 downto 0);
    end record;
    constant REG_INIT_C : RegType := (
       tag    => (others=>'0'));

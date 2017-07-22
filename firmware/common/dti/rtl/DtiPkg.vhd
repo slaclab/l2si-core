@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2016-03-25
--- Last update: 2017-07-05
+-- Last update: 2017-07-21
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -108,10 +108,12 @@ package DtiPkg is
    
    type DtiUsLinkStatusType is record
      linkUp     : sl;
+     remLinkID  : slv( 7 downto 0);
      rxErrs     : slv(31 downto 0);
      rxFull     : slv(31 downto 0);
      ibRecv     : slv(47 downto 0);
      ibEvt      : slv(31 downto 0);
+     ibDump     : slv(31 downto 0);
      obL0       : slv(19 downto 0);
      obL1A      : slv(19 downto 0);
      obL1R      : slv(19 downto 0);
@@ -119,10 +121,12 @@ package DtiPkg is
 
    constant DTI_US_LINK_STATUS_INIT_C : DtiUsLinkStatusType := (
      linkUp     => '0',
+     remLinkID  => (others=>'0'),
      rxErrs     => (others=>'0'),
      rxFull     => (others=>'0'),
      ibRecv     => (others=>'0'),
      ibEvt      => (others=>'0'),
+     ibDump     => (others=>'0'),
      obL0       => (others=>'0'),
      obL1A      => (others=>'0'),
      obL1R      => (others=>'0') );
@@ -143,6 +147,7 @@ package DtiPkg is
 
    type DtiDsLinkStatusType is record
      linkUp     : sl;
+     remLinkID  : slv( 7 downto 0);
      rxErrs     : slv(31 downto 0);
      rxFull     : slv(31 downto 0);
      obSent     : slv(47 downto 0);
@@ -150,24 +155,35 @@ package DtiPkg is
 
    constant DTI_DS_LINK_STATUS_INIT_C : DtiDsLinkStatusType := (
      linkUp     => '0',
+     remLinkID  => (others=>'0'),
      rxErrs     => (others=>'0'),
      rxFull     => (others=>'0'),
      obSent     => (others=>'0') );
 
    type DtiDsLinkStatusArray is array (natural range<>) of DtiDsLinkStatusType;
 
+   type DtiBpLinkStatusType is record
+     linkUp    : sl;
+     obSent    : slv(31 downto 0);
+   end record;
+
+   constant DTI_BP_LINK_STATUS_INIT_C : DtiBpLinkStatusType := (
+     linkUp    => '0',
+     obSent    => (others=>'0') );
    
    type DtiConfigType is record
      usLink     : DtiUsLinkConfigArray   (MaxUsLinks-1 downto 0);
+     bpPeriod   : slv(7 downto 0);
    end record;
 
    constant DTI_CONFIG_INIT_C : DtiConfigType := (
-     usLink     => (others=>DTI_US_LINK_CONFIG_INIT_C) );
+     usLink     => (others=>DTI_US_LINK_CONFIG_INIT_C),
+     bpPeriod   => toSlv(33,8) );
 
    type DtiStatusType is record
      usLink     : DtiUsLinkStatusArray   (MaxUsLinks-1 downto 0);
      dsLink     : DtiDsLinkStatusArray   (MaxDsLinks-1 downto 0);
-     bpLinkUp   : sl;
+     bpLink     : DtiBpLinkStatusType;
      usApp      : DtiUsAppStatusArray    (MaxUsLinks-1 downto 0);
      qplllock   : slv(3 downto 0);
    end record;
@@ -175,7 +191,7 @@ package DtiPkg is
    constant DTI_STATUS_INIT_C : DtiStatusType := (
      usLink     => (others=>DTI_US_LINK_STATUS_INIT_C),
      dsLink     => (others=>DTI_DS_LINK_STATUS_INIT_C),
-     bpLinkUp   => '0',
+     bpLink     => DTI_BP_LINK_STATUS_INIT_C,
      usApp      => (others=>DTI_US_APP_STATUS_INIT_C),
      qplllock   => "00" );
 

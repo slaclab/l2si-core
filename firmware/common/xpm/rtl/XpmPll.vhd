@@ -18,8 +18,7 @@ library unisim;
 use unisim.vcomponents.all;
 
 entity XpmPll is
-  port ( clk         : in    sl;
-         config      : in    XpmPllConfigType;
+  port ( config      : in    XpmPllConfigType;
          status      : out   XpmPllStatusType;
          frqTbl      : inout sl;
          frqSel      : inout slv(3 downto 0);
