@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-12-14
--- Last update: 2017-02-21
+-- Last update: 2017-07-23
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -38,7 +38,8 @@ use work.XpmPkg.all;
 
 entity XpmTxLink is
    generic (
-      ADDR : integer := 0 );
+      ADDR    : integer := 0;
+      DEBUG_G : boolean := false );
    port (
       clk              : in  sl;
       rst              : in  sl;
@@ -88,9 +89,47 @@ architecture rtl of XpmTxLink is
   signal fiducialDelayed   : sl;
   signal advance   : slv(1 downto 0);
   signal utxDelay  : slv(config.txDelay'range);
+  signal itxData   : slv(15 downto 0);
+  signal itxDataK  : slv( 1 downto 0);
   
+  component ila_0
+    port ( clk    : in sl;
+           probe0 : in slv(255 downto 0) );
+  end component;
+
 begin
 
+  GEN_DEBUG : if DEBUG_G generate
+    U_ILA : ila_0
+      port map ( clk                   => clk,
+                 probe0( 15 downto  0) => itxData,
+                 probe0( 17 downto 16) => itxDataK,
+                 probe0( 18 )          => sof,
+                 probe0( 19 )          => eof,
+                 probe0( 20 )          => fiducial,
+                 probe0( 22 downto 21) => advance_i,
+                 probe0( 24 downto 23) => advance,
+                 probe0( 25 )          => crcErr,
+                 probe0( 26 )          => streams(0).ready,
+                 probe0( 27 )          => streams(1).ready,
+                 probe0( 28 )          => fstreams(0).ready,
+                 probe0( 29 )          => fstreams(1).ready,
+                 probe0( 32 downto 30) => r.fiducial,
+                 probe0( 33 )          => r.efifoV,
+                 probe0( 36 downto 34) => r.efifoWr,
+                 probe0( 38 downto 37) => r.eadvance,
+                 probe0( 39 )          => tfifoWr,
+                 probe0( 40 )          => efifoWr,
+                 probe0( 41 )          => efifoFull,
+                 probe0( 57 downto 42) => efifoDin,
+                 probe0( 58 )          => fifoV,
+                 probe0( 59 )          => fiducialDelayed,
+                 probe0(255 downto 60) => (others=>'0') );
+  end generate;
+
+  txData  <= itxData;
+  txDataK <= itxDataK;
+  
   U_Serializer : entity work.TimingSerializer
      generic map ( STREAMS_C => 2 )
      port map ( clk       => clk,
@@ -99,8 +138,8 @@ begin
                 streams   => fstreams,
                 streamIds => streamIds,
                 advance   => advance,
-                data      => txData,
-                dataK     => txDataK );
+                data      => itxData,
+                dataK     => itxDataK );
 
   U_TimingFifo : entity work.FifoSync
     generic map ( FWFT_EN_G => true )
