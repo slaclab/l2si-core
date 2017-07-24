@@ -122,7 +122,7 @@ begin
                  probe0( 40 )          => efifoWr,
                  probe0( 41 )          => efifoFull,
                  probe0( 57 downto 42) => efifoDin,
-                 probe0( 58 )          => fifoV,
+                 probe0( 58 )          => efifoV,
                  probe0( 59 )          => fiducialDelayed,
                  probe0(255 downto 60) => (others=>'0') );
   end generate;
