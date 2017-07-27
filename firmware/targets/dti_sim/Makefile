@@ -54,7 +54,7 @@ export RTM_INTF = Version1
 ##########################################################################################
 
 # COMMON_FILE is defined by application
-export COMMON_FILE = CommonTemplate
+export COMMON_FILE = dti
 
 ##########################################################################################
 # Application have the option to remove unused source code from Vivado project

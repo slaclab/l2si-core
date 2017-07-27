@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-07-10
--- Last update: 2017-04-12
+-- Last update: 2017-07-26
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -85,11 +85,11 @@ architecture top_level_app of dti_sim is
   signal bpTxLinkUp : sl := '1';
   signal bpTxData   : slv(15 downto 0);
   signal bpTxDataK  : slv( 1 downto 0);
-  signal bpRxLinkUp : slv(13 downto 0);
-  signal bpRxLinkFull : Slv16Array(13 downto 0);
+  signal bpRxLinkUp : slv(NBPLinks-1 downto 0);
+  signal bpRxLinkFull : Slv16Array(NBPLinks-1 downto 0);
 
   signal dsLinkUp     : slv(MaxDsLinks-1 downto 0);
-  signal dsRxErr      : slv(MaxDsLinks-1 downto 0);
+  signal dsRxErrs     : Slv32Array(MaxDsLinks-1 downto 0);
   signal dsFullIn     : slv(MaxDsLinks-1 downto 0);
   
   -- for debug only --
@@ -106,7 +106,7 @@ begin
    usConfig(0).fwdMode   <= '0';
    usConfig(0).dataSrc   <= x"ABADCAFE";
    usConfig(0).dataType  <= x"FEEDADAD";
-   usConfig(0).tagEnable <= '1';
+   usConfig(0).tagEnable <= '0';
    usConfig(0).l1Enable  <= '0';
      
    usConfig(1).enable    <= '1';
@@ -174,9 +174,9 @@ begin
    xpmDsRxRst   <= (others=>'1');
    xpmDsRxData  <= (others=>(K_COM_C & K_COM_C));
    xpmDsRxDataK <= (others=>"10");
-   bpRxLinkUp   <= toSlv(1,14);
+   bpRxLinkUp   <= toSlv(1,NBPLinks);
    bpRxLinkFull(0) <= usFull(0) or usFull(1);
-   bpRxLinkFull(13 downto 1) <= (others=>(others=>'0'));
+   bpRxLinkFull(NBPLinks-1 downto 1) <= (others=>(others=>'0'));
    
    U_Sim : entity work.XpmSim
      port map ( dsRxClk         => xpmDsRxClk,
@@ -221,18 +221,19 @@ begin
      U_DUT : entity work.DtiUsCore
        port map ( sysClk       => clk156,
                   sysRst       => rst156,
-                  fifoRst      => fifoRst,
+                  clear        => fifoRst,
                   config       => usConfig(i),
+                  remLinkId    => x"00",
                   status       => usStatus(i),
                   fullOut      => usFull  (i),
                   --
-                  ctlClk       => clk156,
-                  ctlRst       => rst156,
-                  ctlRxMaster  => ctlRxM  (i),
-                  ctlRxSlave   => ctlRxS  (i),
-                  ctlTxMaster  => ctlTxM  (i),
-                  ctlTxSlave   => ctlTxS  (i),
-                  --
+                  --ctlClk       => clk156,
+                  --ctlRst       => rst156,
+                  --ctlRxMaster  => ctlRxM  (i),
+                  --ctlRxSlave   => ctlRxS  (i),
+                  --ctlTxMaster  => ctlTxM  (i),
+                  --ctlTxSlave   => ctlTxS  (i),
+                  ----
                   timingClk    => clk186,
                   timingRst    => rst186,
                   timingBus    => timingBus,
@@ -242,18 +243,18 @@ begin
                   eventRst     => rst156,
                   eventMasters => usEvtMasters(i),
                   eventSlaves  => usEvtSlaves (i),
-                  full         => dsFull,
+                  dsFull       => dsFull,
                   --
                   ibClk        => usIbClk   (i),
                   ibLinkUp     => '1',
                   ibErrs       => (others=>'0'),
+                  ibFull       => '0',
                   ibMaster     => usIbMaster(i),
                   ibSlave      => usIbSlave (i),
                   --
                   obClk        => usObClk   (i),
-                  obTrig       => usObTrig  (i),
-                  obMaster     => usObMaster(i),
-                  obSlave      => usObSlave (i) );
+                  obTrigValid  => open,
+                  obTrig       => usObTrig  (i) );
 
      U_App : entity work.DtiUsSimApp
        generic map ( SERIAL_ID_G => x"ABADCAFE" )
@@ -277,7 +278,8 @@ begin
    GEN_DS : for i in 0 to MaxDsLinks-1 generate
      U_DsCore : entity work.DtiDsCore
        port map ( clear         => fifoRst,
-                  update        => update,
+                  update        => '1',
+                  remLinkID     => x"00",
                   status        => dsStatus(i),
                   --
                   eventClk      => clk156,
@@ -287,7 +289,7 @@ begin
                   fullOut       => dsFull      (i),
                   --
                   linkUp        => dsLinkUp    (i),
-                  rxErr         => dsRxErr     (i),
+                  rxErrs        => dsRxErrs    (i),
                   fullIn        => dsFullIn    (i),
                   --
                   obClk         => dsObClk     (i),
@@ -299,7 +301,7 @@ begin
                   amcRst        => rst156,
                   ibRst         => rst156,
                   linkUp        => dsLinkUp    (i),
-                  rxErr         => dsRxErr     (i),
+                  rxErrs        => dsRxErrs    (i),
                   full          => open,
                   obClk         => dsObClk     (i),
                   obMaster      => dsObMaster  (i),
