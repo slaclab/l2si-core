@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2016-03-25
--- Last update: 2017-07-21
+-- Last update: 2017-07-24
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -435,7 +435,7 @@ package body XpmPkg is
      assignSlv(i, vector, pword.l1e);
      assignSlv(i, vector, pword.l1a);
      assignSlv(i, vector, pword.l1tag);
-     assignSlv(i, vector, "1");
+     assignSlv(i, vector, "1");  -- valid trigger word
      assignSlv(i, vector, pword.anatag);
      return vector;
    end function;
