@@ -196,9 +196,18 @@ DtiReg: &DtiReg
         offset: 0x0080
       class: IntField
       name: usRxErrs
-      sizeBits: 32
+      sizeBits: 24
       mode: RO
       description: Indexed upstream link - rx errors count
+    #########################################################
+    usRemLinkID:
+      at:
+        offset: 0x0083
+      class: IntField
+      name: usRemLinkID
+      sizeBits: 8
+      mode: RO
+      description: Indexed upstream link - remote link ID
     #########################################################
     usRxFull:
       at:
@@ -209,14 +218,14 @@ DtiReg: &DtiReg
       mode: RO
       description: Indexed upstream link - rx full count
     #########################################################
-    usIbRecv:
+    usIbDump:
       at:
         offset: 0x0088
       class: IntField
-      name: usIbRecv
+      name: usIbDump
       sizeBits: 32
       mode: RO
-      description: Indexed upstream link - rx words count
+      description: Indexed upstream link - rx events dropped
     #########################################################
     usIbEvt:
       at:
@@ -225,7 +234,7 @@ DtiReg: &DtiReg
       name: usIbEvt
       sizeBits: 32
       mode: RO
-      description: Indexed upstream link - rx events count
+      description: Indexed upstream link - rx events forwarded
     #########################################################
     dsRxErrs:
       at:
@@ -244,6 +253,15 @@ DtiReg: &DtiReg
       sizeBits: 32
       mode: RO
       description: Indexed downstream link - rx full count
+    #########################################################
+    dsRemLinkID:
+      at:
+        offset: 0x0097
+      class: IntField
+      name: dsRemLinkID
+      sizeBits: 8
+      mode: RO
+      description: Indexed downstream link - remote link ID
     #########################################################
     dsObSent:
       at:
@@ -280,6 +298,15 @@ DtiReg: &DtiReg
       sizeBits: 2
       mode: RO
       description: Lock status of QPLLs
+    #########################################################
+    bpTxInterval:
+      at:
+        offset: 0x00B2
+      class: IntField
+      name: bpTxInterval
+      sizeBits: 8
+      mode: RW
+      description: rxFull push interval - 125MHz ticks
     #########################################################
     monClkRate:
       at:
