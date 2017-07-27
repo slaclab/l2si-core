@@ -258,6 +258,7 @@ ssize_t PgpCardG3_Write(struct file *filp, const char* buffer, size_t count, lof
   if ( pgpDevice->debug & 0x100 ) printk(KERN_DEBUG "%s: cmd 0x%x, data 0x%p\n", MOD_NAME, pgpCardTx->cmd, pgpCardTx->data);
   switch (pgpCardTx->cmd) {
     case IOCTL_Normal_Write :
+    case IOCTL_Looped_Write :
       for (i=0; i<MAX_NUMBER_OPEN_CLIENTS; i++) {
         if (pgpDevice->client[i].fp == filp) {
           if (pgpDevice->client[i].mask & (1 << pgpCardTx->pgpLane)) {
@@ -272,7 +273,7 @@ ssize_t PgpCardG3_Write(struct file *filp, const char* buffer, size_t count, lof
       }
       if (!(pgpDevice->client[mi].vcMask & (1 << pgpCardTx->pgpVc))) {
         printk(KERN_WARNING "%s: Write: failed because this this client's mask 0x%x does not have VC %u opened\n",
-            MOD_NAME, pgpDevice->client[i].vcMask, pgpCardTx->pgpVc);
+            MOD_NAME, pgpDevice->client[mi].vcMask, pgpCardTx->pgpVc);
         return ERROR;
       }
       if (!found) {
@@ -357,9 +358,10 @@ ssize_t PgpCardG3_Write(struct file *filp, const char* buffer, size_t count, lof
       pgpDevice->txBuffer[pgpDevice->txRead]->length = pgpCardTx->size;
 
       // Generate Tx descriptor
-      descA  = (pgpCardTx->pgpLane << 27) & 0xF8000000; // Bits 31:27 = Lane
+      descA  = (pgpCardTx->pgpLane << 27) & 0x78000000; // Bits 30:27 = Lane
       descA += (pgpCardTx->pgpVc   << 24) & 0x07000000; // Bits 26:24 = VC
       descA += (pgpCardTx->size         ) & 0x00FFFFFF; // Bits 23:0 = Length
+      descA += (pgpCardTx->cmd == IOCTL_Looped_Write) ? (1<<31) : 0; // Bit 31 = Loop
       descB = pgpDevice->txBuffer[pgpDevice->txRead]->dma;
       pgpDevice->txHistoLV[pgpCardTx->pgpLane * NUMBER_OF_VC + pgpCardTx->pgpVc] += 1;
 
@@ -1789,6 +1791,7 @@ int my_Ioctl(struct file *filp, __u32 cmd, __u64 argument) {
          tmp = pgpDevice->reg->rxFreeStat[x];
          stat->RxFreeFull[x]      = (tmp >> 31) & 0x1;
          stat->RxFreeValid[x]     = (tmp >> 30) & 0x1;
+         stat->RxFreeFifoThres[x] = (tmp >> 16) & 0xFF;
          stat->RxFreeFifoCount[x] = (tmp >> 0)  & 0x3FF;
          stat->RxWrite[x] = (__u32)pgpDevice->rxWrite[x];
          stat->RxRead[x]  = (__u32)pgpDevice->rxRead[x];

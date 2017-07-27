@@ -4,7 +4,7 @@ module="pgpcardG3"
 device="pgpcardG3"
 mode="666"
 
-#/sbin/insmod ./$module.ko || exit 1
+/sbin/insmod ./$module.ko || exit 1
 
 # remove stale nodes
 for d in `ls /dev/${device}*`

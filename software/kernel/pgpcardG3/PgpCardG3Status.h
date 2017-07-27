@@ -81,6 +81,7 @@ typedef struct {
    // RX Descriptor Status
    __u32 RxFreeFull[8];
    __u32 RxFreeValid[8];
+   __u32 RxFreeFifoThres[8];
    __u32 RxFreeFifoCount[8];
    __u32 RxReadReady;
    __u32 RxRetFifoCount;

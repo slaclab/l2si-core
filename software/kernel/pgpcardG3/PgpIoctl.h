@@ -63,6 +63,7 @@
 #define IOCTL_Set_VC_Mask            34
 #define IOCTL_Show_Version           35
 #define IOCTL_Clear_Run_Count        36
-#define IOCTL_Tx_Loop_Clear          37
-#define IOCTL_End_Of_List            38
+#define IOCTL_Looped_Write           37
+#define IOCTL_Tx_Loop_Clear          38
+#define IOCTL_End_Of_List            39
 #endif
