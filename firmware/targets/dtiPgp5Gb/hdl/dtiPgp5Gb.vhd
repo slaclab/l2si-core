@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-12-14
--- Last update: 2017-07-21
+-- Last update: 2017-07-24
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -205,9 +205,9 @@ architecture top_level of dtiPgp5Gb is
   
   signal dsFull     : slv(MaxDsLinks-1 downto 0) := (others=>'0');
 
-  signal dsLinkUp     : slv(MaxDsLinks-1 downto 0);
-  signal dsRxErr      : slv(MaxDsLinks-1 downto 0);
-  signal dsFullIn     : slv(MaxDsLinks-1 downto 0);
+  signal dsLinkUp     : slv       (MaxDsLinks-1 downto 0);
+  signal dsRxErrs     : Slv32Array(MaxDsLinks-1 downto 0);
+  signal dsFullIn     : slv       (MaxDsLinks-1 downto 0);
 
   signal amcClockP   : slv         (1 downto 0);
   signal amcClockN   : slv         (1 downto 0);
@@ -534,12 +534,12 @@ begin
                  remLinkID     => usRemLinkID  (i),
                  fullOut       => usFull       (i),
                  --
-                 ctlClk        => regClk,
-                 ctlRst        => regRst,
-                 ctlRxMaster   => ctlRxM (i),
-                 ctlRxSlave    => ctlRxS (i),
-                 ctlTxMaster   => ctlTxM (i),
-                 ctlTxSlave    => ctlTxS (i),
+                 --ctlClk        => regClk,
+                 --ctlRst        => regRst,
+                 --ctlRxMaster   => dsCtlRxM (i),
+                 --ctlRxSlave    => dsCtlRxS (i),
+                 --ctlTxMaster   => ctlTxM (i),
+                 --ctlTxSlave    => ctlTxS (i),
                  --
                  timingClk     => recTimingClk,  -- outbound data (to sensor)
                  timingRst     => recTimingRst,
@@ -561,13 +561,10 @@ begin
                  --
                  obClk         => usObClk   (i),
                  obTrig        => usObTrig  (i),
-                 obTrigValid   => usObTrigV (i),
-                 obMaster      => usObMaster(i),
-                 obSlave       => usObSlave (i) );
+                 obTrigValid   => usObTrigV (i) );
 
     U_App : entity work.DtiUsPgp5Gb
       generic map ( ID_G           => x"0" & toSlv(i,4),
-                    DEBUG_G        => ite(i>0, false, true),
                     INCLUDE_AXIL_G => ite(i<NPGPAXI_C, true, false) )
       port map ( coreClk  => coreClk(i),
                  coreRst  => coreRst(i),
@@ -587,18 +584,20 @@ begin
                  axilWriteMaster  => usAxilWriteMasters(i),
                  axilWriteSlave   => usAxilWriteSlaves (i),
                  --
-                 ibClk    => usIbClk   (i),
+                 ibClk    => regClk,
                  ibRst    => regRst,
-                 ibMaster => usIbMaster(i),
-                 ibSlave  => usIbSlave (i),
+                 ibMaster(VC_EVT) => usIbMaster (i),
+                 ibMaster(VC_CTL) => ctlTxM     (i),
+                 ibSlave (VC_EVT) => usIbSlave  (i),
+                 ibSlave (VC_CTL) => ctlTxS     (i),
                  linkUp   => usLinkUp  (i),
                  rxErrs   => usRxErrs  (i),
                  txFull   => usFullIn  (i),
                  --
-                 obClk       => usObClk   (i),
-                 obRst       => recTimingRst,
-                 obMaster    => usObMaster(i),
-                 obSlave     => usObSlave (i),
+                 obClk       => regClk,
+                 obRst       => regRst,
+                 obMaster    => ctlRxM (i),
+                 obSlave     => ctlRxS (i),
                  --  Timing clock domain
                  timingClk   => recTimingClk,
                  timingRst   => recTimingRst,
@@ -627,7 +626,7 @@ begin
                  fullOut        => dsFull      (i),
                  --
                  linkUp         => dsLinkUp  (i),
-                 rxErr          => dsRxErr   (i),
+                 rxErrs         => dsRxErrs  (i),
                  fullIn         => dsFullIn  (i),
                  --
                  obClk          => dsObClk   (i),
@@ -657,7 +656,7 @@ begin
                  --
                  linkUp        => dsLinkUp    (i),
                  remLinkID     => dsRemLinkID (i),
-                 rxErr         => dsRxErr     (i),
+                 rxErrs        => dsRxErrs    (i),
                  full          => dsFullIn    (i),
                  obClk         => dsObClk     (i),
                  obMaster      => dsObMaster  (i),
