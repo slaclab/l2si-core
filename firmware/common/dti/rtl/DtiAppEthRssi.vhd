@@ -5,7 +5,7 @@
 -- Author     : Larry Ruckman  <ruckman@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2016-02-23
--- Last update: 2017-04-21
+-- Last update: 2017-07-24
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -60,13 +60,14 @@ end DtiAppEthRssi;
 
 architecture mapping of DtiAppEthRssi is
 
+  constant NSTREAMS_C : integer := 1;
    --  APP Streams
    constant ETH_AXIS_CONFIG_C : AxiStreamConfigType := ssiAxiStreamConfig(8, TKEEP_COMP_C, TUSER_FIRST_LAST_C, 8);  -- Use 8 tDest bits
-   constant APP_AXIS_CONFIG_C  : AxiStreamConfigArray(1 downto 0) := (others => ETH_AXIS_CONFIG_C);
-   signal rssiIbMasters : AxiStreamMasterArray(1 downto 0);
-   signal rssiIbSlaves  : AxiStreamSlaveArray (1 downto 0);
-   signal rssiObMasters : AxiStreamMasterArray(1 downto 0);
-   signal rssiObSlaves  : AxiStreamSlaveArray (1 downto 0);
+   constant APP_AXIS_CONFIG_C  : AxiStreamConfigArray(NSTREAMS_C-1 downto 0) := (others => ETH_AXIS_CONFIG_C);
+   signal rssiIbMasters : AxiStreamMasterArray(NSTREAMS_C-1 downto 0);
+   signal rssiIbSlaves  : AxiStreamSlaveArray (NSTREAMS_C-1 downto 0);
+   signal rssiObMasters : AxiStreamMasterArray(NSTREAMS_C-1 downto 0);
+   signal rssiObSlaves  : AxiStreamSlaveArray (NSTREAMS_C-1 downto 0);
 
 begin
 
@@ -76,10 +77,9 @@ begin
    U_RssiServer : entity work.RssiCoreWrapper
       generic map (
          TPD_G               => TPD_G,
-         APP_STREAMS_G       => 2,
+         APP_STREAMS_G       => NSTREAMS_C,
          APP_STREAM_ROUTES_G => (
-            0                => X"00",  -- TDEST 0 routed to stream 0
-            1                => X"01"), -- TDEST 1 routed to stream 1 (loopback)
+            0                => X"00"),  -- TDEST 0 routed to stream 0
          CLK_FREQUENCY_G     => AXI_CLK_FREQ_C,
          TIMEOUT_UNIT_G      => TIMEOUT_C,
          SERVER_G            => true,
@@ -117,10 +117,11 @@ begin
          axilWriteSlave    => axilWriteSlave);
 
    --------------------------------
-   -- App Path: TDEST = 0x0b
+   -- App Path: TDEST = 0x0
    --------------------------------
    ibAppMaster     <= rssiObMasters(0);
    rssiObSlaves(0) <= ibAppSlave;
+   
    U_IbLimiter : entity work.SsiFrameLimiter
       generic map (
          TPD_G               => TPD_G,
@@ -144,11 +145,5 @@ begin
          mAxisRst    => axilRst,
          mAxisMaster => rssiIbMasters(0),
          mAxisSlave  => rssiIbSlaves (0));   
-
-   --------------------------------
-   -- Loopback Channel: TDEST = 0x1
-   --------------------------------
-   rssiIbMasters(1) <= rssiObMasters(1);
-   rssiObSlaves (1) <= rssiIbSlaves (1);
-
+   
 end mapping;

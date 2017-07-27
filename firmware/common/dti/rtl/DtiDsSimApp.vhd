@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-07-10
--- Last update: 2017-04-10
+-- Last update: 2017-07-26
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -43,7 +43,7 @@ entity DtiDsSimApp is
      --  App Interface
      ibRst           : in  sl;
      linkUp          : out sl;
-     rxErr           : out sl;
+     rxErrs          : out slv(31 downto 0);
      full            : out sl;
      --
      obClk           : in  sl;
@@ -56,7 +56,7 @@ architecture rtl of DtiDsSimApp is
 begin
 
   linkUp  <= '1';
-  rxErr   <= '0';
+  rxErrs  <= (others=>'0');
   full    <= '0';
   obSlave <= AXI_STREAM_SLAVE_FORCE_C;
   

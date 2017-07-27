@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-07-10
--- Last update: 2017-07-21
+-- Last update: 2017-07-26
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -33,6 +33,7 @@ use work.XpmPkg.all;
 use work.DtiPkg.all;
 use work.ArbiterPkg.all;
 use work.AxiStreamPkg.all;
+use work.SsiPkg.all;
 
 entity DtiUsCore is
    generic (
@@ -49,12 +50,12 @@ entity DtiUsCore is
      status          : out DtiUsLinkStatusType;
      fullOut         : out slv(15 downto 0);
      --  Ethernet control interface
-     ctlClk          : in  sl;
-     ctlRst          : in  sl;
-     ctlRxMaster     : in  AxiStreamMasterType;
-     ctlRxSlave      : out AxiStreamSlaveType;
-     ctlTxMaster     : out AxiStreamMasterType;
-     ctlTxSlave      : in  AxiStreamSlaveType;
+     --ctlClk          : in  sl;
+     --ctlRst          : in  sl;
+     --ctlRxMaster     : in  AxiStreamMasterType;
+     --ctlRxSlave      : out AxiStreamSlaveType;
+     --ctlTxMaster     : out AxiStreamMasterType;
+     --ctlTxSlave      : in  AxiStreamSlaveType;
      --  Timing interface
      timingClk       : in  sl;
      timingRst       : in  sl;
@@ -77,9 +78,9 @@ entity DtiUsCore is
      --  Out to detector
      obClk           : out sl;
      obTrigValid     : out sl;
-     obTrig          : out XpmPartitionDataType;
-     obMaster        : out AxiStreamMasterType;
-     obSlave         : in  AxiStreamSlaveType );
+     obTrig          : out XpmPartitionDataType);
+     --obMaster        : out AxiStreamMasterType;
+     --obSlave         : in  AxiStreamSlaveType );
 end DtiUsCore;
 
 architecture rtl of DtiUsCore is
@@ -91,6 +92,7 @@ architecture rtl of DtiUsCore is
   type RegType is record
     ena     : sl;
     state   : StateType;
+    msg     : sl;
     dest    : slv(MAX_BIT downto 0);
     mask    : slv(MaxDsLinks-1 downto 0);
     ack     : slv(MaxDsLinks-1 downto 0);
@@ -109,6 +111,7 @@ architecture rtl of DtiUsCore is
   constant REG_INIT_C : RegType := (
     ena     => '0',
     state   => S_IDLE,
+    msg     => '0',
     dest    => toSlv(MaxDsLinks-1,MAX_BIT+1),
     mask    => (others=>'0'),
     ack     => (others=>'0'),
@@ -127,19 +130,19 @@ architecture rtl of DtiUsCore is
   signal rin : RegType;
 
   signal eventTag : slv(4 downto 0);
+  signal pmsg     : sl;
   signal pdata    : XpmPartitionDataType;
   signal pdataV   : sl;
   signal eventHeader : DtiEventHeaderType;
   
   signal configV, configSV : slv(DTI_US_LINK_CONFIG_BITS_C-1 downto 0);
   signal configS : DtiUsLinkConfigType;
+
+  signal ibEvtMaster  : AxiStreamMasterType;
+  signal ibEvtSlave   : AxiStreamSlaveType;
   
   signal tMaster      : AxiStreamMasterType;
   signal tSlave       : AxiStreamSlaveType;
-
-  signal ictlTxMaster  : AxiStreamMasterType;
-  signal iictlTxMaster : AxiStreamMasterType;
-  signal ictlTxSlave   : AxiStreamSlaveType;
 
   signal urst    : sl;
   signal supdate : sl := '0';
@@ -157,32 +160,6 @@ architecture rtl of DtiUsCore is
   signal cntL1R  : slv(19 downto 0);
   
 begin
-
-  GEN_DEBUG : if DEBUG_G generate
-    r_state <= "000" when r.state = S_IDLE else
-               "001" when r.state = S_EVHDR1 else
-               "010" when r.state = S_EVHDR2 else
-               "011" when r.state = S_EVHDR3 else
-               "100" when r.state = S_EVHDR4 else
-               "101";
-    
-    U_ILA_EVT : ila_0
-      port map ( clk                 => eventClk,
-                 probe0(0)           => tMaster.tValid, 
-                 probe0(1)           => tMaster.tLast,
-                 probe0(2)           => tSlave.tReady,
-                 probe0( 6 downto 3) => tMaster.tDest( 3 downto 0),
-                 probe0(70 downto 7) => tMaster.tData(63 downto 0),
-                 probe0(73 downto 71) => r_state,
-                 probe0(74)           => iictlTxMaster.tValid,
-                 probe0(75)           => iictlTxMaster.tLast,
-                 probe0(76)           => ictlTxSlave.tReady,
-                 probe0(80 downto 77) => iictlTxMaster.tDest( 3 downto 0),
-                 probe0(144 downto 81) => iictlTxMaster.tData(63 downto 0),
-                 probe0(145)           => ibMaster.tValid,
-                 probe0(146)           => ibMaster.tLast,
-                 probe0(255 downto 147) => (others=>'0') );
-  end generate;
 
   status.obL0   <= cntL0;
   status.obL1A  <= cntL1A;
@@ -203,50 +180,19 @@ begin
   status.ibEvt      <= r.ibEvt;
   status.ibDump     <= r.ibDump;
   
-  eventTag      <= ibMaster.tId(eventTag'range);
+  eventTag        <= ibMaster.tId(eventTag'range);
   
-  U_CtlRxStreamFifo : entity work.AxiStreamFifo
-    generic map ( SLAVE_AXI_CONFIG_G  => CTLS_CONFIG_C,
-                  MASTER_AXI_CONFIG_G => US_OB_CONFIG_C )
-    port map ( sAxisClk    => ctlClk,
-               sAxisRst    => ctlRst,
-               sAxisMaster => ctlRxMaster,
-               sAxisSlave  => ctlRxSlave,
-               mAxisClk    => timingClk,
-               mAxisRst    => timingRst,
-               mAxisMaster => obMaster,
-               mAxisSlave  => obSlave );
-  
-  U_CtlTxStreamFifo : entity work.AxiStreamFifo
-    generic map ( SLAVE_AXI_CONFIG_G  => US_IB_CONFIG_C,
-                  MASTER_AXI_CONFIG_G => CTLS_CONFIG_C )
-    port map ( sAxisClk    => eventClk,
-               sAxisRst    => eventRst,
-               sAxisMaster => iictlTxMaster,
-               sAxisSlave  => ictlTxSlave,
-               mAxisClk    => ctlClk,
-               mAxisRst    => ctlRst,
-               mAxisMaster => ctlTxMaster,
-               mAxisSlave  => ctlTxSlave );
-
-  process (ictlTxMaster) is
-  begin
-    iictlTxMaster       <= ictlTxMaster;
-    iictlTxMaster.tDest <= toSlv(0, iictlTxMaster.tDest'length);
-  end process;
-    
-  U_Mux : entity work.AxiStreamDeMux
-    generic map ( NUM_MASTERS_G  => MaxDsLinks+1,
+  U_Mux : entity work.DtiStreamDeMux
+    generic map ( NUM_MASTERS_G  => MaxDsLinks,
                   TDEST_HIGH_G   => MAX_BIT,
                   TDEST_LOW_G    => 0 )
-    port map ( sAxisMaster                         => tMaster,
-               sAxisSlave                          => tSlave,
-               mAxisMasters(MaxDsLinks-1 downto 0) => eventMasters,
-               mAxisMasters(MaxDsLinks)            => ictlTxMaster,
-               mAxisSlaves (MaxDsLinks-1 downto 0) => eventSlaves,
-               mAxisSlaves (MaxDsLinks)            => ictlTxSlave,
-               axisClk                             => eventClk,
-               axisRst                             => eventRst );
+    port map ( sAxisMaster  => tMaster,
+               sAxisSlave   => tSlave,
+               sFlood       => r.msg,
+               mAxisMasters => eventMasters,
+               mAxisSlaves  => eventSlaves,
+               axisClk      => eventClk,
+               axisRst      => eventRst );
 
   U_HdrCache : entity work.DtiHeaderCache
     port map ( rst       => urst,
@@ -265,6 +211,7 @@ begin
                entag     => config.tagEnable,
                l0tag     => eventTag,
                advance   => r.hdrRd,
+               pmsg      => pmsg,
                hdrOut    => eventHeader );
 
   configV <= toSlv(config);
@@ -292,8 +239,7 @@ begin
   --    Arbitrate through forwarding mask
   --    Add event header
   --
-  comb : process ( r, ibMaster, tSlave, configS, eventRst, sclear, supdate, eventHeader, dsfull, ibFull,
-                   ictlTxMaster, ictlTxSlave, rin) is
+  comb : process ( r, ibMaster, tSlave, configS, eventRst, sclear, supdate, eventHeader, dsfull, ibFull, pmsg, rin) is
     variable v : RegType;
     variable selv : sl;
     variable fwd  : slv(MAX_BIT downto 0);
@@ -313,34 +259,38 @@ begin
 
     case r.state is
       when S_IDLE =>
-        if v.master.tValid='0' and ibMaster.tValid='1' then
-          if ibMaster.tDest(0)='1' then
-            v.slave.tReady := '1';
-            v.master       := ibMaster;
-            v.master.tDest := toSlv(MaxDsLinks,r.master.tDest'length);
-            if ibMaster.tLast='1' then
-              v.state      := S_IDLE;
-            else
-              v.state      := S_PAYLOAD;
-            end if;
-          elsif selv = '0' then
-            v.state        := S_DUMP;
-            v.ibDump       := r.ibDump+1;
-          else
+        if v.master.tValid='0' then
+          v.msg         := '0';
+          if pmsg='1' then
+            v.msg          := '1';
             v.state        := S_EVHDR1;
             v.ibEvt        := r.ibEvt+1;
+          elsif ibMaster.tValid='1' then
+            if selv = '0' then
+              v.state        := S_DUMP;
+              v.ibDump       := r.ibDump+1;
+            else
+              v.state        := S_EVHDR1;
+              v.ibEvt        := r.ibEvt+1;
+            end if;
           end if;
         end if;
       when S_EVHDR1 =>
-        if v.master.tValid='0' and ibMaster.tValid='1' then
+        if v.master.tValid='0' then
           v.dest          := fwd;
           v.master.tValid := '1';
           v.master.tData(63 downto 0) := eventHeader.timeStamp;
           v.master.tKeep  := genTKeep(US_IB_CONFIG_C);
           v.master.tLast  := '0';
-          v.master.tDest  := resize(fwd,r.master.tDest'length);
-          v.master.tId    := ibMaster.tId;
-          v.master.tUser  := ibMaster.tUser;  -- SOF sometimes goes here
+          if r.msg = '1' then
+            --  how to broadcast? - just unicast for now
+            v.master.tDest  := resize(fwd,r.master.tDest'length);
+            ssiSetUserSof(US_IB_CONFIG_C, v.master, '1');
+          else
+            v.master.tDest  := resize(fwd,r.master.tDest'length);
+            v.master.tId    := ibMaster.tId;
+            v.master.tUser  := ibMaster.tUser;  -- SOF sometimes goes here
+          end if;
           v.state         := S_EVHDR2;
         end if;
       when S_EVHDR2 =>
@@ -348,20 +298,26 @@ begin
           v.master.tValid := '1';
           v.master.tData(63 downto 0) := eventHeader.pulseId;
           v.master.tUser  := (others=>'0');
-          v.hdrRd         := '1';
           v.state         := S_EVHDR3;
         end if;
       when S_EVHDR3 =>
         if v.master.tValid='0' then
           v.master.tValid := '1';
-          v.master.tData(63 downto 0) := eventHeader.evttag & toSlv(0,32);
+          v.master.tData(63 downto 0) := eventHeader.evttag & toSlv(0,16);
+          v.hdrRd         := '1';
           v.state         := S_EVHDR4;
         end if;
       when S_EVHDR4 =>
         if v.master.tValid='0' then
           v.master.tValid := '1';
           v.master.tData(63 downto 0) := configS.dataSrc & configS.dataType;
-          v.state         := S_FIRST_PAYLOAD;
+          if r.msg = '1' then
+            v.master.tLast := '1';
+            ssiSetUserEofe(US_IB_CONFIG_C, v.master, '0');
+            v.state       := S_IDLE;
+          else
+            v.state       := S_FIRST_PAYLOAD;
+          end if;
         end if;
       when S_FIRST_PAYLOAD =>
         if v.master.tValid='0' and ibMaster.tValid='1' then
@@ -433,8 +389,8 @@ begin
     
     rin <= v;
 
-    tMaster <= r.master;
-    ibSlave <= rin.slave;
+    tMaster    <= r.master;
+    ibSlave    <= rin.slave;
   end process;
   
   seq : process (eventClk) is

@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-07-10
--- Last update: 2017-07-20
+-- Last update: 2017-07-25
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -53,7 +53,7 @@ entity DtiDsCore is
      fullOut         : out sl;
      --  App Interface
      linkUp          : in  sl;
-     rxErr           : in  sl;
+     rxErrs          : in  slv(31 downto 0);
      fullIn          : in  sl;
      --
      obClk           : out sl;
@@ -64,7 +64,6 @@ end DtiDsCore;
 architecture rtl of DtiDsCore is
 
   signal srxFull : sl;
-  signal srxErr  : sl;
   signal supdate : sl;
   signal sclear  : sl;
   
@@ -91,33 +90,13 @@ begin
   status.linkUp    <= linkUp;
   status.remLinkID <= remLinkID;
   status.rxFull    <= r.status.rxFull;
-  status.rxErrs    <= r.status.rxErrs;
+  status.rxErrs    <= rxErrs;
   status.obSent    <= r.status.obSent;
 
   fullOut  <= fullIn;
   obClk    <= eventClk;
   obMaster <= tMaster;
 
-  GEN_DEBUG : if DEBUG_G generate
-    U_ILA : ila_0
-      port map ( clk                    => eventClk,
-                 probe0( 63 downto   0) => tMaster.tData(63 downto 0),
-                 probe0( 71 downto  64) => tMaster.tKeep( 7 downto 0),
-                 probe0( 72 )           => tMaster.tValid,
-                 probe0( 73 )           => tMaster.tLast,
-                 probe0( 77 downto  74) => tMaster.tDest(3 downto 0),
-                 probe0( 81 downto  78) => tMaster.tId  (3 downto 0),
-                 probe0( 89 downto  82) => tMaster.tUser(7 downto 0),
-                 probe0( 90 )           => obSlave.tReady,
-                 probe0(255 downto  91) => (others=>'0') );
-
-  end generate;
-  
-  U_SRxErr : entity work.Synchronizer
-    port map ( clk     => eventClk,
-               dataIn  => rxErr,
-               dataOut => srxErr );
-  
   U_SRxFull : entity work.Synchronizer
     port map ( clk     => eventClk,
                dataIn  => fullIn,
@@ -142,7 +121,7 @@ begin
                mAxisMaster  => tMaster,
                mAxisSlave   => obSlave );
 
-  comb : process ( r, eventRst, clear, supdate, srxErr, srxFull, tMaster, obSlave ) is
+  comb : process ( r, eventRst, clear, supdate, srxFull, tMaster, obSlave ) is
     variable v : RegType;
   begin
     v := r;
@@ -150,10 +129,6 @@ begin
     if supdate = '1' then
       if srxFull = '1' then
         v.status.rxFull := r.status.rxFull+1;
-      end if;
-
-      if srxErr = '1' then
-        v.status.rxErrs := r.status.rxErrs+1;
       end if;
 
       if tMaster.tValid='1' and obSlave.tReady='1' then

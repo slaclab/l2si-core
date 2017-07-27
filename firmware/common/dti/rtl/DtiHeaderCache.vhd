@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-07-10
--- Last update: 2017-07-08
+-- Last update: 2017-07-26
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -54,6 +54,7 @@ entity DtiHeaderCache is
      entag           : in  sl;
      l0tag           : in  slv(4 downto 0);
      advance         : in  sl;
+     pmsg            : out sl;
      hdrOut          : out DtiEventHeaderType );
 end DtiHeaderCache;
 
@@ -62,7 +63,9 @@ architecture rtl of DtiHeaderCache is
   type WrRegType is record
     rden   : sl;
     wren   : sl;
-    rdaddr : slv(7 downto 0);
+    rdaddr : slv( 7 downto 0);
+    pvec   : slv(47 downto 0);
+    pmsg   : slv( 5 downto 0);
     pword  : XpmPartitionDataType;
     pwordV : sl;
     cntL0  : slv(19 downto 0);
@@ -74,6 +77,8 @@ architecture rtl of DtiHeaderCache is
     rden   => '0',
     wren   => '0',
     rdaddr => (others=>'0'),
+    pvec   => (others=>'1'),
+    pmsg   => (others=>'0'),
     pword  => XPM_PARTITION_DATA_INIT_C,
     pwordV => '0',
     cntL0  => (others=>'0'),
@@ -85,15 +90,29 @@ architecture rtl of DtiHeaderCache is
   
   signal wrrst, rdrst : sl;
   signal entagw, entagr : sl;
+  signal pmsgw, pmsgr   : sl;
+  signal maddr        : slv(  4 downto 0);
   signal daddr        : slv(  4 downto 0);
   signal doutf        : slv(  4 downto 0);
   signal dout         : slv(127 downto 0);
-  signal doutb        : slv(159 downto 0);
+  signal doutb        : slv(175 downto 0);
   signal il1a         : sl;
   signal sdelay       : slv(l0delay'range);
   signal spartition   : slv(partition'range);
 
 begin
+
+  U_PMsg : entity work.SynchronizerOneShot
+    port map ( clk      => rdclk,
+               dataIn   => wr.pmsg(wr.pmsg'left),
+               dataOut  => pmsg );
+
+  pmsgw <= not wr.pvec(15);
+  
+  U_PMsgR : entity work.Synchronizer
+    port map ( clk      => rdclk,
+               dataIn   => pmsgw,
+               dataOut  => pmsgr );
 
   pdata            <= wr.pword;
   pdataV           <= wr.pwordV;
@@ -103,9 +122,10 @@ begin
   
   hdrOut.timeStamp <= doutb( 63 downto   0);
   hdrOut.pulseId   <= doutb(127 downto  64);
-  hdrOut.evttag    <= doutb(159 downto 128);
+  hdrOut.evttag    <= doutb(175 downto 128);
     
-  daddr <= l0tag when entagr='1' else
+  daddr <= maddr when pmsgr ='1' else
+           l0tag when entagr='1' else
            doutf;
 
   il1a  <= wr.pword.l1e and wr.pword.l1a and wr.pwordV;
@@ -157,14 +177,14 @@ begin
                doutb  => dout );
 
   U_TagRam : entity work.SimpleDualPortRam
-    generic map ( DATA_WIDTH_G => 160,
+    generic map ( DATA_WIDTH_G => 176,
                   ADDR_WIDTH_G => 5 )
     port map ( clka   => wrclk,
                ena    => '1',
                wea    => wr.wren,
                addra  => wr.pword.l0tag,
                dina(127 downto   0) => dout,
-               dina(159 downto 128) => wr.pword.anatag,
+               dina(175 downto 128) => wr.pvec,
                clkb   => rdclk,
                enb    => '1',
                addrb  => daddr,
@@ -182,6 +202,12 @@ begin
                rd_en     => advance,
                dout      => doutf );
 
+  U_MAddr : entity work.SynchronizerVector
+    generic map ( WIDTH_G => 5 )
+    port map ( clk     => rdclk,
+               dataIn  => wr.pword.l0tag,
+               dataOut => maddr );
+  
   comb : process( wr, wrrst, timingBus, exptBus, sdelay, spartition, enable ) is
     variable v  : WrRegType;
     variable ip : integer;
@@ -191,18 +217,21 @@ begin
     v.rden      := '0';
     v.wren      := '0';
     v.pwordV    := '0';
+    v.pmsg      := wr.pmsg(wr.pmsg'left-1 downto 0) & '0';
     
     ip := conv_integer(spartition);
-    
+
     if timingBus.strobe = '1' then
       v.rden   := '1';
       v.rdaddr := timingBus.message.pulseId(7 downto 0) - sdelay;
       v.pword  := toPartitionWord(exptBus.message.partitionWord(ip));
-      v.pwordV := enable;
+      v.pwordV := enable and exptBus.message.partitionWord(ip)(15);
+      v.pvec   := exptBus.message.partitionWord(ip);
+      v.pmsg(0) := enable and not exptBus.message.partitionWord(ip)(15);
     end if;
 
     if wr.rden = '1' then
-      v.wren  := wr.pword.l0a;
+      v.wren  := wr.pword.l0a or not wr.pvec(15);
     end if;
     
     if wrrst = '1' then

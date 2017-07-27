@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2016-03-25
--- Last update: 2017-07-21
+-- Last update: 2017-07-26
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -37,6 +37,10 @@ package DtiPkg is
    constant MAX_CUM_ACK_CNT_C  : positive := WINDOW_ADDR_SIZE_C;
    constant MAX_RETRANS_CNT_C  : positive := ite((WINDOW_ADDR_SIZE_C > 1), WINDOW_ADDR_SIZE_C-1, 1);
 
+   constant NUM_DTI_VC_C       : integer  := 2;
+   constant VC_EVT             : integer  := 0;
+   constant VC_CTL             : integer  := 1;
+   
    constant MaxUsLinks     : integer := 7;
 --   constant MaxDsLinks     : integer := 13;
    constant MaxDsLinks     : integer := 7;
@@ -193,12 +197,12 @@ package DtiPkg is
      dsLink     => (others=>DTI_DS_LINK_STATUS_INIT_C),
      bpLink     => DTI_BP_LINK_STATUS_INIT_C,
      usApp      => (others=>DTI_US_APP_STATUS_INIT_C),
-     qplllock   => "00" );
+     qplllock   => "0000" );
 
    type DtiEventHeaderType is record
      timeStamp  : slv(63 downto 0);
      pulseId    : slv(63 downto 0);
-     evttag     : slv(31 downto 0);
+     evttag     : slv(47 downto 0);
    end record;
 
    constant DTI_EVENT_HEADER_INIT_C : DtiEventHeaderType := (

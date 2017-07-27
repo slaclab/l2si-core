@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-12-14
--- Last update: 2017-07-21
+-- Last update: 2017-07-24
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -124,11 +124,7 @@ begin
                dataIn  => status.bpLink.obSent,
                dataOut => bpStatus.obSent );
 
-  U_UsRxErrs : entity work.SynchronizerVector
-    generic map ( WIDTH_G => 32 )
-    port map ( clk     => axilClk,
-               dataIn  => iusStatus.rxErrs,
-               dataOut => usStatus.rxErrs );
+  usStatus.rxErrs <= iusStatus.rxErrs;
   
   U_UsRemLinkID : entity work.SynchronizerVector
     generic map ( WIDTH_G => 8 )
@@ -177,12 +173,8 @@ begin
     port map ( clk     => axilClk,
                dataIn  => iusStatus.obL1R,
                dataOut => usStatus.obL1R );
-  
-  U_DsRxErrs : entity work.SynchronizerVector
-    generic map ( WIDTH_G => 32 )
-    port map ( clk     => axilClk,
-               dataIn  => idsStatus.rxErrs,
-               dataOut => dsStatus.rxErrs );
+
+  dsStatus.rxErrs <= idsStatus.rxErrs;
   
   U_DsRemLinkID : entity work.SynchronizerVector
     generic map ( WIDTH_G => 8 )

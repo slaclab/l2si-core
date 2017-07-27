@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-07-10
--- Last update: 2017-07-20
+-- Last update: 2017-07-24
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -61,7 +61,7 @@ entity DtiDsPgp5Gb is
      ibRst           : in  sl;
      linkUp          : out sl;
      remLinkID       : out slv(7 downto 0);
-     rxErr           : out sl;
+     rxErrs          : out slv(31 downto 0);
      full            : out sl;
      --
      obClk           : in  sl;
@@ -94,6 +94,7 @@ begin
   pgpRst <= ibRst;
 
   locTxIn.locData          <= ID_G;
+  linkUp                   <= pgpRxOut.linkReady;
   remLinkID                <= pgpRxOut.remLinkData;
   
   U_Fifo : entity work.AxiStreamFifo
@@ -113,8 +114,15 @@ begin
       mAxisMaster => amcObMaster,
       mAxisSlave  => amcObSlave );
 
-  linkUp                   <= pgpRxOut.linkReady;
-  rxErr                    <= pgpRxOut.frameRxErr;
+  U_RXERR : entity work.SynchronizerOneShotCnt
+    generic map ( CNT_WIDTH_G => 32 )
+    port map ( wrClk   => pgpClk,
+               rdClk   => axilClk,
+               cntRst  => fifoRst,
+               rollOverEn => '1',
+               dataIn  => pgpRxOut.linkError,
+               dataOut => open,
+               cntOut  => rxErrs );
   
   pgpTxMasters(0)          <= amcObMaster;
   amcObSlave               <= pgpTxSlaves(0);

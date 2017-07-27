@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-07-10
--- Last update: 2017-07-21
+-- Last update: 2017-07-24
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -35,7 +35,6 @@ use work.AxiLitePkg.all;
 use work.AxiStreamPkg.all;
 use work.XpmPkg.all;
 use work.DtiPkg.all;
-use work.DtiSimPkg.all;
 use work.Pgp2bPkg.all;
 use work.SsiPkg.all;
 
@@ -67,8 +66,8 @@ entity DtiUsPgp5Gb is
      --
      ibClk           : in  sl;
      ibRst           : in  sl;
-     ibMaster        : out AxiStreamMasterType;
-     ibSlave         : in  AxiStreamSlaveType;
+     ibMaster        : out AxiStreamMasterArray(NUM_DTI_VC_C-1 downto 0);
+     ibSlave         : in  AxiStreamSlaveArray (NUM_DTI_VC_C-1 downto 0);
      linkUp          : out sl;
      rxErrs          : out slv(31 downto 0);
      txFull          : out sl;
@@ -102,12 +101,6 @@ architecture top_level_app of DtiUsPgp5Gb is
   signal pgpTrig      : slv(2 downto 0);
   signal pgpTrigValid : sl;
 
-  signal dmaIbMaster    : AxiStreamMasterType;
-  signal dmaIbSlave     : AxiStreamSlaveType;
-  signal dmaIbCtrl      : AxiStreamCtrlType;
-  signal dmaObMaster    : AxiStreamMasterType;
-  signal dmaObSlave     : AxiStreamSlaveType;
-
   signal locTxIn        : Pgp2bTxInType;
   signal pgpTxIn        : Pgp2bTxInType;
   signal pgpTxOut       : Pgp2bTxOutType;
@@ -135,11 +128,6 @@ begin
   locTxIn.locData          <= ID_G;
   locTxIn.flowCntlDis      <= '1';
   
-  pgpTxMasters(0)          <= dmaObMaster;
-  dmaObSlave               <= pgpTxSlaves(0);
-  dmaIbMaster              <= pgpRxMasters(0);
-  pgpRxCtrls(0)            <= dmaIbCtrl;
-
   U_PgpFb : entity work.DtiPgpFb
     port map ( pgpClk       => pgpClk,
                pgpRst       => pgpRst,
@@ -147,6 +135,7 @@ begin
                txAlmostFull => itxFull );
 
   U_Pgp2b : entity work.MpsPgpFrontEnd
+    generic map ( NUM_VC_EN_G => NUM_DTI_VC_C )
     port map ( pgpClk       => pgpClk,
                pgpRst       => pgpRst,
                stableClk    => axilClk,
@@ -172,7 +161,7 @@ begin
   U_RXERR : entity work.SynchronizerOneShotCnt
     generic map ( CNT_WIDTH_G => 32 )
     port map ( wrClk   => pgpClk,
-               rdClk   => ibClk,
+               rdClk   => axilClk,
                cntRst  => fifoRst,
                rollOverEn => '1',
                dataIn  => pgpRxOut.linkError,
@@ -224,22 +213,24 @@ begin
                sAxisSlave  => obSlave,
                mAxisClk    => pgpClk,
                mAxisRst    => pgpRst,
-               mAxisMaster => dmaObMaster,
-               mAxisSlave  => dmaObSlave );
-  
-  U_AmcToIb : entity work.AxiStreamFifo
-    generic map ( SLAVE_AXI_CONFIG_G  => SSI_PGP2B_CONFIG_C,
-                  MASTER_AXI_CONFIG_G => US_IB_CONFIG_C )
-    port map ( sAxisClk    => pgpClk,
-               sAxisRst    => pgpRst,
-               sAxisMaster => dmaIbMaster,
-               sAxisSlave  => dmaIbSlave,
-               sAxisCtrl   => dmaIbCtrl,
-               mAxisClk    => ibClk,
-               mAxisRst    => ibRst,
-               mAxisMaster => ibMaster,
-               mAxisSlave  => ibSlave );
+               mAxisMaster => pgpTxMasters(VC_CTL),
+               mAxisSlave  => pgpTxSlaves (VC_CTL));
 
+  GEN_AMCTOIB : for i in 0 to NUM_DTI_VC_C-1 generate
+    U_AmcToIb : entity work.AxiStreamFifo
+      generic map ( SLAVE_AXI_CONFIG_G  => SSI_PGP2B_CONFIG_C,
+                    MASTER_AXI_CONFIG_G => US_IB_CONFIG_C )
+      port map ( sAxisClk    => pgpClk,
+                 sAxisRst    => pgpRst,
+                 sAxisMaster => pgpRxMasters(i),
+                 sAxisSlave  => open,
+                 sAxisCtrl   => pgpRxCtrls  (i),
+                 mAxisClk    => ibClk,
+                 mAxisRst    => ibRst,
+                 mAxisMaster => ibMaster    (i),
+                 mAxisSlave  => ibSlave     (i));
+  end generate;
+  
   U_SyncObTrig : entity work.SynchronizerFifo
     generic map ( DATA_WIDTH_G  => 3 )
     port map ( rst     => timingRst,
