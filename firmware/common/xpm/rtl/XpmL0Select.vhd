@@ -172,7 +172,7 @@ begin
 
       if (uconfig.reset='1') then
         v := REG_INIT_C;
-      end if;cd 
+      end if;
       
       rin <= v;
    end process comb;
