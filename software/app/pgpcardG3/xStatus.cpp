@@ -25,14 +25,18 @@ int main (int argc, char **argv) {
   int           fd;
   int           x;
   int           y;
+  const char*  dev = "/dev/pgpcardG3_0_0";
 
-  if ( argc != 2 ) {
-    printf("Usage: %s <device>\n", argv[0]);
+  if (argc>2 || 
+      (argc==2 && argv[1][0]=='-')) {
+    printf("Usage: %s [<device>]\n", argv[0]);
     return(0);
   }
+  else if (argc==2)
+    dev = argv[1];
 
-  if ( (fd = open(argv[1], O_RDWR)) <= 0 ) {
-    cout << "Error opening " << argv[1] << endl;
+  if ( (fd = open(dev, O_RDWR)) <= 0 ) {
+    cout << "Error opening " << dev << endl;
     return(1);
   }
 
@@ -122,11 +126,10 @@ int main (int argc, char **argv) {
   }
 
   for(x=0;x<8;x++){
-    cout << "       PgpRxCount["<<  setw(1) << setfill('0') << x <<"][0:3]: ";
-    for(y=0;y<4;y++){
-      cout << "0x" <<  setw(1) << setfill('0') << status.PgpRxCount[x][y];
-      if(y!=3) cout << ", "; else cout << endl;
-    }
+    cout << "       PgpRxOpcodeCnt/Last["<<  setw(1) << setfill('0') << x <<"]: ";
+    cout << "0x" << setw(4) << setfill('0') << hex << ((status.PgpRxCount[x][1]<<4) | status.PgpRxCount[x][0]) << "/";
+    cout << "0x" << setw(4) << setfill('0') << hex << ((status.PgpRxCount[x][3]<<4) | status.PgpRxCount[x][2]);
+    cout << endl;
   }
 
   cout << "       PgpCellErrCnt[0:7]: ";
@@ -180,6 +183,12 @@ int main (int argc, char **argv) {
   cout << "    RxFreeValid[0:7]: ";
   for(x=0;x<8;x++){
     cout << setw(1) << setfill('0') << status.RxFreeValid[x];
+    if(x!=7) cout << ", "; else cout << endl;
+  }
+
+  cout << "RxFreeFifoThres[0:7]: ";
+  for(x=0;x<8;x++){
+    cout << "0x" << setw(1) << setfill('0') << status.RxFreeFifoThres[x];
     if(x!=7) cout << ", "; else cout << endl;
   }
 

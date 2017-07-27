@@ -24,7 +24,7 @@ int main (int argc, char **argv) {
    PgpCardTx pgpCardTx;
    
   if (argc < 3) { 
-    printf("arc is %d, Usage: %s %s {set|clear}\n", argc, argv[0], argc==2 ? argv[1] : "device");
+    printf("arc is %d, Usage: %s %s lanemask\n", argc, argv[0], argc==2 ? argv[1] : "device");
     return(1);
   } 
 
@@ -34,14 +34,14 @@ int main (int argc, char **argv) {
      cout << "Error opening " << argv[1] << endl;
      return(1);
   }      
+
+  unsigned mask = strtoul(argv[2],NULL,0);
+
   for(i=0;i<8;i++){
-    if( strcmp(argv[2],"set") == 0 ) {
+    if( mask & (1<<i) ) {
        p->cmd   = IOCTL_Set_Loop;
-    } else if( strcmp(argv[2],"clear") == 0 ) { 
-       p->cmd   = IOCTL_Clr_Loop;
     } else {
-       cout << "Usage: xloop device {set|clear}" << endl;
-       return(0);      
+       p->cmd   = IOCTL_Clr_Loop;
     }
     p->data  = reinterpret_cast<__u32*>(i);
     write(s, p, sizeof(PgpCardTx));

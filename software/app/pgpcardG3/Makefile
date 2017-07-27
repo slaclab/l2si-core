@@ -11,6 +11,7 @@ all:
 	$(CC) $(CFLAGS) xLoopTest.cpp -o xLoopTest
 	$(CC) $(CFLAGS) xWrite.cpp -o xWrite
 	$(CC) $(CFLAGS) xRead.cpp -o xRead
+	$(CC) $(CFLAGS) xRegSrv.cpp -o xRegSrv
 	$(CC) -c $(CFLAGS) McsRead.cpp -o McsRead.o
 	$(CC) -c $(CFLAGS) PgpCardG3Prom.cpp -o PgpCardG3Prom.o
 	$(CC) $(CFLAGS) McsRead.o PgpCardG3Prom.o xPromLoad.cpp -o xPromLoad
