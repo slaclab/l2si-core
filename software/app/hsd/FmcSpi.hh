@@ -1,6 +1,7 @@
 #ifndef HSD_FmcSpi_hh
 #define HSD_FmcSpi_hh
 
+#include "hsd/Globals.hh"
 #include <stdint.h>
 
 namespace Pds {
@@ -14,8 +15,9 @@ namespace Pds {
       enum SyncSrc { NoSync=0, FPGA=1 };
       int cpld_init();
         
-      int clocktree_init   (unsigned clksrc, 
-                            unsigned vcotype);
+      int clocktree_init   (unsigned   clksrc, 
+                            unsigned   vcotype,
+                            TimingType timing = LCLS);
       void clockWhileSync  ();
       void limitBandwidth  (bool);
       int adc_enable_test  (unsigned pattern);

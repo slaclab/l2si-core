@@ -1,6 +1,7 @@
 #ifndef HSD_Module_hh
 #define HSD_Module_hh
 
+#include "hsd/Globals.hh"
 #include <stdint.h>
 #include <stdio.h>
 
@@ -18,6 +19,8 @@ namespace Pds {
       
       ~Module();
 
+      uint64_t device_dna() const;
+
       void board_status();
 
       void flash_write(FILE*);
@@ -26,8 +29,8 @@ namespace Pds {
       void init();
 
       //  Initialize clock tree and IO training
-      void fmc_init();
-      void fmc_clksynth_setup();
+      void fmc_init          (TimingType =LCLS);
+      void fmc_clksynth_setup(TimingType =LCLS);
       void fmc_dump();
 
       int  train_io(unsigned);
@@ -71,6 +74,7 @@ namespace Pds {
       //  Copy on read
       int read(uint32_t* data, unsigned data_size);
 
+      void* reg();
     private:
       Module() {}
 

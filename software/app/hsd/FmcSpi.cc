@@ -96,7 +96,7 @@ int FmcSpi::cpld_init()
 {
   unsigned char fans = 0;
   unsigned syncsrc = 1; // FPGA
-#ifdef TIMINGREF
+#if 1
   unsigned char dirs = 0x1;
   unsigned clksrc = 3;  // external ref
 #else
@@ -155,30 +155,39 @@ int FmcSpi::resetSPIadc()
   return 0;
 }
 
-int FmcSpi::clocktree_init(unsigned clocksource, unsigned vcotype)
+int FmcSpi::clocktree_init(unsigned   clocksource, 
+                           unsigned   vcotype,
+                           TimingType timing)
 {
   unsigned v;
 
-#ifdef TIMINGREF
-#ifdef LCLSII
-  // 14-6/7 MHz refclk (LCLSII)
-  // Gives 2696 samples / 929kHz beam cycle
-  int32_t A = 21, B = 52;
-  int32_t P = 6; // P-counter = 32
-  int32_t R = 10;
-#else
-  // 9.996 MHz refclk  (LCLS)
-  // Gives 21 samples / 119MHz cycle (294 samples / 8.5MHz cycle)
-  int32_t A = 4, B = 78;
-  int32_t P = 6; // P-counter = 32
-  int32_t R = 10;
-#endif
-#else
-  //  100 MHz refclk
-  int32_t A = 10, B = 15;
-  int32_t P = 5; // P-counter = 16
-  int32_t R = 10;
-#endif
+  int32_t A,B,P,R;
+
+  switch(timing) {
+  case LCLS:
+    // 9.996 MHz refclk  (LCLS)
+    // Gives 21 samples / 119MHz cycle (294 samples / 8.5MHz cycle)
+    A = 4; B = 78;
+    P = 6; // P-counter = 32
+    R = 10;
+    break;
+  case LCLSII:
+    // 14-6/7 MHz refclk (LCLSII)
+    // Gives 2696 samples / 929kHz beam cycle
+    A = 21; B = 52;
+    P = 6; // P-counter = 32
+    R = 10;
+    break;
+  case EXTERNAL:
+  default:
+    //  100 MHz refclk
+    A = 10; B = 15;
+    P = 5; // P-counter = 16
+    R = 10;
+  }
+
+  printf("clocktree A=%u, B=%u, P=%u, R=%u\n",
+         A,B,P,R);
 
   _writeAD9517( 0x10, 0x7c); //CP 4.8mA, normal op.
   _writeAD9517( 0x11, R);    //R lo
@@ -192,12 +201,8 @@ int FmcSpi::clocktree_init(unsigned clocksource, unsigned vcotype)
   _writeAD9517( 0x19, 0x00);
   _writeAD9517( 0x1A, 0x00); //LD = DLD
   _writeAD9517( 0x1B, 0x00); //REFMON = GND
-#ifdef TIMINGREF
   //  _writeAD9517( 0x1C, 0x86); //REF1 input
   _writeAD9517( 0x1C, 0x87); //Diff ref input
-#else
-  _writeAD9517( 0x1C, 0x87); //Diff ref input
-#endif
   _writeAD9517( 0x1D, 0x00); 
   _writeAD9517( 0xF0, 0x02); //out0, safe power down
   _writeAD9517( 0xF1, 0x0C); //out1, lvpecl 960mW

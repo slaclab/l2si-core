@@ -33,21 +33,10 @@ void usage(const char* p) {
   printf("\t-A <dump gtx alignment>\n");
   printf("\t-0 <dump raw timing receive buffer>\n");
   printf("\t-1 <dump timing message buffer>\n");
+  printf("\t-2 <configure for LCLSII>\n");
   //  printf("Options: -a <IP addr (dotted notation)> : Use network <IP>\n");
 }
 
-static double lclsClock[] = { 125., 
-                              624.75,624.75,624.75,624.75,
-                              9.996,
-                              312.375,
-                              156.1875 };
-                              
-static double lclsiiClock[] = { 125., 
-                                625.86,625.86,625.86,625.86,
-                                14.875,
-                                312.93,
-                                156.46 };
-                              
 int main(int argc, char** argv) {
 
   extern char* optarg;
@@ -67,6 +56,7 @@ int main(int argc, char** argv) {
   bool lTrainNoReset = false;
   bool lTestSync = false;
   unsigned syncDelay[4] = {0,0,0,0};
+  TimingType timing=LCLS;
 
   const char* fWrite=0;
 #if 0
@@ -76,9 +66,8 @@ int main(int argc, char** argv) {
   unsigned trainRefDelay = 0;
   unsigned alignTarget = 16;
   int      alignRstLen = -1;
-  const double*  clockRate = lclsClock;
 
-  while ( (c=getopt( argc, argv, "CRS:XPA:01D:d:htT:W:")) != EOF ) {
+  while ( (c=getopt( argc, argv, "CRS:XPA:0123D:d:htT:W:")) != EOF ) {
     switch(c) {
     case 'A':
       lDumpAlign = true;
@@ -109,6 +98,12 @@ int main(int argc, char** argv) {
       break;
     case '1':
       lRing1 = true;
+      break;
+    case '2':
+      timing = LCLSII;
+      break;
+    case '3':
+      timing = EXTERNAL;
       break;
     case 'd':
       qadc = optarg[0];
@@ -157,7 +152,7 @@ int main(int argc, char** argv) {
   p->board_status();
 
   if (lTrain) {
-    p->fmc_init();
+    p->fmc_init(timing);
     p->train_io(trainRefDelay);
   }
 
@@ -168,15 +163,21 @@ int main(int argc, char** argv) {
   p->fmc_dump();
 
   if (lSetupClkSynth) {
-    p->fmc_clksynth_setup();
+    p->fmc_clksynth_setup(timing);
   }
-
+    
   if (lResetRx) {
-#ifdef LCLSII
-    p->tpr().setLCLSII();
-#else
-    p->tpr().setLCLS();
-#endif
+    switch(timing) {
+    case LCLS:
+      p->tpr().setLCLS();
+      break;
+    case LCLSII:
+      p->tpr().setLCLSII();
+      break;
+    default:
+      return 0;
+      break;
+    }
     p->tpr().resetRxPll();
     usleep(10000);
     p->tpr().resetRx();

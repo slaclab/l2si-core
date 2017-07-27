@@ -34,7 +34,7 @@ namespace Pds {
       void init();
 
       //  Initialize clock tree and IO training
-      void fmc_init();
+      void fmc_init(TimingType);
 
       int  train_io(unsigned);
 
@@ -210,12 +210,12 @@ void Module::PrivateData::init()
   fmc_spi.initSPI();
 }
 
-void Module::PrivateData::fmc_init()
+void Module::PrivateData::fmc_init(TimingType timing)
 {
 // if(FMC12x_init(AddrSipFMC12xBridge, AddrSipFMC12xClkSpi, AddrSipFMC12xAdcSpi, AddrSipFMC12xCpldSpi, AddrSipFMC12xAdcPhy, 
 //                modeClock, cardType, GA, typeVco, carrierKC705)!=FMC12X_ERR_OK) {
 
-#ifdef TIMINGREF
+#if 1
   const uint32_t clockmode = FMC12X_EXTERNAL_REF;
 #else
   const uint32_t clockmode = FMC12X_INTERNAL_CLK;
@@ -249,7 +249,7 @@ void Module::PrivateData::fmc_init()
     i2c_sw_control.select(I2cSwitch::PrimaryFmc); 
     if (fmc_spi.cpld_init())
       printf("cpld_init failed!\n");
-    if (fmc_spi.clocktree_init(clksrc_clktree, vcotype))
+    if (fmc_spi.clocktree_init(clksrc_clktree, vcotype, timing))
       printf("clocktree_init failed!\n");
   }
 
@@ -258,7 +258,7 @@ void Module::PrivateData::fmc_init()
     i2c_sw_control.select(I2cSwitch::SecondaryFmc); 
     if (fmc_spi.cpld_init())
       printf("cpld_init failed!\n");
-    if (fmc_spi.clocktree_init(clksrc_clktree, vcotype))
+    if (fmc_spi.clocktree_init(clksrc_clktree, vcotype, timing))
       printf("clocktree_init failed!\n");
   }
 }
@@ -439,7 +439,7 @@ void Module::PrivateData::setAdcMux(bool     interleave,
 
 void Module::init() { p->init(); }
 
-void Module::fmc_init() { p->fmc_init(); }
+void Module::fmc_init(TimingType timing) { p->fmc_init(timing); }
 
 void Module::fmc_dump() {
   if (p->fmca_core.present())
@@ -457,17 +457,31 @@ void Module::fmc_dump() {
     }
 }
 
-void Module::fmc_clksynth_setup()
+void Module::fmc_clksynth_setup(TimingType timing)
 {
   p->i2c_sw_control.select(I2cSwitch::LocalBus);  // ClkSynth is on local bus
-  p->clksynth.setup();
+  p->clksynth.setup(timing);
   p->clksynth.dump ();
+}
+
+uint64_t Module::device_dna() const
+{
+  uint64_t v = p->version.DeviceDnaHigh;
+  v <<= 32;
+  v |= p->version.DeviceDnaLow;
+  return v;
 }
 
 void Module::board_status()
 {
   printf("Axi Version [%p]: BuildStamp[%p]: %s\n", 
          &(p->version), &(p->version.BuildStamp[0]), p->version.buildStamp().c_str());
+
+  printf("Dna: %08x%08x  Serial: %08x%08x\n",
+         p->version.DeviceDnaHigh,
+         p->version.DeviceDnaLow,
+         p->version.FdSerialHigh,
+         p->version.FdSerialLow );
 
   p->i2c_sw_control.select(I2cSwitch::LocalBus);
   p->i2c_sw_control.dump();
@@ -650,3 +664,5 @@ void Module::set_gain(unsigned channel, unsigned value)
                            I2cSwitch::SecondaryFmc); 
   p->fmc_spi.set_gain(channel&0x3,value);
 }
+
+void* Module::reg() { return (void*)p; }

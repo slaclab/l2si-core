@@ -1,7 +1,8 @@
 include setup.mk
 
 # List of packages (low level first)
-packages := hsd dti
+#packages := hsd dti
+packages := hsd
 
 SHELL := /bin/bash
 
