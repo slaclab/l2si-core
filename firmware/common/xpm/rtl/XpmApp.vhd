@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-07-10
--- Last update: 2017-07-23
+-- Last update: 2017-07-27
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -73,7 +73,7 @@ end XpmApp;
 
 architecture top_level_app of XpmApp is
 
-  type LinkFullArray  is array (natural range<>) of slv(31 downto 0);
+  type LinkFullArray  is array (natural range<>) of slv(30 downto 0);
   type LinkL1InpArray is array (natural range<>) of XpmL1InputArray(NDsLinks-1 downto 0);
     
   type StateType is (INIT_S, PADDR_S, EWORD_S, EOS_S);

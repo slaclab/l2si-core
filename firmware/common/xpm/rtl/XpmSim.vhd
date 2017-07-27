@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-07-10
--- Last update: 2017-04-10
+-- Last update: 2017-07-26
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -219,17 +219,14 @@ begin
          dsRxRst         => dsRxRst,
          dsRxErr         => (others=>'0'),
          -- BP DS Ports
-         bpTxLinkUp      => bpTxLinkUp,
          bpTxData        => bpTxData,
          bpTxDataK       => bpTxDataK,
-         bpRxLinkUp      => bpRxLinkUp,
-         bpRxLinkFull    => bpRxLinkFull,
-         bpClk           => bpRxClk,
-         bpClkRst        => bpRxClkRst,
+         bpStatus        => (others=>XPM_BP_LINK_STATUS_INIT_C),
+         bpRxLinkFull    => (others=>x"0000"),
          ----------------------
          -- Top Level Interface
          ----------------------
-         sysclk          => regClk,
+         regclk          => regClk,
          update          => toSlv(1,NPartitions),
          status          => xpmStatus,
          config          => xpmConfig,

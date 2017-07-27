@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-07-10
--- Last update: 2017-07-19
+-- Last update: 2017-07-27
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -49,7 +49,7 @@ entity XpmAppMaster is
       sof               : in  sl;
       eof               : in  sl;
       crcErr            : in  sl;
-      full              : in  slv              (31 downto 0);
+      full              : in  slv              (30 downto 0);
       l1Input           : in  XpmL1InputArray  (NDsLinks-1 downto 0) := (others=>XPM_L1_INPUT_INIT_C);
       result            : out slv              (47 downto 0) );
 end XpmAppMaster;
@@ -59,6 +59,7 @@ architecture rtl of XpmAppMaster is
   type RegType is record
     result     : slv(result'range);
     latch      : sl;
+    queueMsg   : sl;
     insertMsg  : sl;
     partStrobe : sl;
     timingBus  : TimingBusType;
@@ -66,6 +67,7 @@ architecture rtl of XpmAppMaster is
   constant REG_INIT_C : RegType := (
     result     => (others=>'0'),
     latch      => '0',
+    queueMsg   => '0',
     insertMsg  => '0',
     partStrobe => '0',
     timingBus  => TIMING_BUS_INIT_C );
@@ -147,7 +149,8 @@ begin
                --
                clk            => timingClk,
                rst            => timingRst,
-               full           => full,
+               full(30 downto 0) => full,
+               full(31)          => r.insertMsg,
                fiducial       => fiducial,
                l0Accept       => l0Accept,
                l1Accept       => l1Accept,
@@ -234,7 +237,12 @@ begin
     v.partStrobe := r.timingBus.strobe;
     v.latch      := r.partStrobe;
 
-    if msgConfig.insert = '1' then
+    if msgConfig.insert = '1' then  -- latch the strobed request and
+      v.queueMsg := '1';            -- disable L0 logic
+    end if;
+
+    if r.queueMsg = '1' and r.timingBus.strobe = '1' then
+      v.queueMsg  := '0';
       v.insertMsg := '1';
     end if;
     

@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-12-14
--- Last update: 2016-08-31
+-- Last update: 2017-07-27
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -172,7 +172,7 @@ begin
 
       if (uconfig.reset='1') then
         v := REG_INIT_C;
-      end if;
+      end if;cd 
       
       rin <= v;
    end process comb;
