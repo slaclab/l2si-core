@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-07-10
--- Last update: 2017-06-16
+-- Last update: 2017-07-25
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -254,7 +254,7 @@ begin
    --             axilWriteSlave   => regWriteSlave );
 
 --   U_DUT : configuration work.raw_chfifo_cfg
-   U_DUT : entity work.QuadAdcChannelFifov2
+   U_DUT : entity work.QuadAdcChannelFifo
      port map ( clk              => dmaClk,
                 rst              => dmaRst,
                 clear            => dmaRst,

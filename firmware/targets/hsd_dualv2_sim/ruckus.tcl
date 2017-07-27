@@ -17,6 +17,7 @@ loadRuckusTcl "${SURF_DIR}/xilinx"     "quiet"
 
 #loadRuckusTcl /u1/weaver/lcls-timing-core
 loadRuckusTcl "$::DIR_PATH/../../common/hsd"
+loadRuckusTcl "$::DIR_PATH/../../common/hsd/v2"
 
 # Load target's source code and constraints
 loadSource      -dir  "$::DIR_PATH/hdl/"
