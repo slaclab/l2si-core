@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-07-10
--- Last update: 2017-07-25
+-- Last update: 2017-08-23
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -21,13 +21,17 @@
 
 library ieee;
 use ieee.std_logic_1164.all;
+use IEEE.NUMERIC_STD.all;
 use ieee.std_logic_unsigned.all;
+
+use STD.textio.all;
+use ieee.std_logic_textio.all;
 
 use work.StdRtlPkg.all;
 use work.AxiLitePkg.all;
 use work.AxiStreamPkg.all;
---use work.TimingPkg.all;
---use work.TPGPkg.all;
+use work.TimingPkg.all;
+use work.TPGPkg.all;
 use work.QuadAdcPkg.all;
 use work.SsiPkg.all;
 
@@ -39,7 +43,7 @@ end hsd_dualv2_sim;
 
 architecture top_level_app of hsd_dualv2_sim is
 
-   constant NCHAN_C : integer := CHANNELS_C;
+   constant NCHAN_C : integer := 4;
    
    signal phyClk   : sl;
    signal rst      : sl;
@@ -56,8 +60,8 @@ architecture top_level_app of hsd_dualv2_sim is
     -- DMA
    signal dmaClk            : sl;
    signal dmaRst            : sl;
-   signal dmaIbMaster       : AxiStreamMasterType;
-   signal dmaIbSlave        : AxiStreamSlaveType := AXI_STREAM_SLAVE_FORCE_C;
+   signal dmaIbMaster       : AxiStreamMasterArray(4 downto 0);
+   signal dmaIbSlave        : AxiStreamSlaveArray (4 downto 0) := (others=>AXI_STREAM_SLAVE_FORCE_C);
 
    signal adcI, adcO        : AdcDataArray(NCHAN_C-1 downto 0);
 
@@ -71,16 +75,64 @@ architecture top_level_app of hsd_dualv2_sim is
 
    signal r    : TrigType;
    signal r_in : TrigType;
-   
-   constant AXIS_CONFIG_C : AxiStreamConfigType := ssiAxiStreamConfig(16);
 
-   signal dmaData           : slv(127 downto 0);
+   signal eventId : slv(191 downto 0) := (others=>'0');
+   signal trig    : Slv8Array(3 downto 0) := (others=>(others=>'0'));
+   
+--   constant AXIS_CONFIG_C : AxiStreamConfigType := ssiAxiStreamConfig(16);
+   constant AXIS_CONFIG_C : AxiStreamConfigType := ssiAxiStreamConfig(4);
+
+   signal dmaData           : slv(31 downto 0);
+   signal dmaUser           : slv( 1 downto 0);
+
    signal axilDone : sl;
+
+   signal config  : QuadAdcConfigType := (
+     enable    => toSlv(1,8),
+     partition => "0000",
+     intlv     => "00",
+     samples   => toSlv(0,18),
+     prescale  => toSlv(0,6),
+     offset    => toSlv(0,20),
+     acqEnable => '1',
+     rateSel   => (others=>'0'),
+     destSel   => (others=>'0'),
+     inhibit   => '0',
+     dmaTest   => '0',
+     trigShift => (others=>'0') );
+   
+   constant DBG_AXIS_CONFIG_C : AxiStreamConfigType := ssiAxiStreamConfig(16);
+   signal dbgIbMaster : AxiStreamMasterType;
+   signal evtId   : slv(31 downto 0) := (others=>'0');
+   signal fexSize : slv(30 downto 0) := (others=>'0');
+   signal fexOvfl : sl := '0';
+   signal fexOffs : slv(15 downto 0) := (others=>'0');
+   signal fexIndx : slv(15 downto 0) := (others=>'0');
+
+   signal tpgConfig : TPGConfigType := TPG_CONFIG_INIT_C;
+
+   -- Timing Interface (timingClk domain) 
+   signal xData     : TimingRxType  := TIMING_RX_INIT_C;
+   signal timingBus : TimingBusType := TIMING_BUS_INIT_C;
+   signal exptBus   : ExptBusType   := EXPT_BUS_INIT_C;
+   signal recTimingClk : sl;
+   signal recTimingRst : sl;
+   signal ready               : sl;
+
+   signal trigIn              : Slv8Array(3 downto 0) := (others=>(others=>'0'));
+   signal trigSlot            : sl;
+   signal trigSel             : sl;
+
+   signal cfgWriteMaster    : AxiLiteWriteMasterType := AXI_LITE_WRITE_MASTER_INIT_C;
+   signal cfgWriteSlave     : AxiLiteWriteSlaveType;
+   signal cfgReadMaster     : AxiLiteReadMasterType := AXI_LITE_READ_MASTER_INIT_C;
+   signal cfgReadSlave      : AxiLiteReadSlaveType;
    
 begin
 
-   dmaRst <= rst;
-   dmaData <= dmaIbMaster.tData(dmaData'range);
+--   dmaRst <= rst;
+   dmaData <= dmaIbMaster(0).tData(dmaData'range);
+   dmaUser <= dmaIbMaster(0).tUser(dmaUser'range);
    
    process (phyClk) is
      variable s : slv(7 downto 0) := (others=>'0');
@@ -116,8 +168,8 @@ begin
        else
          t := t+1;
        end if;
---       trigIn(0) <= d(0) & trigIn(0)(7 downto 1);
---       d := trigSel & d(2 downto 1);
+       trigIn(0) <= d(0) & trigIn(0)(7 downto 1);
+       d := trigSel & d(2 downto 1);
        s := s+1;
      end if;
    end process;
@@ -136,6 +188,11 @@ begin
        for ch in 0 to NCHAN_C-1 loop
          adcO(ch) <= adcI(ch);
        end loop;
+       trig(trig'left-1 downto 0) <= trig(trig'left downto 1);
+       trig(trig'left) <= (others=>r_in.lopen);
+       if r_in.lopen='1' then
+         eventId <= eventId+1;
+       end if;
      end if;
    end process;
    
@@ -236,46 +293,165 @@ begin
      wait for 3.2 ns;
    end process;
      
-   --U_DUT : configuration work.raw_cfg 
-   --  generic map ( AXIS_CONFIG_G => AXIS_CONFIG_C )
+   --U_DUT : entity work.QuadAdcChannelFifo
+   --  generic map ( AXIS_CONFIG_G => AXIS_CONFIG_C,
+   --                ALGORITHM_G   => ("RAW","RAW") )
    --  port map ( clk              => dmaClk,
    --             rst              => dmaRst,
+   --             clear            => dmaRst,
+   --             start            => r.lopen,
+   --             shift            => r.lphase,
    --             din              => adcO(0).data,
-   --             lopen            => r.lopen,
-   --             lclose           => r.lclose,
-   --             lphase           => r.lphase,
    --             l1in             => r.l1in,
-   --             l1a              => r.l1a,
-   --             axisMaster       => dmaIbMaster,
-   --             axisSlave        => dmaIbSlave,
+   --             l1ina            => r.l1a,
+   --             l1a              => open,
+   --             l1v              => open,
+   --             axisMaster       => dmaIbMaster(0),
+   --             axisSlave        => dmaIbSlave (0),
+   --             axilClk          => regClk,
+   --             axilRst          => regRst,
    --             axilReadMaster   => regReadMaster,
    --             axilReadSlave    => regReadSlave,
    --             axilWriteMaster  => regWriteMaster,
    --             axilWriteSlave   => regWriteSlave );
 
---   U_DUT : configuration work.raw_chfifo_cfg
-   U_DUT : entity work.QuadAdcChannelFifo
-     port map ( clk              => dmaClk,
-                rst              => dmaRst,
-                clear            => dmaRst,
-                start            => r.lopen,
-                shift            => r.lphase,
-                din              => adcO(0).data,
-                l1in             => r.l1in,
-                l1ina            => r.l1a,
-                l1a              => open,
-                l1v              => open,
-                axisMaster       => dmaIbMaster,
-                axisSlave        => dmaIbSlave,
-                axilClk          => regClk,
-                axilRst          => regRst,
-                axilReadMaster   => regReadMaster,
-                axilReadSlave    => regReadSlave,
-                axilWriteMaster  => regWriteMaster,
-                axilWriteSlave   => regWriteSlave );
+   --U_DUT : entity work.QuadAdcEvent
+   --  generic map ( FIFO_ADDR_WIDTH_C => 10,
+   --                NFMC_G            => 1,
+   --                SYNC_BITS_G       => 4,
+   --                DMA_STREAM_CONFIG_G => AXIS_CONFIG_C,
+   --                BASE_ADDR_C         => toSlv(0,32) )
+   --  port map ( axilClk          => regClk,
+   --             axilRst          => regRst,
+   --             axilReadMaster   => regReadMaster,
+   --             axilReadSlave    => regReadSlave,
+   --             axilWriteMaster  => regWriteMaster,
+   --             axilWriteSlave   => regWriteSlave,
+   --             --
+   --             eventClk         => dmaClk,
+   --             eventRst         => dmaRst,
+   --             configE          => config,
+   --             strobe           => r.lopen,
+   --             eventId          => eventId,
+   --             l1in             => r.l1in,
+   --             l1ina            => r.l1a,
+   --             --
+   --             adcClk           => dmaClk,
+   --             adcRst           => dmaRst,
+   --             configA          => config,
+   --             adc              => adcO(3 downto 0),
+   --             trigArm          => r.lopen,
+   --             trigIn           => trig,
+   --             --
+   --             dmaClk           => dmaClk,
+   --             dmaRst           => dmaRst,
+   --             dmaFullThr       => (others=>'0'),
+   --             dmaMaster        => dmaIbMaster,
+   --             dmaSlave         => dmaIbSlave );
 
-process is
-  procedure wreg(addr : integer; data : slv(31 downto 0)) is
+   recTimingRst <= rst;
+   process is
+   begin
+     recTimingClk <= '1';
+     wait for 2.7 ns;
+     recTimingClk <= '0';
+     wait for 2.7 ns;
+   end process;
+
+   U_TPG : entity work.TPGMini
+      port map ( configI  => tpgConfig,
+                 txClk    => recTimingClk,
+                 txRst    => recTimingRst,
+                 txRdy    => '1',
+                 txData   => xData.data,
+                 txDataK  => xData.dataK );
+
+   U_RxLcls : entity work.TimingFrameRx
+     port map ( rxClk               => recTimingClk,
+                rxRst               => recTimingRst,
+                rxData              => xData,
+                messageDelay        => (others=>'0'),
+                messageDelayRst     => '0',
+                timingMessage       => timingBus.message,
+                timingMessageStrobe => timingBus.strobe,
+                timingMessageValid  => timingBus.valid,
+                exptMessage         => exptBus.message,
+                exptMessageValid    => exptBus.valid );
+                
+  U_Core : entity work.QuadAdcCore
+    generic map ( DMA_STREAM_CONFIG_G => AXIS_CONFIG_C )
+    port map (
+      axiClk              => regClk,
+      axiRst              => regRst,
+      axilWriteMasters(1) => regWriteMaster,
+      axilWriteMasters(0) => cfgWriteMaster,
+      axilWriteSlaves (1) => regWriteSlave,
+      axilWriteSlaves (0) => cfgWriteSlave,
+      axilReadMasters (1) => regReadMaster,
+      axilReadMasters (0) => cfgReadMaster,
+      axilReadSlaves  (1) => regReadSlave,
+      axilReadSlaves  (0) => cfgReadSlave,
+      -- DMA
+      dmaClk              => dmaClk,
+      dmaRst              => dmaRst,
+      dmaRxIbMaster       => dmaIbMaster,
+      dmaRxIbSlave        => dmaIbSlave ,
+      -- EVR Ports
+      evrClk              => recTimingClk,
+      evrRst              => recTimingRst,
+      evrBus              => timingBus,
+      exptBus             => exptBus,
+      ready               => ready,
+      -- ADC
+      gbClk               => '0', -- unused
+      adcClk              => dmaClk,
+      adcRst              => dmaRst,
+      adc                 => adcO,
+      --
+      trigSlot            => trigSlot,
+      trigOut             => trigSel,
+      trigIn              => trigIn,
+      adcSyncRst          => open,
+      adcSyncLocked       => '1' );
+
+   U_DBGFIFO : entity work.AxiStreamFifo
+     generic map ( SLAVE_AXI_CONFIG_G  => AXIS_CONFIG_C,
+                   MASTER_AXI_CONFIG_G => DBG_AXIS_CONFIG_C )
+     port map ( sAxisClk => dmaClk,
+                sAxisRst => dmaRst,
+                sAxisMaster => dmaIbMaster(0),
+                sAxisSlave  => dmaIbSlave (0),
+                mAxisClk    => dmaClk,
+                mAxisRst    => dmaRst,
+                mAxisMaster => dbgIbMaster,
+                mAxisSlave  => AXI_STREAM_SLAVE_FORCE_C );
+                
+   process (dmaClk) is
+     type StateType is (S_IDLE, S_HDR, S_FEX, S_END);
+     variable v : StateType := S_IDLE;
+   begin
+     if rising_edge(dmaClk) then
+       if dbgIbMaster.tValid='1' then
+         case (v) is
+           when S_IDLE => v := S_HDR;
+                          evtId   <= dbgIbMaster.tData(31 downto 0);
+           when S_HDR  => v := S_FEX;
+           when S_FEX  => v := S_END;
+                          fexSize <= dbgIbMaster.tData(30 downto 0); 
+                          fexOvfl <= dbgIbMaster.tData(31);
+                          fexOffs <= dbgIbMaster.tData(47 downto 32);
+                          fexIndx <= dbgIbMaster.tData(63 downto 48);
+           when S_END  => if dbgIbMaster.tLast='1' then
+                            v := S_IDLE;
+                          end if;
+           when others => null;
+         end case;
+       end if;
+     end if;
+   end process;
+   
+   process is
+     procedure wreg(addr : integer; data : slv(31 downto 0)) is
      begin
        wait until regClk='0';
        regWriteMaster.awaddr  <= toSlv(addr,32);
@@ -298,16 +474,101 @@ process is
     wait until regRst='0';
     wait for 200 ns;
     wreg(16,x"00000001"); -- prescale
-    wreg(20,x"08000004"); -- fexLength/Delay
+    wreg(20,x"04000004"); -- fexLength/Delay
     wreg(24,x"00040C00"); -- almostFull
     wreg(32,x"00000000"); -- prescale
-    wreg(36,x"00800784"); -- fexLength/Delay
+    wreg(36,x"00400384"); -- fexLength/Delay
     wreg(40,x"00040100"); -- almostFull
     wreg( 0,x"00000003"); -- fexEnable
     wait for 600 ns;
     axilDone <= '1';
     wait;
   end process;
-   
+
+   process is
+     procedure wreg(addr : integer; data : slv(31 downto 0)) is
+     begin
+       wait until regClk='0';
+       cfgWriteMaster.awaddr  <= toSlv(addr,32);
+       cfgWriteMaster.awvalid <= '1';
+       cfgWriteMaster.wdata   <= data;
+       cfgWriteMaster.wvalid  <= '1';
+       cfgWriteMaster.bready  <= '1';
+       wait until regClk='1';
+       wait until cfgWriteSlave.bvalid='1';
+       wait until regClk='0';
+       wait until regClk='1';
+       wait until regClk='0';
+       cfgWriteMaster.awvalid <= '0';
+       cfgWriteMaster.wvalid  <= '0';
+       cfgWriteMaster.bready  <= '0';
+       wait for 50 ns;
+     end procedure;
+  begin
+    wait until regRst='0';
+    wait for 200 ns;
+    wreg(16,x"00000010");
+    wreg(16,x"00000000");
+    wreg(20,x"40000000");
+    wreg(24,x"00000001");
+    wreg(28,x"00000100");
+    wreg(16,x"80000000");
+    wait;
+  end process;
+
+  process is
+    function HexChar(v : in slv(3 downto 0)) return character is
+      variable result : character := '0';
+    begin
+      case(v) is
+        when x"0" => result := '0';
+        when x"1" => result := '1';
+        when x"2" => result := '2';
+        when x"3" => result := '3';
+        when x"4" => result := '4';
+        when x"5" => result := '5';
+        when x"6" => result := '6';
+        when x"7" => result := '7';
+        when x"8" => result := '8';
+        when x"9" => result := '9';
+        when x"A" => result := 'a';
+        when x"B" => result := 'b';
+        when x"C" => result := 'c';
+        when x"D" => result := 'd';
+        when x"E" => result := 'e';
+        when x"F" => result := 'f';
+        when others => null;
+      end case;
+      return result;
+    end function;
+
+    function HexString(v : in slv(31 downto 0)) return string is
+      variable result : string(8 downto 1);
+    begin
+      for i in 0 to 7 loop
+        result(i+1) := HexChar(v(4*i+3 downto 4*i));
+      end loop;
+      return result;
+    end function;
+    
+    file results : text;
+    variable oline : line;
+  begin
+    file_open(results, "HSD.xtc", write_mode);
+    loop
+      wait until rising_edge(dmaClk);
+      if dbgIbMaster.tValid='1' then
+        write(oline, HexString(dbgIbMaster.tData( 31 downto  0)), right, 9);
+        write(oline, HexString(dbgIbMaster.tData( 63 downto 32)), right, 9);
+        write(oline, HexString(dbgIbMaster.tData( 95 downto 64)), right, 9);
+        write(oline, HexString(dbgIbMaster.tData(127 downto 96)), right, 9);
+        if dbgIbMaster.tLast='1' then
+          writeline(results, oline);
+        end if;
+      end if;
+    end loop;
+    file_close(results);
+  end process;
+     
 end top_level_app;
 
