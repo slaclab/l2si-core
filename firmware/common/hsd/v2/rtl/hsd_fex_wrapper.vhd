@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2016-01-04
--- Last update: 2017-06-19
+-- Last update: 2017-08-23
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -50,6 +50,8 @@ entity hsd_fex_wrapper is
     rst             :  in sl;
     din             :  in Slv11Array(7 downto 0);  -- row of data
     lopen           :  in sl;                      -- begin sampling
+    lskip           :  in sl;                      -- skip sampling (cache
+                                                   -- header for readout)
     lphase          :  in slv(2 downto 0);         -- lopen location within the row
     lclose          :  in sl;                      -- end sampling
     l1in            :  in sl;                      -- once per lopen
@@ -93,6 +95,7 @@ architecture mapping of hsd_fex_wrapper is
     boffs  : slv(13 downto 0);
     baddr  : slv(CACHE_ADDR_LEN_C-1 downto 0);
     eaddr  : slv(CACHE_ADDR_LEN_C-1 downto 0);
+    skip   : sl;
     ovflow : sl;
   end record;
   constant CACHE_INIT_C : CacheType := (
@@ -102,6 +105,7 @@ architecture mapping of hsd_fex_wrapper is
     boffs  => (others=>'0'),
     baddr  => (others=>'0'),
     eaddr  => (others=>'0'),
+    skip   => '0',
     ovflow => '0' );
   
   type CacheArray is array(natural range<>) of CacheType;
@@ -177,18 +181,21 @@ begin
 
   rstn <= not rst;
 
-  U_SHIFT : entity work.AxiStreamShift
-    generic map ( AXIS_CONFIG_G => AXIS_CONFIG_G )
-    port map ( axisClk     => clk,
-               axisRst     => rst,
---               axiStart    => r.shiftEn(0),
-               axiStart    => '1',
-               axiShiftDir => '1',
-               axiShiftCnt => r.shift(0),
-               sAxisMaster => r.axisMaster,
-               sAxisSlave  => maxisSlave,
-               mAxisMaster => axisMaster,
-               mAxisSlave  => axisSlave );
+--  U_SHIFT : entity work.AxiStreamShift
+--    generic map ( AXIS_CONFIG_G => AXIS_CONFIG_G,
+--                  PIPE_STAGES_G => 1 )
+--    port map ( axisClk     => clk,
+--               axisRst     => rst,
+----               axiStart    => r.shiftEn(0),
+--               axiStart    => '1',
+--               axiShiftDir => '1',
+--               axiShiftCnt => r.shift(0),
+--               sAxisMaster => r.axisMaster,
+--               sAxisSlave  => maxisSlave,
+--               mAxisMaster => axisMaster,
+--               mAxisSlave  => axisSlave );
+  axisMaster <= r.axisMaster;
+  maxisSlave <= axisSlave;
 
   U_RAM : entity work.SimpleDualPortRam
     generic map ( DATA_WIDTH_G => 16*ROW_SIZE,
@@ -204,7 +211,7 @@ begin
                addrb  => rdaddr,
                doutb  => rddata );
   
-  comb : process( r, rst, lopen, lclose, lphase, l1in, l1ina,
+  comb : process( r, rst, lopen, lskip, lclose, lphase, l1in, l1ina,
                   tout, dout, douten, rddata, maxisSlave ) is
     variable v : RegType;
     variable n : integer range 0 to 2*ROW_SIZE-1;
@@ -221,7 +228,8 @@ begin
     v.tout    := tout;
     v.douten  := douten;
     v.sync    := '0';
-
+    v.axisMaster.tKeep := genTKeep(AXIS_CONFIG_G);
+    
     if r.sync = '1' then
       v.count := (others=>'0');
     else
@@ -231,10 +239,18 @@ begin
     if lopen = '1' then
       i := conv_integer(r.iempty);
       v.iempty := r.iempty+1;
-      v.cache(i).state  := OPEN_S;
+      if lskip = '1' then
+        v.cache(i).state  := CLOSED_S;
+        v.cache(i).mapd   := DONE_M;
+        v.cache(i).baddr  := resize(r.count & lphase,CACHE_ADDR_LEN_C);
+        v.cache(i).skip   := '1';
+      else
+        v.cache(i).state  := OPEN_S;
 --      v.cache(i).trigd  := WAIT_T;  -- l1t can precede open
-      v.cache(i).mapd   := BEGIN_M;
-      v.cache(i).baddr  := resize(r.count & lphase,CACHE_ADDR_LEN_C);
+        v.cache(i).mapd   := BEGIN_M;
+        v.cache(i).baddr  := resize(r.count & lphase,CACHE_ADDR_LEN_C);
+        v.cache(i).skip   := '0';
+      end if;
     end if;
 
     i := conv_integer(r.iopened);
@@ -317,16 +333,21 @@ begin
             v.shiftEn := "01";
             v.axisMaster.tValid := '1';
             v.axisMaster.tData(ROW_SIZE*16-1 downto 0) := (others=>'0');
-            
-            v.axisMaster.tData(30 downto IDX_BITS) :=
-              resize(r.cache(i).eaddr(CACHE_ADDR_LEN_C-1 downto IDX_BITS) -
-                     r.cache(i).baddr(CACHE_ADDR_LEN_C-1 downto IDX_BITS) + 1,
-                     31-IDX_BITS);
+
+            if r.cache(i).skip = '0' then
+              v.axisMaster.tData(30 downto IDX_BITS) :=
+                resize(r.cache(i).eaddr(CACHE_ADDR_LEN_C-1 downto IDX_BITS) -
+                       r.cache(i).baddr(CACHE_ADDR_LEN_C-1 downto IDX_BITS) + 1,
+                       31-IDX_BITS);
+            else
+              v.axisMaster.tData(30 downto IDX_BITS) := (others=>'0');
+            end if;
             v.axisMaster.tData(31) := r.cache(i).ovflow;
             v.axisMaster.tData(47 downto 32) := resize(r.cache(i).boffs,16);
-            v.axisMaster.tData(63 downto 48) := toSlv(i,16);
+            v.axisMaster.tData(55 downto 48) := toSlv(i,8);
+            v.axisMaster.tData(63 downto 56) := resize(r.cache(i).baddr(IDX_BITS-1 downto 0),7) & '0';
             v.cache(i).state := READING_S;
-            if r.cache(i).eaddr = r.cache(i).baddr then
+            if r.cache(i).skip = '1' then
               v.axisMaster.tLast := '1';
               v.cache(i) := CACHE_INIT_C;
               v.ireading := r.ireading+1;
@@ -371,6 +392,7 @@ begin
         when "101" => v.wrdata(ROW_SIZE+4 downto 5) := r.dout;
         when "110" => v.wrdata(ROW_SIZE+5 downto 6) := r.dout;
         when "111" => v.wrdata(ROW_SIZE+6 downto 7) := r.dout;
+        when others => null;
       end case;
       n := i+conv_integer(r.douten);
       v.wren := '1';
@@ -381,7 +403,8 @@ begin
       v.wrword := toSlv(n,IDX_BITS);
     end if;
 
-    if r.free < 4 then
+    -- skipped buffers are causing this to fire
+    if conv_integer(r.free) < 4 and false then
       --  Deadtime failed
       --  Close all open caches/gates and flag them
       v.wren   := '0';
@@ -408,7 +431,8 @@ begin
     end if;
     
     if (r.cache(i).state = EMPTY_S or
-        r.cache(i).mapd = BEGIN_M) then
+        r.cache(i).mapd = BEGIN_M or
+        r.cache(i).skip = '1' ) then
       v.rdtail := r.wraddr-1;
     else
       v.rdtail := r.cache(i).baddr(r.rdaddr'left+IDX_BITS downto IDX_BITS);

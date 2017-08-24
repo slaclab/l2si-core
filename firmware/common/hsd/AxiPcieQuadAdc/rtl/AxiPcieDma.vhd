@@ -5,7 +5,7 @@
 -- Author     : Larry Ruckman  <ruckman@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2016-02-12
--- Last update: 2017-04-06
+-- Last update: 2017-08-22
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -111,7 +111,7 @@ architecture mapping of AxiPcieDma is
    signal axilWriteMasters : AxiLiteWriteMasterArray((2*DMA_SIZE_G)-1 downto 0);
    signal axilWriteSlaves  : AxiLiteWriteSlaveArray((2*DMA_SIZE_G)-1 downto 0);
 
-   constant DEBUG_C : boolean := true;
+   constant DEBUG_C : boolean := false;
 
    component ila_0
      port ( clk : in sl;

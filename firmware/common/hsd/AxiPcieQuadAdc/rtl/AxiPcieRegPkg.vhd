@@ -5,7 +5,7 @@
 -- Author     : Larry Ruckman  <ruckman@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2016-02-12
--- Last update: 2016-11-20
+-- Last update: 2017-08-17
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -32,6 +32,7 @@ package AxiPcieRegPkg is
   constant I2C_ADDR_C     : slv(31 downto 0) := x"00010000";
   constant DMA_ADDR_C     : slv(31 downto 0) := x"00020000";
   constant PHY_ADDR_C     : slv(31 downto 0) := x"00030000";
+  constant GTH_ADDR_C     : slv(31 downto 0) := x"00031000";
   constant TIM_ADDR_C     : slv(31 downto 0) := x"00040000";
   constant APP_ADDR_C     : slv(31 downto 0) := x"00080000";
    

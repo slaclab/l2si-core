@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-07-10
--- Last update: 2017-06-28
+-- Last update: 2017-08-24
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -35,6 +35,7 @@ use work.Pgp2bPkg.all;
 entity PgpCore is
    generic (
       TPD_G               : time                := 1 ns;
+      PGP_ID              : slv(7 downto 0)     := (others=>'0');
       AXI_CONFIG_G        : AxiStreamConfigType );
    port (
      coreClk         : in  sl;
@@ -45,6 +46,12 @@ entity PgpCore is
      pgpTxP          : out sl;
      pgpTxN          : out sl;
      fifoRst         : in  sl;
+     --
+     phyRst          : in  sl;
+     txPllRst        : in  sl;
+     rxPllRst        : in  sl;
+     txPgpRst        : in  sl;
+     rxPgpRst        : in  sl;
      --
      axilClk         : in  sl;
      axilRst         : in  sl;
@@ -68,6 +75,7 @@ architecture rtl of PgpCore is
   signal pgpObMaster : AxiStreamMasterType;
   signal pgpObSlave  : AxiStreamSlaveType;
 
+  signal pgpClk         : sl;
   signal pgpTxIn        : Pgp2bTxInType;
   signal pgpTxOut       : Pgp2bTxOutType;
   signal pgpRxIn        : Pgp2bRxInType;
@@ -78,10 +86,17 @@ architecture rtl of PgpCore is
   signal pgpRxCtrls     : AxiStreamCtrlArray  (3 downto 0) := (others=>AXI_STREAM_CTRL_UNUSED_C);
 
   constant USER_ALMOST_FULL : integer := 0;
+
+  constant locTxIn : Pgp2bTxInType := (
+    flush       => '0',
+    opCodeEn    => '0',
+    opCode      => (others=>'0'),
+    locData     => PGP_ID,
+    flowCntlDis => '0' );
   
 begin
 
-  U_Fifo : entity work.AxiStreamFifo
+  U_Fifo : entity work.AxiStreamFifoV2
     generic map (
       SLAVE_AXI_CONFIG_G  => AXI_CONFIG_G,
       MASTER_AXI_CONFIG_G => SSI_PGP2B_CONFIG_C )
@@ -92,7 +107,7 @@ begin
       sAxisMaster => obMaster,
       sAxisSlave  => obSlave,
       -- Master Port
-      mAxisClk    => coreClk,
+      mAxisClk    => pgpClk,
       mAxisRst    => fifoRst,
       mAxisMaster => pgpObMaster,
       mAxisSlave  => pgpObSlave );
@@ -100,21 +115,40 @@ begin
   linkUp                   <= pgpRxOut.linkReady;
   rxErr                    <= pgpRxOut.frameRxErr;
   full                     <= pgpRxOut.remLinkData(USER_ALMOST_FULL);
+
+  -- Assumes MpsPgpFrontEnd only asserts tReady when acknowledging tValid;
+  -- no tValid => no tReady.
+  process (pgpObMaster, full) is
+  begin
+    pgpTxMasters(0)        <= pgpObMaster;
+    pgpTxMasters(0).tValid <= pgpObMaster.tValid and not full;
+  end process;
   
-  pgpTxMasters(0)          <= pgpObMaster;
   pgpObSlave               <= pgpTxSlaves(0);
-  --  How to connect dmaIbSlave?
-  
-  U_Pgp2b : entity work.PgpFrontEnd
-    port map ( pgpClk       => coreClk,
+
+  U_PgpFb : entity work.DtiPgpFb
+    port map ( pgpClk       => pgpClk,
+               pgpRst       => coreRst,
+               pgpRxOut     => pgpRxOut,
+               rxAlmostFull => full );
+
+  U_Pgp2b : entity work.MpsPgpFrontEnd
+    port map ( pgpClk       => pgpClk,
                pgpRst       => coreRst,
                stableClk    => axilClk,
                gtRefClk     => gtRefClk,
+               txOutClk     => pgpClk,
                --
                pgpTxIn      => pgpTxIn,
                pgpTxOut     => pgpTxOut,
                pgpRxIn      => pgpRxIn,
                pgpRxOut     => pgpRxOut,
+               --
+               --phyRst       => phyRst,
+               --txPllRst     => txPllRst,
+               --rxPllRst     => rxPllRst,
+               --txPgpRst     => txPgpRst,
+               --rxPgpRst     => rxPgpRst,
                -- Frame TX Interface
                pgpTxMasters => pgpTxMasters,
                pgpTxSlaves  => pgpTxSlaves,
@@ -128,13 +162,15 @@ begin
                gtRxN        => pgpRxN );
 
   U_Axi : entity work.Pgp2bAxi
+    generic map ( WRITE_EN_G => true )
     port map ( -- TX PGP Interface (pgpTxClk)
-               pgpTxClk         => coreClk,
+               pgpTxClk         => pgpClk,
                pgpTxClkRst      => coreRst,
                pgpTxIn          => pgpTxIn,
                pgpTxOut         => pgpTxOut,
+               locTxIn          => locTxIn,
                -- RX PGP Interface (pgpRxClk)
-               pgpRxClk         => coreClk,
+               pgpRxClk         => pgpClk,
                pgpRxClkRst      => coreRst,
                pgpRxIn          => pgpRxIn,
                pgpRxOut         => pgpRxOut,

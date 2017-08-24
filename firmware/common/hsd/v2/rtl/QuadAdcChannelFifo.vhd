@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2016-01-04
--- Last update: 2017-06-28
+-- Last update: 2017-08-24
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -39,8 +39,10 @@ use work.QuadAdcCompPkg.all;
 use work.FexAlgPkg.all;
 
 entity QuadAdcChannelFifo is
-  generic ( BASE_ADDR_C : slv(31 downto 0) := x"00000000";
-            ALGORITHM_G : StringArray );
+  generic ( BASE_ADDR_C   : slv(31 downto 0) := x"00000000";
+            AXIS_CONFIG_G : AxiStreamConfigType;
+            ALGORITHM_G   : StringArray;
+            DEBUG_G       : boolean := false );
   port (
     clk             :  in sl;
     rst             :  in sl;
@@ -88,6 +90,7 @@ architecture mapping of QuadAdcChannelFifo is
     fexPreCount: Slv10Array(NSTREAMS_C-1 downto 0);
     fexBegin   : Slv14Array(NSTREAMS_C-1 downto 0);
     fexLength  : Slv14Array(NSTREAMS_C-1 downto 0);
+    skip       : slv       (NSTREAMS_C-1 downto 0);
     start      : slv       (NSTREAMS_C-1 downto 0);
     l1in       : slv       (NSTREAMS_C-1 downto 0);
     l1ina      : slv       (NSTREAMS_C-1 downto 0);
@@ -112,6 +115,7 @@ architecture mapping of QuadAdcChannelFifo is
     fexPreCount=> (others=>(others=>'0')),
     fexBegin   => (others=>(others=>'0')),
     fexLength  => (others=>(others=>'0')),
+    skip       => (others=>'0'),
     start      => (others=>'0'),
     l1in       => (others=>'0'),
     l1ina      => (others=>'0'),
@@ -132,7 +136,7 @@ architecture mapping of QuadAdcChannelFifo is
   signal r   : RegType := REG_INIT_C;
   signal rin : RegType;
 
-  signal lopen, lclose     : slv(NSTREAMS_C-1 downto 0);
+  signal lopen, lclose, lskip : slv(NSTREAMS_C-1 downto 0);
   signal free              : Slv16Array(NSTREAMS_C-1 downto 0);
   signal nfree             : Slv5Array (NSTREAMS_C-1 downto 0);
 
@@ -149,7 +153,8 @@ architecture mapping of QuadAdcChannelFifo is
   signal maxisSlave        : AxiStreamSlaveType;
   
   constant SAXIS_CONFIG_C : AxiStreamConfigType := ssiAxiStreamConfig(16);
-  constant MAXIS_CONFIG_C : AxiStreamConfigType := ssiAxiStreamConfig(32);
+--  constant MAXIS_CONFIG_C : AxiStreamConfigType := ssiAxiStreamConfig(32);
+  constant MAXIS_CONFIG_C : AxiStreamConfigType := AXIS_CONFIG_G;
 
   function AxilCrossbarConfig  return AxiLiteCrossbarMasterConfigArray is
     variable ret : AxiLiteCrossbarMasterConfigArray(NSTREAMS_C downto 0);
@@ -164,11 +169,49 @@ architecture mapping of QuadAdcChannelFifo is
   
   constant AXIL_XBAR_CONFIG_C : AxiLiteCrossbarMasterConfigArray(NSTREAMS_C downto 0) := AxilCrossbarConfig;
 
-    for all : hsd_fex_wrapper
-      use configuration work.raw_cfg;
+  -- signals for debugging
+  signal rData : slv(127 downto 0);
+  signal sData : slv(127 downto 0);
 
+  component ila_0
+    port ( clk : in sl;
+           probe0 : in slv(255 downto 0) );
+  end component;
+  
 begin  -- mapping
 
+  rData <= r.axisMaster.tData(127 downto 0);
+  sData <= axisMasters(0).tData(127 downto 0);
+
+  GEN_DEBUG : if DEBUG_G generate
+    U_ILA : ila_0
+      port map ( clk           => clk,
+                 probe0(0)     => rst,
+                 probe0(1)     => clear,
+                 probe0(2)     => start,
+                 probe0(3)     => l1in,
+                 probe0(4)     => l1ina,
+                 probe0(5)     => lopen(0),
+                 probe0(6)     => lskip(0),
+                 probe0(7)     => lclose(0),
+                 probe0(8)     => r.start(0),
+                 probe0(9)     => r.l1in (0),
+                 probe0(10)    => r.l1ina(0),
+                 probe0(11)    => axisMasters(0).tValid,
+                 probe0(12)    => axisMasters(0).tLast,
+                 probe0(13)    => rin.axisSlaves(0).tReady,
+                 probe0(14)    => r.fexEnable(0),
+                 probe0(18 downto 15) => r.npend,
+                 probe0(22 downto 19) => r.ntrig,
+                 probe0(26 downto 23) => r.nread,
+                 probe0(27)           => maxilWriteMasters(0).awvalid,
+                 probe0(28)           => maxilWriteMasters(0).wvalid,
+                 probe0(29)           => maxilWriteMasters(0).bready,
+                 probe0(61 downto 30) => maxilWriteMasters(0).awaddr,
+                 probe0(93 downto 62) => maxilWriteMasters(0).wdata,
+                 probe0(255 downto 94) => (others=>'0') );
+  end generate;
+  
   --  Do we have to cross clock domains here or does VivadoHLS do it for us?
   GEN_AXIL_ASYNC : entity work.AxiLiteAsync
     port map ( sAxiClk         => axilClk,
@@ -224,7 +267,7 @@ begin  -- mapping
                mAxisMaster => axisMaster,
                mAxisSlave  => axisSlave );
 
-  GEN_REM : for i in 0 to NSTREAMS_C-1 generate
+  GEN_STR : for i in 0 to NSTREAMS_C-1 generate
     l1v   (i) <= lclose(i);
     l1a   (i) <= '0';
 
@@ -232,33 +275,40 @@ begin  -- mapping
       port map ( clk     => clk,
                  rst     => clear,
                  start   => r.start    (i),
+                 handle  => r.skip     (i),
                  fbegin  => r.fexBegin (i),
                  flength => r.fexLength(i),
                  lopen   => lopen      (i),
+                 lhandle => lskip      (i),
                  lclose  => lclose     (i) );
 
-  U_FEX : entity work.hsd_fex_wrapper
-    generic map ( AXIS_CONFIG_G => SAXIS_CONFIG_C,
-                  ALGORITHM_G   => ALGORITHM_G(i) )
-    port map ( clk               => clk,
-               rst               => clear,
-               din               => din,
-               lopen             => lopen(i),
-               lphase            => shift,
-               lclose            => lclose(i),
-               l1in              => r.l1in  (i),
-               l1ina             => r.l1ina (i),
-               free              => free            (i),
-               nfree             => nfree           (i),
-               axisMaster        => axisMasters     (i),
-               axisSlave         => r.axisSlaves    (i),
-               axilReadMaster    => maxilReadMasters (i+1),
-               axilReadSlave     => maxilReadSlaves  (i+1),
-               axilWriteMaster   => maxilWriteMasters(i+1),
-               axilWriteSlave    => maxilWriteSlaves (i+1) );
-    
+    U_FEX : entity work.hsd_fex_wrapper
+      generic map ( AXIS_CONFIG_G => SAXIS_CONFIG_C,
+                    ALGORITHM_G   => ALGORITHM_G(i) )
+      port map ( clk               => clk,
+                 rst               => clear,
+                 din               => din,
+                 lopen             => lopen(i),
+                 lskip             => lskip(i),
+                 lphase            => shift,
+                 lclose            => lclose(i),
+                 l1in              => r.l1in  (i),
+                 l1ina             => r.l1ina (i),
+                 free              => free            (i),
+                 nfree             => nfree           (i),
+                 axisMaster        => axisMasters     (i),
+                 axisSlave         => rin.axisSlaves    (i),
+                 axilReadMaster    => maxilReadMasters (i+1),
+                 axilReadSlave     => maxilReadSlaves  (i+1),
+                 axilWriteMaster   => maxilWriteMasters(i+1),
+                 axilWriteSlave    => maxilWriteSlaves (i+1) );
   end generate;
 
+  GEN_REM : for i in NSTREAMS_C to 3 generate
+    l1v   (i) <= '0';
+    l1a   (i) <= '0';
+  end generate;
+  
   process (r, rst, clear, start, free, nfree, l1in, l1ina,
            axisMasters, maxisSlave,
            maxilWriteMasters, maxilReadMasters) is
@@ -268,9 +318,11 @@ begin  -- mapping
   begin  -- process
     v := r;
 
+    v.skip  := (others=>'0');
     v.start := (others=>'0');
     v.l1in  := (others=>'0');
     v.l1ina := (others=>'0');
+    v.axisMaster.tKeep := genTKeep(SAXIS_CONFIG_C);
     
     -- AxiStream interface
     if maxisSlave.tReady='1' then
@@ -331,10 +383,12 @@ begin  -- mapping
     if start = '1' then
       for i in 0 to NSTREAMS_C-1 loop
         if r.fexEnable(i)='1' then
+          v.start      (i) := '1';
           if r.fexPreCount(i)=r.fexPrescale(i) then
-            v.start      (i) := '1';
+            v.skip       (i) := '0';
             v.fexPreCount(i) := (others=>'0');
           else
+            v.skip       (i) := '1';
             v.fexPreCount(i) := r.fexPreCount(i)+1;
           end if;
         else

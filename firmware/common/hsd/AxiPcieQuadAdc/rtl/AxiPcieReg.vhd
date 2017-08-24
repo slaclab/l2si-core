@@ -5,7 +5,7 @@
 -- Author     : Larry Ruckman  <ruckman@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2016-02-12
--- Last update: 2017-06-27
+-- Last update: 2017-08-17
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -64,11 +64,16 @@ entity AxiPcieReg is
       dmaCtrlReadSlave   : in  AxiLiteReadSlaveType;
       dmaCtrlWriteMaster : out AxiLiteWriteMasterType;
       dmaCtrlWriteSlave  : in  AxiLiteWriteSlaveType;
-      -- PHY AXI-Lite Interfaces [0x00030000:0x0003FFFF]
+      -- PHY AXI-Lite Interfaces [0x00030000:0x00030FFF]
       phyReadMaster      : out AxiLiteReadMasterType;
       phyReadSlave       : in  AxiLiteReadSlaveType;
       phyWriteMaster     : out AxiLiteWriteMasterType;
       phyWriteSlave      : in  AxiLiteWriteSlaveType;
+      -- GTH AXI-Lite Interfaces [0x00031000:0x00031FFF]
+      gthReadMaster      : out AxiLiteReadMasterType;
+      gthReadSlave       : in  AxiLiteReadSlaveType;
+      gthWriteMaster     : out AxiLiteWriteMasterType;
+      gthWriteSlave      : in  AxiLiteWriteSlaveType;
       -- Timing AXI-Lite Interfaces [0x00040000:0x0004FFFF]
       timReadMaster      : out AxiLiteReadMasterType;
       timReadSlave       : in  AxiLiteReadSlaveType;
@@ -85,15 +90,16 @@ end AxiPcieReg;
 
 architecture mapping of AxiPcieReg is
 
-   constant NUM_AXI_MASTERS_C : natural := 7;
+   constant NUM_AXI_MASTERS_C : natural := 8;
 
    constant VERSION_INDEX_C : natural := 0;
    constant FLASH_INDEX_C   : natural := 1;
    constant I2C_INDEX_C     : natural := 2;
    constant DMA_INDEX_C     : natural := 3;
    constant PHY_INDEX_C     : natural := 4;
-   constant TIM_INDEX_C     : natural := 5;
-   constant APP_INDEX_C     : natural := 6;
+   constant GTH_INDEX_C     : natural := 5;
+   constant TIM_INDEX_C     : natural := 6;
+   constant APP_INDEX_C     : natural := 7;
 
    constant AXI_CROSSBAR_MASTERS_CONFIG_C : AxiLiteCrossbarMasterConfigArray(NUM_AXI_MASTERS_C-1 downto 0) := (
       VERSION_INDEX_C => (
@@ -114,6 +120,10 @@ architecture mapping of AxiPcieReg is
          connectivity => x"FFFF"),
       PHY_INDEX_C     => (
          baseAddr     => PHY_ADDR_C,
+         addrBits     => 16,
+         connectivity => x"FFFF"),
+      GTH_INDEX_C     => (
+         baseAddr     => GTH_ADDR_C,
          addrBits     => 16,
          connectivity => x"FFFF"),
       TIM_INDEX_C     => (
@@ -273,6 +283,14 @@ begin
    axilWriteSlaves(PHY_INDEX_C) <= phyWriteSlave;
    phyReadMaster                <= axilReadMasters(PHY_INDEX_C);
    axilReadSlaves(PHY_INDEX_C)  <= phyReadSlave;
+
+   -------------------------------
+   -- Map the AXI-Lite to Timing PHY
+   -------------------------------
+   gthWriteMaster               <= axilWriteMasters(GTH_INDEX_C);
+   axilWriteSlaves(GTH_INDEX_C) <= gthWriteSlave;
+   gthReadMaster                <= axilReadMasters(GTH_INDEX_C);
+   axilReadSlaves(GTH_INDEX_C)  <= gthReadSlave;
 
    -------------------------------
    -- Map the AXI-Lite to Timing

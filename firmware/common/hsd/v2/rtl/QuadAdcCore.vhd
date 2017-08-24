@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2016-01-04
--- Last update: 2017-06-26
+-- Last update: 2017-08-18
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -40,6 +40,7 @@ entity QuadAdcCore is
     LCLSII_G    : boolean := TRUE;
     NFMC_G      : integer := 1;
     SYNC_BITS_G : integer := 4;
+    DMA_STREAM_CONFIG_G : AxiStreamConfigType;
     BASE_ADDR_C : slv(31 downto 0) := (others=>'0') );
   port (
     -- AXI-Lite and IRQ Interface
@@ -52,8 +53,8 @@ entity QuadAdcCore is
     -- DMA
     dmaClk              : in  sl;
     dmaRst              : out sl;
-    dmaRxIbMaster       : out AxiStreamMasterType;
-    dmaRxIbSlave        : in  AxiStreamSlaveType;
+    dmaRxIbMaster       : out AxiStreamMasterArray(DMA_CHANNELS_C-1 downto 0);
+    dmaRxIbSlave        : in  AxiStreamSlaveArray (DMA_CHANNELS_C-1 downto 0);
     -- EVR Ports
     evrClk              : in  sl;
     evrRst              : in  sl;
@@ -87,7 +88,7 @@ architecture mapping of QuadAdcCore is
   signal dmaHistEnaS         : sl;
   signal dmaHistDump         : sl;
   signal dmaHistDumpS        : sl;
-  signal eventId             : slv(95 downto 0);
+  signal eventId             : slv(191 downto 0);
   
   signal eventSel            : sl;
   signal eventSelQ           : sl;
@@ -96,9 +97,6 @@ architecture mapping of QuadAdcCore is
 
   signal dmaCtrlC            : slv(31 downto 0);
   signal dmaCtrlCount        : slv(31 downto 0);
-  
-  signal intRxIbMasters      : AxiStreamMasterArray(1 downto 0);
-  signal intRxIbSlaves       : AxiStreamSlaveArray (1 downto 0);
   
   signal histMaster          : AxiStreamMasterType;
   signal histSlave           : AxiStreamSlaveType;
@@ -125,15 +123,6 @@ architecture mapping of QuadAdcCore is
   constant HIST_STREAM_CONFIG_C : AxiStreamConfigType := (
     TSTRB_EN_C    => false,
     TDATA_BYTES_C => 4,
-    TDEST_BITS_C  => 0,
-    TID_BITS_C    => 0,
-    TKEEP_MODE_C  => TKEEP_NORMAL_C,
-    TUSER_BITS_C  => 0,
-    TUSER_MODE_C  => TUSER_NONE_C );
-
-  constant DMA_STREAM_CONFIG_C : AxiStreamConfigType := (
-    TSTRB_EN_C    => false,
-    TDATA_BYTES_C => 32,
     TDEST_BITS_C  => 0,
     TID_BITS_C    => 0,
     TKEEP_MODE_C  => TKEEP_NORMAL_C,
@@ -187,6 +176,7 @@ begin
                   FIFO_ADDR_WIDTH_C => FIFO_ADDR_WIDTH_C,
                   NFMC_G            => NFMC_G,
                   SYNC_BITS_G       => SYNC_BITS_G,
+                  DMA_STREAM_CONFIG_G => DMA_STREAM_CONFIG_G,
                   BASE_ADDR_C       => BASE_ADDR_C )
     port map (    axilClk         => axiClk,
                   axilRst         => axiRst,
@@ -214,8 +204,8 @@ begin
                   dmaFullThr => dmaFullThrS(FIFO_ADDR_WIDTH_C-1 downto 0),
                   dmaFullS   => dmaFullS,
                   dmaFullQ   => dmaFullQ,
-                  dmaMaster  => intRxIbMasters(0),
-                  dmaSlave   => intRxIbSlaves (0) );
+                  dmaMaster  => dmaRxIbMaster(3 downto 0),
+                  dmaSlave   => dmaRxIbSlave (3 downto 0) );
 
   GEN_HIST_DMA : if HIST_DMA generate
     U_FifoDepthH : entity work.HistogramDma
@@ -234,29 +224,19 @@ begin
       generic map ( FIFO_ADDR_WIDTH_G   => 4,
                     GEN_SYNC_FIFO_G     => true,
                     SLAVE_AXI_CONFIG_G  => HIST_STREAM_CONFIG_C,
-                    MASTER_AXI_CONFIG_G => DMA_STREAM_CONFIG_C )
+                    MASTER_AXI_CONFIG_G => DMA_STREAM_CONFIG_G )
       port map ( sAxisClk    => dmaClk,
                  sAxisRst    => idmaRst,
                  sAxisMaster => histMaster,
                  sAxisSlave  => histSlave,
                  mAxisClk    => dmaClk,
                  mAxisRst    => idmaRst,
-                 mAxisMaster => intRxIbMasters(1),
-                 mAxisSlave  => intRxIbSlaves (1) );
-    
-    U_StreamMux : entity work.AxiStreamMux
-      generic map ( NUM_SLAVES_G => 2 )
-      port map ( sAxisMasters => intRxIbMasters,
-                 sAxisSlaves  => intRxIbSlaves,
-                 mAxisMaster  => dmaRxIbMaster,
-                 mAxisSlave   => dmaRxIbSlave,
-                 axisClk      => dmaClk,
-                 axisRst      => idmaRst );
+                 mAxisMaster => dmaRxIbMaster(4),
+                 mAxisSlave  => dmaRxIbSlave (4) );
   end generate;
 
   NOGEN_HIST_DMA : if not HIST_DMA generate
-    dmaRxIbMaster <= intRxIbMasters(0);
-    intRxIbSlaves(0) <= dmaRxIbSlave;
+    dmaRxIbMaster(4) <= AXI_STREAM_MASTER_INIT_C;
   end generate;
     
   Sync_EvtCount : entity work.SyncStatusVector

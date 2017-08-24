@@ -103,10 +103,12 @@ port (
   sync_from_fpga_n : out   std_logic;
 
   adc_in           : in    AdcInputArray(3 downto 0);
-  
+
   pg_m2c           : in    std_logic;
   prsnt_m2c_l      : in    std_logic;
 
+  tst_clks         : in  slv(7 downto 0) := (others=>'0');
+  
   cal_clk_en       : out   std_logic
 );
 end FmcCore;
@@ -396,7 +398,7 @@ test_clocks(4) <= phy_clk_d;
 test_clocks(5) <= ref_clk;
 test_clocks(6) <= clk_to_fpga_buf;
 test_clocks(7) <= adc_clk;
-test_clocks(15 downto 8) <= (others => '0');
+test_clocks(15 downto 8) <= tst_clks;
 
 U_TRGCLK : BUFG
   port map ( I => trigger,

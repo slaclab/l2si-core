@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2016-01-04
--- Last update: 2017-06-16
+-- Last update: 2017-08-23
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -42,9 +42,11 @@ entity FexGate is
     clk             :  in sl;
     rst             :  in sl;
     start           :  in sl;
+    handle          :  in sl;
     fbegin          :  in slv(13 downto 0);
     flength         :  in slv(13 downto 0);
     lopen           : out sl;
+    lhandle         : out sl;
     lclose          : out sl );
 end FexGate;
 
@@ -53,10 +55,12 @@ architecture rtl of FexGate is
   type L0StateType is record
     state  : StateType;
     count  : slv(13 downto 0);
+    handle : sl;
   end record;
   constant L0STATE_INIT_C : L0StateType := (
     state  => CLOSED_S,
-    count  => (others=>'0') );
+    count  => (others=>'0'),
+    handle => '0' );
   type L0StateArray  is array(natural range<>) of L0StateType;
 
   type RegType is record
@@ -67,6 +71,7 @@ architecture rtl of FexGate is
     iopen      : slv(3 downto 0);
     lopen      : sl;
     lclose     : sl;
+    lhandle    : sl;
   end record;
 
   constant REG_INIT_C : RegType := (
@@ -76,20 +81,22 @@ architecture rtl of FexGate is
     iwait      => (others=>'0'),
     iopen      => (others=>'0'),
     lopen      => '0',
-    lclose     => '0' );
+    lclose     => '0',
+    lhandle    => '0' );
   
   signal r    : RegType := REG_INIT_C;
   signal r_in : RegType;
 
 begin 
 
-  process (r, rst, start, fbegin, flength) is
+  process (r, rst, start, handle, fbegin, flength) is
     variable v  : RegType;
     variable i  : integer;
   begin
     v := r;
-    v.lopen  := '0';
-    v.lclose := '0';
+    v.lopen   := '0';
+    v.lclose  := '0';
+    v.lhandle := '0';
 
     v.count := r.count+1;
     
@@ -98,6 +105,7 @@ begin
       i := conv_integer(r.iclosed);
       v.l0(i).state := WAIT_S;
       v.l0(i).count := r.count + fbegin + 1;
+      v.l0(i).handle := handle;
       v.iclosed := r.iclosed+1;
     end if;
 
@@ -105,6 +113,7 @@ begin
     if (r.l0(i).state = WAIT_S and
         r.l0(i).count = r.count) then
       v.lopen       := '1';
+      v.lhandle     := r.l0(i).handle;
       v.l0(i).state := OPEN_S;
       v.l0(i).count := r.count + flength;
       v.iwait := r.iwait+1;
@@ -124,8 +133,9 @@ begin
     
     r_in <= v;
 
-    lopen  <= r.lopen;
-    lclose <= r.lclose;
+    lopen   <= r.lopen;
+    lclose  <= r.lclose;
+    lhandle <= r.lhandle;
   end process;
 
   process (clk)

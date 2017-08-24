@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2016-01-04
--- Last update: 2017-06-27
+-- Last update: 2017-08-24
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -31,8 +31,8 @@ use ieee.NUMERIC_STD.all;
 use work.StdRtlPkg.all;
 use work.AxiLitePkg.all;
 use work.AxiStreamPkg.all;
-use work.TimingPkg.all;
-use work.ArbiterPkg.all;
+use work.SsiPkg.all;
+--use work.TimingPkg.all;
 use work.QuadAdcPkg.all;
 use work.FexAlgPkg.all;
 
@@ -42,6 +42,7 @@ entity QuadAdcEvent is
     FIFO_ADDR_WIDTH_C : integer := 10;
     NFMC_G            : integer := 1;
     SYNC_BITS_G       : integer := 4;
+    DMA_STREAM_CONFIG_G : AxiStreamConfigType;
     BASE_ADDR_C       : slv(31 downto 0) := (others=>'0') );
   port (
     axilClk         :  in sl;
@@ -55,7 +56,7 @@ entity QuadAdcEvent is
     configE    :  in QuadAdcConfigType;
     strobe     :  in sl;
     trigArm    :  in sl;
-    eventId    :  in slv(95 downto 0);
+    eventId    :  in slv(191 downto 0);
     l1in       :  in sl;
     l1ina      :  in sl;
     --
@@ -70,12 +71,13 @@ entity QuadAdcEvent is
     dmaFullThr :  in slv(FIFO_ADDR_WIDTH_C-1 downto 0);
     dmaFullS   : out sl;
     dmaFullQ   : out slv(FIFO_ADDR_WIDTH_C-1 downto 0);
-    dmaMaster  : out AxiStreamMasterType;
-    dmaSlave   : in  AxiStreamSlaveType );
+    dmaMaster  : out AxiStreamMasterArray(3 downto 0);
+    dmaSlave   : in  AxiStreamSlaveArray (3 downto 0) );
 end QuadAdcEvent;
 
 architecture mapping of QuadAdcEvent is
 
+  constant ONE_STREAM : boolean := false;
   constant NCHAN_C : integer := 4*NFMC_G;
   
   type EventStateType is (E_IDLE, E_SYNC);
@@ -99,21 +101,13 @@ architecture mapping of QuadAdcEvent is
   signal re    : EventRegType := EVENT_REG_INIT_C;
   signal re_in : EventRegType;
 
-  type RdStateType is (S_IDLE, S_READHDR, S_WRITEHDR,
-                       S_WAITCHAN, S_READCHAN, S_DUMP);
   type SyncStateType is (S_SHIFT_S, S_WAIT_S);
 
   constant TMO_VAL_C : integer := 4095;
   
   type RegType is record
-    hdrRd    : sl;
-    enable   : slv(NCHAN_C-1 downto 0);
-    enableValid : sl;
     full     : sl;
     afull    : sl;
-    state    : RdStateType;
-    master   : AxiStreamMasterType;
-    slave    : AxiStreamSlaveType;
     start    : sl;
     syncState: SyncStateType;
     adcShift : slv(2 downto 0);
@@ -126,14 +120,8 @@ architecture mapping of QuadAdcEvent is
   end record;
 
   constant REG_INIT_C : RegType := (
-    hdrRd     => '0',
-    enable    => (others=>'0'),
-    enableValid => '0',
     full      => '0',
     afull     => '0',
-    state     => S_IDLE,
-    master    => AXI_STREAM_MASTER_INIT_C,
-    slave     => AXI_STREAM_SLAVE_INIT_C,
     start     => '0',
     syncState => S_SHIFT_S,
     adcShift  => (others=>'0'),
@@ -154,13 +142,10 @@ architecture mapping of QuadAdcEvent is
   signal  adcs : AdcShiftArray(NCHAN_C-1 downto 0);
   signal iadcs : AdcShiftArray(NCHAN_C-1 downto 0);
 
-  signal chmasters : AxiStreamMasterArray(NCHAN_C-1 downto 0);
-  signal chslaves  : AxiStreamSlaveArray (NCHAN_C-1 downto 0);
-  signal chmaster  : AxiStreamMasterType;
-  signal chslave   : AxiStreamSlaveType;
-  signal chEnableV   : sl;
-  signal chEnable    : slv(NCHAN_C-1 downto 0);
-  signal chEnableAck : sl;
+  constant CHN_AXIS_CONFIG_C : AxiStreamConfigType := ssiAxiStreamConfig(16);
+
+  signal chmasters   : AxiStreamMasterArray(NCHAN_C-1 downto 0);
+  signal chslaves    : AxiStreamSlaveArray (NCHAN_C-1 downto 0);
   signal chafull     : slv(NCHAN_C-1 downto 0);
   signal chfull      : slv(NCHAN_C-1 downto 0);
   
@@ -174,13 +159,6 @@ architecture mapping of QuadAdcEvent is
   signal trigArmS  : sl;
   
   constant XPMV7 : boolean := false;
-
-  constant DEBUG_C : boolean := true;
-
-  component ila_0
-    port ( clk : in sl;
-           probe0 : in slv(255 downto 0) );
-  end component;
 
   signal r_state : slv(2 downto 0);
   signal r_syncstate : sl;
@@ -208,9 +186,32 @@ architecture mapping of QuadAdcEvent is
   
   constant AXIL_XBAR_CONFIG_C : AxiLiteCrossbarMasterConfigArray(NCHAN_C-1 downto 0) := AxilCrossbarConfig;
 
+  constant DEBUG_C : boolean := true;
+
+  component ila_0
+    port ( clk   : in sl;
+           probe0: in slv(255 downto 0) );
+  end component;
+  
 begin  -- mapping
 
-  dmaMaster <= r.master;
+  GEN_DEBUG: if DEBUG_C generate
+    U_ILA : ila_0
+      port map ( clk     => dmaClk,
+                 probe0 ( 0 ) => dmaRst, 
+                 probe0 ( 1 ) => r.start,
+                 probe0 ( 2 ) => sl1in,
+                 probe0 ( 3 ) => sl1ina,
+                 probe0 ( 4 ) => chafull(0),                 
+                 probe0 ( 5 ) => chfull(0),
+                 probe0 ( 6 ) => chmasters(0).tValid,
+                 probe0 ( 7 ) => chmasters(0).tLast,
+                 probe0 (  9 downto  8 ) => chmasters(0).tUser( 1 downto 0),
+                 probe0 ( 41 downto 10 ) => chmasters(0).tData(31 downto 0),
+                 probe0 ( 42 ) => chslaves(0).tReady,
+                 probe0 ( 255 downto 43 ) => (others=>'0') );
+  end generate;
+
   dmaFullS  <= r.afull;
   dmaFullQ  <= (others=>'0');
 
@@ -234,10 +235,10 @@ begin  -- mapping
                dataIn  => l1in,
                dataOut => sl1in );
   
-  U_L1INA : entity work.SynchronizerOneShot
-    port map ( clk     => dmaClk,
-               dataIn  => l1ina,
-               dataOut => sl1ina );
+  U_L1INA : entity work.RstSync
+    port map ( clk      => dmaClk,
+               asyncRst => l1ina,
+               syncRst  => sl1ina );
   
   U_TRIGARM : entity work.SynchronizerOneShot
     port map ( clk     => dmaClk,
@@ -266,7 +267,9 @@ begin  -- mapping
 --      This is the large buffer.
     U_FIFO : entity work.QuadAdcChannelFifo
       generic map ( BASE_ADDR_C => AXIL_XBAR_CONFIG_C(i).baseAddr,
-                    ALGORITHM_G => FEX_ALGORITHMS(i) )
+                    AXIS_CONFIG_G => CHN_AXIS_CONFIG_C,
+                    ALGORITHM_G => FEX_ALGORITHMS(i),
+                    DEBUG_G     => ite(i>0, false, DEBUG_C) )
       port map ( clk      => dmaClk,
                  rst      => dmaRst,
                  clear    => dmaRst,
@@ -287,20 +290,50 @@ begin  -- mapping
                  axilReadSlave   => mAxilReadSlaves  (i),
                  axilWriteMaster => mAxilWriteMasters(i),
                  axilWriteSlave  => mAxilWriteSlaves (i) );
+
+    GEN_DATA : if ONE_STREAM=false generate
+      U_DATA : entity work.QuadAdcChannelData
+        generic map ( DMA_STREAM_CONFIG_G => DMA_STREAM_CONFIG_G )
+        port map ( eventClk    => eventClk,
+                   eventRst    => eventRst,
+                   eventWr     => re.hdrWr(0),
+                   eventDin    => re.hdrData(127 downto 0),
+                   --
+                   dmaClk      => dmaClk,
+                   dmaRst      => dmaRst,
+                   eventTrig(31 downto 24) => r.trig(3),
+                   eventTrig(23 downto 16) => r.trig(2),
+                   eventTrig(15 downto  8) => r.trig(1),
+                   eventTrig( 7 downto  0) => r.trig(0),
+                   chnMaster   => chmasters(i),
+                   chnSlave    => chslaves (i),
+                   dmaMaster   => dmaMaster(i),
+                   dmaSlave    => dmaSlave (i) );
+    end generate GEN_DATA;
   end generate;
 
-  U_HDR : entity work.FifoAsync
-    generic map ( DATA_WIDTH_G  => 128,
-                  ADDR_WIDTH_G  =>   8 )
-    port map ( rst      => dmaRst,
-               wr_clk   => eventClk,
-               wr_en    => re.hdrWr  (0),
-               din      => re.hdrData(127 downto 0),
-               rd_clk   => dmaClk,
-               rd_en    => rin.hdrRd,
-               dout     => hdrDout,
-               valid    => hdrValid,
-               empty    => hdrEmpty );
+  GEN_ONE : if ONE_STREAM=true generate
+    U_DATA : entity work.QuadAdcChannelMux
+      generic map ( NCHAN_C             => NCHAN_C,
+                    DMA_STREAM_CONFIG_G => DMA_STREAM_CONFIG_G )
+      port map ( eventClk    => eventClk,
+                 eventRst    => eventRst,
+                 eventWr     => re.hdrWr(0),
+                 eventDin    => re.hdrData(127 downto 0),
+                 --
+                 dmaClk      => dmaClk,
+                 dmaRst      => dmaRst,
+                 eventTrig(31 downto 24) => r.trig(3),
+                 eventTrig(23 downto 16) => r.trig(2),
+                 eventTrig(15 downto  8) => r.trig(1),
+                 eventTrig( 7 downto  0) => r.trig(0),
+                 chenable    => configA.enable,
+                 chmasters   => chmasters,
+                 chslaves    => chslaves,
+                 dmaMaster   => dmaMaster(0),
+                 dmaSlave    => dmaSlave (0) );
+    dmaMaster(dmaMaster'left downto 1) <= (others=>AXI_STREAM_MASTER_INIT_C);
+  end generate;
 
   U_PLL_SYNC : entity work.SynchronizerVector
     generic map ( WIDTH_G => pllSync'length )
@@ -308,18 +341,6 @@ begin  -- mapping
                rst      => eventRst,
                dataIn   => r.adcShift,
                dataOut  => pllSync );
-
-  U_AXISMUX : entity work.AxiStreamOrderedMux
-    generic map ( NUM_SLAVES_G => NCHAN_C )
-    port map ( clk          => dmaClk,
-               rst          => dmaRst,
-               enableValid  => chEnableV,
-               enableSel    => chEnable,
-               enableAck    => chEnableAck,
-               sAxisMasters => chmasters,
-               sAxisSlaves  => chslaves,
-               mAxisMaster  => chmaster,
-               mAxisSlave   => chslave );
   
   process (re, eventRst, eventId, strobe, fullE, configE, pllSync) is
     variable v  : EventRegType;
@@ -335,10 +356,7 @@ begin  -- mapping
       when E_IDLE =>
         if strobe='1' and fullE='0' then
           v.delay   := (others=>'0');
-          v.hdrData(159 downto 0) := eventId &
-                                     x"00" & configE.enable &
-                                     "00" & configE.samples(17 downto 4) &
-                                     sz;
+          v.hdrData(191 downto 0) := eventId;
           v.state   := E_SYNC;
         else
           v.hdrData := toSlv(0,128) & re.hdrData(re.hdrData'left downto 128);
@@ -346,9 +364,9 @@ begin  -- mapping
       when E_SYNC =>
         if re.delay=toSlv(T_SYNC,re.delay'length) then
           v.intv  := toSlv(1,re.intv'length);
-          v.hdrData(255 downto 160) := toSlv(0,32) & -- space for trigIn
-                                       re.intv &
-                                       toSlv(0,29) & pllSync;
+          v.hdrData(255 downto 192) := toSlv(0,29) & pllSync &
+                                       configE.enable & toSlv(0,6) &
+                                       configE.samples(17 downto 4) & x"0";
           v.delay := (others=>'0');
           v.hdrWr := (others=>'1');
           v.state := E_IDLE;
@@ -372,86 +390,24 @@ begin  -- mapping
     end if;
   end process;
     
-  process (r, dmaRst, configA, hdrValid, hdrEmpty, hdrDout, dmaSlave, dmaFullThr, trigArmS, trigIn,
-           chfull, chafull, chmaster, chEnableAck)
+  process (r, dmaRst, dmaFullThr, trigArmS, trigIn, chfull, chafull, configA) is
     variable v   : RegType;
   begin  -- process
     v := r;
 
-    v.hdrRd   := '0';
     v.trigd1  := trigIn(0);
 --    v.trigd2  := (r.trigd1 and configA.trigShift) or (trigIn(0) and not configA.trigShift);
     v.trigd2  := r.trigd1;
 
-    v.enableValid  := '0';
-    v.slave.tReady := '0';
     v.full         := uOr(chfull);
     v.afull        := uOr(chafull);
-    
-    if dmaSlave.tReady='1' then
-      v.master.tValid := '0';
-    end if;
-
-    if r.state = S_READCHAN and r.master.tValid='0' then
-      v.tmo := r.tmo-1;
-    else
-      v.tmo := TMO_VAL_C;
-    end if;
-    
-    case r.state is
-      when S_IDLE =>
-        v.enable  := configA.enable;
-        if hdrEmpty='0' then
-          v.hdrRd := '1';
-          v.state := S_READHDR;
-          v.tmo   := TMO_VAL_C;
-        end if;
-      when S_READHDR =>
-        if v.master.tValid='0' then
-          v.master.tData(127 downto 0) := hdrDout;
-          if hdrEmpty='0' then
-            v.hdrRd := '1';
-            v.state := S_WRITEHDR;
-          end if;
-        end if;
-      when S_WRITEHDR =>
-        if r.master.tValid='0' or dmaSlave.tReady='1' then
-          v.master.tData(255 downto 224) := r.trig(3) & r.trig(2) & r.trig(1) & r.trig(0);
-          v.master.tData(223 downto 128) := hdrDout(95 downto 0);
-          v.master.tKeep                 := genTKeep(32);
-          v.master.tValid                := '1';
-          v.master.tLast                 := '0';
-          v.state := S_WAITCHAN;
-          v.enableValid := '1';
-          v.state       := S_WAITCHAN;
-        end if;
-      when S_WAITCHAN =>
-        if chEnableAck = '0' then
-          v.enableValid := '1';
-        end if;
-        if v.master.tValid = '0' then
-          v.master       := chmaster;
-          v.slave.tReady := '1';
-        end if;
-      when S_DUMP =>
-        if v.master.tValid='0' then
-          v.state := S_IDLE;
-        end if;
-      when others => NULL;
-    end case;
-
-    if r.tmo = 0 then
-      v.state := S_DUMP;
-      v.master.tValid := '1';
-      v.master.tLast  := '1';
-    end if;
     
     if r.trigCnt/="11" then
       v.trig    := r.trigd2 & r.trig(r.trig'left downto 1);
       v.trigCnt := r.trigCnt+1;
     end if;
     
-   v.start := '0';
+    v.start := '0';
     case (r.syncState) is
       when S_SHIFT_S =>
         if trigArmS = '1' then
@@ -483,10 +439,6 @@ begin  -- mapping
     end if;
 
     rin <= v;
-
-    chEnableV <= r.enableValid;
-    chEnable  <= r.enable;
-    chslave   <= v.slave;
   end process;
 
   process (dmaClk)

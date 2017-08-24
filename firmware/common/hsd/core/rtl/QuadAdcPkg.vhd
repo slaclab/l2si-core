@@ -25,8 +25,10 @@ use ieee.std_logic_unsigned.all;
 
 library work;
 use work.StdRtlPkg.all;
+use work.AxiStreamPkg.all;
 
 package QuadAdcPkg is
+  constant DMA_CHANNELS_C : natural := 5;  -- 4 ADC channels + 1 monitor channel
 -------------------------------------------------------------------------------
 --  Constants to configue in function of ADC witch is targeted
 -------------------------------------------------------------------------------

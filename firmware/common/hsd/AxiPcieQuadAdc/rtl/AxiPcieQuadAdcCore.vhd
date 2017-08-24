@@ -5,7 +5,7 @@
 -- Author     : Larry Ruckman  <ruckman@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2016-02-12
--- Last update: 2017-06-27
+-- Last update: 2017-08-22
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -131,6 +131,11 @@ architecture mapping of AxiPcieQuadAdcCore is
    signal phyWriteMaster : AxiLiteWriteMasterType;
    signal phyWriteSlave  : AxiLiteWriteSlaveType;
 
+   signal gthReadMaster  : AxiLiteReadMasterType;
+   signal gthReadSlave   : AxiLiteReadSlaveType;
+   signal gthWriteMaster : AxiLiteWriteMasterType;
+   signal gthWriteSlave  : AxiLiteWriteSlaveType;
+
    signal timReadMaster  : AxiLiteReadMasterType;
    signal timReadSlave   : AxiLiteReadSlaveType;
    signal timWriteMaster : AxiLiteWriteMasterType;
@@ -163,29 +168,6 @@ architecture mapping of AxiPcieQuadAdcCore is
    signal dmaIrq  : sl;
    signal dmaIrqAck : sl;
    
-   constant NUM_AXI_MASTERS_C : natural := 2;
-   constant APP_INDEX_C : natural := 0;
-   constant GTH_INDEX_C : natural := 1;
-   constant APP_ADDR_C  : slv(31 downto 0) := x"00080000";
-   constant GTH_ADDR_C  : slv(31 downto 0) := x"00090000";
-   constant AXI_CROSSBAR_MASTERS_CONFIG_C : AxiLiteCrossbarMasterConfigArray(NUM_AXI_MASTERS_C-1 downto 0) := (
-     APP_INDEX_C => (
-       baseAddr     => APP_ADDR_C,
-       addrBits     => 16,
-       connectivity => x"FFFF"),
-     GTH_INDEX_C     => (
-       baseAddr     => GTH_ADDR_C,
-       addrBits     => 16,
-       connectivity => x"FFFF") );
-   signal axilReadMasters  : AxiLiteReadMasterArray(NUM_AXI_MASTERS_C-1 downto 0);
-   signal axilReadSlaves   : AxiLiteReadSlaveArray(NUM_AXI_MASTERS_C-1 downto 0);
-   signal axilWriteMasters : AxiLiteWriteMasterArray(NUM_AXI_MASTERS_C-1 downto 0);
-   signal axilWriteSlaves  : AxiLiteWriteSlaveArray(NUM_AXI_MASTERS_C-1 downto 0);
-   signal maxiReadMaster  : AxiLiteReadMasterType;
-   signal maxiReadSlave   : AxiLiteReadSlaveType;
-   signal maxiWriteMaster : AxiLiteWriteMasterType;
-   signal maxiWriteSlave  : AxiLiteWriteSlaveType;
-
    constant DEVICE_MAP_C : I2cAxiLiteDevArray(11 downto 0) := (
      -- PCA9548A I2C Mux
      0 => MakeI2cAxiLiteDevType( "1110100", 8, 0, '0' ),
@@ -387,50 +369,28 @@ begin
          dmaCtrlReadSlave   => dmaCtrlReadSlave,
          dmaCtrlWriteMaster => dmaCtrlWriteMaster,
          dmaCtrlWriteSlave  => dmaCtrlWriteSlave,
-         -- PHY AXI-Lite Interfaces [0x00030000:0x0003FFFF]
+         -- PHY AXI-Lite Interfaces [0x00030000:0x00030FFF]
          phyReadMaster      => phyReadMaster,
          phyReadSlave       => phyReadSlave,
          phyWriteMaster     => phyWriteMaster,
          phyWriteSlave      => phyWriteSlave,
+         -- GTH AXI-Lite Interfaces [0x00031000:0x00031FFF]
+         gthReadMaster      => gthReadMaster,
+         gthReadSlave       => gthReadSlave,
+         gthWriteMaster     => gthWriteMaster,
+         gthWriteSlave      => gthWriteSlave,
          -- Timing AXI-Lite Interfaces [0x00040000:0x0004FFFF]
          timReadMaster      => timReadMaster,
          timReadSlave       => timReadSlave,
          timWriteMaster     => timWriteMaster,
          timWriteSlave      => timWriteSlave,
          -- (Optional) Application AXI-Lite Interfaces [0x00080000:0x000FFFFF]
-         appReadMaster      => maxiReadMaster,
-         appReadSlave       => maxiReadSlave,
-         appWriteMaster     => maxiWriteMaster,
-         appWriteSlave      => maxiWriteSlave,
+         appReadMaster      => appReadMaster,
+         appReadSlave       => appReadSlave,
+         appWriteMaster     => appWriteMaster,
+         appWriteSlave      => appWriteSlave,
          -- Interrupts
          interrupt          => interrupt);
-
-   --------------------------
-   -- AXI-Lite Version Module
-   --------------------------   
-   U_XBAR : entity work.AxiLiteCrossbar
-      generic map (
-         TPD_G              => TPD_G,
-         DEC_ERROR_RESP_G   => AXI_ERROR_RESP_C,
-         NUM_SLAVE_SLOTS_G  => 1,
-         NUM_MASTER_SLOTS_G => NUM_AXI_MASTERS_C,
-         MASTERS_CONFIG_G   => AXI_CROSSBAR_MASTERS_CONFIG_C)
-      port map (
-         axiClk              => axilClk,
-         axiClkRst           => axilRst,
-         sAxiWriteMasters(0) => maxiWriteMaster,
-         sAxiWriteSlaves(0)  => maxiWriteSlave,
-         sAxiReadMasters(0)  => maxiReadMaster,
-         sAxiReadSlaves(0)   => maxiReadSlave,
-         mAxiWriteMasters    => axilWriteMasters,
-         mAxiWriteSlaves     => axilWriteSlaves,
-         mAxiReadMasters     => axilReadMasters,
-         mAxiReadSlaves      => axilReadSlaves);         
-
-   appWriteMaster               <= axilWriteMasters(APP_INDEX_C);
-   axilWriteSlaves(APP_INDEX_C) <= appWriteSlave;
-   appReadMaster                <= axilReadMasters (APP_INDEX_C);
-   axilReadSlaves(APP_INDEX_C)  <= appReadSlave;
 
    flash_data_dts               <= (others => flash_data_tri);
    
@@ -548,14 +508,14 @@ begin
    U_TimingGth : entity work.TimingGthCoreWrapper
       generic map (
          EXTREF_G         => LCLSII_G,  -- because Si5338 can't generate 371MHz
-         AXIL_BASE_ADDR_G => AXI_CROSSBAR_MASTERS_CONFIG_C(GTH_INDEX_C).baseAddr )
+         AXIL_BASE_ADDR_G => GTH_ADDR_C )
       port map (
          axilClk         => axilClk,
          axilRst         => axilRst,
-         axilReadMaster  => axilReadMasters (GTH_INDEX_C),
-         axilReadSlave   => axilReadSlaves  (GTH_INDEX_C),
-         axilWriteMaster => axilWriteMasters(GTH_INDEX_C),
-         axilWriteSlave  => axilWriteSlaves (GTH_INDEX_C),
+         axilReadMaster  => gthReadMaster,
+         axilReadSlave   => gthReadSlave,
+         axilWriteMaster => gthWriteMaster,
+         axilWriteSlave  => gthWriteSlave,
          stableClk       => axilClk,
          gtRefClk        => timingRefClk,
          gtRxP           => timingRxP,
@@ -586,6 +546,7 @@ begin
          TPD_G             => TPD_G,
          TPGEN_G           => false,
          ASYNC_G           => false,
+         CLKSEL_MODE_G     => "LCLSII",
 --         PROG_DELAY_G      => true,
          AXIL_BASE_ADDR_G  => TIM_ADDR_C,
          AXIL_ERROR_RESP_G => AXI_RESP_DECERR_C,

@@ -23,7 +23,8 @@ entity Application is
   generic (
      VERSION_625MHz : boolean := FALSE;
      LCLSII_G       : boolean := TRUE;
-     NFMC_G           : integer := 1);
+     NFMC_G         : integer := 1;
+     DMA_STREAM_CONFIG_G : AxiStreamConfigType );
   port (
     fmc_to_cpld      : inout Slv4Array(NFMC_G-1 downto 0);
     front_io_fmc     : inout Slv4Array(NFMC_G-1 downto 0);
@@ -36,6 +37,7 @@ entity Application is
     adcInput         : in    AdcInputArray(4*NFMC_G-1 downto 0);
     pg_m2c           : in    slv(NFMC_G-1 downto 0);
     prsnt_m2c_l      : in    slv(NFMC_G-1 downto 0);
+    tst_clks         : in    slv(7 downto 0) := (others=>'0');
     -- AXI-Lite and IRQ Interface
     axiClk              : in  sl;
     axiRst              : in  sl;
@@ -46,8 +48,8 @@ entity Application is
     -- DMA
     dmaClk              : out sl;
     dmaRst              : out sl;
-    dmaRxIbMaster       : out AxiStreamMasterType;
-    dmaRxIbSlave        : in  AxiStreamSlaveType;
+    dmaRxIbMaster       : out AxiStreamMasterArray(DMA_CHANNELS_C-1 downto 0);
+    dmaRxIbSlave        : in  AxiStreamSlaveArray (DMA_CHANNELS_C-1 downto 0);
     -- EVR Ports
     evrClk              : in  sl;
     evrRst              : in  sl;
@@ -315,8 +317,8 @@ begin  -- rtl
     generic map ( LCLSII_G    => LCLSII_G,
                   NFMC_G      => NFMC_G,
                   SYNC_BITS_G => SYNC_BITS,
-                  BASE_ADDR_C => AXI_CROSSBAR_MASTERS_CONFIG_C(5).baseAddr )
---                  BASE_ADDR_C => x"80000000" )
+                  BASE_ADDR_C => AXI_CROSSBAR_MASTERS_CONFIG_C(5).baseAddr,
+                  DMA_STREAM_CONFIG_G => DMA_STREAM_CONFIG_G )
     port map (
       axiClk              => axiClk,
       axiRst              => axiRst,
@@ -392,6 +394,8 @@ begin  -- rtl
         pg_m2c           => pg_m2c     (i),
         prsnt_m2c_l      => prsnt_m2c_l(i),
 
+        tst_clks         => tst_clks,
+        
         cal_clk_en       => calClkEn   (i));
   end generate;
 
