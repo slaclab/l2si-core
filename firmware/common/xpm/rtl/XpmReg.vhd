@@ -1,11 +1,11 @@
-------------------------------------------------------------------------------
+-----------------------------------------------------------------------------
 -- Title      : 
 -------------------------------------------------------------------------------
 -- File       : XpmReg.vhd
 -- Author     : Matt Weaver
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-12-14
--- Last update: 2017-07-20
+-- Last update: 2017-08-19
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -125,8 +125,48 @@ architecture rtl of XpmReg is
   signal monClkLock : slv       (3 downto 0);
   signal monClkSlow : slv       (3 downto 0);
   signal monClkFast : slv       (3 downto 0);
+
+  constant DEBUG_C : boolean := true;
+
+  signal p0InhCh  : sl;
+  signal p0InhErr : sl;
+  signal pInhV    : slv(NPartitions-1 downto 0);
+  
+  component ila_0
+    port ( clk : in sl;
+           probe0 : in slv(255 downto 0) );
+  end component;
+  
 begin
 
+  GEN_DBUG : if DEBUG_C generate
+    U_ILA : ila_0
+      port map ( clk  => axilClk,
+                 probe0(0) => pInhV(0),
+                 probe0(1) => p0InhCh,
+                 probe0(2) => p0InhErr,
+                 probe0(66 downto 3) => s.partition(0).l0Select.inhibited,
+                 probe0(255 downto 67) => (others=>'0') );
+    process (axilClk) is
+      variable p0Inh, p0Inhi : slv(15 downto 0);
+    begin
+      if rising_edge(axilClk) then
+        p0Inhi := s.partition(0).l0Select.inhibited(p0Inh'range);
+        if p0Inh/=p0Inhi then
+          p0InhCh <= '1';
+        else
+          p0InhCh <= '0';
+        end if;
+        if p0Inh>p0Inhi then
+          p0InhErr <= '1';
+        else
+          p0InhErr <= '0';
+        end if;
+        p0Inh := p0Inhi;
+      end if;
+    end process;
+  end generate;
+    
   dbgChan        <= r.linkDebug(dbgChan'range);
   config         <= r.config;
   axilReadSlave  <= r.axilReadSlave;
@@ -181,6 +221,7 @@ begin
       generic map ( DATA_WIDTH_G => 64 )
       port map ( wr_clk => staClk, rd_clk=> axilClk, rd_en=> r.axilRdEn(i),
                  din  => status.partition(i).l0Select.inhibited  ,
+                 valid => pInhV(i),
                  dout => s.partition(i).l0Select.inhibited);
     U_Sync64_num : entity work.SynchronizerFifo
       generic map ( DATA_WIDTH_G => 64 )

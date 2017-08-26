@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver  <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2016-07-07
--- Last update: 2016-10-07
+-- Last update: 2017-08-21
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -41,6 +41,7 @@ entity XpmSerialDelay is
       fiducial_i : in  sl;  -- must precede advance_i
       advance_i  : in  sl;  -- follows fiducial_i by 1
       stream_i   : in  TimingSerialType;
+      reset_o    : out sl;
       fiducial_o : out sl;  -- precedes advance_o by 1
       advance_o  : out sl;  -- accompanies valid data
       stream_o   : out TimingSerialType;
@@ -60,6 +61,7 @@ architecture behavior of XpmSerialDelay is
     target : slv(DELAY_WIDTH_G-1 downto 0);
     stream : TimingSerialType;
     state  : StateType;
+    running: sl;
     firstW : sl;
     rd_cnt : sl;
     rd_msg : sl;
@@ -77,6 +79,7 @@ architecture behavior of XpmSerialDelay is
     target => (others=>'0'),
     stream => TIMING_SERIAL_INIT_C,
     state  => ERR_S,
+    running=> '0',
     firstW => '0',
     rd_cnt => '0',
     rd_msg => '0',
@@ -108,6 +111,7 @@ begin
    fiducial_o <= r.rd_cnt or r.inject_fid;
    advance_o  <= r.rd_msg or r.inject_msg;
    overflow_o <= full_cnt or full_msg;
+   reset_o    <= not r.running;
    
    U_CntDelay : entity work.FifoSync
      generic map ( TPD_G        => TPD_G,
@@ -173,7 +177,9 @@ begin
      
      case (r.state) is
        when ERR_S =>
+         v.fifoRst := advance_i;
          if fiducial_i='1' then
+           v.running := '1';
            v.state := ARMED_S;
          end if;
        when IDLE_S  =>

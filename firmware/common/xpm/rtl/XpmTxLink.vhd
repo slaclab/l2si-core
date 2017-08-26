@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-12-14
--- Last update: 2017-07-23
+-- Last update: 2017-08-21
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -65,7 +65,7 @@ architecture rtl of XpmTxLink is
     fiducial  : slv(2 downto 0);
     txDelay   : slv(config.txDelay'range);
     efifoV    : sl;
-    efifoWr   : slv(paddr'length/16 downto 0);
+    efifoWr   : slv(paddr'length/16-1 downto 0);
     eadvance  : slv(paddr'length/16-1 downto 0);
     paddr     : slv(paddr'range);
   end record;
@@ -91,6 +91,7 @@ architecture rtl of XpmTxLink is
   signal utxDelay  : slv(config.txDelay'range);
   signal itxData   : slv(15 downto 0);
   signal itxDataK  : slv( 1 downto 0);
+  signal fifoRst   : sl;
   
   component ila_0
     port ( clk    : in sl;
@@ -116,7 +117,8 @@ begin
                  probe0( 29 )          => fstreams(1).ready,
                  probe0( 32 downto 30) => r.fiducial,
                  probe0( 33 )          => r.efifoV,
-                 probe0( 36 downto 34) => r.efifoWr,
+                 probe0( 35 downto 34) => r.efifoWr,
+                 probe0( 36 )          => '0',
                  probe0( 38 downto 37) => r.eadvance,
                  probe0( 39 )          => tfifoWr,
                  probe0( 40 )          => efifoWr,
@@ -124,7 +126,9 @@ begin
                  probe0( 57 downto 42) => efifoDin,
                  probe0( 58 )          => efifoV,
                  probe0( 59 )          => fiducialDelayed,
-                 probe0(255 downto 60) => (others=>'0') );
+                 probe0( 60 )          => fifoRst,
+                 probe0( 76 downto 61 )=> fstreams(1).data,
+                 probe0(255 downto 77) => (others=>'0') );
   end generate;
 
   txData  <= itxData;
@@ -156,7 +160,7 @@ begin
   U_ExptFifo : entity work.FifoSync
     generic map ( FWFT_EN_G => true )
     port map ( clk     => clk,
-               rst     => rst,
+               rst     => fifoRst,
                wr_en   => efifoWr,
                din     => efifoDin,
                rd_en   => advance(1),
@@ -183,6 +187,7 @@ begin
                 fiducial_i => fiducial,
                 advance_i  => advance_i(0),
                 stream_i   => streams(0),
+                reset_o    => fifoRst,
                 fiducial_o => fiducialDelayed,
                 advance_o  => tfifoWr,
                 stream_o   => tfifoStream,
@@ -194,7 +199,7 @@ begin
                dataIn  => config.txDelay,
                dataOut => utxDelay );
   
-  comb: process (r, rst, isXpm, utxDelay, fiducialDelayed, efifoV, advance_i, paddr ) is
+  comb: process (r, rst, isXpm, utxDelay, fiducialDelayed, efifoV, advance_i, paddr, streams, fstreams ) is
      variable v : RegType;
    begin
      v := r;
