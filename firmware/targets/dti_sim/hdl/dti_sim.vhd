@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-07-10
--- Last update: 2017-07-26
+-- Last update: 2017-08-26
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -179,6 +179,7 @@ begin
    bpRxLinkFull(NBPLinks-1 downto 1) <= (others=>(others=>'0'));
    
    U_Sim : entity work.XpmSim
+     generic map ( PIPELINE_DEPTH_G => 0 )
      port map ( dsRxClk         => xpmDsRxClk,
                 dsRxRst         => xpmDsRxRst,
                 dsRxData        => xpmDsRxData,
