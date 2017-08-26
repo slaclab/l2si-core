@@ -173,17 +173,19 @@ architecture mapping of QuadAdcChannelFifo is
   signal rData : slv(127 downto 0);
   signal sData : slv(127 downto 0);
 
+  constant DEBUG_C : boolean := false;
+  
   component ila_0
     port ( clk : in sl;
            probe0 : in slv(255 downto 0) );
   end component;
-  
+
 begin  -- mapping
 
   rData <= r.axisMaster.tData(127 downto 0);
   sData <= axisMasters(0).tData(127 downto 0);
 
-  GEN_DEBUG : if DEBUG_G generate
+  GEN_DEBUG : if DEBUG_C generate
     U_ILA : ila_0
       port map ( clk           => clk,
                  probe0(0)     => rst,
@@ -284,7 +286,8 @@ begin  -- mapping
 
     U_FEX : entity work.hsd_fex_wrapper
       generic map ( AXIS_CONFIG_G => SAXIS_CONFIG_C,
-                    ALGORITHM_G   => ALGORITHM_G(i) )
+                    ALGORITHM_G   => ALGORITHM_G(i),
+                    DEBUG_G       => ite(i>0, false, DEBUG_G) )
       port map ( clk               => clk,
                  rst               => clear,
                  din               => din,

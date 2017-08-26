@@ -63,7 +63,6 @@ entity PgpCore is
      ibRst           : in  sl;
      linkUp          : out sl;
      rxErr           : out sl;
-     full            : out sl;
      --
      obClk           : in  sl;
      obMaster        : in  AxiStreamMasterType;
@@ -85,8 +84,8 @@ architecture rtl of PgpCore is
   signal pgpRxMasters   : AxiStreamMasterArray(3 downto 0);
   signal pgpRxCtrls     : AxiStreamCtrlArray  (3 downto 0) := (others=>AXI_STREAM_CTRL_UNUSED_C);
 
-  constant USER_ALMOST_FULL : integer := 0;
-
+  signal full           : sl;
+  
   constant locTxIn : Pgp2bTxInType := (
     flush       => '0',
     opCodeEn    => '0',
@@ -114,7 +113,6 @@ begin
 
   linkUp                   <= pgpRxOut.linkReady;
   rxErr                    <= pgpRxOut.frameRxErr;
-  full                     <= pgpRxOut.remLinkData(USER_ALMOST_FULL);
 
   -- Assumes MpsPgpFrontEnd only asserts tReady when acknowledging tValid;
   -- no tValid => no tReady.

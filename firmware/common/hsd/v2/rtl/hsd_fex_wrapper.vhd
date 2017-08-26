@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2016-01-04
--- Last update: 2017-08-23
+-- Last update: 2017-08-24
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -44,7 +44,8 @@ use work.QuadAdcCompPkg.all;
 entity hsd_fex_wrapper is
   generic ( RAM_DEPTH_G   : integer := 4096;
             AXIS_CONFIG_G : AxiStreamConfigType;
-            ALGORITHM_G   : string := "RAW" );
+            ALGORITHM_G   : string := "RAW";
+            DEBUG_G       : boolean := false );
   port (
     clk             :  in sl;
     rst             :  in sl;
@@ -176,9 +177,38 @@ architecture mapping of hsd_fex_wrapper is
   signal rddata : slv(ROW_SIZE*16-1 downto 0);
   signal wrdata : slv(ROW_SIZE*16-1 downto 0);
   signal maxisSlave : AxiStreamSlaveType;
+
+  constant DEBUG_C : boolean := DEBUG_G;
   
+  component ila_0
+    port ( clk : in sl;
+           probe0 : in slv(255 downto 0) );
+  end component;
+
 begin
 
+  GEN_DEBUG : if DEBUG_C generate
+    U_ILA : ila_0
+      port map ( clk       => clk,
+                 probe0(0) => lopen,
+                 probe0(1) => lclose,
+                 probe0(2) => l1in,
+                 probe0(16 downto  3) => r.count,
+                 probe0(30 downto 17) => r.cache(0).baddr,
+                 probe0(44 downto 31) => r.cache(0).eaddr,
+                 probe0(58 downto 45) => r.tout(0),
+                 probe0(71 downto 59) => r.rdaddr(12 downto 0),
+                 probe0(84 downto 72) => r.wraddr(12 downto 0),
+                 probe0(85) => r.axisMaster.tValid,
+                 probe0(86) => r.axisMaster.tLast,
+                 probe0(90 downto 87) => r.iclose,
+                 probe0(94 downto 91) => r.iempty,
+                 probe0(98 downto 95) => r.iopened,
+                 probe0(102 downto 99) => r.ireading,
+                 probe0(106 downto 103) => r.itrigger,
+                 probe0(255 downto 107) => (others=>'0') );
+  end generate;
+  
   rstn <= not rst;
 
 --  U_SHIFT : entity work.AxiStreamShift
@@ -267,7 +297,7 @@ begin
         imatch := 8;
         for j in r.tout'left downto 0 loop
           if (j < conv_integer(r.douten) and
-              r.tout(j) >= r.cache(i).baddr(13 downto 0)) then
+              conv_integer(r.tout(j)) >= conv_integer(r.cache(i).baddr(13 downto 0))) then
             imatch := j;
           end if;
         end loop;
@@ -288,7 +318,7 @@ begin
         imatch := 8;
         for j in r.tout'left downto 0 loop
           if (j < conv_integer(r.douten) and
-              r.tout(j) >= r.cache(i).eaddr(13 downto 0)) then
+              conv_integer(r.tout(j)) >= conv_integer(r.cache(i).eaddr(13 downto 0))) then
             imatch := j;
           end if;
         end loop;
@@ -359,7 +389,8 @@ begin
         v.axisMaster.tData(rddata'range) := rddata;
         v.rdaddr := r.rdaddr+1;
         if r.rdaddr = r.cache(i).eaddr(r.rdaddr'left+IDX_BITS-1 downto IDX_BITS) then
-          if r.cache(i).baddr(IDX_BITS-1 downto 0) < r.cache(i).eaddr(IDX_BITS-1 downto 0) then
+          if (conv_integer(r.cache(i).baddr(IDX_BITS-1 downto 0)) <
+              conv_integer(r.cache(i).eaddr(IDX_BITS-1 downto 0))) then
             v.cache(i).state := LAST_S;
           else
             v.axisMaster.tLast := '1';

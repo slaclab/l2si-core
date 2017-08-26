@@ -186,7 +186,7 @@ architecture mapping of QuadAdcEvent is
   
   constant AXIL_XBAR_CONFIG_C : AxiLiteCrossbarMasterConfigArray(NCHAN_C-1 downto 0) := AxilCrossbarConfig;
 
-  constant DEBUG_C : boolean := true;
+  constant DEBUG_C : boolean := false;
 
   component ila_0
     port ( clk   : in sl;
@@ -269,7 +269,7 @@ begin  -- mapping
       generic map ( BASE_ADDR_C => AXIL_XBAR_CONFIG_C(i).baseAddr,
                     AXIS_CONFIG_G => CHN_AXIS_CONFIG_C,
                     ALGORITHM_G => FEX_ALGORITHMS(i),
-                    DEBUG_G     => ite(i>0, false, DEBUG_C) )
+                    DEBUG_G     => ite(i>0, false, true) )
       port map ( clk      => dmaClk,
                  rst      => dmaRst,
                  clear    => dmaRst,
