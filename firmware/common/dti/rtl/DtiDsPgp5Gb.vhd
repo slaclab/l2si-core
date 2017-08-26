@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-07-10
--- Last update: 2017-07-24
+-- Last update: 2017-08-23
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -180,7 +180,7 @@ begin
   end generate;
 
   NOGEN_AXIL : if not INCLUDE_AXIL_G generate
-    pgpTxIn        <= PGP2B_TX_IN_INIT_C;
+    pgpTxIn        <= locTxIn;
     pgpRxIn        <= PGP2B_RX_IN_INIT_C;
     axilReadSlave  <= AXI_LITE_READ_SLAVE_INIT_C;
     axilWriteSlave <= AXI_LITE_WRITE_SLAVE_INIT_C;

@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-07-10
--- Last update: 2017-07-26
+-- Last update: 2017-08-26
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -120,8 +120,8 @@ begin
   cntL1A           <= wr.cntL1A;
   cntL1R           <= wr.cntL1R;
   
-  hdrOut.timeStamp <= doutb( 63 downto   0);
-  hdrOut.pulseId   <= doutb(127 downto  64);
+  hdrOut.pulseId   <= doutb( 63 downto   0);
+  hdrOut.timeStamp <= doutb(127 downto  64);
   hdrOut.evttag    <= doutb(175 downto 128);
     
   daddr <= maddr when pmsgr ='1' else
@@ -169,8 +169,8 @@ begin
                ena    => '1',
                wea    => timingBus.strobe,
                addra  => timingBus.message.pulseId(7 downto 0),
-               dina(127 downto 64) => timingBus.message.pulseId,
-               dina( 63 downto  0) => timingBus.message.timeStamp,
+               dina( 63 downto  0) => timingBus.message.pulseId,
+               dina(127 downto 64) => timingBus.message.timeStamp,
                clkb   => wrclk,
                enb    => wr.rden,
                addrb  => wr.rdaddr,
@@ -221,7 +221,7 @@ begin
     
     ip := conv_integer(spartition);
 
-    if timingBus.strobe = '1' then
+    if timingBus.strobe = '1' and exptBus.valid = '1' then
       v.rden   := '1';
       v.rdaddr := timingBus.message.pulseId(7 downto 0) - sdelay;
       v.pword  := toPartitionWord(exptBus.message.partitionWord(ip));

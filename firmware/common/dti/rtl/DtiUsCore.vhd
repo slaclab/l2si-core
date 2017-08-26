@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-07-10
--- Last update: 2017-07-26
+-- Last update: 2017-07-27
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -279,7 +279,7 @@ begin
         if v.master.tValid='0' then
           v.dest          := fwd;
           v.master.tValid := '1';
-          v.master.tData(63 downto 0) := eventHeader.timeStamp;
+          v.master.tData(63 downto 0) := eventHeader.pulseId;
           v.master.tKeep  := genTKeep(US_IB_CONFIG_C);
           v.master.tLast  := '0';
           if r.msg = '1' then
@@ -296,14 +296,16 @@ begin
       when S_EVHDR2 =>
         if v.master.tValid='0' then
           v.master.tValid := '1';
-          v.master.tData(63 downto 0) := eventHeader.pulseId;
+          v.master.tData(63 downto 0) := eventHeader.timeStamp;
           v.master.tUser  := (others=>'0');
           v.state         := S_EVHDR3;
         end if;
       when S_EVHDR3 =>
         if v.master.tValid='0' then
           v.master.tValid := '1';
-          v.master.tData(63 downto 0) := eventHeader.evttag & toSlv(0,16);
+          v.master.tData(63 downto 0) := eventHeader.evttag(47 downto 16) &
+                                         toSlv(0,16) &
+                                         eventHeader.evttag(15 downto 0);
           v.hdrRd         := '1';
           v.state         := S_EVHDR4;
         end if;
