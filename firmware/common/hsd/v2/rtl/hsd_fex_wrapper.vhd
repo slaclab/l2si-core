@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2016-01-04
--- Last update: 2017-08-24
+-- Last update: 2017-08-28
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -388,7 +388,7 @@ begin
         v.axisMaster.tValid := '1';
         v.axisMaster.tData(rddata'range) := rddata;
         v.rdaddr := r.rdaddr+1;
-        if r.rdaddr = r.cache(i).eaddr(r.rdaddr'left+IDX_BITS-1 downto IDX_BITS) then
+        if r.rdaddr = r.cache(i).eaddr(r.rdaddr'left+IDX_BITS downto IDX_BITS) then
           if (conv_integer(r.cache(i).baddr(IDX_BITS-1 downto 0)) <
               conv_integer(r.cache(i).eaddr(IDX_BITS-1 downto 0))) then
             v.cache(i).state := LAST_S;
