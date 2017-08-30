@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2016-01-04
--- Last update: 2017-08-28
+-- Last update: 2017-08-30
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -42,7 +42,7 @@ use work.AxiStreamPkg.all;
 use work.QuadAdcCompPkg.all;
 
 entity hsd_fex_wrapper is
-  generic ( RAM_DEPTH_G   : integer := 4096;
+  generic ( RAM_DEPTH_G   : integer := 8192;
             AXIS_CONFIG_G : AxiStreamConfigType;
             ALGORITHM_G   : string := "RAW";
             DEBUG_G       : boolean := false );
@@ -74,9 +74,10 @@ architecture mapping of hsd_fex_wrapper is
   constant LATENCY_C : integer := 0;
   constant ROW_SIZE : integer := 8;
   constant IDX_BITS : integer := bitSize(ROW_SIZE-1);
-  constant RAM_ADDR_WIDTH_C : integer := bitSize(RAM_DEPTH_G);
+  constant RAM_ADDR_WIDTH_C : integer := bitSize(RAM_DEPTH_G-1);
   constant CACHE_ADDR_LEN_C : integer := RAM_ADDR_WIDTH_C+IDX_BITS;
-
+  constant SKIP_CHAR : slv(1 downto 0) := "01";
+  
   type StateType is ( EMPTY_S,  -- buffer empty
                       OPEN_S,   -- buffer filling
                       CLOSED_S, -- buffer filled
@@ -88,12 +89,16 @@ architecture mapping of hsd_fex_wrapper is
   type MapStateType is ( BEGIN_M,     -- seeking first address in RAM
                          END_M,       -- seeking last address in RAM
                          DONE_M );    -- all addresses known
+  type SkipStateType is ( SKIPPING_K,
+                          FILLING_K );
   
   type CacheType is record
     state  : StateType;
     trigd  : TrigStateType;
     mapd   : MapStateType;
-    boffs  : slv(13 downto 0);
+    toffs  : slv(15 downto 0);
+    boffs  : slv(IDX_BITS-1 downto 0);
+    eoffs  : slv(IDX_BITS-1 downto 0);
     baddr  : slv(CACHE_ADDR_LEN_C-1 downto 0);
     eaddr  : slv(CACHE_ADDR_LEN_C-1 downto 0);
     skip   : sl;
@@ -103,7 +108,9 @@ architecture mapping of hsd_fex_wrapper is
     state  => EMPTY_S,
     trigd  => WAIT_T,
     mapd   => DONE_M,
+    toffs  => (others=>'0'),
     boffs  => (others=>'0'),
+    eoffs  => (others=>'0'),
     baddr  => (others=>'0'),
     eaddr  => (others=>'0'),
     skip   => '0',
@@ -120,12 +127,13 @@ architecture mapping of hsd_fex_wrapper is
     tout       : Slv14Array(ROW_SIZE-1 downto 0);
     dout       : Slv16Array(ROW_SIZE-1 downto 0);
     douten     : slv(3 downto 0);
-    iclose     : slv(MAX_OVL_BITS_C-1 downto 0);
     iempty     : slv(MAX_OVL_BITS_C-1 downto 0);
     iopened    : slv(MAX_OVL_BITS_C-1 downto 0);
     ireading   : slv(MAX_OVL_BITS_C-1 downto 0);
     itrigger   : slv(MAX_OVL_BITS_C-1 downto 0);
     cache      : CacheArray(MAX_OVL_C-1 downto 0);
+    kstate     : SkipStateType;
+    tout_next  : slv(13 downto 0);
     rden       : sl;
     rdaddr     : slv(RAM_ADDR_WIDTH_C-1 downto 0);
     rdtail     : slv(RAM_ADDR_WIDTH_C-1 downto 0);
@@ -146,12 +154,13 @@ architecture mapping of hsd_fex_wrapper is
     tout       => (others=>(others=>'0')),
     dout       => (others=>(others=>'0')),
     douten     => (others=>'0'),
-    iclose     => (others=>'0'),
     iempty     => (others=>'0'),
     iopened    => (others=>'0'),
     ireading   => (others=>'0'),
     itrigger   => (others=>'0'),
     cache      => (others=>CACHE_INIT_C),
+    kstate     => FILLING_K,
+    tout_next  => (others=>'0'),
     rden       => '0',
     rdaddr     => (others=>'0'),
     rdtail     => (others=>'0'),
@@ -194,19 +203,18 @@ begin
                  probe0(1) => lclose,
                  probe0(2) => l1in,
                  probe0(16 downto  3) => r.count,
-                 probe0(30 downto 17) => r.cache(0).baddr,
-                 probe0(44 downto 31) => r.cache(0).eaddr,
+                 probe0(30 downto 17) => r.cache(0).baddr(13 downto 0),
+                 probe0(44 downto 31) => r.cache(0).eaddr(13 downto 0),
                  probe0(58 downto 45) => r.tout(0),
                  probe0(71 downto 59) => r.rdaddr(12 downto 0),
                  probe0(84 downto 72) => r.wraddr(12 downto 0),
                  probe0(85) => r.axisMaster.tValid,
                  probe0(86) => r.axisMaster.tLast,
-                 probe0(90 downto 87) => r.iclose,
-                 probe0(94 downto 91) => r.iempty,
-                 probe0(98 downto 95) => r.iopened,
-                 probe0(102 downto 99) => r.ireading,
-                 probe0(106 downto 103) => r.itrigger,
-                 probe0(255 downto 107) => (others=>'0') );
+                 probe0(90 downto 87) => r.iempty,
+                 probe0(94 downto 91) => r.iopened,
+                 probe0(98 downto 95) => r.ireading,
+                 probe0(102 downto 99) => r.itrigger,
+                 probe0(255 downto 103) => (others=>'0') );
   end generate;
   
   rstn <= not rst;
@@ -247,9 +255,11 @@ begin
     variable n : integer range 0 to 2*ROW_SIZE-1;
     variable i,j : integer;
     variable imatch : integer;
+    variable flush  : sl;
+    variable skip   : sl;
   begin
     v := r;
-
+    
     v.wren    := '0';
     v.wrfull  := '0';
     v.rden    := '1';
@@ -258,7 +268,13 @@ begin
     v.tout    := tout;
     v.douten  := douten;
     v.sync    := '0';
+    flush     := '0';
     v.axisMaster.tKeep := genTKeep(AXIS_CONFIG_G);
+
+    --  Are no buffers in use?
+    --if r.cache(conv_integer(r.iopened)).mapd /= BEGIN_M then
+    --  v.tout_next := v.tout(0);
+    --end if;
     
     if r.sync = '1' then
       v.count := (others=>'0');
@@ -266,6 +282,9 @@ begin
       v.count   := r.count+1;
     end if;
 
+    --
+    --  A gate has opened; latch time and record data into buffer
+    --
     if lopen = '1' then
       i := conv_integer(r.iempty);
       v.iempty := r.iempty+1;
@@ -280,9 +299,17 @@ begin
         v.cache(i).mapd   := BEGIN_M;
         v.cache(i).baddr  := resize(r.count & lphase,CACHE_ADDR_LEN_C);
         v.cache(i).skip   := '0';
+--        flush := '1';  -- force out skip characters for sparsified data
+        --  If no buffers are recording, force a start
+        --if r.cache(conv_integer(r.iopened)).mapd /= BEGIN_M then
+        --  v.tout_next := resize(r.count & lphase,r.tout_next'length);
+        --end if;
       end if;
     end if;
 
+    --
+    --  A gate has closed; latch time
+    --
     i := conv_integer(r.iopened);
     if lclose = '1' then
       if r.cache(i).state = OPEN_S then
@@ -293,19 +320,23 @@ begin
     end if;
 
     for i in 0 to 15 loop
+      --
+      --  Search for latched open time in recorded data buffer
+      --
       if r.cache(i).mapd = BEGIN_M then
-        imatch := 8;
+        imatch := ROW_SIZE;
         for j in r.tout'left downto 0 loop
           if (j < conv_integer(r.douten) and
               conv_integer(r.tout(j)) >= conv_integer(r.cache(i).baddr(13 downto 0))) then
             imatch := j;
           end if;
         end loop;
-        if imatch < 8 then
+        if imatch < ROW_SIZE then
           v.cache(i).mapd  := END_M;
           n := conv_integer(r.wrword)+imatch;
-          v.cache(i).boffs(2 downto 0) := toSlv(n, 3);
-          if n < 8 then
+          v.cache(i).boffs := toSlv(n, IDX_BITS);
+          v.cache(i).toffs := resize(r.tout(imatch)-r.cache(i).baddr(13 downto 0),16);
+          if n < ROW_SIZE then
             v.cache(i).baddr := r.wraddr & toSlv(0,IDX_BITS);
           else
             v.cache(i).baddr := r.wraddr+1 & toSlv(0,IDX_BITS);
@@ -313,26 +344,35 @@ begin
         end if;
       end if;
 
+      --
+      --  Search for latched close time in recorded data buffer
+      --
       if (r.cache(i).mapd = END_M and
           r.cache(i).state = CLOSED_S) then
-        imatch := 8;
+        imatch := ROW_SIZE;
         for j in r.tout'left downto 0 loop
           if (j < conv_integer(r.douten) and
               conv_integer(r.tout(j)) >= conv_integer(r.cache(i).eaddr(13 downto 0))) then
             imatch := j;
           end if;
         end loop;
-        if imatch < 8 then
+        if imatch < ROW_SIZE then
           v.cache(i).mapd  := DONE_M;
-          if r.wrword+imatch < 8 then
+          n := conv_integer(r.wrword)+imatch;
+          v.cache(i).eoffs := toSlv(n, IDX_BITS);
+          if n < ROW_SIZE then
             v.cache(i).eaddr := r.wraddr & toSlv(0,IDX_BITS);
           else
             v.cache(i).eaddr := r.wraddr+1 & toSlv(0,IDX_BITS);
           end if;
+          flush := '1';  -- force out skip characters for sparsified data
         end if;
       end if;
     end loop;
-    
+
+    --
+    --  Capture veto decision
+    --
     if l1in = '1' then
       i := conv_integer(r.itrigger);
       if l1ina = '1' then
@@ -343,6 +383,9 @@ begin
       v.itrigger := r.itrigger+1;
     end if;
 
+    --
+    --  Stream out data for pending event buffers
+    --
     if maxisSlave.tReady='1' then
       v.axisMaster.tValid := '0';
     end if;
@@ -358,26 +401,40 @@ begin
             v.cache(i) := CACHE_INIT_C;
             v.ireading := r.ireading+1;
           when ACCEPT_T =>
+            --
+            --  Prepare reading from recorded data RAM
+            --
             v.rdaddr := r.cache(i).baddr(r.rdaddr'left+IDX_BITS downto IDX_BITS);
             v.shift := (resize(r.cache(i).baddr(IDX_BITS-1 downto 0),5) & '0') & toSlv(0,6);
             v.shiftEn := "01";
+            --
+            --  Form header word
+            --
             v.axisMaster.tValid := '1';
             v.axisMaster.tData(ROW_SIZE*16-1 downto 0) := (others=>'0');
 
-            if r.cache(i).skip = '0' then
+            skip := r.cache(i).skip;
+            if (r.cache(i).eaddr=r.cache(i).baddr and
+                r.cache(i).eoffs=r.cache(i).boffs) then
+              skip := '1';
+            end if;
+            if skip = '1' then
+              v.axisMaster.tData(30 downto IDX_BITS) := (others=>'0');
+            else
               v.axisMaster.tData(30 downto IDX_BITS) :=
                 resize(r.cache(i).eaddr(CACHE_ADDR_LEN_C-1 downto IDX_BITS) -
                        r.cache(i).baddr(CACHE_ADDR_LEN_C-1 downto IDX_BITS) + 1,
                        31-IDX_BITS);
-            else
-              v.axisMaster.tData(30 downto IDX_BITS) := (others=>'0');
             end if;
             v.axisMaster.tData(31) := r.cache(i).ovflow;
-            v.axisMaster.tData(47 downto 32) := resize(r.cache(i).boffs,16);
-            v.axisMaster.tData(55 downto 48) := toSlv(i,8);
-            v.axisMaster.tData(63 downto 56) := resize(r.cache(i).baddr(IDX_BITS-1 downto 0),7) & '0';
+            v.axisMaster.tData( 39 downto  32) := resize(r.cache(i).boffs,8);
+            v.axisMaster.tData( 47 downto  40) := resize(r.cache(i).eoffs,8);
+            v.axisMaster.tData( 63 downto  48) := toSlv(i,16);
+            v.axisMaster.tData( 95 downto  64) := resize(r.cache(i).toffs,32);
+            v.axisMaster.tData(111 downto  96) := resize(r.cache(i).baddr,16);
+            v.axisMaster.tData(127 downto 112) := resize(r.cache(i).eaddr,16);
             v.cache(i).state := READING_S;
-            if r.cache(i).skip = '1' then
+            if skip = '1' then
               v.axisMaster.tLast := '1';
               v.cache(i) := CACHE_INIT_C;
               v.ireading := r.ireading+1;
@@ -385,6 +442,9 @@ begin
           when others => null;
         end case;
       elsif r.cache(i).state = READING_S then
+        --
+        --  Continue streaming data from RAM
+        --
         v.axisMaster.tValid := '1';
         v.axisMaster.tData(rddata'range) := rddata;
         v.rdaddr := r.rdaddr+1;
@@ -406,26 +466,49 @@ begin
         v.ireading := r.ireading+1;
       end if;
     end if;
-    
+
+    --
+    --  If a buffered line was written, shift away
+    --
     if r.wrfull='1' then
       v.wrdata(ROW_SIZE-1 downto 0) := r.wrData(2*ROW_SIZE-1 downto ROW_SIZE);
       v.wraddr := r.wraddr+1;
     end if;
+
+    --
+    --  Assume dout vector is contiguous and only sparsified at leading or
+    --  trailing end.
+    --  If douten/=0 and tout(0)/=tout_next, insert skip character
+    --  Insert dout vector
+    --
+    i := conv_integer(r.wrword);
+    if (v.cache(conv_integer(r.iopened)).state=OPEN_S or
+        r.cache(conv_integer(r.iopened)).state=OPEN_S or
+        flush='1') then
+      if ((r.tout(0) < r.tout_next) or
+          ((r.douten/=0 or flush='1') and r.tout(0)/=r.tout_next)) then
+        v.wrdata(i) := SKIP_CHAR & resize(r.tout(0)-r.tout_next,14);
+        i := i+1;
+      end if;
     
-    if (r.douten/=0 and v.cache(conv_integer(r.iopened)).state=OPEN_S) then
-      i := conv_integer(r.wrword);
-      case r.wrword is
-        when "000" => v.wrdata(ROW_SIZE-1 downto 0) := r.dout;
-        when "001" => v.wrdata(ROW_SIZE-0 downto 1) := r.dout;
-        when "010" => v.wrdata(ROW_SIZE+1 downto 2) := r.dout;
-        when "011" => v.wrdata(ROW_SIZE+2 downto 3) := r.dout;
-        when "100" => v.wrdata(ROW_SIZE+3 downto 4) := r.dout;
-        when "101" => v.wrdata(ROW_SIZE+4 downto 5) := r.dout;
-        when "110" => v.wrdata(ROW_SIZE+5 downto 6) := r.dout;
-        when "111" => v.wrdata(ROW_SIZE+6 downto 7) := r.dout;
+      case i is
+        when 0 => v.wrdata(ROW_SIZE-1 downto 0) := r.dout;
+        when 1 => v.wrdata(ROW_SIZE-0 downto 1) := r.dout;
+        when 2 => v.wrdata(ROW_SIZE+1 downto 2) := r.dout;
+        when 3 => v.wrdata(ROW_SIZE+2 downto 3) := r.dout;
+        when 4 => v.wrdata(ROW_SIZE+3 downto 4) := r.dout;
+        when 5 => v.wrdata(ROW_SIZE+4 downto 5) := r.dout;
+        when 6 => v.wrdata(ROW_SIZE+5 downto 6) := r.dout;
+        when 7 => v.wrdata(ROW_SIZE+6 downto 7) := r.dout;
+        when 8 => v.wrdata(ROW_SIZE+7 downto 8) := r.dout;
         when others => null;
       end case;
-      n := i+conv_integer(r.douten);
+      
+      j := conv_integer(r.douten);
+      if (j>0) then
+        v.tout_next := r.tout(j-1)+1;
+      end if;
+      n := i+j;
       v.wren := '1';
       if n>=ROW_SIZE then
         v.wrfull := '1';
@@ -491,8 +574,61 @@ begin
     end if;
   end process;
   
-  GEN_FEX : if ALGORITHM_G = "RAW" generate
+  GEN_RAW : if ALGORITHM_G = "RAW" generate
     U_FEX : entity work.hsd_raw
+      port map ( ap_start            => '1',
+                 ap_done             => open,
+                 ap_idle             => open,
+                 ap_ready            => open,
+                 sync                => r.sync,
+                 ap_clk              => clk,
+                 ap_rst_n            => rstn,
+                 x0_V                => din(0),
+                 x1_V                => din(1),
+                 x2_V                => din(2),
+                 x3_V                => din(3),
+                 x4_V                => din(4),
+                 x5_V                => din(5),
+                 x6_V                => din(6),
+                 x7_V                => din(7),
+                 y0_V                => dout(0),
+                 y1_V                => dout(1),
+                 y2_V                => dout(2),
+                 y3_V                => dout(3),
+                 y4_V                => dout(4),
+                 y5_V                => dout(5),
+                 y6_V                => dout(6),
+                 y7_V                => dout(7),
+                 t0_V                => tout(0),
+                 t1_V                => tout(1),
+                 t2_V                => tout(2),
+                 t3_V                => tout(3),
+                 t4_V                => tout(4),
+                 t5_V                => tout(5),
+                 t6_V                => tout(6),
+                 t7_V                => tout(7),
+                 yv_V                => douten,
+                 s_axi_BUS_A_AWVALID => axilWriteMaster.awvalid,
+                 s_axi_BUS_A_AWREADY => axilWriteSlave .awready,
+                 s_axi_BUS_A_AWADDR  => axilWriteMaster.awaddr(4 downto 0),
+                 s_axi_BUS_A_WVALID  => axilWriteMaster.wvalid,
+                 s_axi_BUS_A_WREADY  => axilWriteSlave .wready,
+                 s_axi_BUS_A_WDATA   => axilWriteMaster.wdata,
+                 s_axi_BUS_A_WSTRB   => axilWriteMaster.wstrb(3 downto 0),
+                 s_axi_BUS_A_ARVALID => axilReadMaster .arvalid,
+                 s_axi_BUS_A_ARREADY => axilReadSlave  .arready,
+                 s_axi_BUS_A_ARADDR  => axilReadMaster .araddr(4 downto 0),
+                 s_axi_BUS_A_RVALID  => axilReadSlave  .rvalid,
+                 s_axi_BUS_A_RREADY  => axilReadMaster .rready,
+                 s_axi_BUS_A_RDATA   => axilReadSlave  .rdata,
+                 s_axi_BUS_A_RRESP   => axilReadSlave  .rresp,
+                 s_axi_BUS_A_BVALID  => axilWriteSlave .bvalid,
+                 s_axi_BUS_A_BREADY  => axilWriteMaster.bready,
+                 s_axi_BUS_A_BRESP   => axilWriteSlave .bresp );
+    end generate;
+    
+  GEN_THR : if ALGORITHM_G = "THR" generate
+    U_FEX : entity work.hsd_thr
       port map ( ap_start            => '1',
                  ap_done             => open,
                  ap_idle             => open,
