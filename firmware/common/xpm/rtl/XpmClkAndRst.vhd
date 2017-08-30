@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver  <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-07-08
--- Last update: 2015-12-15
+-- Last update: 2017-08-29
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -75,23 +75,23 @@ architecture mapping of XpmClkAndRst is
 
 begin
 
-   axilClk      <= fabClk;
    ref156MHzClk <= fabClk;
+   ref156MHzRst <= fabRst;
 
 --   axilRst      <= rstDly(2);
 --   ref156MHzRst <= rstDly(2);
    --  Put large fanout reset onto BUFG
+   axilClk      <= clkOut(2);
    axilRst      <= rstFO;
-   ref156MHzRst <= rstFO;
    U_AXILRST : BUFG
      port map ( O => rstFO,
                 I => rstDly(2) );
 
    -- Adding registers to help with timing
-   process(fabClk)
+   process(clkOut)
    begin
-      if rising_edge(fabClk) then
-         rstDly <= rstDly(1 downto 0) & fabRst after TPD_G;
+      if rising_edge(clkOut(2)) then
+         rstDly <= rstDly(1 downto 0) & rstOut(2) after TPD_G;
       end if;
    end process;
 

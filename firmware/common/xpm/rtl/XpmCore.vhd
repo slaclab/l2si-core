@@ -5,7 +5,7 @@
 -- Author     : Larry Ruckman  <ruckman@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-07-08
--- Last update: 2017-07-07
+-- Last update: 2017-08-29
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -56,8 +56,8 @@ entity XpmCore is
       ----------------------
       -- AXI-Lite Interface (regClk domain)
       -- Address Range = [0x80000000:0xFFFFFFFF]
-      regClk            : in    sl;
-      regRst            : in    sl;
+      regClk            : out   sl;
+      regRst            : out   sl;
       regReadMaster     : out   AxiLiteReadMasterType;
       regReadSlave      : in    AxiLiteReadSlaveType;
       regWriteMaster    : out   AxiLiteWriteMasterType;
@@ -216,6 +216,9 @@ begin
     localIp    <= bsiIp;
     localMac   <= bsiMac;
   end generate GEN_NO_BSI_OVERRIDE;
+
+  regClk <= axilClk;
+  regRst <= axilRst;
   
   --------------------------------
   -- Common Clock and Reset Module
