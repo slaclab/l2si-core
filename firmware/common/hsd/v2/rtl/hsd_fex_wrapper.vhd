@@ -76,7 +76,7 @@ architecture mapping of hsd_fex_wrapper is
   constant IDX_BITS : integer := bitSize(ROW_SIZE-1);
   constant RAM_ADDR_WIDTH_C : integer := bitSize(RAM_DEPTH_G-1);
   constant CACHE_ADDR_LEN_C : integer := RAM_ADDR_WIDTH_C+IDX_BITS;
-  constant SKIP_CHAR : slv(1 downto 0) := "01";
+  constant SKIP_CHAR : slv(1 downto 0) := "10";
   
   type StateType is ( EMPTY_S,  -- buffer empty
                       OPEN_S,   -- buffer filling
