@@ -54,6 +54,7 @@ port (
     t7_V : OUT STD_LOGIC_VECTOR (13 downto 0);
     t7_V_ap_vld : OUT STD_LOGIC;
     yv_V : OUT STD_LOGIC_VECTOR (3 downto 0);
+    iy_V : OUT STD_LOGIC_VECTOR (2 downto 0);
     s_axi_BUS_A_AWVALID : IN STD_LOGIC;
     s_axi_BUS_A_AWREADY : OUT STD_LOGIC;
     s_axi_BUS_A_AWADDR : IN STD_LOGIC_VECTOR (C_S_AXI_BUS_A_ADDR_WIDTH-1 downto 0);
@@ -330,21 +331,23 @@ begin
 
     tmp_15_fu_378_p2 <= std_logic_vector(unsigned(ap_const_lv32_8) + unsigned(count));
     tmp_8_fu_324_p1 <= count(14 - 1 downto 0);
-        y0_V <= std_logic_vector(resize(signed(x0_V),16));
+        y0_V <= std_logic_vector(resize(unsigned(x0_V),16));
 
-        y1_V <= std_logic_vector(resize(signed(x1_V),16));
+        y1_V <= std_logic_vector(resize(unsigned(x1_V),16));
 
-        y2_V <= std_logic_vector(resize(signed(x2_V),16));
+        y2_V <= std_logic_vector(resize(unsigned(x2_V),16));
 
-        y3_V <= std_logic_vector(resize(signed(x3_V),16));
+        y3_V <= std_logic_vector(resize(unsigned(x3_V),16));
 
-        y4_V <= std_logic_vector(resize(signed(x4_V),16));
+        y4_V <= std_logic_vector(resize(unsigned(x4_V),16));
 
-        y5_V <= std_logic_vector(resize(signed(x5_V),16));
+        y5_V <= std_logic_vector(resize(unsigned(x5_V),16));
 
-        y6_V <= std_logic_vector(resize(signed(x6_V),16));
+        y6_V <= std_logic_vector(resize(unsigned(x6_V),16));
 
-        y7_V <= std_logic_vector(resize(signed(x7_V),16));
+        y7_V <= std_logic_vector(resize(unsigned(x7_V),16));
 
     yv_V <= ap_const_lv4_8;
+    iy_V <= (others=>'0');  -- manual addition
+    
 end behav;

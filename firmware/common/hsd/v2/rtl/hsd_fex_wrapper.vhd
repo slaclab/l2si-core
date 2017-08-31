@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2016-01-04
--- Last update: 2017-08-30
+-- Last update: 2017-08-31
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -120,27 +120,32 @@ architecture mapping of hsd_fex_wrapper is
 
   constant MAX_OVL_C : integer := 16;
   constant MAX_OVL_BITS_C : integer := bitSize(MAX_OVL_C-1);
+  constant COUNT_BITS_C : integer := 14;
 
   type RegType is record
     sync       : sl;
-    count      : slv(13 downto 0);
-    tout       : Slv14Array(ROW_SIZE-1 downto 0);
+    count      : slv(COUNT_BITS_C-1 downto 0);
+    tout_next  : slv(COUNT_BITS_C-1 downto 0);
+    toutnl     : sl;
+    tout       : Slv14Array(ROW_SIZE-1 downto 0);  -- COUNT_BITS_C array dimension
     dout       : Slv16Array(ROW_SIZE-1 downto 0);
     douten     : slv(3 downto 0);
+    doute0     : slv(2 downto 0);
     iempty     : slv(MAX_OVL_BITS_C-1 downto 0);
     iopened    : slv(MAX_OVL_BITS_C-1 downto 0);
     ireading   : slv(MAX_OVL_BITS_C-1 downto 0);
     itrigger   : slv(MAX_OVL_BITS_C-1 downto 0);
     cache      : CacheArray(MAX_OVL_C-1 downto 0);
     kstate     : SkipStateType;
-    tout_next  : slv(13 downto 0);
     rden       : sl;
     rdaddr     : slv(RAM_ADDR_WIDTH_C-1 downto 0);
     rdtail     : slv(RAM_ADDR_WIDTH_C-1 downto 0);
-    wren       : sl;
+    wren       : slv(3 downto 0);
     wrfull     : sl;
-    wrword     : slv(IDX_BITS-1 downto 0);
+    wrword     : slv(IDX_BITS downto 0);
     wrdata     : Slv16Array(2*ROW_SIZE-1 downto 0);
+    wrtout     : Slv14Array(2*ROW_SIZE-1 downto 0);
+    wrtoutl    : slv(COUNT_BITS_C-1 downto 0);
     wraddr     : slv(RAM_ADDR_WIDTH_C-1 downto 0);
     shift      : Slv6Array(1 downto 0);
     shiftEn    : slv      (1 downto 0);
@@ -151,23 +156,27 @@ architecture mapping of hsd_fex_wrapper is
   constant REG_INIT_C : RegType := (
     sync       => '1',
     count      => (others=>'0'),
+    tout_next  => (others=>'0'),
+    toutnl     => '0',
     tout       => (others=>(others=>'0')),
     dout       => (others=>(others=>'0')),
     douten     => (others=>'0'),
+    doute0     => (others=>'0'),
     iempty     => (others=>'0'),
     iopened    => (others=>'0'),
     ireading   => (others=>'0'),
     itrigger   => (others=>'0'),
     cache      => (others=>CACHE_INIT_C),
     kstate     => FILLING_K,
-    tout_next  => (others=>'0'),
     rden       => '0',
     rdaddr     => (others=>'0'),
     rdtail     => (others=>'0'),
-    wren       => '0',
+    wren       => (others=>'0'),
     wrfull     => '0',
     wrword     => (others=>'0'),
     wrdata     => (others=>(others=>'0')),
+    wrtout     => (others=>(others=>'0')),
+    wrtoutl    => (others=>'0'),
     wraddr     => (others=>'0'),
     shift      => (others=>(others=>'0')),
     shiftEn    => (others=>'0'),
@@ -181,7 +190,8 @@ architecture mapping of hsd_fex_wrapper is
   signal rstn   : sl;
   signal dout   : Slv16Array(ROW_SIZE-1 downto 0);
   signal tout   : Slv14Array(ROW_SIZE-1 downto 0);
-  signal douten : slv(IDX_BITS downto 0);
+  signal douten : slv(IDX_BITS   downto 0);  -- number of valid points
+  signal doute0 : slv(IDX_BITS-1 downto 0); -- index of first valid point
   signal rdaddr : slv(RAM_ADDR_WIDTH_C-1 downto 0);
   signal rddata : slv(ROW_SIZE*16-1 downto 0);
   signal wrdata : slv(ROW_SIZE*16-1 downto 0);
@@ -240,7 +250,7 @@ begin
                   ADDR_WIDTH_G => rdaddr'length )
     port map ( clka   => clk,
                ena    => '1',
-               wea    => r.wren,
+               wea    => r.wren(0),
                addra  => r.wraddr,
                dina   => wrdata,
                clkb   => clk,
@@ -250,23 +260,38 @@ begin
                doutb  => rddata );
   
   comb : process( r, rst, lopen, lskip, lclose, lphase, l1in, l1ina,
-                  tout, dout, douten, rddata, maxisSlave ) is
+                  tout, dout, douten, doute0, rddata, maxisSlave ) is
     variable v : RegType;
     variable n : integer range 0 to 2*ROW_SIZE-1;
-    variable i,j : integer;
+    variable i,j,k : integer;
     variable imatch : integer;
     variable flush  : sl;
     variable skip   : sl;
   begin
     v := r;
     
-    v.wren    := '0';
+    v.wren    := '0' & r.wren(r.wren'left downto 1);
     v.wrfull  := '0';
     v.rden    := '1';
     v.shiftEn := '0' & r.shiftEn(1);
     v.dout    := dout;
-    v.tout    := tout;
+--    v.tout    := tout;
+    --  Hack for now
+    v.tout(0) := tout(0);
+    for i in 1 to 7 loop
+      v.tout(i) := v.tout(i-1)+1;
+    end loop;
+      
     v.douten  := douten;
+--    v.doute0  := doute0;
+    --  Hack for now
+    if ((dout(0) < toSlv(512,16) and dout(7) < dout(0)) or
+        (dout(0) > toSlv(512,16) and dout(7) > dout(0))) then
+      v.doute0 := toSlv(8-conv_integer(douten),3);
+    else
+      v.doute0 := (others=>'0');
+    end if;
+
     v.sync    := '0';
     flush     := '0';
     v.axisMaster.tKeep := genTKeep(AXIS_CONFIG_G);
@@ -299,6 +324,7 @@ begin
         v.cache(i).mapd   := BEGIN_M;
         v.cache(i).baddr  := resize(r.count & lphase,CACHE_ADDR_LEN_C);
         v.cache(i).skip   := '0';
+        v.wren            := (others=>'1');
 --        flush := '1';  -- force out skip characters for sparsified data
         --  If no buffers are recording, force a start
         --if r.cache(conv_integer(r.iopened)).mapd /= BEGIN_M then
@@ -325,47 +351,59 @@ begin
       --
       if r.cache(i).mapd = BEGIN_M then
         imatch := ROW_SIZE;
-        for j in r.tout'left downto 0 loop
-          if (j < conv_integer(r.douten) and
-              conv_integer(r.tout(j)) >= conv_integer(r.cache(i).baddr(13 downto 0))) then
-            imatch := j;
-          end if;
-        end loop;
+        if r.wren(0)='1' then
+          for j in ROW_SIZE-1 downto 0 loop
+            if ((j < conv_integer(r.wrword) or r.wrfull='1') and
+                (conv_integer(r.wrtout(j)) >= conv_integer(r.cache(i).baddr(13 downto 0)))) then
+              imatch := j;
+            end if;
+          end loop;
+        end if;
         if imatch < ROW_SIZE then
           v.cache(i).mapd  := END_M;
-          n := conv_integer(r.wrword)+imatch;
-          v.cache(i).boffs := toSlv(n, IDX_BITS);
-          v.cache(i).toffs := resize(r.tout(imatch)-r.cache(i).baddr(13 downto 0),16);
-          if n < ROW_SIZE then
-            v.cache(i).baddr := r.wraddr & toSlv(0,IDX_BITS);
-          else
-            v.cache(i).baddr := r.wraddr+1 & toSlv(0,IDX_BITS);
-          end if;
+          v.cache(i).boffs := toSlv(imatch, IDX_BITS);
+          v.cache(i).toffs := resize(r.wrtout(imatch)-r.cache(i).baddr(13 downto 0),16);
+          v.cache(i).baddr := r.wraddr & toSlv(0,IDX_BITS);
         end if;
       end if;
 
       --
       --  Search for latched close time in recorded data buffer
       --
-      if (r.cache(i).mapd = END_M and
-          r.cache(i).state = CLOSED_S) then
+      if (r.cache(i).state = CLOSED_S) then
         imatch := ROW_SIZE;
-        for j in r.tout'left downto 0 loop
-          if (j < conv_integer(r.douten) and
-              conv_integer(r.tout(j)) >= conv_integer(r.cache(i).eaddr(13 downto 0))) then
-            imatch := j;
+        if r.wren(0)='1' then
+          --
+          --  Have we passed the end of the gate (but not recorded)
+          --
+          if (r.wrfull='0' and
+              conv_integer(r.wrtoutl) >= conv_integer(r.cache(i).eaddr(13 downto 0))) then
+            imatch := conv_integer(r.wrword);
           end if;
-        end loop;
+          --
+          --  Have we passed the end of the gate in the recorded data
+          --
+          for j in ROW_SIZE-1 downto 0 loop
+            if ((j < conv_integer(r.wrword) or r.wrfull='1') and
+                (conv_integer(r.wrtout(j)) >= conv_integer(r.cache(i).eaddr(13 downto 0)))) then
+              imatch := j;
+            end if;
+          end loop;
+        end if;
         if imatch < ROW_SIZE then
-          v.cache(i).mapd  := DONE_M;
-          n := conv_integer(r.wrword)+imatch;
-          v.cache(i).eoffs := toSlv(n, IDX_BITS);
-          if n < ROW_SIZE then
+          if r.cache(i).mapd /= DONE_M then
+            v.cache(i).mapd  := DONE_M;
+            v.cache(i).eoffs := toSlv(imatch, IDX_BITS);
             v.cache(i).eaddr := r.wraddr & toSlv(0,IDX_BITS);
-          else
-            v.cache(i).eaddr := r.wraddr+1 & toSlv(0,IDX_BITS);
+--          flush := '1';  -- force out skip characters for sparsified data
+            --
+            --  Never found a first recorded word; skip event
+            --
+            if r.cache(i).mapd = BEGIN_M then
+              v.cache(i).boffs := v.cache(i).eoffs;
+              v.cache(i).baddr := v.cache(i).eaddr;
+            end if;
           end if;
-          flush := '1';  -- force out skip characters for sparsified data
         end if;
       end if;
     end loop;
@@ -472,56 +510,87 @@ begin
     --
     if r.wrfull='1' then
       v.wrdata(ROW_SIZE-1 downto 0) := r.wrData(2*ROW_SIZE-1 downto ROW_SIZE);
+      v.wrtout(ROW_SIZE-1 downto 0) := r.wrtout(2*ROW_SIZE-1 downto ROW_SIZE);
       v.wraddr := r.wraddr+1;
     end if;
 
     --
     --  Assume dout vector is contiguous and only sparsified at leading or
-    --  trailing end.
-    --  If douten/=0 and tout(0)/=tout_next, insert skip character
-    --  Insert dout vector
+    --  trailing end => doute0 = leading sample, douten = num samples.
     --
+    if (r.cache(conv_integer(r.iopened)).state=OPEN_S) then
+      v.wren(r.wren'left) := '1';
+    end if;
+
     i := conv_integer(r.wrword);
-    if (v.cache(conv_integer(r.iopened)).state=OPEN_S or
-        r.cache(conv_integer(r.iopened)).state=OPEN_S or
-        flush='1') then
-      if ((r.tout(0) < r.tout_next) or
-          ((r.douten/=0 or flush='1') and r.tout(0)/=r.tout_next)) then
-        v.wrdata(i) := SKIP_CHAR & resize(r.tout(0)-r.tout_next,14);
+    if (v.wren(0)='1') then
+      j := conv_integer(r.doute0);
+      --
+      --  Insert a skip character if:
+      --    New data arrives that is not contiguous with last data, or
+      --    no new data but the time counter advanced "far".
+      --
+      if ((r.douten/=0 and r.tout(j)/=r.tout_next) or
+          (r.douten=0  and r.tout(0)(COUNT_BITS_C-1)=r.toutnl)) then
+        v.wrdata(i) := SKIP_CHAR & resize(r.tout(j)-r.tout_next-1,14);
+        v.wrtout(i) := r.tout_next;
+        v.tout_next := r.tout(j);
+        v.toutnl    := not v.tout_next(COUNT_BITS_C-1);
         i := i+1;
       end if;
-    
-      case i is
-        when 0 => v.wrdata(ROW_SIZE-1 downto 0) := r.dout;
-        when 1 => v.wrdata(ROW_SIZE-0 downto 1) := r.dout;
-        when 2 => v.wrdata(ROW_SIZE+1 downto 2) := r.dout;
-        when 3 => v.wrdata(ROW_SIZE+2 downto 3) := r.dout;
-        when 4 => v.wrdata(ROW_SIZE+3 downto 4) := r.dout;
-        when 5 => v.wrdata(ROW_SIZE+4 downto 5) := r.dout;
-        when 6 => v.wrdata(ROW_SIZE+5 downto 6) := r.dout;
-        when 7 => v.wrdata(ROW_SIZE+6 downto 7) := r.dout;
-        when 8 => v.wrdata(ROW_SIZE+7 downto 8) := r.dout;
-        when others => null;
-      end case;
+
+      v.wrdata(ROW_SIZE-j-1+i downto i) := r.dout(r.dout'left downto j);
+      v.wrtout(ROW_SIZE-j-1+i downto i) := r.tout(r.dout'left downto j);
       
-      j := conv_integer(r.douten);
-      if (j>0) then
-        v.tout_next := r.tout(j-1)+1;
+      --v.wrdata(ROW_SIZE+i-1 downto i) := r.dout;
+      --v.wrtout(ROW_SIZE+i-1 downto i) := r.tout;
+      
+      --case i is
+      --  when 0 => v.wrdata(ROW_SIZE-1 downto 0) := r.dout;
+      --            v.wrtout(ROW_SIZE-1 downto 0) := r.tout;
+      --  when 1 => v.wrdata(ROW_SIZE-0 downto 1) := r.dout;
+      --            v.wrtout(ROW_SIZE-0 downto 1) := r.tout;
+      --  when 2 => v.wrdata(ROW_SIZE+1 downto 2) := r.dout;
+      --            v.wrtout(ROW_SIZE+1 downto 2) := r.tout;
+      --  when 3 => v.wrdata(ROW_SIZE+2 downto 3) := r.dout;
+      --            v.wrtout(ROW_SIZE+2 downto 3) := r.tout;
+      --  when 4 => v.wrdata(ROW_SIZE+3 downto 4) := r.dout;
+      --            v.wrtout(ROW_SIZE+3 downto 4) := r.tout;
+      --  when 5 => v.wrdata(ROW_SIZE+4 downto 5) := r.dout;
+      --            v.wrtout(ROW_SIZE+4 downto 5) := r.tout;
+      --  when 6 => v.wrdata(ROW_SIZE+5 downto 6) := r.dout;
+      --            v.wrtout(ROW_SIZE+5 downto 6) := r.tout;
+      --  when 7 => v.wrdata(ROW_SIZE+6 downto 7) := r.dout;
+      --            v.wrtout(ROW_SIZE+6 downto 7) := r.tout;
+      --  when 8 => v.wrdata(ROW_SIZE+7 downto 8) := r.dout;
+      --            v.wrtout(ROW_SIZE+7 downto 8) := r.tout;
+      --  when others => null;
+      --end case;
+
+      k := conv_integer(r.douten);
+      if (r.douten/=0) then
+        v.tout_next := r.tout(j+k-1)+1;
+        v.toutnl    := not v.tout_next(COUNT_BITS_C-1);
+        v.wrtoutl   := r.tout(j+k-1);
+      else
+        v.wrtoutl   := r.tout(0);
       end if;
-      n := i+j;
-      v.wren := '1';
-      if n>=ROW_SIZE then
-        v.wrfull := '1';
-        n := n-ROW_SIZE;
-      end if;
-      v.wrword := toSlv(n,IDX_BITS);
+    else
+      k := 0;
     end if;
+    
+    n := i+k;
+    if n>=ROW_SIZE then
+      v.wrfull := '1';
+      n := n-ROW_SIZE;
+    end if;
+    v.wrword := toSlv(n,IDX_BITS+1);
 
     -- skipped buffers are causing this to fire
     if conv_integer(r.free) < 4 and false then
       --  Deadtime failed
       --  Close all open caches/gates and flag them
-      v.wren   := '0';
+      v.wren   := (others=>'0');
       v.wrfull := '0';
       v.wrword := (others=>'0');
       for i in 0 to 15 loop
@@ -608,6 +677,7 @@ begin
                  t6_V                => tout(6),
                  t7_V                => tout(7),
                  yv_V                => douten,
+                 iy_V                => doute0,
                  s_axi_BUS_A_AWVALID => axilWriteMaster.awvalid,
                  s_axi_BUS_A_AWREADY => axilWriteSlave .awready,
                  s_axi_BUS_A_AWADDR  => axilWriteMaster.awaddr(4 downto 0),
@@ -661,6 +731,7 @@ begin
                  t6_V                => tout(6),
                  t7_V                => tout(7),
                  yv_V                => douten,
+                 iy_V                => doute0,
                  s_axi_BUS_A_AWVALID => axilWriteMaster.awvalid,
                  s_axi_BUS_A_AWREADY => axilWriteSlave .awready,
                  s_axi_BUS_A_AWADDR  => axilWriteMaster.awaddr(4 downto 0),

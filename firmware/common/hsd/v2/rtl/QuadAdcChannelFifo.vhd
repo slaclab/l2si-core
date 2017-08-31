@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2016-01-04
--- Last update: 2017-08-24
+-- Last update: 2017-08-30
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -173,6 +173,8 @@ architecture mapping of QuadAdcChannelFifo is
   signal rData : slv(127 downto 0);
   signal sData : slv(127 downto 0);
 
+  signal dmaData : Slv128Array(NSTREAMS_C-1 downto 0);
+
   constant DEBUG_C : boolean := false;
   
   component ila_0
@@ -185,6 +187,10 @@ begin  -- mapping
   rData <= r.axisMaster.tData(127 downto 0);
   sData <= axisMasters(0).tData(127 downto 0);
 
+  GEN_DMADATA : for i in 0 to NSTREAMS_C-1 generate
+    dmaData(i) <= axisMasters(i).tData(127 downto 0);
+  end generate;
+  
   GEN_DEBUG : if DEBUG_C generate
     U_ILA : ila_0
       port map ( clk           => clk,
@@ -287,7 +293,7 @@ begin  -- mapping
     U_FEX : entity work.hsd_fex_wrapper
       generic map ( AXIS_CONFIG_G => SAXIS_CONFIG_C,
                     ALGORITHM_G   => ALGORITHM_G(i),
-                    DEBUG_G       => ite(i>0, false, DEBUG_G) )
+                    DEBUG_G       => DEBUG_G )
       port map ( clk               => clk,
                  rst               => clear,
                  din               => din,
@@ -369,6 +375,8 @@ begin  -- mapping
                      maxilWriteMasters(0), maxilReadMasters(0),
                      v.axilWriteSlave, v.axilReadSlave );
 
+    v.axilReadSlave.rdata := (others=>'0');
+      
     axiSlaveRegister ( ep, x"00", 0, v.fexEnable );
 
     for i in 0 to NSTREAMS_C-1 loop
