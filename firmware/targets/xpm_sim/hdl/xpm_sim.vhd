@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-07-10
--- Last update: 2017-03-29
+-- Last update: 2017-09-02
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -40,9 +40,6 @@ end xpm_sim;
 
 architecture top_level_app of xpm_sim is
 
-   constant NDsLinks : integer := 14;
-   constant NBpLinks : integer := 14;
-
    -- Reference Clocks and Resets
    signal recTimingClk : sl;
    signal recTimingRst : sl;
@@ -51,20 +48,30 @@ architecture top_level_app of xpm_sim is
    signal xpmConfig : XpmConfigType := XPM_CONFIG_INIT_C;
    signal xpmStatus : XpmStatusType;
 
-   signal dsLinkStatus: XpmLinkStatusArray(NDsLinks-1 downto 0) := (others=>XPM_LINK_STATUS_INIT_C);
+   signal dsLinkStatus: XpmLinkStatusArray(NDSLinks-1 downto 0) := (others=>XPM_LINK_STATUS_INIT_C);
    
-   signal dsTxData  : Slv16Array(NDsLinks-1 downto 0);
-   signal dsTxDataK : Slv2Array (NDsLinks-1 downto 0);
-   signal dsRxData  : Slv16Array(NDsLinks-1 downto 0) := (others=>X"0000");
-   signal dsRxDataK : Slv2Array (NDsLinks-1 downto 0) := (others=>"00");
-   signal dsRxClk   : slv(NDsLinks-1 downto 0);
-   signal dsRxRst   : slv(NDsLinks-1 downto 0);
+   signal simDsTxData  : Slv16Array(NDSLinks-1 downto 0);
+   signal simDsTxDataK : Slv2Array (NDSLinks-1 downto 0);
+   signal simDsRxData  : Slv16Array(NDSLinks-1 downto 0) := (others=>X"0000");
+   signal simDsRxDataK : Slv2Array (NDSLinks-1 downto 0) := (others=>"00");
+   signal simDsTxClk   : slv(NDSLinks-1 downto 0);
+   signal simDsTxRst   : slv(NDSLinks-1 downto 0);
+   signal simDsRxClk   : slv(NDSLinks-1 downto 0);
+   signal simDsRxRst   : slv(NDSLinks-1 downto 0);
 
-   signal bpRxLinkFull   : Slv16Array        (NBpLinks-1 downto 0) := (others=>(others=>'0'));
+   signal dsTxData  : Slv16Array(NDSLinks-1 downto 0);
+   signal dsTxDataK : Slv2Array (NDSLinks-1 downto 0);
+   signal dsRxData  : Slv16Array(NDSLinks-1 downto 0) := (others=>X"0000");
+   signal dsRxDataK : Slv2Array (NDSLinks-1 downto 0) := (others=>"00");
+   signal dsRxClk   : slv(NDSLinks-1 downto 0);
+   signal dsRxRst   : slv(NDSLinks-1 downto 0);
+
+   signal bpRxLinkFull   : Slv16Array        (NBPLinks-1 downto 0) := (others=>(others=>'0'));
    signal bpTxData       : Slv16Array(0 downto 0);
    signal bpTxDataK      : Slv2Array (0 downto 0);
   
    -- Timing Interface (timingClk domain) 
+   signal dsPhy     : TimingPhyType;
    signal xData     : TimingRxType := TIMING_RX_INIT_C;
    signal timingBus : TimingBusType;
    signal exptBus   : ExptBusType;
@@ -72,9 +79,9 @@ architecture top_level_app of xpm_sim is
    signal regClk    : sl;
    signal regRst    : sl;
 
-   signal pconfig : XpmPartitionConfigType := XPM_PARTITION_CONFIG_INIT_C;
-   signal dsFull  : slv(NPartitions-1 downto 0) := toSlv(1,NPartitions);
-   signal dsPhy   : TimingPhyType := TIMING_PHY_INIT_C;
+   signal pconfig  : XpmPartitionConfigType := XPM_PARTITION_CONFIG_INIT_C;
+   signal dsFull   : slv(NPartitions-1 downto 0) := toSlv(1,NPartitions);
+   signal timingFb : TimingPhyType := TIMING_PHY_INIT_C;
 
    signal msgCount : integer := 0;
 begin
@@ -100,22 +107,6 @@ begin
    
    dsRxClk <= (others=>recTimingClk);
    dsRxRst <= (others=>recTimingRst);
-
-   process is
-   begin
-     recTimingRst <= '1';
-     wait for 10 ns;
-     recTimingRst <= '0';
-     wait;
-   end process;
-   
-   process is
-   begin
-      recTimingClk <= '1';
-      wait for 2.6 ns;
-      recTimingClk <= '0';
-      wait for 2.6 ns;
-   end process;
 
    regRst <= recTimingRst;
    process is
@@ -234,35 +225,39 @@ begin
      insertMsg(8);
      wait;
    end process;
-     
-   U_TPG : entity work.TPGMini
-      port map ( txClk    => recTimingClk,
-                 txRst    => recTimingRst,
-                 txRdy    => '1',
-                 txData   => xData.data,
-                 txDataK  => xData.dataK,
-                 statusO  => open,
-                 configI  => tpgConfig );
 
-   timingBus.valid  <= '1';
-   timingBus.stream <= TIMING_STREAM_INIT_C;
-   timingBus.v1     <= LCLS_V1_TIMING_DATA_INIT_C;
-   timingBus.v2     <= LCLS_V2_TIMING_DATA_INIT_C;
+   simDsRxClk  <= (others=>recTimingClk);
+   simDsRxRst  <= (others=>recTimingRst);
+   simDsRxData (simDsRxData 'left downto 1) <= (others=>(others=>'0'));
+   simDsRxDataK(simDsRxDataK'left downto 1) <= (others=>(others=>'0'));
+   simDsRxData (0) <= timingFb.data;
+   simDsRxDataK(0) <= timingFb.dataK;
 
-   U_RxLcls2 : entity work.TimingFrameRx
-     port map ( rxClk               => recTimingClk,
-                rxRst               => recTimingRst,
-                rxData              => xData,
-                messageDelay        => (others=>'0'),
-                messageDelayRst     => '0',
-                timingMessage       => timingBus.message,
-                timingMessageStrobe => timingBus.strobe,
-                exptMessage         => exptBus.message,
-                exptMessageValid    => exptBus.valid );
-                
-   U_Application : entity work.XpmApp
-      generic map ( NDsLinks => NDsLinks,
-                    NBpLinks => NBpLinks )
+   recTimingClk <= simDsTxClk(0);
+   recTimingRst <= simDsTxRst(0);
+   xData.data   <= simDsTxData(0);
+   xData.dataK  <= simDsTxDataK(0);
+   
+   U_Sim : entity work.XpmSim
+     generic map( ENABLE_DS_LINKS_G => toSlv(1,NDSLinks),
+                  ENABLE_BP_LINKS_G => toSlv(0,NBPLinks))
+     port map ( dsRxClk      => simDsRxClk,
+                dsRxRst      => simDsRxRst,
+                dsRxData     => (others=>timingFb.data),
+                dsRxDataK    => (others=>timingFb.dataK),
+                dsTxClk      => simDsTxClk,
+                dsTxRst      => simDsTxRst,
+                dsTxData     => simDsTxData,
+                dsTxDataK    => simDsTxDataK,
+                bpTxLinkUp   => '0',
+                bpRxClk      => '0',
+                bpRxClkRst   => '0',
+                bpRxLinkUp   => (others=>'0'),
+                bpRxLinkFull => (others=>(others=>'0')) );
+
+   U_DUT : entity work.XpmApp
+      generic map ( NDSLinks => NDSLinks,
+                    NBPLinks => NBPLinks )
       port map (
          -----------------------
          -- Application Ports --
@@ -277,17 +272,14 @@ begin
          dsRxClk         => dsRxClk,
          dsRxRst         => dsRxRst,
          -- BP ports
-         bpTxLinkStatus  => XPM_LINK_STATUS_INIT_C,
          bpTxData        => bpTxData (0),
          bpTxDataK       => bpTxDataK(0),
-         bpRxLinkStatus  => (others=>XPM_LINK_STATUS_INIT_C),
+         bpStatus        => (others=>XPM_BP_LINK_STATUS_INIT_C),
          bpRxLinkFull    => bpRxLinkFull,
-         bpClk           => regClk,
-         bpClkRst        => regRst,
          ----------------------
          -- Top Level Interface
          ----------------------
-         sysclk          => regClk,
+         regclk          => regClk,
          update          => toSlv(1,NPartitions),
          status          => xpmStatus,
          config          => xpmConfig,
@@ -295,10 +287,8 @@ begin
          timingClk         => recTimingClk,
          timingRst         => recTimingRst,
          timingin          => xData,
-         timingFbClk       => '0',
-         timingFbRst       => '1',
-         timingFb          => open );
---         timingBus         => timingBus,
---         exptBus           => exptBus );
+         timingFbClk       => recTimingClk,
+         timingFbRst       => recTimingRst,
+         timingFb          => timingFb );
 
 end top_level_app;
