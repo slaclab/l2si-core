@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-07-10
--- Last update: 2017-07-27
+-- Last update: 2017-09-02
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -281,12 +281,9 @@ begin
       when INIT_S =>
         v.aword := 0;
         if (r.source='0' and advance(1)='1') then
-          if (r.taddr'length>16) then
-            v.taddr := v.streams(1).data & r.taddr(r.paddr'left downto r.paddr'left-15);
-          else
-            v.taddr := v.streams(1).data;
-          end if;
-          v.state := PADDR_S;
+          v.taddr := v.streams(1).data & r.taddr(r.paddr'left downto r.paddr'left-15);
+          v.aword           := r.aword+1;
+          v.state           := PADDR_S;
         elsif (r.source='1' and advance(0)='0' and r.advance(0)='1') then
           v.advance(1)      := '1';
           v.streams(1).data := r.paddr(15 downto 0);
@@ -298,11 +295,7 @@ begin
           v.advance(1)      := '1';
           v.streams(1).data := r.paddr(r.aword*16+15 downto r.aword*16);
         else
-          if (r.taddr'length>16) then
-            v.taddr := v.streams(1).data & r.taddr(r.paddr'left downto r.paddr'left-15);
-          else
-            v.taddr := v.streams(1).data;
-          end if;
+          v.taddr := v.streams(1).data & r.taddr(r.paddr'left downto r.paddr'left-15);
         end if;
         if (r.aword=r.paddr'left/16) then
           v.ipart := 0;
