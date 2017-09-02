@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-12-14
--- Last update: 2017-07-23
+-- Last update: 2017-08-29
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -292,9 +292,6 @@ begin
   fpgaclk_P(3) <= '0';
   fpgaclk_N(3) <= '1';
   
-   regClk <= ref125MHzClk;
-   regRst <= ref125MHzRst;
-
    U_XBAR : entity work.AxiLiteCrossbar
       generic map (
          DEC_ERROR_RESP_G   => AXI_RESP_DECERR_C,
