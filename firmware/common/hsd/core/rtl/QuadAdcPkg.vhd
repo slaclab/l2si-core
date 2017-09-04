@@ -56,6 +56,9 @@ package QuadAdcPkg is
   type AdcData is record
     data : Slv11Array(7 downto 0);
   end record;
+  constant ADC_DATA_INIT_C : AdcData := (
+    data => (others=>(others=>'0')) );
+  
   type AdcDataArray is array(natural range<>) of AdcData;
 
   type QuadAdcFex is ( F_SAMPLE, F_SUM );
