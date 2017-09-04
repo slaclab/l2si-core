@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2016-01-04
--- Last update: 2017-08-31
+-- Last update: 2017-09-03
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -267,6 +267,7 @@ begin
     variable imatch : integer;
     variable flush  : sl;
     variable skip   : sl;
+    variable sdout  : Slv16Array(ROW_SIZE-1 downto 0) := (others=>(others=>'0'));
   begin
     v := r;
     
@@ -539,9 +540,16 @@ begin
         i := i+1;
       end if;
 
-      v.wrdata(ROW_SIZE-j-1+i downto i) := r.dout(r.dout'left downto j);
-      v.wrtout(ROW_SIZE-j-1+i downto i) := r.tout(r.dout'left downto j);
-      
+      --v.wrdata(ROW_SIZE-j-1+i downto i) := r.dout(r.dout'left downto j);
+      --v.wrtout(ROW_SIZE-j-1+i downto i) := r.tout(r.dout'left downto j);
+
+      for k in 0 to ROW_SIZE-1 loop
+        if k < ROW_SIZE-j then
+          v.wrdata(i+k) := r.dout(j+k);
+          v.wrtout(i+k) := r.tout(j+k);
+        end if;
+      end loop;
+
       --v.wrdata(ROW_SIZE+i-1 downto i) := r.dout;
       --v.wrtout(ROW_SIZE+i-1 downto i) := r.tout;
       
