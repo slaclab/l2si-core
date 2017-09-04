@@ -13,6 +13,7 @@ loadRuckusTcl /u1/weaver/lcls-timing-core
 loadRuckusTcl /u1/weaver/surf
 
 loadRuckusTcl "$::DIR_PATH/../../common/xpm"
+loadRuckusTcl "$::DIR_PATH/../../common/base"
 
 # Load target's source code and constraints
 loadSource      -dir  "$::DIR_PATH/hdl/"
