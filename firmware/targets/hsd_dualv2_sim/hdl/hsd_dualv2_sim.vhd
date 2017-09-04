@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-07-10
--- Last update: 2017-08-23
+-- Last update: 2017-09-03
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -45,11 +45,8 @@ architecture top_level_app of hsd_dualv2_sim is
 
    constant NCHAN_C : integer := 4;
    
-   signal phyClk   : sl;
    signal rst      : sl;
    
-   signal adcInput         :    AdcInputArray(NCHAN_C-1 downto 0);
-
     -- AXI-Lite and IRQ Interface
    signal regClk    : sl;
    signal regRst    : sl;
@@ -63,21 +60,10 @@ architecture top_level_app of hsd_dualv2_sim is
    signal dmaIbMaster       : AxiStreamMasterArray(4 downto 0);
    signal dmaIbSlave        : AxiStreamSlaveArray (4 downto 0) := (others=>AXI_STREAM_SLAVE_FORCE_C);
 
-   signal adcI, adcO        : AdcDataArray(NCHAN_C-1 downto 0);
-
-   type TrigType is record
-     lopen   : sl;
-     lclose  : sl;
-     lphase  : slv(2 downto 0);
-     l1in    : sl;
-     l1a     : sl;
-   end record;
-
-   signal r    : TrigType;
-   signal r_in : TrigType;
-
-   signal eventId : slv(191 downto 0) := (others=>'0');
-   signal trig    : Slv8Array(3 downto 0) := (others=>(others=>'0'));
+   signal phyClk            : sl;
+   signal adcO              : AdcDataArray(NCHAN_C-1 downto 0);
+   signal trigIn            : Slv8Array(3 downto 0);
+   signal trigSel, trigSlot : sl;
    
 --   constant AXIS_CONFIG_C : AxiStreamConfigType := ssiAxiStreamConfig(16);
    constant AXIS_CONFIG_C : AxiStreamConfigType := ssiAxiStreamConfig(4);
@@ -119,62 +105,27 @@ architecture top_level_app of hsd_dualv2_sim is
    signal recTimingRst : sl;
    signal ready               : sl;
 
-   signal trigIn              : Slv8Array(3 downto 0) := (others=>(others=>'0'));
-   signal trigSlot            : sl;
-   signal trigSel             : sl;
-
    signal cfgWriteMaster    : AxiLiteWriteMasterType := AXI_LITE_WRITE_MASTER_INIT_C;
    signal cfgWriteSlave     : AxiLiteWriteSlaveType;
    signal cfgReadMaster     : AxiLiteReadMasterType := AXI_LITE_READ_MASTER_INIT_C;
    signal cfgReadSlave      : AxiLiteReadSlaveType;
-   
+
 begin
 
---   dmaRst <= rst;
    dmaData <= dmaIbMaster(0).tData(dmaData'range);
    dmaUser <= dmaIbMaster(0).tUser(dmaUser'range);
-   
-   process (phyClk) is
-     variable s : slv(7 downto 0) := (others=>'0');
-     variable d : slv(2 downto 0) := (others=>'0');
-     variable t : integer         := 0;
---     constant PERIOD_C : integer := 1348;
-     constant PERIOD_C : integer := 13480;
-   begin
-     for ch in 0 to NCHAN_C-1 loop
-       adcInput(ch).clkp <= phyclk;
-       adcInput(ch).clkn <= not phyClk;
-     end loop;
-     if rising_edge(phyClk) then
-       for ch in 0 to NCHAN_C-1 loop
-         adcInput(ch).datap <= toSlv(ch,3) & s;
-         adcInput(ch).datan <= toSlv(ch,3) & (s xor toSlv(255,8));
-         adcI(ch).data(7) <= toSlv(ch,3) & s;
-         adcI(ch).data(6 downto 0) <= adcI(ch).data(7 downto 1);
-       end loop;
 
-       if t = PERIOD_C-1 then
-         adcI(2).data(7)(10) <= '1';
-       else
-         adcI(2).data(7)(10) <= '0';
-       end if;
+--   U_QIN : entity work.AdcRamp
+   U_QIN : entity work.AdcStrobe
+     generic map ( NCHAN_C => NCHAN_C )
+     port map ( phyClk   => phyClk,
+                dmaClk   => dmaClk,
+                ready    => axilDone,
+                adcOut   => adcO,
+                trigSel  => trigSel,
+                trigOut  => trigIn );
 
-       for ch in 0 to 1 loop
-         adcI(ch).data(7)(10) <= adcI(ch+1).data(0)(10);
-       end loop;
-       
-       if t = PERIOD_C-1 then
-         t := 0;
-       else
-         t := t+1;
-       end if;
-       trigIn(0) <= d(0) & trigIn(0)(7 downto 1);
-       d := trigSel & d(2 downto 1);
-       s := s+1;
-     end if;
-   end process;
-
-   process is
+  process is
    begin
      phyClk <= '1';
      wait for 0.4 ns;
@@ -182,99 +133,6 @@ begin
      wait for 0.4 ns;
    end process;
 
-   process (dmaClk) is
-   begin
-     if rising_edge(dmaClk) then
-       for ch in 0 to NCHAN_C-1 loop
-         adcO(ch) <= adcI(ch);
-       end loop;
-       trig(trig'left-1 downto 0) <= trig(trig'left downto 1);
-       trig(trig'left) <= (others=>r_in.lopen);
-       if r_in.lopen='1' then
-         eventId <= eventId+1;
-       end if;
-     end if;
-   end process;
-   
-   process is
-   begin
-     dmaClk <= '1';
-     wait for 3.2 ns;
-     dmaClk <= '0';
-     wait for 3.2 ns;
-   end process;
-
-   process is
-     variable lcount : slv(1 downto 0) := (others=>'0');
-   begin
-     r_in.lopen  <= '0';
-     r_in.lclose <= '0';
-     r_in.lphase <= (others=>'0');
-     r_in.l1in   <= '0';
-     r_in.l1a    <= '0';
-
-     wait until axilDone='1';
-
-     for k in 0 to 15 loop
-       wait until adcI(2).data(0)(10)='1';
-       wait until dmaClk='0';
-       r_in.lopen <= '1';
-       for j in 0 to 7 loop
-         if adcO(2).data(j)(10)='1' then
-           r_in.lphase <= toSlv(j,3);
-         end if;
-       end loop;
-       wait until dmaClk='1';
-       wait until dmaClk='0';
-       r_in.lopen <= '0';
-       
-       for i in 0 to 3 loop
-         wait until adcI(2).data(0)(10)='1';
-         wait until dmaClk='0';
-         if i<3 then
-           r_in.lopen <= '1';
-           for j in 0 to 7 loop
-             if adcO(2).data(j)(10)='1' then
-               r_in.lphase <= toSlv(j,3);
-             end if;
-           end loop;
-         end if;
-         wait until dmaClk='1';
-         wait until dmaClk='0';
-         r_in.lopen <= '0';
-         
-         wait for 100 ns;
-         wait until dmaClk='0';
-         r_in.lclose <= '1';
-         r_in.l1in   <= '1';
-         lcount := lcount+1;
-         if lcount = toSlv(0,lcount'length) then
-           r_in.l1a    <= '0';
-         else
-           r_in.l1a    <= '1';
-         end if;
-         if lcount(0)='1' then
-           r_in.lphase <= toSlv(0,3);
-         else
-           r_in.lphase <= toSlv(4,3);
-         end if;
-         wait until dmaClk='1';
-         wait until dmaClk='0';
-         r_in.lclose <= '0';
-         r_in.l1in   <= '0';
-       end loop;
-       
-       wait for 200 us;
-     end loop;
-   end process;
-
-   process (dmaClk) is
-   begin
-     if rising_edge(dmaClk) then
-       r <= r_in;
-     end if;
-   end process;
-   
    process is
    begin
      rst <= '1';
@@ -293,62 +151,6 @@ begin
      wait for 3.2 ns;
    end process;
      
-   --U_DUT : entity work.QuadAdcChannelFifo
-   --  generic map ( AXIS_CONFIG_G => AXIS_CONFIG_C,
-   --                ALGORITHM_G   => ("RAW","RAW") )
-   --  port map ( clk              => dmaClk,
-   --             rst              => dmaRst,
-   --             clear            => dmaRst,
-   --             start            => r.lopen,
-   --             shift            => r.lphase,
-   --             din              => adcO(0).data,
-   --             l1in             => r.l1in,
-   --             l1ina            => r.l1a,
-   --             l1a              => open,
-   --             l1v              => open,
-   --             axisMaster       => dmaIbMaster(0),
-   --             axisSlave        => dmaIbSlave (0),
-   --             axilClk          => regClk,
-   --             axilRst          => regRst,
-   --             axilReadMaster   => regReadMaster,
-   --             axilReadSlave    => regReadSlave,
-   --             axilWriteMaster  => regWriteMaster,
-   --             axilWriteSlave   => regWriteSlave );
-
-   --U_DUT : entity work.QuadAdcEvent
-   --  generic map ( FIFO_ADDR_WIDTH_C => 10,
-   --                NFMC_G            => 1,
-   --                SYNC_BITS_G       => 4,
-   --                DMA_STREAM_CONFIG_G => AXIS_CONFIG_C,
-   --                BASE_ADDR_C         => toSlv(0,32) )
-   --  port map ( axilClk          => regClk,
-   --             axilRst          => regRst,
-   --             axilReadMaster   => regReadMaster,
-   --             axilReadSlave    => regReadSlave,
-   --             axilWriteMaster  => regWriteMaster,
-   --             axilWriteSlave   => regWriteSlave,
-   --             --
-   --             eventClk         => dmaClk,
-   --             eventRst         => dmaRst,
-   --             configE          => config,
-   --             strobe           => r.lopen,
-   --             eventId          => eventId,
-   --             l1in             => r.l1in,
-   --             l1ina            => r.l1a,
-   --             --
-   --             adcClk           => dmaClk,
-   --             adcRst           => dmaRst,
-   --             configA          => config,
-   --             adc              => adcO(3 downto 0),
-   --             trigArm          => r.lopen,
-   --             trigIn           => trig,
-   --             --
-   --             dmaClk           => dmaClk,
-   --             dmaRst           => dmaRst,
-   --             dmaFullThr       => (others=>'0'),
-   --             dmaMaster        => dmaIbMaster,
-   --             dmaSlave         => dmaIbSlave );
-
    recTimingRst <= rst;
    process is
    begin
@@ -473,12 +275,14 @@ begin
     axilDone <= '0';
     wait until regRst='0';
     wait for 200 ns;
-    wreg(16,x"00000001"); -- prescale
-    wreg(20,x"04000004"); -- fexLength/Delay
+    wreg(16,x"00000000"); -- prescale
+    wreg(20,x"00800004"); -- fexLength/Delay
     wreg(24,x"00040C00"); -- almostFull
     wreg(32,x"00000000"); -- prescale
-    wreg(36,x"00400384"); -- fexLength/Delay
-    wreg(40,x"00040100"); -- almostFull
+    wreg(36,x"00800004"); -- fexLength/Delay
+    wreg(40,x"00040C00"); -- almostFull
+    wreg(256*2+16,x"00000040");
+    wreg(256*2+24,x"000003c0");
     wreg( 0,x"00000003"); -- fexEnable
     wait for 600 ns;
     axilDone <= '1';
