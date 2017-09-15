@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-07-08
--- Last update: 2017-07-23
+-- Last update: 2017-09-14
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -38,6 +38,7 @@ use work.AxiLitePkg.all;
 use work.TimingPkg.all;
 use work.AmcCarrierPkg.all;
 use work.AmcCarrierSysRegPkg.all;
+use work.XpmOpts.all;
 use work.XpmPkg.all;
 
 library unisim;
@@ -166,6 +167,10 @@ architecture mapping of XpmTiming is
    signal txOutClk       : sl;
    signal loopback       : slv(2 downto 0);
    signal rxRst          : sl;
+
+   signal genTimingPhy   : TimingPhyType;
+   signal genTimingRef   : sl;
+   signal genTimingRefG  : sl;
 begin
 
    --------------------------
@@ -215,16 +220,40 @@ begin
          I     => timingRefClkInP,
          IB    => timingRefClkInN,
          CEB   => '0',
-         ODIV2 => open,
+         ODIV2 => genTimingRef,
          O     => timingRefClk);
 
    -------------------------------------------------------------------------------------------------
    -- GTH Timing Receiver
    -------------------------------------------------------------------------------------------------
-   TimingGthCoreWrapper_1 : entity work.TimingGthCoreWrapper
-      generic map ( TPD_G            => TPD_G,
-                    AXIL_BASE_ADDR_G => GTH_ADDR )
-      port map (
+   GEN_MINI : if TPGMINI_C generate
+     U_GENTIMING : BUFG_GT
+       port map ( I       => genTimingRef,
+                  CE      => '1',
+                  CEMASK  => '1',
+                  CLR     => '0',
+                  CLRMASK => '1',
+                  DIV     => "000",           -- Divide-by-1
+                  O       => genTimingRefG);
+
+     txUsrClk  <= genTimingRefG;
+     txStatus.locked       <= '1';
+     txStatus.resetDone    <= '1';
+     txStatus.bufferByDone <= '1';
+     txStatus.bufferByErr  <= '0';
+     rxOutClk  <= genTimingRefG;
+     rxData    <= genTimingPhy.data;
+     rxDataK   <= genTimingPhy.dataK;
+     rxDispErr <= "00";
+     rxDecErr  <= "00";
+     rxStatus  <= TIMING_PHY_STATUS_INIT_C;
+   end generate;
+   
+   GEN_NOMINI : if not TPGMINI_C generate
+     TimingGthCoreWrapper_1 : entity work.TimingGthCoreWrapper
+       generic map ( TPD_G            => TPD_G,
+                     AXIL_BASE_ADDR_G => GTH_ADDR )
+       port map (
          axilClk        => axilClk,
          axilRst        => axilRst,
          axilReadMaster => axilReadMasters(1),
@@ -255,7 +284,8 @@ begin
          txDataK        => appTimingPhy.dataK,
          txOutClk       => txUsrClk,  -- will this be source synchronous?
          loopback       => loopback);
-
+   end generate;
+   
    -- Drive the external CLK MUX
    timingClkSel <= '1';
 
@@ -271,6 +301,7 @@ begin
 
    TimingCore_1 : entity work.TimingCore
      generic map ( TPD_G             => TPD_G,
+                   TPGMINI_G         => TPGMINI_C,
                    AXIL_BASE_ADDR_G  => TIMING_ADDR_C,
                    AXIL_ERROR_RESP_G => AXI_RESP_DECERR_C )
      port map (
@@ -288,7 +319,7 @@ begin
          appTimingRst    => rxRst,
          appTimingBus    => recTimingBus,
          exptBus         => recExptBus,
-         timingPhy       => open,
+         timingPhy       => genTimingPhy,
          axilClk         => axilClk,
          axilRst         => axilRst,
          axilReadMaster  => axilReadMasters(0),

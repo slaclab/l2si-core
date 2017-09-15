@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-07-10
--- Last update: 2017-09-02
+-- Last update: 2017-09-14
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -305,9 +305,9 @@ begin
           v.aword := r.aword+1;
         end if;
       when EWORD_S =>
-        v.eword := r.eword+1;
-        if r.source='1' then
-          v.advance(1)      := '1';
+        v.eword      := r.eword+1;
+        v.advance(1) := '1';
+        if r.source='1' or pmaster(r.ipart)='1' then
           v.streams(1).data := expWord(r.ipart)(r.eword*16+15 downto r.eword*16);
         end if;
         if (r.eword=(NTagBytes+1)/2) then

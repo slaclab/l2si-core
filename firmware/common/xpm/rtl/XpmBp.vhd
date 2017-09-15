@@ -2,7 +2,7 @@
 -- File       : XpmBp.vhd
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-09-04
--- Last update: 2017-07-20
+-- Last update: 2017-09-13
 -------------------------------------------------------------------------------
 -- Description: 
 -------------------------------------------------------------------------------
@@ -126,8 +126,7 @@ begin
          COMMON_TX_CLK_G     => false,
          COMMON_RX_CLK_G     => false,
          SLAVE_AXI_CONFIG_G  => BP_CONFIG_C,
-         MASTER_AXI_CONFIG_G => BP_CONFIG_C,
-         DEBUG_G             => ite(i>1,false,true) )
+         MASTER_AXI_CONFIG_G => BP_CONFIG_C )
        port map (
          -- TX Serial Stream
          txP           => open,
