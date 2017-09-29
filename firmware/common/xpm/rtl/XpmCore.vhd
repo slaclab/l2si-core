@@ -5,7 +5,7 @@
 -- Author     : Larry Ruckman  <ruckman@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-07-08
--- Last update: 2017-08-29
+-- Last update: 2017-09-15
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -29,6 +29,7 @@ use work.SsiPkg.all;
 use work.AxiLitePkg.all;
 use work.AxiPkg.all;
 use work.TimingPkg.all;
+use work.XpmOpts.all;
 use work.XpmPkg.all;
 use work.AmcCarrierSysRegPkg.all;
 use work.AmcCarrierPkg.all;
@@ -112,9 +113,12 @@ entity XpmCore is
       timingRefClkOut   : out   sl;
       timingRecClkOutP  : out   sl;
       timingRecClkOutN  : out   sl;
---      timingClkSel      : out   sl;
       timingClkScl      : inout sl;
       timingClkSda      : inout sl;
+      -- Timing Reference (standalone use only)
+      timingClkSel      : out   sl;
+      timingRefClkInP   : in    sl;
+      timingRefClkInN   : in    sl;
       -- Crossbar Ports
       xBarSin           : out   slv(1 downto 0);
       xBarSout          : out   slv(1 downto 0);
@@ -205,6 +209,8 @@ architecture mapping of XpmCore is
    signal localIp    : slv(31 downto 0);
    signal localAppId : slv(15 downto 0);
 
+   signal timingRefClkP : sl;
+   signal timingRefClkN : sl;
 begin
 
   GEN_BSI_OVERRIDE: if OVERRIDE_BSI_G=true generate
@@ -219,7 +225,17 @@ begin
 
   regClk <= axilClk;
   regRst <= axilRst;
-  
+
+  GEN_TPGMINI : if TPGMINI_C=true generate
+    timingRefClkP <= timingRefClkInP;
+    timingRefClkN <= timingRefClkInN;
+  end generate;
+
+  GEN_NO_TPGMINI : if TPGMINI_C=false generate
+    timingRefClkP <= usRefClkP;
+    timingRefClkN <= usRefClkN;
+  end generate;
+    
   --------------------------------
   -- Common Clock and Reset Module
   -------------------------------- 
@@ -418,12 +434,12 @@ begin
          timingRxN        => usRxN,
          timingTxP        => usTxP,
          timingTxN        => usTxN,
-         timingRefClkInP  => usRefClkP,
-         timingRefClkInN  => usRefClkN,
+         timingRefClkInP  => timingRefClkP,
+         timingRefClkInN  => timingRefClkN,
          timingRefClkOut  => timingRefClkOut,
          timingRecClkOutP => timingRecClkOutP,
          timingRecClkOutN => timingRecClkOutN,
-         timingClkSel     => open);
+         timingClkSel     => timingClkSel);
 
     U_HSRepeater : entity work.HSRepeater
      generic map (

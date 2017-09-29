@@ -2,7 +2,7 @@
 -- File       : XpmBpClk.vhd
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-07-08
--- Last update: 2017-06-30
+-- Last update: 2017-09-20
 -------------------------------------------------------------------------------
 -- Description: 
 -------------------------------------------------------------------------------
@@ -33,7 +33,8 @@ entity XpmBpClk is
    generic (
       TPD_G         : time    := 1 ns;
       MPS_SLOT_G    : boolean := false;
-      SIM_SPEEDUP_G : boolean := false);
+      SIM_SPEEDUP_G : boolean := false;
+      PHASE_500M_G  : real    := 0.0 );
    port (
       -- Stable Clock and Reset 
       refClk       : in sl;
@@ -83,6 +84,7 @@ begin
          CLKFBOUT_MULT_F_G  => ite(MPS_SLOT_G, 8.0, 10.0),  -- 1.00 GHz
          CLKOUT0_DIVIDE_F_G => 2.0,                         -- 500 MHz = 1.00 GHz/2.0
          CLKOUT0_RST_HOLD_G => 4,
+         CLKOUT0_PHASE_G    => PHASE_500M_G,
          CLKOUT1_DIVIDE_G   => 4,                           -- 250 MHz = 1.00 GHz/4
          CLKOUT2_DIVIDE_G   => 10)                          -- 100 MHz = 1.00 GHz/10
       port map(

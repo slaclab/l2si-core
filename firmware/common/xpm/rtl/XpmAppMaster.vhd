@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-07-10
--- Last update: 2017-07-27
+-- Last update: 2017-09-25
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -49,7 +49,7 @@ entity XpmAppMaster is
       sof               : in  sl;
       eof               : in  sl;
       crcErr            : in  sl;
-      full              : in  slv              (30 downto 0);
+      full              : in  slv              (26 downto 0);
       l1Input           : in  XpmL1InputArray  (NDsLinks-1 downto 0) := (others=>XPM_L1_INPUT_INIT_C);
       result            : out slv              (47 downto 0) );
 end XpmAppMaster;
@@ -149,8 +149,8 @@ begin
                --
                clk            => timingClk,
                rst            => timingRst,
-               full(30 downto 0) => full,
-               full(31)          => r.insertMsg,
+               full(26 downto 0) => full,
+               full(27)          => r.insertMsg,
                fiducial       => fiducial,
                l0Accept       => l0Accept,
                l1Accept       => l1Accept,

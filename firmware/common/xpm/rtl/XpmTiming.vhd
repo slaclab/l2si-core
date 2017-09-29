@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-07-08
--- Last update: 2017-09-14
+-- Last update: 2017-09-15
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -227,6 +227,14 @@ begin
    -- GTH Timing Receiver
    -------------------------------------------------------------------------------------------------
    GEN_MINI : if TPGMINI_C generate
+     U_AxilEmpty : entity work.AxiLiteEmpty
+       port map ( axiClk        => axilClk,
+                  axiClkRst     => axilRst,
+                  axiReadMaster => axilReadMasters(1),
+                  axiReadSlave  => axilReadSlaves (1),
+                  axiWriteMaster=> axilWriteMasters(1),
+                  axiWriteSlave => axilWriteSlaves (1) );
+
      U_GENTIMING : BUFG_GT
        port map ( I       => genTimingRef,
                   CE      => '1',
@@ -246,7 +254,10 @@ begin
      rxDataK   <= genTimingPhy.dataK;
      rxDispErr <= "00";
      rxDecErr  <= "00";
-     rxStatus  <= TIMING_PHY_STATUS_INIT_C;
+     rxStatus.locked       <= '1';
+     rxStatus.resetDone    <= '1';
+     rxStatus.bufferByDone <= '1';
+     rxStatus.bufferByErr  <= '0';
    end generate;
    
    GEN_NOMINI : if not TPGMINI_C generate

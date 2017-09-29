@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-12-14
--- Last update: 2017-07-21
+-- Last update: 2017-09-25
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -41,7 +41,7 @@ entity XpmInhibit is
       --  timing clock domain
       clk              : in  sl;
       rst              : in  sl;
-      full             : in  slv(31 downto 0);      -- status from downstream links
+      full             : in  slv(27 downto 0);      -- status from downstream links
       fiducial         : in  sl;
       l0Accept         : in  sl;
       l1Accept         : in  sl;
@@ -60,20 +60,20 @@ architecture rtl of XpmInhibit is
    signal r    : RegType := REG_INIT_C;
    signal r_in : RegType;
 
-   signal trigfull : slv(config.setup'range);
-   signal fullb    : slv(31 downto 0);
+   signal proginhb : slv(config.setup'range);
+   signal fullb    : slv(27 downto 0);
    signal inhSrc   : slv(31 downto 0);
    signal counts   : SlVectorArray(31 downto 0, 31 downto 0);
    
 begin
    status  <= r.status;
-   inhibit <= uOr(fullb) or uOr(trigfull);
+   inhibit <= uOr(fullb) or uOr(proginhb);
 
-   inhSrc  <= fullb when rejecc='1' else
+   inhSrc  <= (proginhb & fullb) when rejecc='1' else
               (others=>'0');
 
    U_SyncFull : entity work.SynchronizerVector
-     generic map ( WIDTH_G => 32 )
+     generic map ( WIDTH_G => 28 )
      port map ( clk     => clk,
                 dataIn  => full,
                 dataOut => fullb );
@@ -94,7 +94,7 @@ begin
                   config     => config.setup(i),
                   fiducial   => fiducial,
                   trig       => l0Accept,
-                  inhibit    => trigfull    (i) );
+                  inhibit    => proginhb    (i) );
    end generate;
 
    process (r, clear, counts, update) is

@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-12-14
--- Last update: 2017-04-10
+-- Last update: 2017-09-25
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -63,10 +63,12 @@ architecture rtl of XpmTrigInhibit is
   signal dout_cnt  : slv(config.interval'range);
   signal dcount    : slv(config.limit'range);
   signal valid_cnt : sl;
-
+  signal fiforst   : sl;
+  
 begin
 
   inhibit <= r.full;
+  fiforst <= rst or not uconfig.enable;
   
   U_Interval : entity work.SynchronizerVector
     generic map ( WIDTH_G => config.interval'length )
@@ -89,7 +91,7 @@ begin
     generic map ( FWFT_EN_G => true,
                   DATA_WIDTH_G => config.interval'length,
                   ADDR_WIDTH_G => config.limit'length )
-    port map ( rst        => rst,
+    port map ( rst        => fiforst,
                clk        => clk,
                wr_en      => trig,
                rd_en      => r.rd_cnt,
@@ -100,25 +102,27 @@ begin
 
   comb : process (r, rst, fiducial, uconfig, dout_cnt, dcount, valid_cnt ) is
     variable v : RegType;
+    variable ncount : slv(dcount'range);
   begin
     v := r;
-    v.full := '0';
     v.rd_cnt := '0';
-    
+
     if fiducial='1' then
       v.count  := r.count+1;
-      v.target := r.count+1+uconfig.interval;
+      v.target := r.count+uconfig.interval;
+      --  latch the fifo status
+      if (valid_cnt='1' and dcount=uconfig.limit) then
+        v.full := '1';
+      else
+        v.full := '0';
+      end if;
     end if;
     
     if (valid_cnt='1' and dout_cnt=r.count) then
       v.rd_cnt := fiducial;
     end if;
 
-    if (dcount=uconfig.limit) then
-      v.full := '1';
-    end if;
-    
-    if rst='1' then
+    if rst='1' or uconfig.enable='0' then
       v := REG_INIT_C;
     end if;
     
