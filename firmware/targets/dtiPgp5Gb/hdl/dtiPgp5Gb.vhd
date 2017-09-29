@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-12-14
--- Last update: 2017-07-24
+-- Last update: 2017-09-21
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -524,7 +524,7 @@ begin
 
   GEN_US_PGP : for i in 0 to MaxUsLinks-1 generate
     U_Core : entity work.DtiUsCore
-      generic map ( DEBUG_G     => ite(i>0, false, true) )
+--      generic map ( DEBUG_G     => ite(i>0, false, true) )
       port map ( sysClk        => regClk,
                  sysRst        => regRst,
                  clear         => regClear,
@@ -565,6 +565,7 @@ begin
 
     U_App : entity work.DtiUsPgp5Gb
       generic map ( ID_G           => x"0" & toSlv(i,4),
+                    -- DEBUG_G        => ite(i>0, false, true),
                     INCLUDE_AXIL_G => ite(i<NPGPAXI_C, true, false) )
       port map ( coreClk  => coreClk(i),
                  coreRst  => coreRst(i),
