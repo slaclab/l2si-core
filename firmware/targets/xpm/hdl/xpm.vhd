@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-12-14
--- Last update: 2017-08-29
+-- Last update: 2017-09-20
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -92,8 +92,8 @@ entity xpm is
       timingRxP        : in    sl;
       timingRxN        : in    sl;
       -- use dsClk(1) for synchronous transmission
-      --timingRefClkInP  : in    sl;
-      --timingRefClkInN  : in    sl;
+--      timingRefClkInP  : in    sl;
+--      timingRefClkInN  : in    sl;
       -- Upstream timing reception, feedback transmission (if slave)
       usRxP            : in    sl;
       usRxN            : in    sl;
@@ -502,10 +502,13 @@ begin
          timingRecClkOutN  => timingRecClkOutN,
          --
          timingRefClkOut   => timingRefClk,
---         timingClkSel      => timingClkSel,
          timingClkScl      => timingClkScl,
          timingClkSda      => timingClkSda,
-         -- Crossbar Ports
+          -- Timing Reference (standalone system only)
+         timingClkSel      => timingClkSel,
+         timingRefClkInP   => '1',
+         timingRefClkInN   => '0',
+        -- Crossbar Ports
          xBarSin           => xBarSin,
          xBarSout          => xBarSout,
          xBarConfig        => xBarConfig,
