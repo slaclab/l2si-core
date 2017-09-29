@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-07-10
--- Last update: 2017-08-23
+-- Last update: 2017-09-19
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -115,8 +115,35 @@ architecture top_level_app of DtiUsPgp5Gb is
   signal pgpRst         : sl;
 
   signal itxfull        : sl;
+
+  signal iibMaster      : AxiStreamMasterArray(NUM_DTI_VC_C-1 downto 0);
+  
+  component ila_0
+    port ( clk : in sl;
+           probe0 : in slv(255 downto 0) );
+  end component;
+  
 begin
 
+  GEN_DBUG : if DEBUG_G generate
+    U_ILA : ila_0
+      port map ( clk                  => ibClk,
+                 probe0(0)            => ibSlave  (VC_EVT).tReady,
+                 probe0(1)            => iibMaster(VC_EVT).tValid,
+                 probe0(65 downto  2) => iibMaster(VC_EVT).tData(63 downto 0),
+                 probe0(67 downto 66) => iibMaster(VC_EVT).tUser( 1 downto 0),
+                 probe0(255 downto 68) => (others=>'0') );
+    U_ILA_P : ila_0
+      port map ( clk                  => pgpClk,
+                 probe0(0)            => pgpRxCtrls(0).pause,
+                 probe0(1)            => pgpRxMasters(0).tValid,
+                 probe0(17 downto  2) => pgpRxMasters(0).tData(15 downto 0),
+                 probe0(19 downto 18) => pgpRxMasters(0).tUser( 1 downto 0),
+                 probe0(255 downto 20) => (others=>'0') );
+  end generate;
+
+  ibMaster <= iibMaster;
+  
   pgpRst <= ibRst;
 
   linkUp                   <= pgpRxOut.linkReady;
@@ -204,6 +231,7 @@ begin
     axilWriteSlave <= AXI_LITE_WRITE_SLAVE_INIT_C;
   end generate;
     
+--  U_ObToAmc : entity work.AxiStreamFifoV2
   U_ObToAmc : entity work.AxiStreamFifo
     generic map ( SLAVE_AXI_CONFIG_G  => US_OB_CONFIG_C,
                   MASTER_AXI_CONFIG_G => SSI_PGP2B_CONFIG_C )
@@ -217,9 +245,12 @@ begin
                mAxisSlave  => pgpTxSlaves (VC_CTL));
 
   GEN_AMCTOIB : for i in 0 to NUM_DTI_VC_C-1 generate
+--    U_AmcToIb : entity work.AxiStreamFifoV2
     U_AmcToIb : entity work.AxiStreamFifo
       generic map ( SLAVE_AXI_CONFIG_G  => SSI_PGP2B_CONFIG_C,
-                    MASTER_AXI_CONFIG_G => US_IB_CONFIG_C )
+                    MASTER_AXI_CONFIG_G => US_IB_CONFIG_C,
+                    FIFO_ADDR_WIDTH_G   => 9,
+                    FIFO_PAUSE_THRESH_G => 256 )
       port map ( sAxisClk    => pgpClk,
                  sAxisRst    => pgpRst,
                  sAxisMaster => pgpRxMasters(i),
@@ -227,7 +258,7 @@ begin
                  sAxisCtrl   => pgpRxCtrls  (i),
                  mAxisClk    => ibClk,
                  mAxisRst    => ibRst,
-                 mAxisMaster => ibMaster    (i),
+                 mAxisMaster => iibMaster   (i),
                  mAxisSlave  => ibSlave     (i));
   end generate;
   

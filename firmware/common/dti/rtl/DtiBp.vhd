@@ -2,7 +2,7 @@
 -- File       : DtiBp.vhd
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-09-04
--- Last update: 2017-07-21
+-- Last update: 2017-09-20
 -------------------------------------------------------------------------------
 -- Description: 
 -------------------------------------------------------------------------------
@@ -121,7 +121,8 @@ begin
    U_Clk : entity work.XpmBpClk
       generic map (
          TPD_G         => TPD_G,
-         MPS_SLOT_G    => false )
+         MPS_SLOT_G    => false,
+         PHASE_500M_G  => 22.5 )  -- Correct skew btw clk500,clk250
       port map (
          -- Stable Clock and Reset 
          refClk       => bpRefClk,
@@ -148,8 +149,8 @@ begin
        COMMON_TX_CLK_G     => false,
        COMMON_RX_CLK_G     => false,
        SLAVE_AXI_CONFIG_G  => BP_CONFIG_C,
-       MASTER_AXI_CONFIG_G => BP_CONFIG_C,
-       DEBUG_G             => true )
+       MASTER_AXI_CONFIG_G => BP_CONFIG_C )
+--       DEBUG_G             => true )
      port map (
        -- TX Serial Stream
        txP           => bpBusTxP,

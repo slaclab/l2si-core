@@ -218,14 +218,14 @@ DtiReg: &DtiReg
       mode: RO
       description: Indexed upstream link - rx full count
     #########################################################
-    usIbDump:
+    usRxInh:
       at:
         offset: 0x0088
       class: IntField
-      name: usIbDump
+      name: usRxInh
       sizeBits: 32
       mode: RO
-      description: Indexed upstream link - rx events dropped
+      description: Indexed upstream link - rx events inhibited
     #########################################################
     usIbEvt:
       at:

@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-07-10
--- Last update: 2017-08-23
+-- Last update: 2017-09-19
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -97,6 +97,7 @@ begin
   linkUp                   <= pgpRxOut.linkReady;
   remLinkID                <= pgpRxOut.remLinkData;
   
+--  U_Fifo : entity work.AxiStreamFifoV2
   U_Fifo : entity work.AxiStreamFifo
     generic map (
       SLAVE_AXI_CONFIG_G  => US_OB_CONFIG_C,

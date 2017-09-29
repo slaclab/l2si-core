@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-07-10
--- Last update: 2017-08-26
+-- Last update: 2017-09-29
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -49,12 +49,14 @@ entity DtiHeaderCache is
      cntL0           : out slv(19 downto 0);
      cntL1A          : out slv(19 downto 0);
      cntL1R          : out slv(19 downto 0);
+     cntWrFifo       : out slv( 3 downto 0);
      --  Cache Output
      rdclk           : in  sl;
      entag           : in  sl;
      l0tag           : in  slv(4 downto 0);
      advance         : in  sl;
      pmsg            : out sl;
+     cntRdFifo       : out slv( 3 downto 0);
      hdrOut          : out DtiEventHeaderType );
 end DtiHeaderCache;
 
@@ -71,6 +73,8 @@ architecture rtl of DtiHeaderCache is
     cntL0  : slv(19 downto 0);
     cntL1A : slv(19 downto 0);
     cntL1R : slv(19 downto 0);
+    cntWrF : slv( 3 downto 0);
+    rstF   : sl;
   end record;
 
   constant WR_REG_INIT_C : WrRegType := (
@@ -83,14 +87,27 @@ architecture rtl of DtiHeaderCache is
     pwordV => '0',
     cntL0  => (others=>'0'),
     cntL1A => (others=>'0'),
-    cntL1R => (others=>'0') );
+    cntL1R => (others=>'0'),
+    cntWrF => (others=>'0'),
+    rstF   => '1' );
 
   signal wr    : WrRegType := WR_REG_INIT_C;
   signal wr_in : WrRegType;
+
+  type RdRegType is record
+    cntRdF : slv( 3 downto 0);
+  end record;
+
+  constant RD_REG_INIT_C : RdRegType := (
+    cntRdF => (others=>'0') );
+
+  signal rd    : RdRegType := RD_REG_INIT_C;
+  signal rd_in : RdRegType;
   
   signal wrrst, rdrst : sl;
   signal entagw, entagr : sl;
   signal pmsgw, pmsgr   : sl;
+  signal urst           : sl;
   signal maddr        : slv(  4 downto 0);
   signal daddr        : slv(  4 downto 0);
   signal doutf        : slv(  4 downto 0);
@@ -99,7 +116,8 @@ architecture rtl of DtiHeaderCache is
   signal il1a         : sl;
   signal sdelay       : slv(l0delay'range);
   signal spartition   : slv(partition'range);
-
+  signal wr_data_count: slv( 3 downto 0);
+  signal rd_data_count: slv( 3 downto 0);
 begin
 
   U_PMsg : entity work.SynchronizerOneShot
@@ -119,6 +137,8 @@ begin
   cntL0            <= wr.cntL0;
   cntL1A           <= wr.cntL1A;
   cntL1R           <= wr.cntL1R;
+  cntWrFifo        <= wr.cntWrF;
+  cntRdFifo        <= rd.cntRdF;
   
   hdrOut.pulseId   <= doutb( 63 downto   0);
   hdrOut.timeStamp <= doutb(127 downto  64);
@@ -194,13 +214,15 @@ begin
     generic map ( ADDR_WIDTH_G => 4,
                   DATA_WIDTH_G => 5,
                   FWFT_EN_G    => true )
-    port map ( rst       => rst,
-               wr_clk    => wrclk,
-               wr_en     => il1a,
-               din       => wr.pword.l1tag,
-               rd_clk    => rdclk,
-               rd_en     => advance,
-               dout      => doutf );
+    port map ( rst           => wr.rstF,
+               wr_clk        => wrclk,
+               wr_en         => il1a,
+               wr_data_count => wr_data_count,
+               din           => wr.pword.l1tag,
+               rd_clk        => rdclk,
+               rd_en         => advance,
+               rd_data_count => rd_data_count,
+               dout          => doutf );
 
   U_MAddr : entity work.SynchronizerVector
     generic map ( WIDTH_G => 5 )
@@ -208,7 +230,7 @@ begin
                dataIn  => wr.pword.l0tag,
                dataOut => maddr );
   
-  comb : process( wr, wrrst, timingBus, exptBus, sdelay, spartition, enable ) is
+  comb : process( wr, wrrst, timingBus, exptBus, sdelay, spartition, enable, wr_data_count ) is
     variable v  : WrRegType;
     variable ip : integer;
   begin
@@ -218,6 +240,7 @@ begin
     v.wren      := '0';
     v.pwordV    := '0';
     v.pmsg      := wr.pmsg(wr.pmsg'left-1 downto 0) & '0';
+    v.rstF      := '0';
     
     ip := conv_integer(spartition);
 
@@ -230,6 +253,10 @@ begin
       v.pmsg(0) := enable and not exptBus.message.partitionWord(ip)(15);
     end if;
 
+    if wr.pmsg(0) = '1' and wr.pvec(14 downto 0) = 0 then
+      v.rstF := '1';
+    end if;
+      
     if wr.rden = '1' then
       v.wren  := wr.pword.l0a or not wr.pvec(15);
     end if;
@@ -245,6 +272,7 @@ begin
 
       if wr.pword.l1e = '1' then
         if wr.pword.l1a = '1' then
+          v.cntWrF := wr_data_count;
           v.cntL1A := wr.cntL1A + 1;
         else
           v.cntL1R := wr.cntL1R + 1;
@@ -259,6 +287,25 @@ begin
   begin
     if rising_edge(wrclk) then
       wr <= wr_in;
+    end if;
+  end process;
+
+  rdcomb : process( rd, rdrst, advance, rd_data_count ) is
+    variable v  : RdRegType;
+  begin
+    v := rd;
+
+    if advance = '1' then
+      v.cntRdF := rd_data_count;
+    end if;
+    
+    rd_in <= v;
+  end process;
+
+  rdseq : process (rdclk) is
+  begin
+    if rising_edge(rdclk) then
+      rd <= rd_in;
     end if;
   end process;
   

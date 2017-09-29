@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-07-10
--- Last update: 2017-07-27
+-- Last update: 2017-09-29
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -129,14 +129,26 @@ architecture rtl of DtiUsCore is
   signal r   : RegType := REG_INIT_C;
   signal rin : RegType;
 
+  type TRegType is record
+    full    : Slv16Array(3 downto 0);
+    ninh    : slv(31 downto 0);
+  end record;
+
+  constant TREG_INIT_C : TRegType := (
+    full    => (others=>(others=>'0')),
+    ninh    => (others=>'0') );
+
+  signal t   : TRegType := TREG_INIT_C;
+  signal tin : TRegType;
+
   signal eventTag : slv(4 downto 0);
   signal pmsg     : sl;
   signal pdata    : XpmPartitionDataType;
   signal pdataV   : sl;
   signal eventHeader : DtiEventHeaderType;
   
-  signal configV, configSV : slv(DTI_US_LINK_CONFIG_BITS_C-1 downto 0);
-  signal configS : DtiUsLinkConfigType;
+  signal configV, configSV, configTV : slv(DTI_US_LINK_CONFIG_BITS_C-1 downto 0);
+  signal configS, configT : DtiUsLinkConfigType;
 
   signal ibEvtMaster  : AxiStreamMasterType;
   signal ibEvtSlave   : AxiStreamSlaveType;
@@ -147,7 +159,9 @@ architecture rtl of DtiUsCore is
   signal urst    : sl;
   signal supdate : sl := '0';
   signal sclear  : sl;
+  signal tclear  : sl;
   signal senable : sl;
+  signal tfull   : slv(15 downto 0);
 
   component ila_0
     port ( clk    : sl;
@@ -155,15 +169,21 @@ architecture rtl of DtiUsCore is
   end component;
 
   signal r_state : slv(2 downto 0);
-  signal cntL0   : slv(19 downto 0);
-  signal cntL1A  : slv(19 downto 0);
-  signal cntL1R  : slv(19 downto 0);
   
 begin
 
-  status.obL0   <= cntL0;
-  status.obL1A  <= cntL1A;
-  status.obL1R  <= cntL1R;
+  GEN_DEBUG : if DEBUG_G generate
+    U_ILA : ila_0
+      port map ( clk   => timingClk,
+                 probe0(0) => timingBus.strobe,
+                 probe0(1) => toPartitionWord(exptBus.message.partitionWord(0)).l0r,
+                 probe0(17 downto 2) => tfull,
+                 probe0(33 downto 18) => t.full(0),
+                 probe0(49 downto 34) => t.full(1),
+                 probe0(81 downto 50) => t.ninh,
+                 probe0(129 downto 82) => exptBus.message.partitionWord(0),
+                 probe0(255 downto 130) => (others=>'0') );
+  end generate;
   
   obClk         <= timingClk;
   ibClk         <= eventClk;
@@ -179,6 +199,7 @@ begin
   status.ibRecv     <= r.ibRecv;
   status.ibEvt      <= r.ibEvt;
   status.ibDump     <= r.ibDump;
+  status.rxInh      <= t.ninh;
   
   eventTag        <= ibMaster.tId(eventTag'range);
   
@@ -204,14 +225,16 @@ begin
                l0delay   => config.trigDelay,
                pdata     => pdata,
                pdataV    => pdataV,
-               cntL0     => cntL0,
-               cntL1A    => cntL1A,
-               cntL1R    => cntL1R,
+               cntL0     => status.obL0,
+               cntL1A    => status.obL1A,
+               cntL1R    => status.obL1R,
+               cntWrFifo => status.wrFifoD,
                rdclk     => eventClk,
                entag     => config.tagEnable,
                l0tag     => eventTag,
                advance   => r.hdrRd,
                pmsg      => pmsg,
+               cntRdFifo => status.rdFifoD,
                hdrOut    => eventHeader );
 
   configV <= toSlv(config);
@@ -224,10 +247,29 @@ begin
 
   configS <= toUsLinkConfig(configSV);
 
+  U_SyncConfigT : entity work.SynchronizerVector
+    generic map ( WIDTH_G => configV'length )
+    port map ( clk     => timingClk,
+               dataIn  => configV,
+               dataOut => configTV );
+
+  configT <= toUsLinkConfig(configTV);
+
   U_ClearS : entity work.Synchronizer
     port map ( clk     => eventClk,
                dataIn  => clear,
                dataOut => sclear );
+  
+  U_ClearT : entity work.Synchronizer
+    port map ( clk     => timingClk,
+               dataIn  => clear,
+               dataOut => tclear );
+  
+  U_FullT : entity work.SynchronizerVector
+    generic map ( WIDTH_G => 16 )
+    port map ( clk     => timingClk,
+               dataIn  => r.full,
+               dataOut => tfull );
   
   U_EnableS : entity work.Synchronizer
     port map ( clk     => timingClk,
@@ -306,7 +348,7 @@ begin
           v.master.tData(63 downto 0) := eventHeader.evttag(47 downto 16) &
                                          toSlv(0,16) &
                                          eventHeader.evttag(15 downto 0);
-          v.hdrRd         := '1';
+          v.hdrRd         := not r.msg; -- Don't advance the fifo for messages
           v.state         := S_EVHDR4;
         end if;
       when S_EVHDR4 =>
@@ -402,4 +444,36 @@ begin
     end if;
   end process;
 
+  tcomb: process (t, timingRst, timingBus, tclear, tfull, configT, exptBus) is
+    variable v : TRegType;
+    variable ip : integer;
+  begin
+    v := t;
+
+    ip := conv_integer(configT.partition);
+
+    if timingBus.strobe = '1' then
+      if (toPartitionWord(exptBus.message.partitionWord(ip)).l0r = '1' and
+          t.full(t.full'left)(ip)='1') then
+        v.ninh := t.ninh+1;
+      end if;
+      v.full := t.full(t.full'left-1 downto 0) & toSlv(0,16);
+    else
+      v.full(0) := t.full(0) or tfull;
+    end if;
+    
+    if timingRst='1' then
+      v := TREG_INIT_C;
+    end if;
+    
+    tin <= v;
+  end process;
+
+  tseq : process (timingClk) is
+  begin
+    if rising_edge(timingClk) then
+      t <= tin;
+    end if;
+  end process;
+  
 end rtl;
