@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-07-10
--- Last update: 2017-09-02
+-- Last update: 2017-09-25
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -86,24 +86,24 @@ architecture top_level_app of xpm_sim is
    signal msgCount : integer := 0;
 begin
 
-   xpmConfig.partition(0) <= pconfig;
+   xpmConfig.partition(1) <= pconfig;
    xpmConfig.dsLink(0).txDelay <= toSlv(200,20);
    xpmConfig.dsLink(1).txDelay <= toSlv(200,20);
      
-   pconfig.l0Select.rateSel <= x"0001";
+   pconfig.l0Select.rateSel <= x"0000";
    pconfig.l0Select.destSel <= x"8000";
-   pconfig.pipeline.depth   <= toSlv(200,20);
+   pconfig.pipeline.depth   <= toSlv(0,20);
    pconfig.inhibit.setup(0).enable   <= '1';
    pconfig.inhibit.setup(0).limit    <= toSlv(3,4);
-   pconfig.inhibit.setup(0).interval <= toSlv(50,12);
+   pconfig.inhibit.setup(0).interval <= toSlv(5,12);
    
    xpmConfig.dsLink(0).enable     <= '1';
    xpmConfig.dsLink(0).partition  <= toSlv( 0, 4);
    xpmConfig.dsLink(1).enable     <= '1';
    
-   GEN_PIPEL : for i in 1 to NPartitions-1 generate
-     xpmConfig.partition(i).pipeline.depth <= toSlv(0,20);
-   end generate;
+   --GEN_PIPEL : for i in 0 to NPartitions-1 generate
+   --  xpmConfig.partition(i).pipeline.depth <= toSlv(0,20);
+   --end generate;
    
    dsRxClk <= (others=>recTimingClk);
    dsRxRst <= (others=>recTimingRst);
@@ -280,7 +280,7 @@ begin
          -- Top Level Interface
          ----------------------
          regclk          => regClk,
-         update          => toSlv(1,NPartitions),
+         update          => toSlv(2,NPartitions),
          status          => xpmStatus,
          config          => xpmConfig,
          -- Timing Interface (timingClk domain) 
