@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2016-03-25
--- Last update: 2017-07-26
+-- Last update: 2017-09-28
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -115,12 +115,15 @@ package DtiPkg is
      remLinkID  : slv( 7 downto 0);
      rxErrs     : slv(31 downto 0);
      rxFull     : slv(31 downto 0);
+     rxInh      : slv(31 downto 0);
      ibRecv     : slv(47 downto 0);
      ibEvt      : slv(31 downto 0);
      ibDump     : slv(31 downto 0);
      obL0       : slv(19 downto 0);
      obL1A      : slv(19 downto 0);
      obL1R      : slv(19 downto 0);
+     wrFifoD    : slv( 3 downto 0);
+     rdFifoD    : slv( 3 downto 0);
    end record;
 
    constant DTI_US_LINK_STATUS_INIT_C : DtiUsLinkStatusType := (
@@ -128,12 +131,15 @@ package DtiPkg is
      remLinkID  => (others=>'0'),
      rxErrs     => (others=>'0'),
      rxFull     => (others=>'0'),
+     rxInh      => (others=>'0'),
      ibRecv     => (others=>'0'),
      ibEvt      => (others=>'0'),
      ibDump     => (others=>'0'),
      obL0       => (others=>'0'),
      obL1A      => (others=>'0'),
-     obL1R      => (others=>'0') );
+     obL1R      => (others=>'0'),
+     wrFifoD    => (others=>'0'),
+     rdFifoD    => (others=>'0') );
    
    type DtiUsLinkStatusArray is array (natural range<>) of DtiUsLinkStatusType;
 

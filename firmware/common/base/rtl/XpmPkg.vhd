@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2016-03-25
--- Last update: 2017-07-24
+-- Last update: 2017-09-20
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -353,6 +353,7 @@ package XpmPkg is
    type XpmPartitionDataType is record
       l0a     : sl;
       l0tag   : slv(4 downto 0);
+      l0r     : sl;
       l1e     : sl;
       l1a     : sl;
       l1tag   : slv(4 downto 0);
@@ -362,6 +363,7 @@ package XpmPkg is
    constant XPM_PARTITION_DATA_INIT_C : XpmPartitionDataType := (
      l0a      => '0',
      l0tag    => (others=>'0'),
+     l0r      => '0',
      l1e      => '0',
      l1a      => '0',
      l1tag    => (others=>'0'),
@@ -369,9 +371,6 @@ package XpmPkg is
 
    type XpmPartitionDataArray is array(natural range<>) of XpmPartitionDataType;
    
-   function toSlvT(l0a : sl; l0tag : slv; l1e : sl; l1a : sl; l1tag : slv) return slv;
-   function toL0Tag(pword : slv) return slv;
-
    function toSlv(s : XpmLinkStatusType) return slv;
    function toLinkStatus(vector : slv) return XpmLinkStatusType;
 
@@ -381,21 +380,6 @@ package XpmPkg is
 end package XpmPkg;
 
 package body XpmPkg is
-
-   function toSlvT(l0a : sl; l0tag : slv; l1e : sl; l1a : sl; l1tag : slv) return slv is
-     variable vector : slv(15 downto 0);
-   begin
-     vector := '1' & l1tag(4 downto 0) & l1a & l1e &
-               "00" & l0tag(4 downto 0) & l0a;
-     return vector;
-   end function;
-
-   function toL0Tag(pword : slv) return slv is
-     variable vector : slv(4 downto 0);
-   begin
-     vector := pword(5 downto 1);
-     return vector;
-   end function;
 
    function toSlv(s : XpmLinkStatusType) return slv is
      variable vector : slv(21 downto 0) := (others=>'0');
@@ -431,7 +415,8 @@ package body XpmPkg is
    begin
      assignSlv(i, vector, pword.l0a);
      assignSlv(i, vector, pword.l0tag);
-     assignSlv(i, vector, "00");
+     assignSlv(i, vector, "0");
+     assignSlv(i, vector, pword.l0r);
      assignSlv(i, vector, pword.l1e);
      assignSlv(i, vector, pword.l1a);
      assignSlv(i, vector, pword.l1tag);
@@ -446,7 +431,8 @@ package body XpmPkg is
    begin
      assignRecord(i, vector, pword.l0a);
      assignRecord(i, vector, pword.l0tag);
-     i := i+2;
+     i := i+1;
+     assignRecord(i, vector, pword.l0r);
      assignRecord(i, vector, pword.l1e);
      assignRecord(i, vector, pword.l1a);
      assignRecord(i, vector, pword.l1tag);

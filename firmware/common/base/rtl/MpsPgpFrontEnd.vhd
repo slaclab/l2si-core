@@ -5,7 +5,7 @@
 -- Author     : Larry Ruckman  <ruckman@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-09-16
--- Last update: 2017-06-30
+-- Last update: 2017-09-19
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -149,7 +149,7 @@ begin
    U_Pgp2bLane : entity work.Pgp2bLane
       generic map (
          LANE_CNT_G        => 1,
-         DEBUG_G           => DEBUG_G,
+--         DEBUG_G           => DEBUG_G,
          VC_INTERLEAVE_G   => VC_INTERLEAVE_G,
          PAYLOAD_CNT_TOP_G => PAYLOAD_CNT_TOP_G,
          NUM_VC_EN_G       => NUM_VC_EN_G,
