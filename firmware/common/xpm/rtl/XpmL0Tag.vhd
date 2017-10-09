@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-12-14
--- Last update: 2017-07-19
+-- Last update: 2017-10-06
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -44,6 +44,7 @@ entity XpmL0Tag is
       enabled          : in  sl;
       timingBus        : in  TimingBusType;
       push             : in  sl;
+      skip             : in  sl;
       push_tag         : out slv(TAG_WIDTH_G-1 downto 0);
       pop              : in  sl;
       pop_tag          : in  slv(7 downto 0);
