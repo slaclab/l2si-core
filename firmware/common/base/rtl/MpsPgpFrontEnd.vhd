@@ -5,7 +5,7 @@
 -- Author     : Larry Ruckman  <ruckman@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-09-16
--- Last update: 2017-09-19
+-- Last update: 2017-10-03
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -64,7 +64,14 @@ entity MpsPgpFrontEnd is
       pgpTxSlaves  : out AxiStreamSlaveArray(3 downto 0);
       -- Frame Receive Interface - 1 Lane, Array of 4 VCs
       pgpRxMasters : out AxiStreamMasterArray(3 downto 0);
-      pgpRxCtrl    : in  AxiStreamCtrlArray(3 downto 0));      
+      pgpRxCtrl    : in  AxiStreamCtrlArray(3 downto 0);
+      --  DRP Interface (stableClk domain)
+      drpaddr_in   : in  slv(8 DOWNTO 0) := (others=>'0');
+      drpdi_in     : in  slv(15 DOWNTO 0) := (others=>'0');
+      drpen_in     : in  sl := '0';
+      drpwe_in     : in  sl := '0';
+      drpdo_out    : out slv(15 DOWNTO 0);
+      drprdy_out   : out sl );
 end MpsPgpFrontEnd;
 
 architecture mapping of MpsPgpFrontEnd is
@@ -84,7 +91,11 @@ architecture mapping of MpsPgpFrontEnd is
          gtwiz_reset_rx_done_out            : out std_logic_vector(0 downto 0);
          gtwiz_userdata_tx_in               : in  std_logic_vector(15 downto 0);
          gtwiz_userdata_rx_out              : out std_logic_vector(15 downto 0);
-         drpclk_in                          : in  std_logic_vector(0 downto 0);
+         drpaddr_in                         : IN STD_LOGIC_VECTOR(8 DOWNTO 0);
+         drpclk_in                          : IN STD_LOGIC_VECTOR(0 DOWNTO 0);
+         drpdi_in                           : IN STD_LOGIC_VECTOR(15 DOWNTO 0);
+         drpen_in                           : IN STD_LOGIC_VECTOR(0 DOWNTO 0);
+         drpwe_in                           : IN STD_LOGIC_VECTOR(0 DOWNTO 0);
          gthrxn_in                          : in  std_logic_vector(0 downto 0);
          gthrxp_in                          : in  std_logic_vector(0 downto 0);
          gtrefclk0_in                       : in  std_logic_vector(0 downto 0);
@@ -103,6 +114,8 @@ architecture mapping of MpsPgpFrontEnd is
          txctrl2_in                         : in  std_logic_vector(7 downto 0);
          txusrclk_in                        : in  std_logic_vector(0 downto 0);
          txusrclk2_in                       : in  std_logic_vector(0 downto 0);
+         drpdo_out                          : OUT STD_LOGIC_VECTOR(15 DOWNTO 0);
+         drprdy_out                         : OUT STD_LOGIC_VECTOR(0 DOWNTO 0);
          gthtxn_out                         : out std_logic_vector(0 downto 0);
          gthtxp_out                         : out std_logic_vector(0 downto 0);
          rxbufstatus_out                    : out std_logic_vector(2 downto 0);
@@ -191,6 +204,10 @@ begin
          gtwiz_userdata_tx_in                  => phyTxLaneOut.data,
          gtwiz_userdata_rx_out                 => phyRxLaneIn.data,
          drpclk_in(0)                          => stableClk,
+         drpaddr_in                            => drpaddr_in,
+         drpdi_in                              => drpdi_in,
+         drpen_in (0)                          => drpen_in,
+         drpwe_in (0)                          => drpwe_in,
          gthrxn_in(0)                          => gtRxN,
          gthrxp_in(0)                          => gtRxP,
          gtrefclk0_in(0)                       => gtRefClk,
@@ -210,6 +227,8 @@ begin
          txctrl2_in(7 downto 2)                => (others => '0'),
          txusrclk_in(0)                        => pgpClk,
          txusrclk2_in(0)                       => pgpClk,
+         drpdo_out                             => drpdo_out,
+         drprdy_out(0)                         => drprdy_out,
          gthtxn_out(0)                         => gtTxN,
          gthtxp_out(0)                         => gtTxP,
          rxbufstatus_out                       => open,

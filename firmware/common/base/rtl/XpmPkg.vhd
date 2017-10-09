@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2016-03-25
--- Last update: 2017-09-20
+-- Last update: 2017-10-06
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -262,13 +262,18 @@ package XpmPkg is
 
    type XpmPartMsgConfigType is record
      insert  : sl;
-     hdr     : slv(14 downto 0);
+     hdr     : slv( 8 downto 0);
      payload : slv(31 downto 0);
    end record;
    constant XPM_PART_MSG_CONFIG_INIT_C : XpmPartMsgConfigType := (
      insert  => '0',
      hdr     => (others=>'0'),
      payload => (others=>'0') );
+
+   --  Clear event header -> event data match fifos
+   constant MSG_CLEAR_FIFO  : slv(8 downto 0) := toSlv(0,9);
+   --  Communicate delay of pword
+   constant MSG_DELAY_PWORD : slv(8 downto 0) := toSlv(1,9);
    
    type XpmAnalysisConfigType is record
       rst        : slv(  NTagBytes-1 downto 0);
@@ -350,6 +355,17 @@ package XpmPkg is
       tag       => (others=>'0'),
       trigword  => (others=>'0'));
 
+   type XpmPartitionMsgType is record
+      l0tag   : slv(4 downto 0);
+      hdr     : slv(8 downto 0);
+      payload : slv(31 downto 0);
+   end record;
+
+   constant XPM_PARTITION_MSG_INIT_C : XpmPartitionMsgType := (
+     l0tag    => (others=>'0'),
+     hdr      => (others=>'0'),
+     payload  => (others=>'0') );
+
    type XpmPartitionDataType is record
       l0a     : sl;
       l0tag   : slv(4 downto 0);
@@ -374,6 +390,8 @@ package XpmPkg is
    function toSlv(s : XpmLinkStatusType) return slv;
    function toLinkStatus(vector : slv) return XpmLinkStatusType;
 
+   function toSlv  (pword : XpmPartitionMsgType) return slv;
+   function toPartitionMsg (vector : slv) return XpmPartitionMsgType;
    function toSlv  (pword : XpmPartitionDataType) return slv;
    function toPartitionWord(vector : slv) return XpmPartitionDataType;
    
@@ -409,6 +427,30 @@ package body XpmPkg is
      return v;
    end function;
 
+   function toSlv  (pword : XpmPartitionMsgType) return slv is
+     variable vector : slv(47 downto 0) := (others=>'0');
+     variable i      : integer          := 0;
+   begin
+     assignSlv(i, vector, "0");
+     assignSlv(i, vector, pword.l0tag);
+     assignSlv(i, vector, pword.hdr);
+     assignSlv(i, vector, "0");  -- message indicator
+     assignSlv(i, vector, pword.payload);
+     return vector;
+   end function;
+   
+   function toPartitionMsg (vector : slv) return XpmPartitionMsgType is
+     variable pword : XpmPartitionMsgType := XPM_PARTITION_MSG_INIT_C;
+     variable i     : integer              := 0;
+   begin
+     i := i+1;
+     assignRecord(i, vector, pword.l0tag);
+     assignRecord(i, vector, pword.hdr);
+     i := i+1;
+     assignRecord(i, vector, pword.payload);
+     return pword;
+   end function;
+   
    function toSlv  (pword : XpmPartitionDataType) return slv is
      variable vector : slv(47 downto 0) := (others=>'0');
      variable i      : integer          := 0;

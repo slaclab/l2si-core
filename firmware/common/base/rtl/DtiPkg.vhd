@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2016-03-25
--- Last update: 2017-09-28
+-- Last update: 2017-10-04
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -87,7 +87,8 @@ package DtiPkg is
    type DtiUsLinkConfigType is record
      enable     : sl;
      partition  : slv(3 downto 0);
-     trigDelay  : slv(7 downto 0);
+     hdrOnly    : sl;
+--     trigDelay  : slv(7 downto 0);
      fwdMask    : slv(MaxDsLinks-1 downto 0);
      fwdMode    : sl;
      dataSrc    : slv(31 downto 0);
@@ -99,7 +100,8 @@ package DtiPkg is
    constant DTI_US_LINK_CONFIG_INIT_C : DtiUsLinkConfigType := (
      enable     => '0',
      partition  => (others=>'0'),
-     trigDelay  => (others=>'0'),
+     hdrOnly    => '0',
+--     trigDelay  => (others=>'0'),
      fwdMask    => (others=>'0'),
      fwdMode    => '0',
      dataSrc    => (others=>'0'),
@@ -208,7 +210,7 @@ package DtiPkg is
    type DtiEventHeaderType is record
      timeStamp  : slv(63 downto 0);
      pulseId    : slv(63 downto 0);
-     evttag     : slv(47 downto 0);
+     evttag     : slv(63 downto 0);
    end record;
 
    constant DTI_EVENT_HEADER_INIT_C : DtiEventHeaderType := (
