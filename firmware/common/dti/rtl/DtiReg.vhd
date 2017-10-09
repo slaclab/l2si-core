@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-12-14
--- Last update: 2017-09-28
+-- Last update: 2017-10-04
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -287,8 +287,9 @@ begin
       axilRegRW (toSlv(  16*i+0,12),  0, v.config.usLink(i).enable );
       axilRegRW (toSlv(  16*i+0,12),  1, v.config.usLink(i).tagEnable );
       axilRegRW (toSlv(  16*i+0,12),  2, v.config.usLink(i).l1Enable );
+      axilRegRW (toSlv(  16*i+0,12),  3, v.config.usLink(i).hdrOnly );
       axilRegRW (toSlv(  16*i+0,12),  4, v.config.usLink(i).partition );
-      axilRegRW (toSlv(  16*i+0,12),  8, v.config.usLink(i).trigDelay );
+--      axilRegRW (toSlv(  16*i+0,12),  8, v.config.usLink(i).trigDelay );
       axilRegRW (toSlv(  16*i+0,12), 16, v.config.usLink(i).fwdMask );
       axilRegRW (toSlv(  16*i+0,12), 31, v.config.usLink(i).fwdMode );
       axilRegRW (toSlv(  16*i+4,12),  0, v.config.usLink(i).dataSrc );

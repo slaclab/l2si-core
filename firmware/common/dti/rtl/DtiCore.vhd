@@ -5,7 +5,7 @@
 -- Author     : Larry Ruckman  <ruckman@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-07-08
--- Last update: 2017-07-24
+-- Last update: 2017-10-02
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -65,8 +65,9 @@ entity DtiCore is
       obAppSlaves       : out   AxiStreamSlaveArray (NAPP_LINKS_G-1 downto 0);
       -- Timing Interface (timingClk domain)
       timingData        : out   TimingRxType;
-      timingBus         : out   TimingBusType;
-      exptBus           : out   ExptBusType;
+      timingBus         : out   TimingBusType;  -- delayed
+      exptBus           : out   ExptBusType;    -- delayed
+      triggerBus        : out   ExptBusType;    -- prompt
       fullOut           : in    slv(15 downto 0);
       -- BSI Interface (bsiClk domain) 
       bsiBus            : out   BsiBusType;
@@ -203,10 +204,19 @@ architecture mapping of DtiCore is
    signal timingFb    : TimingPhyType;
    signal timingFbClk : sl;
    signal timingFbRst : sl;
+
+   signal intTimingClk : sl;
+   signal intTimingRst : sl;
+   signal intTimingBus : TimingBusType;
+   signal intExptBus   : ExptBusType;
 begin
 
   regClk       <= axilClk;
   regRst       <= axilRst;
+
+  recTimingClk <= intTimingClk;
+  recTimingRst <= intTimingRst;
+  triggerBus   <= intExptBus;
   
   GEN_BSI_OVERRIDE: if OVERRIDE_BSI_G=true generate
     localIp    <= IP_ADDR_G;
@@ -399,10 +409,10 @@ begin
          -- Top Level Interface
          ----------------------         
          -- Timing Interface 
-         recTimingClk     => recTimingClk,
-         recTimingRst     => recTimingRst,
-         recTimingBus     => timingBus,
-         recExptBus       => exptBus,
+         recTimingClk     => intTimingClk,
+         recTimingRst     => intTimingRst,
+         recTimingBus     => intTimingBus,
+         recExptBus       => intExptBus,
          recData          => timingData,
 
          appTimingPhy     => timingFb,
@@ -488,5 +498,22 @@ begin
          ddrPwrEnL       => ddrPwrEnL,
          ddrPg           => ddrPg,
          ddrAlertL       => ddrAlertL);
+
+  U_Realign : entity work.ExptRealign
+     port map ( clk            => intTimingClk,
+                rst            => intTimingRst,
+                timingI_strobe => intTimingBus.strobe,
+                timingI_pid    => intTimingBus.message.pulseId,
+                timingI_time   => intTimingBus.message.timeStamp,
+                exptBusI       => intExptBus,
+                timingO_strobe => timingBus.strobe,
+                timingO_pid    => timingBus.message.pulseId,
+                timingO_time   => timingBus.message.timeStamp,
+                exptBusO       => exptBus );
+  timingBus.valid  <= intTimingBus.valid;
+  timingBus.stream <= TIMING_STREAM_INIT_C;
+  timingBus.v1     <= LCLS_V1_TIMING_DATA_INIT_C;
+  timingBus.v2     <= intTimingBus.v2;
+  timingBus.message.version <= intTimingBus.message.version;
 
 end mapping;

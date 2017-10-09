@@ -55,6 +55,18 @@ DtiReg: &DtiReg
       mode: RW
       description: Enable L1 trigger support
     #########################################################
+    usLinkHdrOnly:
+      at:
+        offset: 0x0000
+        stride: 16
+        nelms: *numUsLinks
+      class: IntField
+      name: usLinkHdrOnly
+      sizeBits: 1
+      lsBit: 3
+      mode: RW
+      description: Forward only event header
+    #########################################################
     usLinkPartition:
       at:
         offset: 0x0000

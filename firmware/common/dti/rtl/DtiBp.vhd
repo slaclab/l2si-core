@@ -2,7 +2,7 @@
 -- File       : DtiBp.vhd
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-09-04
--- Last update: 2017-09-20
+-- Last update: 2017-10-05
 -------------------------------------------------------------------------------
 -- Description: 
 -------------------------------------------------------------------------------
@@ -122,7 +122,7 @@ begin
       generic map (
          TPD_G         => TPD_G,
          MPS_SLOT_G    => false,
-         PHASE_500M_G  => 22.5 )  -- Correct skew btw clk500,clk250
+         PHASE_500M_G  => 45.0 )  -- Correct skew btw clk500,clk250
       port map (
          -- Stable Clock and Reset 
          refClk       => bpRefClk,

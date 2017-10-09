@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-07-10
--- Last update: 2017-09-29
+-- Last update: 2017-10-09
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -59,8 +59,9 @@ entity DtiUsCore is
      --  Timing interface
      timingClk       : in  sl;
      timingRst       : in  sl;
-     timingBus       : in  TimingBusType;
-     exptBus         : in  ExptBusType;
+     timingBus       : in  TimingBusType; -- delayed
+     exptBus         : in  ExptBusType;   -- delayed
+     triggerBus      : in  ExptBusType;   -- prompt
      --  DSLinks interface
      eventClk        : in  sl;
      eventRst        : in  sl;
@@ -93,6 +94,7 @@ architecture rtl of DtiUsCore is
     ena     : sl;
     state   : StateType;
     msg     : sl;
+    hdr     : sl;
     dest    : slv(MAX_BIT downto 0);
     mask    : slv(MaxDsLinks-1 downto 0);
     ack     : slv(MaxDsLinks-1 downto 0);
@@ -112,6 +114,7 @@ architecture rtl of DtiUsCore is
     ena     => '0',
     state   => S_IDLE,
     msg     => '0',
+    hdr     => '0',
     dest    => toSlv(MaxDsLinks-1,MAX_BIT+1),
     mask    => (others=>'0'),
     ack     => (others=>'0'),
@@ -143,9 +146,11 @@ architecture rtl of DtiUsCore is
 
   signal eventTag : slv(4 downto 0);
   signal pmsg     : sl;
+  signal phdr     : sl;
   signal pdata    : XpmPartitionDataType;
   signal pdataV   : sl;
   signal eventHeader : DtiEventHeaderType;
+  signal eventHeaderV : sl;
   
   signal configV, configSV, configTV : slv(DTI_US_LINK_CONFIG_BITS_C-1 downto 0);
   signal configS, configT : DtiUsLinkConfigType;
@@ -161,22 +166,25 @@ architecture rtl of DtiUsCore is
   signal sclear  : sl;
   signal tclear  : sl;
   signal senable : sl;
+  signal shdrOnly : sl;
   signal tfull   : slv(15 downto 0);
-
+  
   component ila_0
     port ( clk    : sl;
            probe0 : slv(255 downto 0) );
   end component;
 
   signal r_state : slv(2 downto 0);
+  signal dbgl0r  : sl;
   
 begin
 
   GEN_DEBUG : if DEBUG_G generate
+    dbgl0r <= toPartitionWord(exptBus.message.partitionWord(0)).l0r;
     U_ILA : ila_0
       port map ( clk   => timingClk,
                  probe0(0) => timingBus.strobe,
-                 probe0(1) => toPartitionWord(exptBus.message.partitionWord(0)).l0r,
+                 probe0(1) => dbgl0r,
                  probe0(17 downto 2) => tfull,
                  probe0(33 downto 18) => t.full(0),
                  probe0(49 downto 34) => t.full(1),
@@ -221,8 +229,8 @@ begin
                enable    => senable,
                timingBus => timingBus,
                exptBus   => exptBus,
+               triggerBus=> triggerBus,
                partition => config.partition(2 downto 0),
-               l0delay   => config.trigDelay,
                pdata     => pdata,
                pdataV    => pdataV,
                cntL0     => status.obL0,
@@ -234,8 +242,10 @@ begin
                l0tag     => eventTag,
                advance   => r.hdrRd,
                pmsg      => pmsg,
+               phdr      => phdr,
                cntRdFifo => status.rdFifoD,
-               hdrOut    => eventHeader );
+               hdrOut    => eventHeader,
+               valid     => eventHeaderV );
 
   configV <= toSlv(config);
   
@@ -276,12 +286,19 @@ begin
                dataIn  => config.enable,
                dataOut => senable );
   
+  U_HdrOnlyS : entity work.Synchronizer
+    port map ( clk     => eventClk,
+               dataIn  => config.hdrOnly,
+               dataOut => shdrOnly );
+  
   --
   --  For event traffic:
   --    Arbitrate through forwarding mask
   --    Add event header
   --
-  comb : process ( r, ibMaster, tSlave, configS, eventRst, sclear, supdate, eventHeader, dsfull, ibFull, pmsg, rin) is
+  comb : process ( r, ibMaster, tSlave, configS, eventRst, sclear, supdate, eventHeader, eventHeaderV,
+                   dsfull, ibFull,
+                   pmsg, phdr, rin, shdrOnly ) is
     variable v : RegType;
     variable selv : sl;
     variable fwd  : slv(MAX_BIT downto 0);
@@ -301,17 +318,20 @@ begin
 
     case r.state is
       when S_IDLE =>
-        if v.master.tValid='0' then
+        if v.master.tValid='0' and eventHeaderV='1' then
           v.msg         := '0';
           if pmsg='1' then
             v.msg          := '1';
             v.state        := S_EVHDR1;
             v.ibEvt        := r.ibEvt+1;
-          elsif ibMaster.tValid='1' then
+          elsif phdr='1' then
             if selv = '0' then
+              v.hdr          := '0';
+              v.hdrRd        := '1';
               v.state        := S_DUMP;
               v.ibDump       := r.ibDump+1;
             else
+              v.hdr          := shdrOnly;
               v.state        := S_EVHDR1;
               v.ibEvt        := r.ibEvt+1;
             end if;
@@ -324,8 +344,7 @@ begin
           v.master.tData(63 downto 0) := eventHeader.pulseId;
           v.master.tKeep  := genTKeep(US_IB_CONFIG_C);
           v.master.tLast  := '0';
-          if r.msg = '1' then
-            --  how to broadcast? - just unicast for now
+          if r.msg = '1' or r.hdr = '1' then
             v.master.tDest  := resize(fwd,r.master.tDest'length);
             ssiSetUserSof(US_IB_CONFIG_C, v.master, '1');
           else
@@ -345,22 +364,21 @@ begin
       when S_EVHDR3 =>
         if v.master.tValid='0' then
           v.master.tValid := '1';
-          v.master.tData(63 downto 0) := eventHeader.evttag(47 downto 16) &
-                                         toSlv(0,16) &
-                                         eventHeader.evttag(15 downto 0);
-          v.hdrRd         := not r.msg; -- Don't advance the fifo for messages
+          v.master.tData(63 downto 0) := eventHeader.evttag;
+          v.hdrRd         := '1';
           v.state         := S_EVHDR4;
         end if;
       when S_EVHDR4 =>
         if v.master.tValid='0' then
           v.master.tValid := '1';
           v.master.tData(63 downto 0) := configS.dataSrc & configS.dataType;
-          if r.msg = '1' then
+          if r.msg = '1' or r.hdr = '1' then
+            v.hdr          := '0';
             v.master.tLast := '1';
             ssiSetUserEofe(US_IB_CONFIG_C, v.master, '0');
-            v.state       := S_IDLE;
+            v.state        := S_IDLE;
           else
-            v.state       := S_FIRST_PAYLOAD;
+            v.state        := S_FIRST_PAYLOAD;
           end if;
         end if;
       when S_FIRST_PAYLOAD =>
@@ -444,7 +462,7 @@ begin
     end if;
   end process;
 
-  tcomb: process (t, timingRst, timingBus, tclear, tfull, configT, exptBus) is
+  tcomb: process (t, timingRst, timingBus, tclear, tfull, configT, triggerBus) is
     variable v : TRegType;
     variable ip : integer;
   begin
@@ -453,7 +471,7 @@ begin
     ip := conv_integer(configT.partition);
 
     if timingBus.strobe = '1' then
-      if (toPartitionWord(exptBus.message.partitionWord(ip)).l0r = '1' and
+      if (toPartitionWord(triggerBus.message.partitionWord(ip)).l0r = '1' and
           t.full(t.full'left)(ip)='1') then
         v.ninh := t.ninh+1;
       end if;

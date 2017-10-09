@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-07-10
--- Last update: 2017-09-19
+-- Last update: 2017-10-03
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -80,7 +80,14 @@ entity DtiUsPgp5Gb is
      timingClk       : in  sl;
      timingRst       : in  sl;
      obTrig          : in  XpmPartitionDataType;
-     obTrigValid     : in  sl );
+     obTrigValid     : in  sl;
+     -- DRP Interface
+     drpaddr_in      : in  slv(8 DOWNTO 0) := (others=>'0');
+     drpdi_in        : in  slv(15 DOWNTO 0) := (others=>'0');
+     drpen_in        : in  sl := '0';
+     drpwe_in        : in  sl := '0';
+     drpdo_out       : out slv(15 DOWNTO 0);
+     drprdy_out      : out sl );
 end DtiUsPgp5Gb;
 
 architecture top_level_app of DtiUsPgp5Gb is
@@ -183,7 +190,14 @@ begin
                gtTxP        => amcTxP,
                gtTxN        => amcTxN,
                gtRxP        => amcRxP,
-               gtRxN        => amcRxN );
+               gtRxN        => amcRxN,
+               -- DRP Interface
+               drpaddr_in   => drpaddr_in,
+               drpdi_in     => drpdi_in,
+               drpen_in     => drpen_in,
+               drpwe_in     => drpwe_in,
+               drpdo_out    => drpdo_out,
+               drprdy_out   => drprdy_out );
 
   U_RXERR : entity work.SynchronizerOneShotCnt
     generic map ( CNT_WIDTH_G => 32 )

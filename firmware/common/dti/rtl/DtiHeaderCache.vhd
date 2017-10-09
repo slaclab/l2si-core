@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-07-10
--- Last update: 2017-09-29
+-- Last update: 2017-10-09
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -42,8 +42,8 @@ entity DtiHeaderCache is
      enable          : in  sl;
      timingBus       : in  TimingBusType;
      exptBus         : in  ExptBusType;
+     triggerBus      : in  ExptBusType;
      partition       : in  slv(2 downto 0);
-     l0delay         : in  slv(7 downto 0);
      pdata           : out XpmPartitionDataType;
      pdataV          : out sl;
      cntL0           : out slv(19 downto 0);
@@ -55,7 +55,9 @@ entity DtiHeaderCache is
      entag           : in  sl;
      l0tag           : in  slv(4 downto 0);
      advance         : in  sl;
+     valid           : out sl;
      pmsg            : out sl;
+     phdr            : out sl;
      cntRdFifo       : out slv( 3 downto 0);
      hdrOut          : out DtiEventHeaderType );
 end DtiHeaderCache;
@@ -65,9 +67,11 @@ architecture rtl of DtiHeaderCache is
   type WrRegType is record
     rden   : sl;
     wren   : sl;
-    rdaddr : slv( 7 downto 0);
     pvec   : slv(47 downto 0);
     pmsg   : slv( 5 downto 0);
+    phdr   : slv( 5 downto 0);
+    tword  : XpmPartitionDataType;
+    twordV : sl;
     pword  : XpmPartitionDataType;
     pwordV : sl;
     cntL0  : slv(19 downto 0);
@@ -80,9 +84,11 @@ architecture rtl of DtiHeaderCache is
   constant WR_REG_INIT_C : WrRegType := (
     rden   => '0',
     wren   => '0',
-    rdaddr => (others=>'0'),
     pvec   => (others=>'1'),
     pmsg   => (others=>'0'),
+    phdr   => (others=>'0'),
+    tword  => XPM_PARTITION_DATA_INIT_C,
+    twordV => '0',
     pword  => XPM_PARTITION_DATA_INIT_C,
     pwordV => '0',
     cntL0  => (others=>'0'),
@@ -106,49 +112,47 @@ architecture rtl of DtiHeaderCache is
   
   signal wrrst, rdrst : sl;
   signal entagw, entagr : sl;
-  signal pmsgw, pmsgr   : sl;
-  signal urst           : sl;
-  signal maddr        : slv(  4 downto 0);
   signal daddr        : slv(  4 downto 0);
-  signal doutf        : slv(  4 downto 0);
-  signal dout         : slv(127 downto 0);
-  signal doutb        : slv(175 downto 0);
-  signal il1a         : sl;
-  signal sdelay       : slv(l0delay'range);
+  signal doutf        : slv(  6 downto 0);
+  signal doutb        : slv(191 downto 0);
   signal spartition   : slv(partition'range);
   signal wr_data_count: slv( 3 downto 0);
   signal rd_data_count: slv( 3 downto 0);
+
+  signal pword        : slv(47 downto 0);
+  signal gword        : slv(15 downto 0);
+  signal ip           : integer;
+  signal ptag         : slv(4 downto 0);
+  signal hdrWe        : sl;
 begin
 
-  U_PMsg : entity work.SynchronizerOneShot
-    port map ( clk      => rdclk,
-               dataIn   => wr.pmsg(wr.pmsg'left),
-               dataOut  => pmsg );
-
-  pmsgw <= not wr.pvec(15);
-  
-  U_PMsgR : entity work.Synchronizer
-    port map ( clk      => rdclk,
-               dataIn   => pmsgw,
-               dataOut  => pmsgr );
-
-  pdata            <= wr.pword;
-  pdataV           <= wr.pwordV;
+  --  trigger bus
+  pdata            <= wr.tword;
+  pdataV           <= wr.twordV;
   cntL0            <= wr.cntL0;
   cntL1A           <= wr.cntL1A;
   cntL1R           <= wr.cntL1R;
   cntWrFifo        <= wr.cntWrF;
   cntRdFifo        <= rd.cntRdF;
-  
+
   hdrOut.pulseId   <= doutb( 63 downto   0);
   hdrOut.timeStamp <= doutb(127 downto  64);
-  hdrOut.evttag    <= doutb(175 downto 128);
-    
-  daddr <= maddr when pmsgr ='1' else
-           l0tag when entagr='1' else
-           doutf;
+  hdrOut.evttag    <= doutb(191 downto 128);
+  pmsg             <= doutf(5);
+  phdr             <= doutf(6);
+  
+  GEN_GROUPS : for i in 0 to NPartitions-1 generate
+    gword(i) <= '1' when (toPartitionWord(exptBus.message.partitionWord(i)).l0a='1') else
+                '0';
+  end generate;
+  gword(15 downto 8) <= (others=>'0');
+  
+  daddr <= l0tag when entagr='1' and pmsgr='0' else
+           doutf(4 downto 0);
 
-  il1a  <= wr.pword.l1e and wr.pword.l1a and wr.pwordV;
+  hdrWe <= wr_in.pmsg(0) or wr_in.phdr(0);
+  pword <= exptBus.message.partitionWord(conv_integer(spartition));
+  ptag  <= toPartitionWord(pword).l0tag;
   
   U_RstIn  : entity work.RstSync
     port map ( clk      => wrclk,
@@ -169,42 +173,19 @@ begin
     port map ( clk      => wrclk,
                dataIn   => entag,
                dataOut  => entagw );
-  
-  U_SyncD : entity work.SynchronizerVector
-    generic map ( WIDTH_G => l0delay'length )
-    port map ( clk     => wrclk,
-               dataIn  => l0delay,
-               dataOut => sdelay );
-
-  U_SyncP : entity work.SynchronizerVector
-    generic map ( WIDTH_G => partition'length )
-    port map ( clk     => wrclk,
-               dataIn  => partition,
-               dataOut => spartition );
-
-  U_HdrRam : entity work.SimpleDualPortRam
-    generic map ( DATA_WIDTH_G => 128,
-                  ADDR_WIDTH_G => 8 )
-    port map ( clka   => wrclk,
-               ena    => '1',
-               wea    => timingBus.strobe,
-               addra  => timingBus.message.pulseId(7 downto 0),
-               dina( 63 downto  0) => timingBus.message.pulseId,
-               dina(127 downto 64) => timingBus.message.timeStamp,
-               clkb   => wrclk,
-               enb    => wr.rden,
-               addrb  => wr.rdaddr,
-               doutb  => dout );
 
   U_TagRam : entity work.SimpleDualPortRam
-    generic map ( DATA_WIDTH_G => 176,
+    generic map ( DATA_WIDTH_G => 192,
                   ADDR_WIDTH_G => 5 )
     port map ( clka   => wrclk,
                ena    => '1',
-               wea    => wr.wren,
-               addra  => wr.pword.l0tag,
-               dina(127 downto   0) => dout,
-               dina(175 downto 128) => wr.pvec,
+               wea    => hdrWe,
+               addra  => ptag,
+               dina( 63 downto   0) => timingBus.message.pulseId,
+               dina(127 downto  64) => timingBus.message.timeStamp,
+               dina(143 downto 128) => gword,
+               dina(159 downto 144) => pword(15 downto 0),
+               dina(191 downto 160) => pword(47 downto 16),
                clkb   => rdclk,
                enb    => '1',
                addrb  => daddr,
@@ -212,25 +193,28 @@ begin
 
   U_TagFifo : entity work.FifoAsync
     generic map ( ADDR_WIDTH_G => 4,
-                  DATA_WIDTH_G => 5,
+                  DATA_WIDTH_G => 7,
                   FWFT_EN_G    => true )
     port map ( rst           => wr.rstF,
                wr_clk        => wrclk,
-               wr_en         => il1a,
+               wr_en         => hdrWe,
                wr_data_count => wr_data_count,
-               din           => wr.pword.l1tag,
+               din(4 downto 0) => ptag,
+               din(5)          => wr_in.pmsg(0),
+               din(6)          => wr_in.phdr(0),
                rd_clk        => rdclk,
                rd_en         => advance,
                rd_data_count => rd_data_count,
-               dout          => doutf );
+               dout          => doutf,
+               valid         => valid );
 
-  U_MAddr : entity work.SynchronizerVector
-    generic map ( WIDTH_G => 5 )
-    port map ( clk     => rdclk,
-               dataIn  => wr.pword.l0tag,
-               dataOut => maddr );
+  U_SPartition : entity work.SynchronizerVector
+    generic map ( WIDTH_G => 3 )
+    port map ( clk     => wrclk,
+               dataIn  => partition,
+               dataOut => spartition );
   
-  comb : process( wr, wrrst, timingBus, exptBus, sdelay, spartition, enable, wr_data_count ) is
+  comb : process( wr, wrrst, timingBus, triggerBus, exptBus, spartition, enable, wr_data_count ) is
     variable v  : WrRegType;
     variable ip : integer;
   begin
@@ -238,22 +222,33 @@ begin
 
     v.rden      := '0';
     v.wren      := '0';
+    v.twordV    := '0';
     v.pwordV    := '0';
     v.pmsg      := wr.pmsg(wr.pmsg'left-1 downto 0) & '0';
+    v.phdr      := wr.phdr(wr.phdr'left-1 downto 0) & '0';
     v.rstF      := '0';
     
     ip := conv_integer(spartition);
 
-    if timingBus.strobe = '1' and exptBus.valid = '1' then
+    if timingBus.strobe = '1' then
       v.rden   := '1';
-      v.rdaddr := timingBus.message.pulseId(7 downto 0) - sdelay;
-      v.pword  := toPartitionWord(exptBus.message.partitionWord(ip));
-      v.pwordV := enable and exptBus.message.partitionWord(ip)(15);
-      v.pvec   := exptBus.message.partitionWord(ip);
-      v.pmsg(0) := enable and not exptBus.message.partitionWord(ip)(15);
+      --  Prompt trigger
+      if triggerBus.valid='1' then
+        v.tword  := toPartitionWord(triggerBus.message.partitionWord(ip));
+        v.twordV := enable and triggerBus.message.partitionWord(ip)(15);
+      end if;
+      --  Delayed event header
+      if exptBus.valid='1' then
+        v.pword  := toPartitionWord(exptBus.message.partitionWord(ip));
+        v.pwordV := enable and exptBus.message.partitionWord(ip)(15);
+        v.pvec   := exptBus.message.partitionWord(ip);
+        v.pmsg(0) := not exptBus.message.partitionWord(ip)(15);
+        v.phdr(0) := enable and     exptBus.message.partitionWord(ip)(15) and
+                     toPartitionWord(exptBus.message.partitionWord(ip)).l0a;
+      end if;
     end if;
 
-    if wr.pmsg(0) = '1' and wr.pvec(14 downto 0) = 0 then
+    if wr.pmsg /= 0 and toPartitionMsg(wr.pvec).hdr = MSG_CLEAR_FIFO then
       v.rstF := '1';
     end if;
       
@@ -298,7 +293,7 @@ begin
     if advance = '1' then
       v.cntRdF := rd_data_count;
     end if;
-    
+
     rd_in <= v;
   end process;
 

@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-07-10
--- Last update: 2017-05-15
+-- Last update: 2017-10-03
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -61,6 +61,7 @@ entity DtiUsSimApp is
      obClk           : in  sl;
      obRst           : in  sl;
      obTrig          : in  XpmPartitionDataType;
+     obTrigValid     : in  sl;
      obMaster        : in  AxiStreamMasterType;
      obSlave         : out AxiStreamSlaveType );
 end DtiUsSimApp;
@@ -72,6 +73,9 @@ architecture top_level_app of DtiUsSimApp is
   type RegType is record
     state    : StateType;
     status   : DtiUsAppStatusType;
+    delay    : slv(31 downto 0);
+    target   : slv(31 downto 0);
+    count    : slv(31 downto 0);
     payload  : slv(31 downto 0);
     scratch  : slv(31 downto 0);
     localts  : slv(63 downto 0);
@@ -85,6 +89,9 @@ architecture top_level_app of DtiUsSimApp is
   constant REG_INIT_C : RegType := (
     state    => S_IDLE,
     status   => DTI_US_APP_STATUS_INIT_C,
+    delay    => toSlv(400,32),
+    target   => toSlv( 0,32),
+    count    => toSlv( 0,32),
     payload  => toSlv(32,32),
     scratch  => x"DEADBEEF",
     localts  => (others=>'0'),
@@ -109,11 +116,17 @@ architecture top_level_app of DtiUsSimApp is
   signal amcIbMaster, amcObMaster : AxiStreamMasterType;
   signal amcIbSlave , amcObSlave  : AxiStreamSlaveType;
 
-  signal l0S, l1S, l1aS : sl;
-
+  signal l0a, l0S, l1S, l1aS : sl;
+  signal obTrigV  : slv(47 downto 0);
+  signal obTrigVS : slv(47 downto 0);
+  signal obTrigS : XpmPartitionDataType;
+  signal obTrigSValid : sl;
+  
   signal tagdout : slv(4 downto 0);
+  signal tgtdout : slv(31 downto 0);
   signal tsdout  : slv(63 downto 0);
   signal tagValid : sl;
+  signal tgtValid : sl;
 
   component ila_0
     port ( clk    : sl;
@@ -128,7 +141,9 @@ begin
 
   linkUp  <= '1';
   obSlave <= iobSlave;
-  
+
+  l0a     <= obTrigValid and obTrig.l0a;
+
   GEN_DEBUG : if DEBUG_G generate
     U_ILA_OB : ila_0
       port map ( clk                 => obClk,
@@ -194,18 +209,30 @@ begin
                mAxisMaster => amcObMaster,
                mAxisSlave  => amcObSlave );
 
+  U_TgtFifo : entity work.FifoSync
+    generic map ( FWFT_EN_G    => true,
+                  DATA_WIDTH_G => 32,
+                  ADDR_WIDTH_G => 5 )
+    port map ( rst    => fifoRst,
+               clk    => amcClk,
+               wr_en  => l0S,
+               din    => r.target,
+               rd_en  => r.tagRd,
+               dout   => tgtdout,
+               valid  => tgtValid );
+
   U_TagFifo : entity work.FifoAsync
     generic map ( FWFT_EN_G    => true,
                   DATA_WIDTH_G => 5,
                   ADDR_WIDTH_G => 5 )
-    port map ( rst     => fifoRst,
-               wr_clk  => obClk,
-               wr_en   => obTrig.l0a,
-               din     => obTrig.l0tag,
-               rd_clk  => amcClk,
-               rd_en   => r.tagRd,
-               dout    => tagdout,
-               valid   => tagValid );
+    port map ( rst    => fifoRst,
+               wr_clk => obClk,
+               wr_en  => l0a,
+               din    => obTrig.l0tag,
+               rd_clk => amcClk,
+               rd_en  => r.tagRd,
+               dout   => tagdout,
+               valid  => tagValid );
 
   U_TsFifo : entity work.FifoSync
     generic map ( FWFT_EN_G    => true,
@@ -218,28 +245,27 @@ begin
                din    => r.localts,
                dout   => tsdout );
 
-  U_SyncL0 : entity work.SynchronizerOneShot
-    port map ( clk     => amcClk,
-               rst     => fifoRst,
-               dataIn  => obTrig.l0a,
-               dataOut => l0S );
-  
-  U_SyncL1 : entity work.SynchronizerOneShot
-    port map ( clk     => amcClk,
-               rst     => fifoRst,
-               dataIn  => obTrig.l1e,
-               dataOut => l1S );
-  
-  U_SyncL1A : entity work.Synchronizer
-    port map ( clk     => amcClk,
-               rst     => fifoRst,
-               dataIn  => obTrig.l1a,
-               dataOut => l1aS );
-  
+  obTrigV <= toSlv(obTrig);
+  U_ObTrigS : entity work.SynchronizerFifo
+    generic map ( DATA_WIDTH_G => 48,
+                  ADDR_WIDTH_G => 4 )
+    port map ( rst    => fifoRst,
+               wr_clk => obClk,
+               wr_en  => obTrigValid,
+               din    => obTrigV,
+               rd_clk => amcClk,
+               valid  => obTrigSValid,
+               dout   => obTrigVS );
+  obTrigS <= toPartitionWord(obTrigVS);
+  l0S     <= obTrigSValid and obTrigS.l0a;
+  l1S     <= obTrigSValid and obTrigS.l1e;
+  l1aS    <= obTrigS.l1a;
+
   --
   --  Parse amcOb stream for register transactions or obTrig
   --
-  comb : process ( fifoRst, r, amcObMaster, amcObSlave, amcIbSlave, l1S, l1aS, tagValid, tagdout, tsdout ) is
+  comb : process ( fifoRst, r, amcObMaster, amcObSlave, amcIbSlave, l1S, l1aS,
+                   tagValid, tagdout, tgtValid, tgtdout, tsdout ) is
     variable v   : RegType;
     variable reg : RegTransactionType;
   begin
@@ -248,6 +274,8 @@ begin
     v.tagRd   := '0';
     v.localts := r.localts+1;
     v.slave.tReady := '1';
+    v.count   := r.count+1;
+    v.target  := r.count+r.delay;
     
     if amcObMaster.tValid = '1' and amcObSlave.tReady = '1' then
       v.status.obReceived := r.status.obReceived+1;
@@ -277,12 +305,14 @@ begin
               when      0 => v.master.tData(63 downto 32) := SERIAL_ID_G;
               when      4 => v.master.tData(63 downto 32) := r.payload;
               when      8 => v.master.tData(63 downto 32) := r.scratch;
+              when     12 => v.master.tData(63 downto 32) := r.delay;
               when others => v.master.tData(63 downto 32) := x"DEADBEEF";
             end case;
           else
             case conv_integer(reg.address) is
               when      4 => v.payload := amcObMaster.tData(63 downto 32);
               when      8 => v.scratch := amcObMaster.tData(63 downto 32);
+              when     12 => v.delay   := amcObMaster.tData(63 downto 32);
               when others => null;
             end case;
           end if;
@@ -298,7 +328,7 @@ begin
         end if;
 
       when S_READOUT =>
-        if v.master.tValid='0' and tagValid='1' then
+        if v.master.tValid='0' and tagValid='1' and tgtValid='1' and tgtdout=r.count then
           v.slave .tReady := '0';
           v.tagRd := '1';
           v.master.tId(4 downto 0) := tagdout;
