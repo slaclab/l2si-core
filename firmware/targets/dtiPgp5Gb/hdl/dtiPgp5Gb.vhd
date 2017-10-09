@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-12-14
--- Last update: 2017-09-21
+-- Last update: 2017-10-05
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -149,6 +149,7 @@ architecture top_level of dtiPgp5Gb is
   signal recTimingData  : TimingRxType;
   signal recTimingBus   : TimingBusType;
   signal recExptBus     : ExptBusType;
+  signal triggerBus     : ExptBusType;
   
   -- Reference Clocks and Resets
   signal timingRefClk : sl;
@@ -227,7 +228,7 @@ architecture top_level of dtiPgp5Gb is
 
 --  constant NPGPAXI_C : integer := 7;
   constant NPGPAXI_C : integer := 1;
-  constant NMASTERS_C : integer := 2*NPGPAXI_C+2;
+  constant NMASTERS_C : integer := 2*NPGPAXI_C+2+MaxUsLinks;
   
   signal mAxilReadMasters  : AxiLiteReadMasterArray (NMASTERS_C-1 downto 0);
   signal mAxilReadSlaves   : AxiLiteReadSlaveArray  (NMASTERS_C-1 downto 0);
@@ -236,6 +237,7 @@ architecture top_level of dtiPgp5Gb is
 
   function crossBarConfig return AxiLiteCrossbarMasterConfigArray is
     variable ret : AxiLiteCrossbarMasterConfigArray(NMASTERS_C-1 downto 0);
+    variable i   : integer;
   begin
     ret(0).baseAddr := x"80000000";
     ret(0).addrBits := 24;
@@ -245,9 +247,16 @@ architecture top_level of dtiPgp5Gb is
       ret(i+1).addrBits := 8;
       ret(i+1).connectivity := x"FFFF";
     end loop;
-    ret(2*NPGPAXI_C+1).baseAddr := x"A0000000";
-    ret(2*NPGPAXI_C+1).addrBits := 24;
-    ret(2*NPGPAXI_C+1).connectivity := x"FFFF";
+    i := 2*NPGPAXI_C+1; 
+    ret(i).baseAddr := x"A0000000";
+    ret(i).addrBits := 24;
+    ret(i).connectivity := x"FFFF";
+    for j in 0 to MaxUsLinks-1 loop
+      i := i+1;
+      ret(i).baseAddr := x"B0000000"+toSlv(j*2048,32);
+      ret(i).addrBits := 11;
+      ret(i).connectivity := x"FFFF";
+    end loop;
     return ret;
   end function crossBarConfig;
   
@@ -266,6 +275,13 @@ architecture top_level of dtiPgp5Gb is
   signal bpMonClk : slv( 1 downto 0);
 
   signal ringData : slv(19 downto 0);
+
+  signal drpRdy   : slv(MaxUsLinks-1 downto 0);
+  signal drpEn    : slv(MaxUsLinks-1 downto 0);
+  signal drpWe    : slv(MaxUsLinks-1 downto 0);
+  signal drpAddr  : Slv9Array (MaxUsLinks-1 downto 0);
+  signal drpDi    : Slv16Array(MaxUsLinks-1 downto 0);
+  signal drpDo    : Slv16Array(MaxUsLinks-1 downto 0);
 begin
 
   --
@@ -338,10 +354,10 @@ begin
        dataValue               => ringData,
        axilClk                 => regClk,
        axilRst                 => regRst,
-       axilReadMaster          => mAxilReadMasters (NMASTERS_C-1),
-       axilReadSlave           => mAxilReadSlaves  (NMASTERS_C-1),
-       axilWriteMaster         => mAxilWriteMasters(NMASTERS_C-1),
-       axilWriteSlave          => mAxilWriteSlaves (NMASTERS_C-1));
+       axilReadMaster          => mAxilReadMasters (2*NPGPAXI_C+1),
+       axilReadSlave           => mAxilReadSlaves  (2*NPGPAXI_C+1),
+       axilWriteMaster         => mAxilWriteMasters(2*NPGPAXI_C+1),
+       axilWriteSlave          => mAxilWriteSlaves (2*NPGPAXI_C+1) );
 
   U_Core : entity work.DtiCore
     generic map (
@@ -367,6 +383,7 @@ begin
       timingData        => recTimingData,
       timingBus         => recTimingBus,
       exptBus           => recExptBus,
+      triggerBus        => triggerBus,
       fullOut           => fullOut,
       -- Reference Clocks and Resets
       recTimingClk      => recTimingClk,
@@ -545,6 +562,7 @@ begin
                  timingRst     => recTimingRst,
                  timingBus     => recTimingBus,
                  exptBus       => recExptBus  ,
+                 triggerBus    => triggerBus  ,
                  --
                  eventClk      => ref156MHzClk,      -- inbound data (from sensor)
                  eventRst      => ref156MHzRst,
@@ -563,6 +581,24 @@ begin
                  obTrig        => usObTrig  (i),
                  obTrigValid   => usObTrigV (i) );
 
+    U_Drp : entity work.AxiLiteToDrp
+      generic map ( COMMON_CLK_G => true,
+                    ADDR_WIDTH_G => 9 )
+      port map ( axilClk         => regClk,
+                 axilRst         => regRst,
+                 axilReadMaster  => mAxilReadMasters (i+2*NPGPAXI_C+2),
+                 axilReadSlave   => mAxilReadSlaves  (i+2*NPGPAXI_C+2),
+                 axilWriteMaster => mAxilWriteMasters(i+2*NPGPAXI_C+2),
+                 axilWriteSlave  => mAxilWriteSlaves (i+2*NPGPAXI_C+2),
+                 drpClk          => regClk,
+                 drpRst          => regRst,
+                 drpRdy          => drpRdy (i),
+                 drpEn           => drpEn  (i),
+                 drpWe           => drpWe  (i),
+                 drpAddr         => drpAddr(i),
+                 drpDi           => drpDi  (i),
+                 drpDo           => drpDo  (i) );
+                 
     U_App : entity work.DtiUsPgp5Gb
       generic map ( ID_G           => x"0" & toSlv(i,4),
                     -- DEBUG_G        => ite(i>0, false, true),
@@ -603,7 +639,15 @@ begin
                  timingClk   => recTimingClk,
                  timingRst   => recTimingRst,
                  obTrig      => usObTrig  (i),
-                 obTrigValid => usObTrigV (i) );
+                 obTrigValid => usObTrigV (i),
+                 -- DRP Interface
+                 drpaddr_in  => drpAddr(i),
+                 drpdi_in    => drpDi  (i),
+                 drpen_in    => drpEn  (i),
+                 drpwe_in    => drpWe  (i),
+                 drpdo_out   => drpDo  (i),
+                 drprdy_out  => drpRdy (i) );
+
     GEN_AXIL : if i < NPGPAXI_C generate
       usAxilReadMasters (i)   <= mAxilReadMasters (i+1);
       usAxilWriteMasters(i)   <= mAxilWriteMasters(i+1);

@@ -12,6 +12,8 @@
 #include DtiCore.yaml
 #include DtiReg.yaml
 #include DtiDsPgp5Gb.yaml
+##include AxiLiteRingBuffer.yaml
+#include Gthe3Channel.yaml
 
 Dti: &Dti
   class: MMIODev
@@ -43,6 +45,18 @@ Dti: &Dti
         offset: 0x90000100 
         stride: 0x100
         nelms: 1
+    ##################################################     
+#    TimingRingB:
+#      <<: *AxiLiteRingBuffer
+#      at:
+#        offset: 0xA0000000 
+    ##################################################     
+    UsDrp:
+      <<: *Gthe3Channel
+      at:
+        offset: 0xB0000000 
+        stride: 0x800
+        nelms: 7
     ##################################################     
   #########
   Commands:
