@@ -1,4 +1,4 @@
-#include "hsd_raw.h"
+#include "hsd_none.h"
 
 #include <fstream>
 #include <iomanip>
@@ -15,30 +15,27 @@ int main()
   adcout_t dout[8];
   tout_t   tout[8];
   ap_fixed<4,4> yv;
-  ap_fixed<3,3> iy;
 
   // Open a file to save the results
-  result .open("result_hsd_raw.dat");
+  result .open("result_hsd_none.dat");
 
   // Apply stimuli, call the top-level function and save the results
   int i=0;
 
   while(i < 10240) {
     { //  Sample data
-      hsd_raw((i%2696)==0,  // clks between beam pulses
+      hsd_none((i%2696)==0,  // clks between beam pulses
               PROC_IN(DIN)
               PROC_IN(DOUT)
               PROC_IN(TOUT)
               yv,
-              iy,
               0);
       unsigned uyv = (unsigned(yv)&0xf);
-      unsigned iyv = (unsigned(iy)&0x7);
 
       result << setw(5) << uyv << ":";
       for(unsigned j=0; j<uyv; j++)
         result << setw(8) << dout[j];
-      result << ":" << setw(5) << tout[iyv] << endl;
+      result << ":" << setw(5) << tout[uyv-1] << endl;
     }
 
     i += 8;
