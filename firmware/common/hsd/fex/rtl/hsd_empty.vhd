@@ -11,10 +11,6 @@ entity hsd_empty is
     C_S_AXI_BUS_A_ADDR_WIDTH : INTEGER := 5;
     C_S_AXI_BUS_A_DATA_WIDTH : INTEGER := 32 );
   port (
-    ap_start : IN STD_LOGIC;
-    ap_done : OUT STD_LOGIC;
-    ap_idle : OUT STD_LOGIC;
-    ap_ready : OUT STD_LOGIC;
     sync  : IN STD_LOGIC;
     x0_V : IN STD_LOGIC_VECTOR (10 downto 0);
     x1_V : IN STD_LOGIC_VECTOR (10 downto 0);
@@ -70,10 +66,6 @@ architecture rtl of hsd_empty is
   signal axilWriteMaster  : AxiLiteWriteMasterType := AXI_LITE_WRITE_MASTER_INIT_C;
   signal axilWriteSlave   : AxiLiteWriteSlaveType;
 begin
-
-  ap_done  <= ap_start;
-  ap_idle  <= '1';
-  ap_ready <= '1';
 
   y0_V <= (others=>'0');
   y1_V <= (others=>'0');

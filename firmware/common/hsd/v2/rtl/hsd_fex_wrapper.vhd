@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2016-01-04
--- Last update: 2017-09-03
+-- Last update: 2017-09-26
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -653,11 +653,8 @@ begin
   
   GEN_RAW : if ALGORITHM_G = "RAW" generate
     U_FEX : entity work.hsd_raw
-      port map ( ap_start            => '1',
-                 ap_done             => open,
-                 ap_idle             => open,
-                 ap_ready            => open,
-                 sync                => r.sync,
+      generic map ( C_S_AXI_BUS_A_ADDR_WIDTH => 8 )
+      port map ( sync                => r.sync,
                  ap_clk              => clk,
                  ap_rst_n            => rstn,
                  x0_V                => din(0),
@@ -688,14 +685,14 @@ begin
                  iy_V                => doute0,
                  s_axi_BUS_A_AWVALID => axilWriteMaster.awvalid,
                  s_axi_BUS_A_AWREADY => axilWriteSlave .awready,
-                 s_axi_BUS_A_AWADDR  => axilWriteMaster.awaddr(4 downto 0),
+                 s_axi_BUS_A_AWADDR  => axilWriteMaster.awaddr(7 downto 0),
                  s_axi_BUS_A_WVALID  => axilWriteMaster.wvalid,
                  s_axi_BUS_A_WREADY  => axilWriteSlave .wready,
                  s_axi_BUS_A_WDATA   => axilWriteMaster.wdata,
                  s_axi_BUS_A_WSTRB   => axilWriteMaster.wstrb(3 downto 0),
                  s_axi_BUS_A_ARVALID => axilReadMaster .arvalid,
                  s_axi_BUS_A_ARREADY => axilReadSlave  .arready,
-                 s_axi_BUS_A_ARADDR  => axilReadMaster .araddr(4 downto 0),
+                 s_axi_BUS_A_ARADDR  => axilReadMaster .araddr(7 downto 0),
                  s_axi_BUS_A_RVALID  => axilReadSlave  .rvalid,
                  s_axi_BUS_A_RREADY  => axilReadMaster .rready,
                  s_axi_BUS_A_RDATA   => axilReadSlave  .rdata,
@@ -707,11 +704,8 @@ begin
     
   GEN_THR : if ALGORITHM_G = "THR" generate
     U_FEX : entity work.hsd_thr
-      port map ( ap_start            => '1',
-                 ap_done             => open,
-                 ap_idle             => open,
-                 ap_ready            => open,
-                 sync                => r.sync,
+      generic map ( C_S_AXI_BUS_A_ADDR_WIDTH => 8 )
+      port map ( sync                => r.sync,
                  ap_clk              => clk,
                  ap_rst_n            => rstn,
                  x0_V                => din(0),
@@ -742,14 +736,14 @@ begin
                  iy_V                => doute0,
                  s_axi_BUS_A_AWVALID => axilWriteMaster.awvalid,
                  s_axi_BUS_A_AWREADY => axilWriteSlave .awready,
-                 s_axi_BUS_A_AWADDR  => axilWriteMaster.awaddr(4 downto 0),
+                 s_axi_BUS_A_AWADDR  => axilWriteMaster.awaddr(7 downto 0),
                  s_axi_BUS_A_WVALID  => axilWriteMaster.wvalid,
                  s_axi_BUS_A_WREADY  => axilWriteSlave .wready,
                  s_axi_BUS_A_WDATA   => axilWriteMaster.wdata,
                  s_axi_BUS_A_WSTRB   => axilWriteMaster.wstrb(3 downto 0),
                  s_axi_BUS_A_ARVALID => axilReadMaster .arvalid,
                  s_axi_BUS_A_ARREADY => axilReadSlave  .arready,
-                 s_axi_BUS_A_ARADDR  => axilReadMaster .araddr(4 downto 0),
+                 s_axi_BUS_A_ARADDR  => axilReadMaster .araddr(7 downto 0),
                  s_axi_BUS_A_RVALID  => axilReadSlave  .rvalid,
                  s_axi_BUS_A_RREADY  => axilReadMaster .rready,
                  s_axi_BUS_A_RDATA   => axilReadSlave  .rdata,

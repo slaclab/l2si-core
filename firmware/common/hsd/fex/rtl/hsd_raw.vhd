@@ -16,10 +16,6 @@ generic (
 port (
     ap_clk : IN STD_LOGIC;
     ap_rst_n : IN STD_LOGIC;
-    ap_start : IN STD_LOGIC;
-    ap_done : OUT STD_LOGIC;
-    ap_idle : OUT STD_LOGIC;
-    ap_ready : OUT STD_LOGIC;
     sync : IN STD_LOGIC;
     x0_V : IN STD_LOGIC_VECTOR (10 downto 0);
     x1_V : IN STD_LOGIC_VECTOR (10 downto 0);
@@ -55,6 +51,7 @@ port (
     t7_V_ap_vld : OUT STD_LOGIC;
     yv_V : OUT STD_LOGIC_VECTOR (3 downto 0);
     iy_V : OUT STD_LOGIC_VECTOR (2 downto 0);
+    iy_V_ap_vld : OUT STD_LOGIC;
     s_axi_BUS_A_AWVALID : IN STD_LOGIC;
     s_axi_BUS_A_AWREADY : OUT STD_LOGIC;
     s_axi_BUS_A_AWADDR : IN STD_LOGIC_VECTOR (C_S_AXI_BUS_A_ADDR_WIDTH-1 downto 0);
@@ -78,14 +75,15 @@ end;
 architecture behav of hsd_raw is 
     attribute CORE_GENERATION_INFO : STRING;
     attribute CORE_GENERATION_INFO of behav : architecture is
-    "hsd_raw,hls_ip_2016_4,{HLS_INPUT_TYPE=cxx,HLS_INPUT_FLOAT=0,HLS_INPUT_FIXED=1,HLS_INPUT_PART=xcku085-flvb1760-2-e,HLS_INPUT_CLOCK=6.000000,HLS_INPUT_ARCH=pipeline,HLS_SYN_CLOCK=2.310000,HLS_SYN_LAT=0,HLS_SYN_TPT=1,HLS_SYN_MEM=0,HLS_SYN_DSP=0,HLS_SYN_FF=101,HLS_SYN_LUT=266}";
+    "hsd_raw,hls_ip_2016_4,{HLS_INPUT_TYPE=cxx,HLS_INPUT_FLOAT=0,HLS_INPUT_FIXED=1,HLS_INPUT_PART=xcku085-flvb1760-2-e,HLS_INPUT_CLOCK=5.400000,HLS_INPUT_ARCH=pipeline,HLS_SYN_CLOCK=2.310000,HLS_SYN_LAT=0,HLS_SYN_TPT=1,HLS_SYN_MEM=0,HLS_SYN_DSP=0,HLS_SYN_FF=101,HLS_SYN_LUT=266}";
     constant ap_const_logic_1 : STD_LOGIC := '1';
     constant ap_const_logic_0 : STD_LOGIC := '0';
     constant ap_ST_fsm_state1 : STD_LOGIC_VECTOR (0 downto 0) := "1";
     constant ap_const_lv32_0 : STD_LOGIC_VECTOR (31 downto 0) := "00000000000000000000000000000000";
-    constant ap_const_lv1_1 : STD_LOGIC_VECTOR (0 downto 0) := "1";
     constant C_S_AXI_DATA_WIDTH : INTEGER range 63 downto 0 := 20;
+    constant ap_const_lv1_1 : STD_LOGIC_VECTOR (0 downto 0) := "1";
     constant ap_const_lv4_8 : STD_LOGIC_VECTOR (3 downto 0) := "1000";
+    constant ap_const_lv3_0 : STD_LOGIC_VECTOR (2 downto 0) := "000";
     constant ap_const_lv14_1 : STD_LOGIC_VECTOR (13 downto 0) := "00000000000001";
     constant ap_const_lv14_2 : STD_LOGIC_VECTOR (13 downto 0) := "00000000000010";
     constant ap_const_lv14_3 : STD_LOGIC_VECTOR (13 downto 0) := "00000000000011";
@@ -96,17 +94,17 @@ architecture behav of hsd_raw is
     constant ap_const_lv32_8 : STD_LOGIC_VECTOR (31 downto 0) := "00000000000000000000000000001000";
 
     signal ap_rst_n_inv : STD_LOGIC;
+    signal config_a : STD_LOGIC_VECTOR (31 downto 0);
+    signal count : STD_LOGIC_VECTOR (31 downto 0) := "00000000000000000000000000000000";
+    signal tmp_15_fu_402_p2 : STD_LOGIC_VECTOR (31 downto 0);
     signal ap_CS_fsm : STD_LOGIC_VECTOR (0 downto 0) := "1";
     attribute fsm_encoding : string;
     attribute fsm_encoding of ap_CS_fsm : signal is "none";
     signal ap_CS_fsm_state1 : STD_LOGIC_VECTOR (0 downto 0);
     attribute fsm_encoding of ap_CS_fsm_state1 : signal is "none";
-    signal config_a : STD_LOGIC_VECTOR (31 downto 0);
-    signal count : STD_LOGIC_VECTOR (31 downto 0) := "00000000000000000000000000000000";
-    signal p_s_fu_384_p3 : STD_LOGIC_VECTOR (31 downto 0);
-    signal tmp_8_fu_324_p1 : STD_LOGIC_VECTOR (13 downto 0);
-    signal p_s_fu_384_p0 : STD_LOGIC_VECTOR (0 downto 0);
-    signal tmp_15_fu_378_p2 : STD_LOGIC_VECTOR (31 downto 0);
+    signal tmp_8_fu_348_p1 : STD_LOGIC_VECTOR (13 downto 0);
+    signal p_Val2_s_fu_300_p0 : STD_LOGIC_VECTOR (0 downto 0);
+    signal p_Val2_s_fu_300_p3 : STD_LOGIC_VECTOR (31 downto 0);
     signal ap_NS_fsm : STD_LOGIC_VECTOR (0 downto 0);
 
     component hsd_raw_BUS_A_s_axi IS
@@ -185,13 +183,13 @@ begin
     process (ap_clk)
     begin
         if (ap_clk'event and ap_clk = '1') then
-            if (((ap_CS_fsm_state1 = ap_const_lv1_1) and not((ap_start = ap_const_logic_0)))) then
-                count <= p_s_fu_384_p3;
+            if (((ap_CS_fsm_state1 = ap_const_lv1_1))) then
+                count <= tmp_15_fu_402_p2;
             end if;
         end if;
     end process;
 
-    ap_NS_fsm_assign_proc : process (ap_start, ap_CS_fsm)
+    ap_NS_fsm_assign_proc : process (ap_CS_fsm)
     begin
         case ap_CS_fsm is
             when ap_ST_fsm_state1 => 
@@ -202,152 +200,131 @@ begin
     end process;
     ap_CS_fsm_state1 <= ap_CS_fsm(0 downto 0);
 
-    ap_done_assign_proc : process(ap_start, ap_CS_fsm_state1)
-    begin
-        if (((ap_CS_fsm_state1 = ap_const_lv1_1) and not((ap_start = ap_const_logic_0)))) then 
-            ap_done <= ap_const_logic_1;
-        else 
-            ap_done <= ap_const_logic_0;
-        end if; 
-    end process;
-
-
-    ap_idle_assign_proc : process(ap_start, ap_CS_fsm_state1)
-    begin
-        if (((ap_const_logic_0 = ap_start) and (ap_CS_fsm_state1 = ap_const_lv1_1))) then 
-            ap_idle <= ap_const_logic_1;
-        else 
-            ap_idle <= ap_const_logic_0;
-        end if; 
-    end process;
-
-
-    ap_ready_assign_proc : process(ap_start, ap_CS_fsm_state1)
-    begin
-        if (((ap_CS_fsm_state1 = ap_const_lv1_1) and not((ap_start = ap_const_logic_0)))) then 
-            ap_ready <= ap_const_logic_1;
-        else 
-            ap_ready <= ap_const_logic_0;
-        end if; 
-    end process;
-
-
     ap_rst_n_inv_assign_proc : process(ap_rst_n)
     begin
                 ap_rst_n_inv <= not(ap_rst_n);
     end process;
 
-    p_s_fu_384_p0 <= (0=>sync, others=>'-');
-    p_s_fu_384_p3 <= 
-        ap_const_lv32_0 when (p_s_fu_384_p0(0) = '1') else 
-        tmp_15_fu_378_p2;
-    t0_V <= tmp_8_fu_324_p1;
+    iy_V <= ap_const_lv3_0;
 
-    t0_V_ap_vld_assign_proc : process(ap_start, ap_CS_fsm_state1)
+    iy_V_ap_vld_assign_proc : process(ap_CS_fsm_state1)
     begin
-        if (((ap_CS_fsm_state1 = ap_const_lv1_1) and not((ap_start = ap_const_logic_0)))) then 
+        if (((ap_CS_fsm_state1 = ap_const_lv1_1))) then 
+            iy_V_ap_vld <= ap_const_logic_1;
+        else 
+            iy_V_ap_vld <= ap_const_logic_0;
+        end if; 
+    end process;
+
+    p_Val2_s_fu_300_p0 <= (0=>sync, others=>'-');
+    p_Val2_s_fu_300_p3 <= 
+        ap_const_lv32_0 when (p_Val2_s_fu_300_p0(0) = '1') else 
+        count;
+    t0_V <= tmp_8_fu_348_p1;
+
+    t0_V_ap_vld_assign_proc : process(ap_CS_fsm_state1)
+    begin
+        if (((ap_CS_fsm_state1 = ap_const_lv1_1))) then 
             t0_V_ap_vld <= ap_const_logic_1;
         else 
             t0_V_ap_vld <= ap_const_logic_0;
         end if; 
     end process;
 
-    t1_V <= std_logic_vector(unsigned(ap_const_lv14_1) + unsigned(tmp_8_fu_324_p1));
+    t1_V <= std_logic_vector(unsigned(ap_const_lv14_1) + unsigned(tmp_8_fu_348_p1));
 
-    t1_V_ap_vld_assign_proc : process(ap_start, ap_CS_fsm_state1)
+    t1_V_ap_vld_assign_proc : process(ap_CS_fsm_state1)
     begin
-        if (((ap_CS_fsm_state1 = ap_const_lv1_1) and not((ap_start = ap_const_logic_0)))) then 
+        if (((ap_CS_fsm_state1 = ap_const_lv1_1))) then 
             t1_V_ap_vld <= ap_const_logic_1;
         else 
             t1_V_ap_vld <= ap_const_logic_0;
         end if; 
     end process;
 
-    t2_V <= std_logic_vector(unsigned(ap_const_lv14_2) + unsigned(tmp_8_fu_324_p1));
+    t2_V <= std_logic_vector(unsigned(ap_const_lv14_2) + unsigned(tmp_8_fu_348_p1));
 
-    t2_V_ap_vld_assign_proc : process(ap_start, ap_CS_fsm_state1)
+    t2_V_ap_vld_assign_proc : process(ap_CS_fsm_state1)
     begin
-        if (((ap_CS_fsm_state1 = ap_const_lv1_1) and not((ap_start = ap_const_logic_0)))) then 
+        if (((ap_CS_fsm_state1 = ap_const_lv1_1))) then 
             t2_V_ap_vld <= ap_const_logic_1;
         else 
             t2_V_ap_vld <= ap_const_logic_0;
         end if; 
     end process;
 
-    t3_V <= std_logic_vector(unsigned(ap_const_lv14_3) + unsigned(tmp_8_fu_324_p1));
+    t3_V <= std_logic_vector(unsigned(ap_const_lv14_3) + unsigned(tmp_8_fu_348_p1));
 
-    t3_V_ap_vld_assign_proc : process(ap_start, ap_CS_fsm_state1)
+    t3_V_ap_vld_assign_proc : process(ap_CS_fsm_state1)
     begin
-        if (((ap_CS_fsm_state1 = ap_const_lv1_1) and not((ap_start = ap_const_logic_0)))) then 
+        if (((ap_CS_fsm_state1 = ap_const_lv1_1))) then 
             t3_V_ap_vld <= ap_const_logic_1;
         else 
             t3_V_ap_vld <= ap_const_logic_0;
         end if; 
     end process;
 
-    t4_V <= std_logic_vector(unsigned(ap_const_lv14_4) + unsigned(tmp_8_fu_324_p1));
+    t4_V <= std_logic_vector(unsigned(ap_const_lv14_4) + unsigned(tmp_8_fu_348_p1));
 
-    t4_V_ap_vld_assign_proc : process(ap_start, ap_CS_fsm_state1)
+    t4_V_ap_vld_assign_proc : process(ap_CS_fsm_state1)
     begin
-        if (((ap_CS_fsm_state1 = ap_const_lv1_1) and not((ap_start = ap_const_logic_0)))) then 
+        if (((ap_CS_fsm_state1 = ap_const_lv1_1))) then 
             t4_V_ap_vld <= ap_const_logic_1;
         else 
             t4_V_ap_vld <= ap_const_logic_0;
         end if; 
     end process;
 
-    t5_V <= std_logic_vector(unsigned(ap_const_lv14_5) + unsigned(tmp_8_fu_324_p1));
+    t5_V <= std_logic_vector(unsigned(ap_const_lv14_5) + unsigned(tmp_8_fu_348_p1));
 
-    t5_V_ap_vld_assign_proc : process(ap_start, ap_CS_fsm_state1)
+    t5_V_ap_vld_assign_proc : process(ap_CS_fsm_state1)
     begin
-        if (((ap_CS_fsm_state1 = ap_const_lv1_1) and not((ap_start = ap_const_logic_0)))) then 
+        if (((ap_CS_fsm_state1 = ap_const_lv1_1))) then 
             t5_V_ap_vld <= ap_const_logic_1;
         else 
             t5_V_ap_vld <= ap_const_logic_0;
         end if; 
     end process;
 
-    t6_V <= std_logic_vector(unsigned(ap_const_lv14_6) + unsigned(tmp_8_fu_324_p1));
+    t6_V <= std_logic_vector(unsigned(ap_const_lv14_6) + unsigned(tmp_8_fu_348_p1));
 
-    t6_V_ap_vld_assign_proc : process(ap_start, ap_CS_fsm_state1)
+    t6_V_ap_vld_assign_proc : process(ap_CS_fsm_state1)
     begin
-        if (((ap_CS_fsm_state1 = ap_const_lv1_1) and not((ap_start = ap_const_logic_0)))) then 
+        if (((ap_CS_fsm_state1 = ap_const_lv1_1))) then 
             t6_V_ap_vld <= ap_const_logic_1;
         else 
             t6_V_ap_vld <= ap_const_logic_0;
         end if; 
     end process;
 
-    t7_V <= std_logic_vector(unsigned(ap_const_lv14_7) + unsigned(tmp_8_fu_324_p1));
+    t7_V <= std_logic_vector(unsigned(ap_const_lv14_7) + unsigned(tmp_8_fu_348_p1));
 
-    t7_V_ap_vld_assign_proc : process(ap_start, ap_CS_fsm_state1)
+    t7_V_ap_vld_assign_proc : process(ap_CS_fsm_state1)
     begin
-        if (((ap_CS_fsm_state1 = ap_const_lv1_1) and not((ap_start = ap_const_logic_0)))) then 
+        if (((ap_CS_fsm_state1 = ap_const_lv1_1))) then 
             t7_V_ap_vld <= ap_const_logic_1;
         else 
             t7_V_ap_vld <= ap_const_logic_0;
         end if; 
     end process;
 
-    tmp_15_fu_378_p2 <= std_logic_vector(unsigned(ap_const_lv32_8) + unsigned(count));
-    tmp_8_fu_324_p1 <= count(14 - 1 downto 0);
-        y0_V <= std_logic_vector(resize(unsigned(x0_V),16));
+    tmp_15_fu_402_p2 <= std_logic_vector(unsigned(ap_const_lv32_8) + unsigned(p_Val2_s_fu_300_p3));
+    tmp_8_fu_348_p1 <= p_Val2_s_fu_300_p3(14 - 1 downto 0);
+        y0_V <= std_logic_vector(resize(signed(x0_V),16));
 
-        y1_V <= std_logic_vector(resize(unsigned(x1_V),16));
+        y1_V <= std_logic_vector(resize(signed(x1_V),16));
 
-        y2_V <= std_logic_vector(resize(unsigned(x2_V),16));
+        y2_V <= std_logic_vector(resize(signed(x2_V),16));
 
-        y3_V <= std_logic_vector(resize(unsigned(x3_V),16));
+        y3_V <= std_logic_vector(resize(signed(x3_V),16));
 
-        y4_V <= std_logic_vector(resize(unsigned(x4_V),16));
+        y4_V <= std_logic_vector(resize(signed(x4_V),16));
 
-        y5_V <= std_logic_vector(resize(unsigned(x5_V),16));
+        y5_V <= std_logic_vector(resize(signed(x5_V),16));
 
-        y6_V <= std_logic_vector(resize(unsigned(x6_V),16));
+        y6_V <= std_logic_vector(resize(signed(x6_V),16));
 
-        y7_V <= std_logic_vector(resize(unsigned(x7_V),16));
+        y7_V <= std_logic_vector(resize(signed(x7_V),16));
 
     yv_V <= ap_const_lv4_8;
-    iy_V <= (others=>'0');  -- manual addition
-    
 end behav;

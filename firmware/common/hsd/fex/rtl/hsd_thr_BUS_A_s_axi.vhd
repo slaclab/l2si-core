@@ -11,7 +11,7 @@ use IEEE.NUMERIC_STD.all;
 
 entity hsd_thr_BUS_A_s_axi is
 generic (
-    C_S_AXI_ADDR_WIDTH    : INTEGER := 5;
+    C_S_AXI_ADDR_WIDTH    : INTEGER := 6;
     C_S_AXI_DATA_WIDTH    : INTEGER := 32);
 port (
     -- axi4 lite slave signals
@@ -37,7 +37,9 @@ port (
     RREADY                :in   STD_LOGIC;
     -- user signals
     config_a              :out  STD_LOGIC_VECTOR(31 downto 0);
-    config_b              :out  STD_LOGIC_VECTOR(31 downto 0)
+    config_b              :out  STD_LOGIC_VECTOR(31 downto 0);
+    config_c              :out  STD_LOGIC_VECTOR(31 downto 0);
+    config_d              :out  STD_LOGIC_VECTOR(31 downto 0)
 );
 end entity hsd_thr_BUS_A_s_axi;
 
@@ -52,6 +54,12 @@ end entity hsd_thr_BUS_A_s_axi;
 -- 0x18 : Data signal of config_b
 --        bit 31~0 - config_b[31:0] (Read/Write)
 -- 0x1c : reserved
+-- 0x20 : Data signal of config_c
+--        bit 31~0 - config_c[31:0] (Read/Write)
+-- 0x24 : reserved
+-- 0x28 : Data signal of config_d
+--        bit 31~0 - config_d[31:0] (Read/Write)
+-- 0x2c : reserved
 -- (SC = Self Clear, COR = Clear on Read, TOW = Toggle on Write, COH = Clear on Handshake)
 
 architecture behave of hsd_thr_BUS_A_s_axi is
@@ -61,7 +69,11 @@ architecture behave of hsd_thr_BUS_A_s_axi is
     constant ADDR_CONFIG_A_CTRL   : INTEGER := 16#14#;
     constant ADDR_CONFIG_B_DATA_0 : INTEGER := 16#18#;
     constant ADDR_CONFIG_B_CTRL   : INTEGER := 16#1c#;
-    constant ADDR_BITS         : INTEGER := 5;
+    constant ADDR_CONFIG_C_DATA_0 : INTEGER := 16#20#;
+    constant ADDR_CONFIG_C_CTRL   : INTEGER := 16#24#;
+    constant ADDR_CONFIG_D_DATA_0 : INTEGER := 16#28#;
+    constant ADDR_CONFIG_D_CTRL   : INTEGER := 16#2c#;
+    constant ADDR_BITS         : INTEGER := 6;
 
     signal waddr               : UNSIGNED(ADDR_BITS-1 downto 0);
     signal wmask               : UNSIGNED(31 downto 0);
@@ -77,6 +89,8 @@ architecture behave of hsd_thr_BUS_A_s_axi is
     -- internal registers
     signal int_config_a        : UNSIGNED(31 downto 0);
     signal int_config_b        : UNSIGNED(31 downto 0);
+    signal int_config_c        : UNSIGNED(31 downto 0);
+    signal int_config_d        : UNSIGNED(31 downto 0);
 
 
 begin
@@ -194,6 +208,10 @@ begin
                         rdata_data <= RESIZE(int_config_a(31 downto 0), 32);
                     when ADDR_CONFIG_B_DATA_0 =>
                         rdata_data <= RESIZE(int_config_b(31 downto 0), 32);
+                    when ADDR_CONFIG_C_DATA_0 =>
+                        rdata_data <= RESIZE(int_config_c(31 downto 0), 32);
+                    when ADDR_CONFIG_D_DATA_0 =>
+                        rdata_data <= RESIZE(int_config_d(31 downto 0), 32);
                     when others =>
                         rdata_data <= (others => '0');
                     end case;
@@ -205,6 +223,8 @@ begin
 -- ----------------------- Register logic ----------------
     config_a             <= STD_LOGIC_VECTOR(int_config_a);
     config_b             <= STD_LOGIC_VECTOR(int_config_b);
+    config_c             <= STD_LOGIC_VECTOR(int_config_c);
+    config_d             <= STD_LOGIC_VECTOR(int_config_d);
 
     process (ACLK)
     begin
@@ -223,6 +243,28 @@ begin
             if (ACLK_EN = '1') then
                 if (w_hs = '1' and waddr = ADDR_CONFIG_B_DATA_0) then
                     int_config_b(31 downto 0) <= (UNSIGNED(WDATA(31 downto 0)) and wmask(31 downto 0)) or ((not wmask(31 downto 0)) and int_config_b(31 downto 0));
+                end if;
+            end if;
+        end if;
+    end process;
+
+    process (ACLK)
+    begin
+        if (ACLK'event and ACLK = '1') then
+            if (ACLK_EN = '1') then
+                if (w_hs = '1' and waddr = ADDR_CONFIG_C_DATA_0) then
+                    int_config_c(31 downto 0) <= (UNSIGNED(WDATA(31 downto 0)) and wmask(31 downto 0)) or ((not wmask(31 downto 0)) and int_config_c(31 downto 0));
+                end if;
+            end if;
+        end if;
+    end process;
+
+    process (ACLK)
+    begin
+        if (ACLK'event and ACLK = '1') then
+            if (ACLK_EN = '1') then
+                if (w_hs = '1' and waddr = ADDR_CONFIG_D_DATA_0) then
+                    int_config_d(31 downto 0) <= (UNSIGNED(WDATA(31 downto 0)) and wmask(31 downto 0)) or ((not wmask(31 downto 0)) and int_config_d(31 downto 0));
                 end if;
             end if;
         end if;
