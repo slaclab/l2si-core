@@ -4,7 +4,7 @@
 #define AMAX 16
 #define PSHIFT(v) buffer[v]=x##v;
 #define PWRITE(v) y##v=buffer[v];
-#define PSET(v) y##v=xsave##v[raddr%AMAX];
+#define PSET(v) y##v=ap_fixed<16,16>(xsave##v[raddr%AMAX]) & 0x7ff;
 #define TSET(v) t##v=rcount*8+v;
 #define PTEST(v) lkeep |= (x##v < xlo || x##v > xhi);
 #define AINIT(v) static adcin_t xsave##v[AMAX];

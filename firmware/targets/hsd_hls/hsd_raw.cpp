@@ -2,7 +2,7 @@
 
 #define PSHIFT(v) buffer[v]=x##v;
 #define PWRITE(v) y##v=buffer[v];
-#define PSET(v) y##v=x##v;
+#define PSET(v) y##v=ap_fixed<16,16>(x##v) & 0x7ff;
 #define TSET(v) t##v=count+v;
 
 // Top-level function with class instantiated

@@ -5,7 +5,7 @@
 #include <cstdlib>
 using namespace std;
 
-#define DIN(v) adcin_t((i+v)&0x3ff),
+#define DIN(v) adcin_t((i+v)&0x7ff),
 #define DOUT(v) dout[v],
 #define TOUT(v) tout[v],
 
