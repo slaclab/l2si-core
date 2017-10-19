@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-07-10
--- Last update: 2017-08-26
+-- Last update: 2017-10-09
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -26,6 +26,9 @@
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.std_logic_unsigned.all;
+
+use STD.textio.all;
+use ieee.std_logic_textio.all;
 
 use work.StdRtlPkg.all;
 use work.AxiStreamPkg.all;
@@ -53,6 +56,7 @@ architecture top_level_app of dti_sim is
   signal usObClk      : slv                 (1 downto 0);
   signal usFull       : Slv16Array          (1 downto 0);
   signal usObTrig     : XpmPartitionDataArray(1 downto 0);
+  signal usObTrigV    : slv                  (1 downto 0);
 
   signal dsStatus : DtiDsLinkStatusArray(MaxDsLinks-1 downto 0);
   
@@ -93,15 +97,54 @@ architecture top_level_app of dti_sim is
   signal dsFullIn     : slv(MaxDsLinks-1 downto 0);
   
   -- for debug only --
+  signal tbusI : TimingBusType;
   signal tbus  : TimingBusType;
+  signal xbusI : ExptBusType;
   signal xbus  : ExptBusType;
   signal p0l0a : sl;
+
+  signal timingBusO     : TimingBusType;
+  signal exptBusO       : ExptBusType;
+
+    function HexChar(v : in slv(3 downto 0)) return character is
+      variable result : character := '0';
+    begin
+      case(v) is
+      when x"0" => result := '0';
+      when x"1" => result := '1';
+      when x"2" => result := '2';
+      when x"3" => result := '3';
+      when x"4" => result := '4';
+      when x"5" => result := '5';
+      when x"6" => result := '6';
+      when x"7" => result := '7';
+      when x"8" => result := '8';
+      when x"9" => result := '9';
+      when x"A" => result := 'a';
+      when x"B" => result := 'b';
+      when x"C" => result := 'c';
+      when x"D" => result := 'd';
+      when x"E" => result := 'e';
+      when x"F" => result := 'f';
+      when others => null;
+    end case;
+    return result;
+  end function;
+
+  function HexString(v : in slv(31 downto 0)) return string is
+    variable result : string(8 downto 1);
+  begin
+    for i in 0 to 7 loop
+      result(i+1) := HexChar(v(4*i+3 downto 4*i));
+    end loop;
+    return result;
+  end function;
 
 begin
 
    usConfig(0).enable    <= '1';
    usConfig(0).partition <= toSlv(0,4);
-   usConfig(0).trigDelay <= toSlv(1,8);
+--   usConfig(0).trigDelay <= toSlv(1,8);
    usConfig(0).fwdMask   <= toSlv(3,MaxDsLinks);
    usConfig(0).fwdMode   <= '0';
    usConfig(0).dataSrc   <= x"ABADCAFE";
@@ -110,14 +153,15 @@ begin
    usConfig(0).l1Enable  <= '0';
      
    usConfig(1).enable    <= '1';
+   usConfig(1).hdrOnly   <= '1';
    usConfig(1).partition <= toSlv(0,4);
-   usConfig(1).trigDelay <= toSlv(1,8);
-   usConfig(1).fwdMask   <= toSlv(12,MaxDsLinks);
+--   usConfig(1).trigDelay <= toSlv(1,8);
+   usConfig(1).fwdMask   <= toSlv(4,MaxDsLinks);
    usConfig(1).fwdMode   <= '0';
    usConfig(1).dataSrc   <= x"ABADCAFF";
    usConfig(1).dataType  <= x"FEEDADAD";
    usConfig(1).tagEnable <= '0';
-   usConfig(0).l1Enable  <= '0';
+   usConfig(1).l1Enable  <= '0';
 
    process is
    begin
@@ -136,9 +180,15 @@ begin
    process (clk186) is
    begin
      if rising_edge(clk186) then
+       tbusI.strobe <= timingBus.strobe;
        if timingBus.strobe='1' then
-         tbus <= timingBus;
-         xbus <= exptBus;
+         tbusI <= timingBus;
+         xbusI <= exptBus;
+       end if;
+       tbus.strobe <= timingBusO.strobe;
+       if timingBusO.strobe='1' then
+         tbus.message           <= timingBusO.message;
+         xbus                   <= exptBusO;
        end if;
      end if;
    end process;
@@ -218,6 +268,18 @@ begin
                 exptMessage         => exptBus.message,
                 exptMessageValid    => exptBus.valid );
 
+   U_Realign : entity work.ExptRealign
+     port map ( clk    => clk186,
+                rst    => rst186,
+                timingI_strobe => timingBus.strobe,
+                timingI_pid    => timingBus.message.pulseId,
+                timingI_time   => timingBus.message.timeStamp,
+                exptBusI       => exptBus,
+                timingO_strobe => timingBusO.strobe,
+                timingO_pid    => timingBusO.message.pulseId,
+                timingO_time   => timingBusO.message.timeStamp,
+                exptBusO       => exptBusO );
+   
    GEN_US : for i in 0 to 1 generate
      U_DUT : entity work.DtiUsCore
        port map ( sysClk       => clk156,
@@ -237,8 +299,9 @@ begin
                   ----
                   timingClk    => clk186,
                   timingRst    => rst186,
-                  timingBus    => timingBus,
-                  exptBus      => exptBus,
+                  timingBus    => timingBusO,
+                  exptBus      => exptBusO,
+                  triggerBus   => exptBus,
                   --
                   eventClk     => clk156,
                   eventRst     => rst156,
@@ -254,9 +317,11 @@ begin
                   ibSlave      => usIbSlave (i),
                   --
                   obClk        => usObClk   (i),
-                  obTrigValid  => open,
+                  obTrigValid  => usObTrigV (i),
                   obTrig       => usObTrig  (i) );
-
+   end generate;
+   
+   GEN_USA : for i in 0 to 0 generate
      U_App : entity work.DtiUsSimApp
        generic map ( SERIAL_ID_G => x"ABADCAFE" )
        port map ( amcClk   => clk156,
@@ -272,6 +337,7 @@ begin
                   obClk    => usObClk   (i),
                   obRst    => rst186,
                   obTrig   => usObTrig  (i),
+                  obTrigValid => usObTrigV(i),
                   obMaster => usObMaster(i),
                   obSlave  => usObSlave (i));
    end generate;
@@ -314,6 +380,23 @@ begin
      end generate;
 
    end generate;
-     
+
+   process
+     file   results : text;
+     variable oline : line;
+   begin
+     file_open(results, "headers.txt", write_mode);
+     loop
+       wait until rising_edge(clk156);
+       if usEvtMasters(1)(2).tValid='1' and usEvtSlaves(1)(2).tReady='1' then
+         write(oline, HexString(usEvtMasters(1)(2).tData( 31 downto  0)), right, 9);
+         write(oline, HexString(usEvtMasters(1)(2).tData( 63 downto 32)), right, 9);
+         if usEvtMasters(1)(2).tLast='1' then
+           writeline(results, oline);
+         end if;
+       end if;
+     end loop;
+     file_close(results);
+   end process;
    
 end top_level_app;
