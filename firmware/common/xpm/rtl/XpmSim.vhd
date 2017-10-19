@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-07-10
--- Last update: 2017-10-09
+-- Last update: 2017-10-16
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -65,6 +65,8 @@ end XpmSim;
 
 architecture top_level_app of XpmSim is
 
+   constant GEN_CLEAR_G : boolean := false;
+   
    -- Reference Clocks and Resets
    signal recTimingClk : sl;
    signal recTimingRst : sl;
@@ -140,10 +142,10 @@ begin
   
   process is
   begin
-    recTimingClk <= '1';
-    wait for 2.6 ns;
     recTimingClk <= '0';
-    wait for 2.6 ns;
+    wait for 2.692 ns;
+    recTimingClk <= '1';
+    wait for 2.692 ns;
   end process;
 
   dsTxClk <= (others=>recTimingClk);
@@ -249,19 +251,21 @@ begin
 
      wait for 10 us;
 
-     for i in 0 to NPartitions-1 loop
-       pconfig(i).message.hdr     <= MSG_CLEAR_FIFO;
-       pconfig(i).message.insert  <= '1';
-     end loop;
-   
-     wait until regClk='1';
-     wait until regClk='0';
-     
-     for i in 0 to NPartitions-1 loop
-       pconfig(i).message.insert  <= '0';
-     end loop;
+     if GEN_CLEAR_G then
+       for i in 0 to NPartitions-1 loop
+         pconfig(i).message.hdr     <= MSG_CLEAR_FIFO;
+         pconfig(i).message.insert  <= '1';
+       end loop;
+       
+       wait until regClk='1';
+       wait until regClk='0';
+       
+       for i in 0 to NPartitions-1 loop
+         pconfig(i).message.insert  <= '0';
+       end loop;
 
-     wait for 100 ns;
+       wait for 100 ns;
+     end if;
      
      pconfig(0).l0Select.enabled <= '1';
      
