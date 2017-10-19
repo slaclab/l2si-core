@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2016-01-04
--- Last update: 2017-08-23
+-- Last update: 2017-10-11
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -37,13 +37,13 @@ entity QuadAdcChannelData is
     FIFO_ADDR_WIDTH_C : integer := 10;
     DMA_STREAM_CONFIG_G : AxiStreamConfigType );
   port (
-    eventClk     :  in sl;
-    eventRst     :  in sl;
-    eventWr      :  in sl;
-    eventDin     :  in slv(127 downto 0);
-    --
     dmaClk       :  in sl;
     dmaRst       :  in sl;
+    --
+    eventHdr     :  in slv(255 downto 0);
+    eventHdrV    :  in sl;
+    eventHdrRd   : out sl;
+    --
     eventTrig    :  in slv(31 downto 0);
     chnMaster    :  in AxiStreamMasterType;
     chnSlave     : out AxiStreamSlaveType;
@@ -77,10 +77,6 @@ architecture mapping of QuadAdcChannelData is
   signal r   : RegType := REG_INIT_C;
   signal rin : RegType;
 
-  signal hdrDout  : slv(127 downto 0);
-  signal hdrValid : sl;
-  signal hdrEmpty : sl;
-
   signal tSlave : AxiStreamSlaveType;
   
 begin  -- mapping
@@ -97,21 +93,9 @@ begin  -- mapping
                mAxisRst    => dmaRst,
                mAxisMaster => dmaMaster,
                mAxisSlave  => dmaSlave );
-  
-  U_HDR : entity work.FifoAsync
-    generic map ( DATA_WIDTH_G  => 128,
-                  ADDR_WIDTH_G  =>   8 )
-    port map ( rst      => dmaRst,
-               wr_clk   => eventClk,
-               wr_en    => eventWr,
-               din      => eventDin,
-               rd_clk   => dmaClk,
-               rd_en    => rin.hdrRd,
-               dout     => hdrDout,
-               valid    => hdrValid,
-               empty    => hdrEmpty );
 
-  process (r, dmaRst, hdrValid, hdrEmpty, hdrDout, eventTrig, tSlave, chnMaster) is
+  
+  process (r, dmaRst, eventHdr, eventHdrV, eventTrig, tSlave, chnMaster) is
     variable v   : RegType;
   begin  -- process
     v := r;
@@ -131,35 +115,25 @@ begin  -- mapping
     
     case r.state is
       when S_IDLE =>
-        if hdrEmpty='0' then
-          v.hdrRd := '1';
+        if eventHdrV='1' then
           v.state := S_READHDR;
           v.tmo   := TMO_VAL_C;
         end if;
       when S_READHDR =>
         if v.master.tValid='0' then
           ssiSetUserSof(SAXIS_CONFIG_C, v.master, '1');
-          v.master.tData(127 downto 0) := hdrDout;
+          v.master.tData(127 downto 0) := eventHdr(127 downto 0);
           v.master.tValid                := '1';
           v.master.tLast                 := '0';
-          if hdrEmpty='0' then
-            v.hdrRd := '1';
-            v.state := S_WRITEHDR;
-          else
-            v.state := S_WAITHDR;
-          end if;
-        end if;
-      when S_WAITHDR =>
-        if hdrEmpty='0' then
-          v.hdrRd := '1';
           v.state := S_WRITEHDR;
         end if;
       when S_WRITEHDR =>
         if v.master.tValid='0' then
           ssiSetUserSof(SAXIS_CONFIG_C, v.master, '0');
           v.master.tData(127 downto  96) := eventTrig;
-          v.master.tData( 95 downto   0) := hdrDout(95 downto 0);
+          v.master.tData( 95 downto   0) := eventHdr(223 downto 128);
           v.master.tValid                := '1';
+          v.hdrRd := '1';
           v.state := S_WAITCHAN;
         end if;
       when S_WAITCHAN =>
@@ -198,7 +172,8 @@ begin  -- mapping
 
     rin <= v;
 
-    chnSlave <= v.slave;
+    chnSlave   <= v.slave;
+    eventHdrRd <= r.hdrRd;
   end process;
 
   process (dmaClk)

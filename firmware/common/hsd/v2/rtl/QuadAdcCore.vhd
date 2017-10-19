@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2016-01-04
--- Last update: 2017-08-18
+-- Last update: 2017-10-12
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -30,7 +30,8 @@ use work.StdRtlPkg.all;
 use work.AxiLitePkg.all;
 use work.AxiStreamPkg.all;
 use work.TimingPkg.all;
-use work.EvrV2Pkg.all;
+use work.XpmPkg.all;
+use work.EventPkg.all;
 use work.SsiPkg.all;
 use work.QuadAdcPkg.all;
 
@@ -77,18 +78,19 @@ end QuadAdcCore;
 architecture mapping of QuadAdcCore is
 
   constant FIFO_ADDR_WIDTH_C : integer := 14;
-
+  constant NCHAN_C           : integer := 4*NFMC_G;
+  
   signal config              : QuadAdcConfigType;
   signal configE             : QuadAdcConfigType; -- evrClk domain
   signal configA             : QuadAdcConfigType; -- adcClk domain
   signal vConfig, vConfigE, vConfigA   : slv(QADC_CONFIG_TYPE_LEN_C-1 downto 0);
   
-  signal oneHz               : sl;
+  signal oneHz               : sl := '0';
   signal dmaHistEna          : sl;
   signal dmaHistEnaS         : sl;
   signal dmaHistDump         : sl;
   signal dmaHistDumpS        : sl;
-  signal eventId             : slv(191 downto 0);
+--  signal eventId             : slv(191 downto 0);
   
   signal eventSel            : sl;
   signal eventSelQ           : sl;
@@ -112,7 +114,7 @@ architecture mapping of QuadAdcCore is
   signal dmaFullQS           : slv(31 downto 0) := (others=>'0');
   signal iready              : sl;
 
-  signal adcQ, adc_test      : AdcDataArray(4*NFMC_G-1 downto 0);
+  signal adcQ, adc_test      : AdcDataArray(NCHAN_C-1 downto 0);
   signal adcSyncReg          : slv(31 downto 0);
   signal idmaRst             : sl;
   signal dmaRstS             : sl;
@@ -131,6 +133,18 @@ architecture mapping of QuadAdcCore is
 
   constant HIST_DMA : boolean := false;
 
+  signal timingHeader_prompt  : TimingHeaderType;
+  signal timingHeader_aligned : TimingHeaderType;
+  signal exptBus_aligned      : ExptBusType;
+  signal trigData             : XpmPartitionDataArray(NCHAN_C-1 downto 0);
+  signal trigDataV            : slv             (NCHAN_C-1 downto 0);
+  signal eventHdr             : EventHeaderArray(NCHAN_C-1 downto 0);
+  signal eventHdrD            : Slv192Array     (NCHAN_C-1 downto 0);
+  signal eventHdrV            : slv             (NCHAN_C-1 downto 0);
+  signal eventHdrRd           : slv             (NCHAN_C-1 downto 0);
+  signal phdr                 : slv             (NCHAN_C-1 downto 0);
+  signal rstFifo              : slv             (NCHAN_C-1 downto 0);
+  
 begin  
 
   ready   <= iready;
@@ -139,20 +153,31 @@ begin
   
   eventSelQ <= eventSel and (iready or not configE.inhibit);
 
-  U_EventSel : entity work.QuadAdcEventV2Select
-    port map ( evrClk     => evrClk,
-               evrRst     => evrRst,
-               config     => configE,
-               evrBus     => evrBus,
-               exptBus    => exptBus,
-               strobe     => trigSlot,
-               oneHz      => oneHz,
-               eventSel   => eventSel,
-               eventId    => eventId,
-               l1v        => l1in,
-               l1a        => l1ina,
-               l1tag      => open );
+  --U_EventSel : entity work.QuadAdcEventV2Select
+  --  port map ( evrClk     => evrClk,
+  --             evrRst     => evrRst,
+  --             config     => configE,
+  --             evrBus     => evrBus,
+  --             exptBus    => exptBus,
+  --             strobe     => trigSlot,
+  --             oneHz      => oneHz,
+  --             eventSel   => eventSel,
+  --             eventId    => eventId,
+  --             l1v        => l1in,
+  --             l1a        => l1ina,
+  --             l1tag      => open );
 
+  timingHeader_prompt.strobe    <= evrBus.strobe;
+  timingHeader_prompt.pulseId   <= evrBus.message.pulseId;
+  timingHeader_prompt.timeStamp <= evrBus.message.timeStamp;
+  U_Realign  : entity work.EventRealign
+    port map ( rst           => evrRst,
+               clk           => evrClk,
+               timingI       => timingHeader_prompt,
+               exptBusI      => exptBus,
+               timingO       => timingHeader_aligned,
+               exptBusO      => exptBus_aligned );
+  
   dmaHistDump <= oneHz and dmaHistEnaS;
 
   Sync_dmaHistDump : entity work.SynchronizerOneShot
@@ -163,14 +188,41 @@ begin
   adcQ <= adc_test when configA.dmaTest='1' else
           adc;
   
-  GEN_TP : for i in 0 to 4*NFMC_G-1 generate
+  GEN_TP : for i in 0 to NCHAN_C-1 generate
     U_DATA : entity work.QuadAdcChannelTestPattern
       generic map ( CHANNEL_C => i )
       port map ( clk   => adcClk,
                  rst   => eventSelQ,
                  data  => adc_test(i).data );
+
+    U_EventSel : entity work.EventHeaderCache
+      port map ( rst            => evrRst,
+                 wrclk          => evrClk,
+                 enable         => configE.acqEnable,
+                 partition      => configE.partition(2 downto 0),
+                 timing_prompt  => timingHeader_prompt,
+                 expt_prompt    => exptBus,
+                 timing_aligned => timingHeader_aligned,
+                 expt_aligned   => exptBus_aligned,
+                 pdata          => trigData (i),
+                 pdataV         => trigDataV(i),
+                 rstFifo        => rstFifo  (i),
+                 --
+                 rdclk          => dmaClk,
+                 advance        => eventHdrRd(i),
+                 valid          => eventHdrV (i),
+                 pmsg           => open,
+                 phdr           => phdr      (i),
+                 hdrOut         => eventHdr  (i) );
+
+    eventHdrD(i) <= toSlv(eventHdr(i));
   end generate;
 
+  trigSlot     <= trigDataV(0);
+  eventSel     <= trigData (0).l0a and trigDataV(0);
+  l1in         <= trigData (0).l1e and trigDataV(0);
+  l1ina        <= trigData (0).l1a;
+  
   U_EventDma : entity work.QuadAdcEvent
     generic map ( TPD_G             => TPD_G,
                   FIFO_ADDR_WIDTH_C => FIFO_ADDR_WIDTH_C,
@@ -185,11 +237,12 @@ begin
                   axilWriteMaster => axilWriteMasters(1),
                   axilWriteSlave  => axilWriteSlaves (1),
                   --
-                  eventClk   => evrClk,
-                  eventRst   => evrRst,
-                  configE    => configE,
-                  strobe     => eventSelQ,
-                  eventId    => eventId,
+                  --eventClk   => evrClk,
+                  --eventRst   => evrRst,
+                  --configE    => configE,
+                  --strobe     => eventSelQ,
+                  --eventId    => eventId,
+                  trigArm    => eventSelQ,
                   l1in       => l1in,
                   l1ina      => l1ina,
                   --
@@ -197,10 +250,13 @@ begin
                   adcRst     => adcRst,
                   configA    => configA,
                   adc        => adcQ,
-                  trigArm    => eventSelQ,
                   trigIn     => trigIn,
                   dmaClk     => dmaClk,
                   dmaRst     => dmaRstS,
+                  eventHeader   => eventHdrD,
+                  eventHeaderV  => eventHdrV,
+                  eventHeaderRd => eventHdrRd,
+                  rstFifo    => rstFifo(0),
                   dmaFullThr => dmaFullThrS(FIFO_ADDR_WIDTH_C-1 downto 0),
                   dmaFullS   => dmaFullS,
                   dmaFullQ   => dmaFullQ,
