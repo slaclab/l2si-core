@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-07-10
--- Last update: 2017-09-03
+-- Last update: 2017-10-18
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -115,8 +115,8 @@ begin
    dmaData <= dmaIbMaster(0).tData(dmaData'range);
    dmaUser <= dmaIbMaster(0).tUser(dmaUser'range);
 
---   U_QIN : entity work.AdcRamp
-   U_QIN : entity work.AdcStrobe
+   U_QIN : entity work.AdcRamp
+--   U_QIN : entity work.AdcStrobe
      generic map ( NCHAN_C => NCHAN_C )
      port map ( phyClk   => phyClk,
                 dmaClk   => dmaClk,
@@ -141,8 +141,9 @@ begin
      wait;
    end process;
    
-   regRst <= rst;
-
+   regRst       <= rst;
+   recTimingRst <= rst;
+   
    process is
    begin
      regClk <= '0';
@@ -151,23 +152,21 @@ begin
      wait for 3.2 ns;
    end process;
      
-   recTimingRst <= rst;
-   process is
-   begin
-     recTimingClk <= '1';
-     wait for 2.7 ns;
-     recTimingClk <= '0';
-     wait for 2.7 ns;
-   end process;
-
-   U_TPG : entity work.TPGMini
-      port map ( configI  => tpgConfig,
-                 txClk    => recTimingClk,
-                 txRst    => recTimingRst,
-                 txRdy    => '1',
-                 txData   => xData.data,
-                 txDataK  => xData.dataK );
-
+   U_XPM : entity work.XpmSim
+     port map ( dsRxClk   => (others=>recTimingClk),
+                dsRxRst   => (others=>'0'),
+                dsRxData  => (others=>(others=>'0')),
+                dsRxDataK => (others=>"00"),
+                --
+                bpTxClk    => recTimingClk,
+                bpTxLinkUp => '1',
+                bpTxData   => xData.data,
+                bpTxDataK  => xData.dataK,
+                bpRxClk    => '0',
+                bpRxClkRst => '0',
+                bpRxLinkUp => (others=>'0'),
+                bpRxLinkFull => (others=>(others=>'0')) );
+   
    U_RxLcls : entity work.TimingFrameRx
      port map ( rxClk               => recTimingClk,
                 rxRst               => recTimingRst,
@@ -283,6 +282,8 @@ begin
     wreg(40,x"00040C00"); -- almostFull
     wreg(256*2+16,x"00000040");
     wreg(256*2+24,x"000003c0");
+    wreg(256*2+32,x"00000002");
+    wreg(256*2+40,x"00000002");
     wreg( 0,x"00000003"); -- fexEnable
     wait for 600 ns;
     axilDone <= '1';

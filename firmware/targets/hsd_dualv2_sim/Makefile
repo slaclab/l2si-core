@@ -5,6 +5,8 @@ target: gui
 # Define Firmware Version Number
 export PRJ_VERSION = 00000000
 
+export REMOVE_UNUSED_CODE = 1
+
 # Define target part
 export PRJ_PART = XCKU085-FLVB1760-2-E
 
