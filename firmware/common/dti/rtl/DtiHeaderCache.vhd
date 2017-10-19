@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-07-10
--- Last update: 2017-10-09
+-- Last update: 2017-10-11
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -147,7 +147,7 @@ begin
   end generate;
   gword(15 downto 8) <= (others=>'0');
   
-  daddr <= l0tag when entagr='1' and pmsgr='0' else
+  daddr <= l0tag when entagr='1' else
            doutf(4 downto 0);
 
   hdrWe <= wr_in.pmsg(0) or wr_in.phdr(0);
@@ -164,16 +164,11 @@ begin
                asyncRst => rst,
                syncRst  => rdrst );
 
-  U_EntagW : entity work.Synchronizer
+  U_EntagR : entity work.Synchronizer
     port map ( clk      => rdclk,
                dataIn   => entag,
                dataOut  => entagr );
   
-  U_EntagR : entity work.Synchronizer
-    port map ( clk      => wrclk,
-               dataIn   => entag,
-               dataOut  => entagw );
-
   U_TagRam : entity work.SimpleDualPortRam
     generic map ( DATA_WIDTH_G => 192,
                   ADDR_WIDTH_G => 5 )
