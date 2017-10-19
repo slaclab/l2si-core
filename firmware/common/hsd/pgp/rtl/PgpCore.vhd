@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-07-10
--- Last update: 2017-08-24
+-- Last update: 2017-10-16
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -59,6 +59,7 @@ entity PgpCore is
      axilReadSlave   : out AxiLiteReadSlaveType;
      axilWriteMaster : in  AxiLiteWriteMasterType;
      axilWriteSlave  : out AxiLiteWriteSlaveType;
+     --
      --  App Interface
      ibRst           : in  sl;
      linkUp          : out sl;
@@ -66,7 +67,14 @@ entity PgpCore is
      --
      obClk           : in  sl;
      obMaster        : in  AxiStreamMasterType;
-     obSlave         : out AxiStreamSlaveType );
+     obSlave         : out AxiStreamSlaveType;
+     --  DRP Interface (axilClk domain)
+     drpaddr_in      : in  slv(8 DOWNTO 0) := (others=>'0');
+     drpdi_in        : in  slv(15 DOWNTO 0) := (others=>'0');
+     drpen_in        : in  sl := '0';
+     drpwe_in        : in  sl := '0';
+     drpdo_out       : out slv(15 DOWNTO 0);
+     drprdy_out      : out sl );
 end PgpCore;
 
 architecture rtl of PgpCore is
@@ -92,6 +100,7 @@ architecture rtl of PgpCore is
     opCode      => (others=>'0'),
     locData     => PGP_ID,
     flowCntlDis => '0' );
+
   
 begin
 
@@ -157,7 +166,14 @@ begin
                gtTxP        => pgpTxP,
                gtTxN        => pgpTxN,
                gtRxP        => pgpRxP,
-               gtRxN        => pgpRxN );
+               gtRxN        => pgpRxN,
+               --
+               drpaddr_in   => drpaddr_in,
+               drpdi_in     => drpdi_in,
+               drpen_in     => drpen_in,
+               drpwe_in     => drpwe_in,
+               drpdo_out    => drpdo_out,
+               drprdy_out   => drprdy_out );
 
   U_Axi : entity work.Pgp2bAxi
     generic map ( WRITE_EN_G => true )
