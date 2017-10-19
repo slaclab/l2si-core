@@ -213,7 +213,7 @@ architecture rtl of hsd_pgp is
   signal pgpTxMasters        : AxiStreamMasterArray   (3 downto 0);
   signal pgpTxSlaves         : AxiStreamSlaveArray    (3 downto 0);
 
-  constant NUM_AXI_MASTERS_C : integer := 6;
+  constant NUM_AXI_MASTERS_C : integer := 10;
   constant AXI_CROSSBAR_MASTERS_CONFIG_C : AxiLiteCrossbarMasterConfigArray(NUM_AXI_MASTERS_C-1 downto 0) := (
     0    => (
       baseAddr        => x"00080000",
@@ -238,6 +238,22 @@ architecture rtl of hsd_pgp is
     5    => (
       baseAddr        => x"00090400",
       addrBits        => 8,
+      connectivity    => x"FFFF"),
+    6    => (
+      baseAddr        => x"00091000",
+      addrBits        => 11,
+      connectivity    => x"FFFF"),
+    7    => (
+      baseAddr        => x"00091800",
+      addrBits        => 11,
+      connectivity    => x"FFFF"),
+    8    => (
+      baseAddr        => x"00092000",
+      addrBits        => 11,
+      connectivity    => x"FFFF"),
+    9    => (
+      baseAddr        => x"00092800",
+      addrBits        => 11,
       connectivity    => x"FFFF") );
 
   signal mAxilWriteMasters : AxiLiteWriteMasterArray(NUM_AXI_MASTERS_C-1 downto 0);
@@ -245,6 +261,13 @@ architecture rtl of hsd_pgp is
   signal mAxilReadMasters  : AxiLiteReadMasterArray (NUM_AXI_MASTERS_C-1 downto 0);
   signal mAxilReadSlaves   : AxiLiteReadSlaveArray  (NUM_AXI_MASTERS_C-1 downto 0);
   
+  signal drpRdy   : slv(3 downto 0);
+  signal drpEn    : slv(3 downto 0);
+  signal drpWe    : slv(3 downto 0);
+  signal drpAddr  : Slv9Array (3 downto 0);
+  signal drpDi    : Slv16Array(3 downto 0);
+  signal drpDo    : Slv16Array(3 downto 0);
+
   component ila_0
     port ( clk    : in sl;
            probe0 : in slv(255 downto 0));
@@ -478,7 +501,33 @@ begin  -- rtl
                  --
                  obClk           => dmaClk,
                  obMaster        => dmaIbMaster(i),
-                 obSlave         => dmaIbSlave (i) );
+                 obSlave         => dmaIbSlave (i),
+                 --
+                 drpaddr_in   => drpAddr(i),
+                 drpdi_in     => drpDi  (i),
+                 drpen_in     => drpEn  (i),
+                 drpwe_in     => drpWe  (i),
+                 drpdo_out    => drpDo  (i),
+                 drprdy_out   => drpRdy (i) );
+
+    U_Drp : entity work.AxiLiteToDrp
+      generic map ( COMMON_CLK_G => true,
+                    ADDR_WIDTH_G => 9 )
+      port map ( axilClk         => regClk,
+                 axilRst         => regRst,
+                 axilReadMaster  => mAxilReadMasters (i+6),
+                 axilReadSlave   => mAxilReadSlaves  (i+6),
+                 axilWriteMaster => mAxilWriteMasters(i+6),
+                 axilWriteSlave  => mAxilWriteSlaves (i+6),
+                 drpClk          => regClk,
+                 drpRst          => regRst,
+                 drpRdy          => drpRdy (i),
+                 drpEn           => drpEn  (i),
+                 drpWe           => drpWe  (i),
+                 drpAddr         => drpAddr(i),
+                 drpDi           => drpDi  (i),
+                 drpDo           => drpDo  (i) );
+
   end generate;
 
   comb : process ( r, regRst, pg_m2c, prsnt_m2c_l, mAxilReadMasters, mAxilWriteMasters ) is
