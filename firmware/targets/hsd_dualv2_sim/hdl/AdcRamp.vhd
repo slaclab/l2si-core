@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-07-10
--- Last update: 2017-10-18
+-- Last update: 2017-10-21
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -109,7 +109,7 @@ begin
        --
        --  Ramp the signal (let it slip by one each cycle)
        --
-       if s = toSlv(254,11) then
+       if s = toSlv(2047,11) then
          s := (others=>'0');
        else
          s := s+1;

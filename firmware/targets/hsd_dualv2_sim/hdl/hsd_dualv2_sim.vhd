@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-07-10
--- Last update: 2017-10-18
+-- Last update: 2017-10-22
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -109,7 +109,8 @@ architecture top_level_app of hsd_dualv2_sim is
    signal cfgWriteSlave     : AxiLiteWriteSlaveType;
    signal cfgReadMaster     : AxiLiteReadMasterType := AXI_LITE_READ_MASTER_INIT_C;
    signal cfgReadSlave      : AxiLiteReadSlaveType;
-
+   signal timingFb          : TimingPhyType;
+   
 begin
 
    dmaData <= dmaIbMaster(0).tData(dmaData'range);
@@ -153,6 +154,7 @@ begin
    end process;
      
    U_XPM : entity work.XpmSim
+     generic map ( RATE_DIV_G => 8 )
      port map ( dsRxClk   => (others=>recTimingClk),
                 dsRxRst   => (others=>'0'),
                 dsRxData  => (others=>(others=>'0')),
@@ -202,7 +204,10 @@ begin
       evrRst              => recTimingRst,
       evrBus              => timingBus,
       exptBus             => exptBus,
-      ready               => ready,
+--      ready               => ready,
+      timingFbClk         => recTimingClk,
+      timingFbRst         => recTimingRst,
+      timingFb            => timingFb,
       -- ADC
       gbClk               => '0', -- unused
       adcClk              => dmaClk,
