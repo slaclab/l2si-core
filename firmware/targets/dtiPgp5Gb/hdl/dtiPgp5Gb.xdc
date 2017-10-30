@@ -150,37 +150,6 @@ set_property -dict {PACKAGE_PIN L18 IOSTANDARD LVCMOS15} [get_ports ddrSda]
 
 set_property -dict {PACKAGE_PIN SYSMONE1_X0Y0} [get_ports vPIn]
 set_property -dict {PACKAGE_PIN SYSMONE1_X0Y0} [get_ports vNIn]
-set_property -dict {PACKAGE_PIN SYSMONE1_X0Y0} [get_ports vNIn]
-set_property -dict {PACKAGE_PIN SYSMONE1_X0Y0} [get_ports vNIn]
-set_property -dict {PACKAGE_PIN SYSMONE1_X0Y0} [get_ports vNIn]
-set_property -dict {PACKAGE_PIN SYSMONE1_X0Y0} [get_ports vNIn]
-set_property -dict {PACKAGE_PIN SYSMONE1_X0Y0} [get_ports vNIn]
-set_property -dict {PACKAGE_PIN SYSMONE1_X0Y0} [get_ports vNIn]
-set_property -dict {PACKAGE_PIN SYSMONE1_X0Y0} [get_ports vNIn]
-set_property -dict {PACKAGE_PIN SYSMONE1_X0Y0} [get_ports vNIn]
-set_property -dict {PACKAGE_PIN SYSMONE1_X0Y0} [get_ports vNIn]
-set_property -dict {PACKAGE_PIN SYSMONE1_X0Y0} [get_ports vNIn]
-set_property -dict {PACKAGE_PIN SYSMONE1_X0Y0} [get_ports vNIn]
-set_property -dict {PACKAGE_PIN SYSMONE1_X0Y0} [get_ports vNIn]
-set_property -dict {PACKAGE_PIN SYSMONE1_X0Y0} [get_ports vNIn]
-set_property -dict {PACKAGE_PIN SYSMONE1_X0Y0} [get_ports vNIn]
-set_property -dict {PACKAGE_PIN SYSMONE1_X0Y0} [get_ports vNIn]
-set_property -dict {PACKAGE_PIN SYSMONE1_X0Y0} [get_ports vNIn]
-set_property -dict {PACKAGE_PIN SYSMONE1_X0Y0} [get_ports vNIn]
-set_property -dict {PACKAGE_PIN SYSMONE1_X0Y0} [get_ports vNIn]
-set_property -dict {PACKAGE_PIN SYSMONE1_X0Y0} [get_ports vNIn]
-set_property -dict {PACKAGE_PIN SYSMONE1_X0Y0} [get_ports vNIn]
-set_property -dict {PACKAGE_PIN SYSMONE1_X0Y0} [get_ports vNIn]
-set_property -dict {PACKAGE_PIN SYSMONE1_X0Y0} [get_ports vNIn]
-set_property -dict {PACKAGE_PIN SYSMONE1_X0Y0} [get_ports vNIn]
-set_property -dict {PACKAGE_PIN SYSMONE1_X0Y0} [get_ports vNIn]
-set_property -dict {PACKAGE_PIN SYSMONE1_X0Y0} [get_ports vNIn]
-set_property -dict {PACKAGE_PIN SYSMONE1_X0Y0} [get_ports vNIn]
-set_property -dict {PACKAGE_PIN SYSMONE1_X0Y0} [get_ports vNIn]
-set_property -dict {PACKAGE_PIN SYSMONE1_X0Y0} [get_ports vNIn]
-set_property -dict {PACKAGE_PIN SYSMONE1_X0Y0} [get_ports vNIn]
-set_property -dict {PACKAGE_PIN SYSMONE1_X0Y0} [get_ports vNIn]
-set_property -dict {PACKAGE_PIN SYSMONE1_X0Y0} [get_ports vNIn]
 
 
 ####################################
@@ -249,6 +218,11 @@ set_false_path -to [get_cells -hierarchical -filter {NAME =~ *GEN_ULTRA_SCALE.Ip
 # Constraints from file : 'SaltUltraScaleTxOnly.xdc'
 ####################################################################################
 
+
+####################################################################################
+# Constraints from file : 'SaltUltraScaleTxOnly.xdc'
+####################################################################################
+
 set_false_path -to [get_cells -hierarchical -filter {NAME =~ *GEN_ULTRA_SCALE.IprogUltraScale_Inst/RstSync_Inst/Synchronizer_1/GEN.ASYNC_RST.crossDomainSyncReg_reg[1]}]
 
 
@@ -273,7 +247,8 @@ set_property CONFIG_VOLTAGE 3.3 [current_design]
 set_property UNAVAILABLE_DURING_CALIBRATION true [get_ports ddrPg]
 
 
-set_property CLKOUT0_PHASE -90 [get_cells U_Backplane/U_Clk/U_ClkManagerMps/MmcmGen.U_Mmcm]
+set_property CLKOUT0_PHASE 0 [get_cells U_Backplane/U_Clk/U_ClkManagerMps/MmcmGen.U_Mmcm]
+
 
 
 set_property C_CLK_INPUT_FREQ_HZ 300000000 [get_debug_cores dbg_hub]
