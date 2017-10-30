@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-07-10
--- Last update: 2017-10-07
+-- Last update: 2017-10-24
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -81,6 +81,7 @@ architecture rtl of XpmAppMaster is
   
   --  input data from sensor links
   --  L0 inhibit decision
+  signal l0Reset        : sl;
   signal inhibit        : sl;
   signal presult        : XpmPartitionDataType;
   --  L0 trigger output
@@ -132,7 +133,7 @@ begin
     generic map ( NWORDS_G => TIMING_MESSAGE_WORDS_C,
                   FDEPTH_G => 100 )
     port map ( clk            => timingClk,
-               rst            => timingRst,
+               rst            => l0Reset,
                delay          => config.pipeline.depth,
                fiducial_i     => fiducial,
                advance_i      => advance(0),
@@ -218,6 +219,10 @@ begin
     port map ( clk       => timingClk,
                dataIn    => config.message.insert,
                dataOut   => msgConfig.insert );
+  U_SyncReset : entity work.RstSync
+    port map ( clk       => timingClk,
+               asyncRst  => config.l0Select.reset,
+               syncRst   => l0Reset );
   --
   --  Unimplemented L1 trigger
   --

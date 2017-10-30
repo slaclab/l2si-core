@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-07-10
--- Last update: 2017-09-24
+-- Last update: 2017-10-25
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -114,8 +114,8 @@ architecture top_level_app of XpmApp is
   type FullArray    is array (natural range<>) of slv            (NPartitions-1 downto 0);
 
   signal l1Input        : L1InputArray(NDsLinks-1 downto 0);
-  signal dsFull         : FullArray(NDsLinks-1 downto 0);
-
+  signal dsFull         : FullArray   (NDsLinks-1 downto 0);
+  signal dsRxRcvs       : Slv32Array  (NDsLinks-1 downto 0);
   signal bpRxLinkFullS  : Slv16Array        (NBpLinks-1 downto 0);
   
   --  Serialized data to sensor links
@@ -134,13 +134,14 @@ architecture top_level_app of XpmApp is
 
 begin
 
-  linkstatp: process (bpStatus, dsLinkStatus, isXpm) is
+  linkstatp: process (bpStatus, dsLinkStatus, dsRxRcvs, isXpm) is
     variable linkStat : XpmLinkStatusType;
   begin
     for i in 0 to NDsLinks-1 loop
-      linkStat         := dsLinkStatus(i);
-      linkStat.rxIsXpm := isXpm(i);
-      status.dsLink(i) <= linkStat;
+      linkStat           := dsLinkStatus(i);
+      linkStat.rxRcvCnts := dsRxRcvs(i);
+      linkStat.rxIsXpm   := isXpm(i);
+      status.dsLink(i)   <= linkStat;
     end loop;
     status.bpLink <= bpStatus;
   end process;
@@ -193,6 +194,7 @@ begin
                  rxClk           => dsRxClk  (i),
                  rxRst           => dsRxRst  (i),
                  isXpm           => isXpm    (i),
+                 rxRcvs          => dsRxRcvs (i),
                  full            => dsFull   (i),
                  l1Input         => l1Input  (i) );
   end generate GEN_DSLINK;

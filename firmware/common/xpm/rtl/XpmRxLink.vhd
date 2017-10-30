@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-12-14
--- Last update: 2017-04-09
+-- Last update: 2017-10-25
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -47,6 +47,7 @@ entity XpmRxLink is
     rxRst            : in  sl;
     rxErr            : in  sl;
     isXpm            : out sl;
+    rxRcvs           : out slv(31 downto 0);
     full             : out slv            (NPartitions-1 downto 0);
     l1Input          : out XpmL1InputArray(NPartitions-1 downto 0) );
 end XpmRxLink;
@@ -58,6 +59,7 @@ architecture rtl of XpmRxLink is
     state     : RxStateType;
     partition : integer range 0 to NPartitions-1;
     isXpm     : sl;
+    rxRcvs    : slv(31 downto 0);
     pfull     : slv(NPartitions-1 downto 0);
     l1input   : XpmL1InputType;
     strobe    : slv(NPartitions-1 downto 0);
@@ -66,6 +68,7 @@ architecture rtl of XpmRxLink is
     state     => IDLE_S,
     partition => 0,
     isXpm     => '0',
+    rxRcvs    => (others=>'0'),
     pfull     => (others=>'1'),
     l1input   => XPM_L1_INPUT_INIT_C,
     strobe    => (others=>'0') );
@@ -77,7 +80,8 @@ architecture rtl of XpmRxLink is
   
 begin
 
-  isXpm <= r.isXpm;
+  isXpm  <= r.isXpm;
+  rxRcvs <= r.rxRcvs;
   
   U_FIFO : for i in 0 to NPartitions-1 generate
     U_ASync : entity work.FifoAsync
@@ -137,11 +141,13 @@ begin
       when IDLE_S =>
         if (rxDataK="01") then
           if (rxData=(D_215_C & K_EOS_C)) then
-            v.isXpm := '1';
-            v.state := PFULL_S;
+            v.isXpm  := '1';
+            v.rxRcvs := r.rxRcvs+1;
+            v.state  := PFULL_S;
           elsif (rxData=(D_215_C & K_SOF_C)) then
-            v.isXpm := '0';
-            v.state := DDATA_S;
+            v.isXpm  := '0';
+            v.rxRcvs := r.rxRcvs+1;
+            v.state  := DDATA_S;
           end if;
         end if;
       when PFULL_S =>

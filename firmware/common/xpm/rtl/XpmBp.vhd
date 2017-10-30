@@ -2,7 +2,7 @@
 -- File       : XpmBp.vhd
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-09-04
--- Last update: 2017-09-13
+-- Last update: 2017-10-25
 -------------------------------------------------------------------------------
 -- Description: 
 -------------------------------------------------------------------------------
@@ -167,6 +167,7 @@ begin
   
    seq: process (ref125MHzClk) is
      variable rxLate : Slv16Array(NBpLinks downto 1) := (others=>(others=>'0'));
+     variable rxErrs : Slv16Array(NBpLinks downto 1) := (others=>(others=>'0'));
      variable ibRecv : Slv32Array(NBpLinks downto 1) := (others=>(others=>'0'));
      variable ticks  : slv(7 downto 0);
    begin
@@ -174,8 +175,10 @@ begin
        for i in 1 to NBpLinks loop
          status(i).ibRecv <= ibRecv(i);
          status(i).rxLate <= rxLate(i);
+         status(i).rxErrs <= rxErrs(i);
          if ref125MHzRst='1' or config(i).enable='0' then
            rxLate(i) := (others=>'0');
+           rxErrs(i) := (others=>'0');
            rxFull(i) <= (others=>'0');
            ibRecv(i) := (others=>'0');
          elsif bpMaster(i).tValid='1' then
@@ -183,6 +186,9 @@ begin
                         (ticks   - bpMaster(i).tData(23 downto 16));
            rxFull(i) <= bpMaster(i).tData(15 downto 0);
            ibRecv(i) := ibRecv(i)+1;
+           if ssiGetUserEofe(BP_CONFIG_C,bpMaster(i))='1' then
+             rxErrs(i) := rxErrs(i)+1;
+           end if;
          end if;
          ticks := ticks + 1;
          if timeStrobe='1' then
