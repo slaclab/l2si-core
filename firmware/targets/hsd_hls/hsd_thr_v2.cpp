@@ -9,7 +9,7 @@
 #define PSSH(u,v) y##u=ap_fixed<16,16>(xsave##v[raddr%AMAX]) & 0x7ff;
 #define TSSH(u,v) to##u=tsave##v[raddr%AMAX];
 
-#define PTEST(v) lkeep |= (x##v < xlo || x##v > xhi);
+#define PTEST(v) { unsigned xv = unsigned(x##v)&0x7ff; lkeep |= (xv < xlo || xv > xhi); }
 
 #define AINIT(v) static adcin_t xsave##v[AMAX];
 #define ASAVE(v) xsave##v[waddr%AMAX] = x##v;
@@ -137,10 +137,7 @@ void hsd_thr(bool sync,
     else if (lopening) {
       // skip to the opening position
       y0 = 0x8000 | ((dcount+iopen)&0x7fff);
-      if (lclosing)
-        to0 = 3;
-      else
-        to0 = 1;
+      to0 = lclosing ? 3 : 1;
       PROC_SHIFT(PSSH);
       PROC_SHIFT(TSSH);
       yv = 1;
@@ -150,7 +147,7 @@ void hsd_thr(bool sync,
     else if (lclosing || dcount >= SKIP_THR) {
       // skip to the first position
       y0 = 0x8000 | (dcount&0x7fff);
-      to0 = 0;
+      to0 = lclosing ? 2 : 0;
       PROC_SHIFT(PSSH);
       PROC_SHIFT(TSSH);
       yv = 1;
