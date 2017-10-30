@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2016-03-25
--- Last update: 2017-10-12
+-- Last update: 2017-10-25
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -80,6 +80,7 @@ package XpmPkg is
       rxReady     : sl;
       rxErr       : sl;
       rxErrCnts   : slv(15 downto 0);
+      rxRcvCnts   : slv(31 downto 0);
       rxIsXpm     : sl;
    end record;
    type XpmLinkStatusArray is array (natural range<>) of XpmLinkStatusType;
@@ -90,17 +91,20 @@ package XpmPkg is
       rxReady     => '0',
       rxErr       => '0',
       rxErrCnts   => (others=>'0'),
+      rxRcvCnts   => (others=>'0'),
       rxIsXpm     => '0' );
 
    type XpmBpLinkStatusType is record
      linkUp   : sl;
      ibRecv   : slv(31 downto 0);
+     rxErrs   : slv(15 downto 0);
      rxLate   : slv(15 downto 0);
    end record;
    type XpmBpLinkStatusArray is array (natural range<>) of XpmBpLinkStatusType;
    constant XPM_BP_LINK_STATUS_INIT_C : XpmBpLinkStatusType := (
       linkUp => '0',
       ibRecv => (others=>'0'),
+      rxErrs => (others=>'0'),
       rxLate => (others=>'0') );
    
    --

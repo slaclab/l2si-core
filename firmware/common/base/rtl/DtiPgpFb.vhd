@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-07-10
--- Last update: 2017-07-18
+-- Last update: 2017-10-22
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -50,7 +50,7 @@ architecture rtl of DtiPgpFb is
   -- Tx Opcodes
   constant NONE_AF_OPCODE   : slv(7 downto 0) := x"00";
   constant RX_AF_OPCODE     : slv(7 downto 0) := x"01";   -- receive queue almost full
-  constant TX_AF_OPCODE     : slv(7 downto 0) := x"02";   -- receive queue almost full
+  constant TX_AF_OPCODE     : slv(7 downto 0) := x"02";   -- transmit queue almost full
   constant BOTH_AF_OPCODE   : slv(7 downto 0) := x"03";   -- both queues almost full
 
   type RegType is record
