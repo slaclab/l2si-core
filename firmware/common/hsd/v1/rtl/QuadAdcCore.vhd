@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2016-01-04
--- Last update: 2017-08-18
+-- Last update: 2017-10-22
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -32,6 +32,7 @@ use work.AxiStreamPkg.all;
 use work.TimingPkg.all;
 use work.EvrV2Pkg.all;
 use work.SsiPkg.all;
+use work.XpmPkg.all;
 use work.QuadAdcPkg.all;
 
 entity QuadAdcCore is
@@ -60,7 +61,10 @@ entity QuadAdcCore is
     evrRst              : in  sl;
     evrBus              : in  TimingBusType;
     exptBus             : in  ExptBusType;
-    ready               : out sl;
+--    ready               : out sl;
+    timingFbClk         : in  sl;
+    timingFbRst         : in  sl;
+    timingFb            : out TimingPhyType;
     -- ADC
     gbClk               : in  sl;
     adcClk              : in  sl;
@@ -92,26 +96,22 @@ architecture mapping of QuadAdcCore is
   
   signal eventSel            : sl;
   signal eventSelQ           : sl;
-  signal eventCount          : SlVectorArray(1 downto 0,31 downto 0);
   signal rstCount            : sl;
 
   signal dmaCtrlC            : slv(31 downto 0);
-  signal dmaCtrlCount        : slv(31 downto 0);
   
   signal histMaster          : AxiStreamMasterType;
   signal histSlave           : AxiStreamSlaveType;
   
   signal irqRequest          : sl;
 
-  signal partitionAddr       : slv(PADDR_LEN-1 downto 0);
   signal dmaFifoDepth        : slv( 9 downto 0);
 
   signal dmaFullThr, dmaFullThrS : slv(23 downto 0) := (others=>'0');
   signal dmaFullQ            : slv(FIFO_ADDR_WIDTH_C-1 downto 0);
   signal dmaFullS            : sl;
-  signal dmaFullQS           : slv(31 downto 0) := (others=>'0');
   signal iready              : sl;
-
+  
   signal adcQ, adc_test      : AdcDataArray(4*NFMC_G-1 downto 0);
   signal adcSyncReg          : slv(31 downto 0);
   signal idmaRst             : sl;
@@ -128,10 +128,12 @@ architecture mapping of QuadAdcCore is
     TUSER_MODE_C  => TUSER_NONE_C );
 
   constant HIST_DMA : boolean := false;
+
+  signal status : QuadAdcStatusType;
   
 begin 
 
-  ready   <= iready;
+  --ready   <= iready;
   iready  <= not dmaFullS;
   dmaRst  <= idmaRst;
   
@@ -139,7 +141,14 @@ begin
 
   axilWriteSlaves(1) <= AXI_LITE_WRITE_SLAVE_INIT_C;
   axilReadSlaves (1) <= AXI_LITE_READ_SLAVE_INIT_C;
-  
+
+  U_TimingFb : entity work.XpmTimingFb
+    port map ( clk        => timingFbClk,
+               rst        => timingFbRst,
+               l1input    => (others=>XPM_L1_INPUT_INIT_C),
+               full       => (others=>'0'),
+               phy        => timingFb );
+
   GEN_EV1 : if not LCLSII_G generate
     U_EventSel : entity work.QuadAdcEventV1Select
       port map ( evrClk     => evrClk,
@@ -209,7 +218,8 @@ begin
                   dmaFullS   => dmaFullS,
                   dmaFullQ   => dmaFullQ,
                   dmaMaster  => dmaRxIbMaster(0),
-                  dmaSlave   => dmaRxIbSlave (0) );
+                  dmaSlave   => dmaRxIbSlave (0),
+                  status     => status.cache );
 
   GEN_HIST_DMA : if HIST_DMA generate
     U_FifoDepthH : entity work.HistogramDma
@@ -250,7 +260,7 @@ begin
                   statusIn(0)  => eventSel,
                   cntRstIn     => rstCount,
                   rollOverEnIn => (others=>'1'),
-                  cntOut       => eventCount,
+                  cntOut       => status.eventCount,
                   wrClk        => evrClk,
                   wrRst        => '0',
                   rdClk        => axiClk,
@@ -273,12 +283,8 @@ begin
                   dmaRst              => idmaRst   ,
                   -- status
                   irqReq              => irqRequest   ,
-                  partitionAddr       => partitionAddr,
                   rstCount            => rstCount     ,
-                  eventCount          => eventCount   ,
-                  dmaCtrlCount        => dmaCtrlCount ,
-                  dmaFullQ            => dmaFullQS,
-                  adcSyncReg          => adcSyncReg );
+                  status              => status );
 
   -- Synchronize configurations to evrClk
   vConfig <= toSlv       (config);
@@ -310,7 +316,7 @@ begin
                   WIDTH_G => partitionAddr'length )
     port map  ( clk     => axiClk,
                 dataIn  => exptBus.message.partitionAddr,
-                dataOut => partitionAddr );
+                dataOut => status.partitionAddr );
   
   Sync_dmaEnable : entity work.Synchronizer
     generic map ( TPD_G   => TPD_G )
@@ -324,7 +330,7 @@ begin
                   WIDTH_G => dmaFullQ'length )
     port map  ( clk     => axiClk,
                 dataIn  => dmaFullQ,
-                dataOut => dmaFullQS(dmaFullQ'range) );
+                dataOut => status.dmaFullQS(dmaFullQ'range) );
   
   seq: process (evrClk) is
   begin
@@ -342,7 +348,7 @@ begin
     port map    ( wr_clk       => evrClk,
                   din          => dmaCtrlC,
                   rd_clk       => axiClk,
-                  dout         => dmaCtrlCount );
+                  dout         => status.dmaCtrlCount );
 
   --
   --  Synchronize reset to timing strobe to fix phase for gearbox
@@ -364,5 +370,11 @@ begin
       end if;
     end if;
   end process;
-      
+
+  Sync_adcSyncReg : entity work.SynchronizerVector
+    generic map ( WIDTH_G => 32 )
+    port map ( clk     => axiClk,
+               dataIn  => adcSyncReg,
+               dataOut => status.adcSyncReg );
+  
 end mapping;

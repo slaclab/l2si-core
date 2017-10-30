@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2016-01-04
--- Last update: 2017-10-12
+-- Last update: 2017-10-28
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -74,6 +74,7 @@ entity QuadAdcEvent is
     dmaFullThr    :  in slv(FIFO_ADDR_WIDTH_C-1 downto 0);
     dmaFullS      : out sl;
     dmaFullQ      : out slv(FIFO_ADDR_WIDTH_C-1 downto 0);
+    status        : out CacheArray(MAX_OVL_C-1 downto 0);
     dmaMaster     : out AxiStreamMasterArray(3 downto 0);
     dmaSlave      : in  AxiStreamSlaveArray (3 downto 0) );
 end QuadAdcEvent;
@@ -196,9 +197,13 @@ architecture mapping of QuadAdcEvent is
     port ( clk   : in sl;
            probe0: in slv(255 downto 0) );
   end component;
-  
+
+  signal cacheStatus : CacheStatusArray(NCHAN_C-1 downto 0);
+
 begin  -- mapping
 
+  status <= cacheStatus(0);
+  
   GEN_DEBUG: if DEBUG_C generate
     U_ILA : ila_0
       port map ( clk     => dmaClk,
@@ -293,7 +298,8 @@ begin  -- mapping
       generic map ( BASE_ADDR_C => AXIL_XBAR_CONFIG_C(i).baseAddr,
                     AXIS_CONFIG_G => CHN_AXIS_CONFIG_C,
                     ALGORITHM_G => FEX_ALGORITHMS(i),
-                    DEBUG_G     => ite(i>0, false, true) )
+--                    DEBUG_G     => ite(i>0, false, true) )
+                    DEBUG_G     => false )
       port map ( clk      => dmaClk,
                  rst      => dmaRst,
                  clear    => dmaRst,
@@ -306,6 +312,7 @@ begin  -- mapping
                  l1v      => open,
                  almost_full     => chafull  (i),
                  full            => chfull   (i),
+                 status          => cacheStatus(i),
                  axisMaster      => chmasters(i),
                  axisSlave       => chslaves (i),
                  axilClk         => axilClk,

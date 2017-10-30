@@ -183,6 +183,10 @@ architecture rtl of hsd_pgp is
   signal timingBus      : TimingBusType;
   signal exptBus        : ExptBusType;
 
+  signal timingFbClk    : sl;
+  signal timingFbRst    : sl;
+  signal timingFb       : TimingPhyType;
+
   signal dmaIbMaster    : AxiStreamMasterArray(DMA_CHANNELS_C-1 downto 0);
   signal dmaIbSlave     : AxiStreamSlaveArray (DMA_CHANNELS_C-1 downto 0);
 
@@ -201,7 +205,6 @@ architecture rtl of hsd_pgp is
   constant SIM_TIMING : boolean := false;
   
   signal tpgData           : TimingRxType := TIMING_RX_INIT_C;
-  signal readoutReady      : sl;
 
   signal adcInput : AdcInputArray(4*NFMC_C-1 downto 0);
 
@@ -313,7 +316,7 @@ begin  -- rtl
                scl            => scl,
                sda            => sda,
                -- Timing
-               readoutReady   => readoutReady,
+--               readoutReady   => readoutReady,
                timingRefClkP  => timingRefClkP,
                timingRefClkN  => timingRefClkN,
                timingRxP      => timingRxP,
@@ -324,6 +327,9 @@ begin  -- rtl
                timingRecClkRst=> timingRecClkRst,
                timingBus      => timingBus,
                exptBus        => exptBus,
+               timingFbClk    => timingFbClk,
+               timingFbRst    => timingFbRst,
+               timingFb       => timingFb,
                -- PCIE Ports
                pciRstL        => pciRstL,
                pciRefClkP     => pciRefClkP,
@@ -413,7 +419,10 @@ begin  -- rtl
       evrRst              => timingRecClkRst,
       evrBus              => timingBus,
       exptBus             => exptBus,
-      ready               => readoutReady );
+--      ready               => readoutReady );
+      timingFbClk         => timingFbClk,
+      timingFbRst         => timingFbRst,
+      timingFb            => timingFb );
 
   IBUFDS_GTE3_Inst : IBUFDS_GTE3
     generic map (

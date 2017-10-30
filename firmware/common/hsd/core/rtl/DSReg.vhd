@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2016-01-04
--- Last update: 2017-03-19
+-- Last update: 2017-10-28
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -49,14 +49,13 @@ entity DSReg is
     dmaHistEna          : out sl;
     adcSyncRst          : out sl;
     dmaRst              : out sl;
+    fbRst               : out sl;
+    fbPLLRst            : out sl;
     -- Status
     irqReq              : in  sl;
     rstCount            : out sl;
-    eventCount          : in  SlVectorArray(1 downto 0,31 downto 0);
-    partitionAddr       : in  slv(PADDR_LEN-1 downto 0);
-    dmaCtrlCount        : in  slv(31 downto 0);
-    dmaFullQ            : in  slv(31 downto 0);
-    adcSyncReg          : in  slv(31 downto 0) );
+    dmaClk              : in  sl;
+    status              : in  QuadAdcStatusType );
 end DSReg;
 
 architecture mapping of DSReg is
@@ -71,6 +70,9 @@ architecture mapping of DSReg is
     config         : QuadAdcConfigType;
     adcSyncRst     : sl;
     dmaRst         : sl;
+    fbRst          : sl;
+    fbPLLRst       : sl;
+    cacheSel       : slv(3 downto 0);
   end record;
   constant REG_INIT_C : RegType := (
     axilReadSlave  => AXI_LITE_READ_SLAVE_INIT_C,
@@ -81,13 +83,19 @@ architecture mapping of DSReg is
     dmaHistEna     => '0',
     config         => QUAD_ADC_CONFIG_INIT_C,
     adcSyncRst     => '0',
-    dmaRst         => '1' );
+    dmaRst         => '1',
+    fbRst          => '1',
+    fbPLLRst       => '1',
+    cacheSel       => (others=>'0') );
   
   signal r   : RegType := REG_INIT_C;
   signal rin : RegType;
 
-  signal adcSyncRegS : slv(31 downto 0);
-
+  signal cacheSel : slv(3 downto 0);
+  signal icache   : integer range 0 to 15;
+  signal cacheS       : CacheType;
+  signal cacheV, cacheSV : slv(CACHETYPE_LEN_C-1 downto 0);
+  
 begin  -- mapping
 
   config         <= r.config;
@@ -99,6 +107,8 @@ begin  -- mapping
   dmaHistEna     <= r.dmaHistEna;
   adcSyncRst     <= r.adcSyncRst;
   dmaRst         <= r.dmaRst;
+  fbRst          <= r.fbRst;
+  fbPLLRst       <= r.fbPLLRst;
 
   process (axiClk)
   begin  -- process
@@ -107,13 +117,23 @@ begin  -- mapping
     end if;
   end process;
 
-  process (r,axilReadMaster,axilWriteMaster,axiRst,eventCount,dmaCtrlCount,irqReq, partitionAddr, adcSyncRegS, dmaFullQ)
+  process (r,axilReadMaster,axilWriteMaster,axiRst,status,irqReq,cacheS) is
     variable v : RegType;
     variable sReg : slv(0 downto 0);
     variable axilStatus : AxiLiteStatusType;
+    variable cacheS_state : slv(3 downto 0);
+    variable cacheS_trigd : slv(3 downto 0);
     procedure axilSlaveRegisterR (addr : in slv; reg : in slv) is
     begin
       axiSlaveRegister(axilReadMaster, v.axilReadSlave, axilStatus, addr, 0, reg);
+    end procedure;
+    procedure axilSlaveRegisterR (addr : in slv; offset : in integer; reg : in slv) is
+    begin
+      axiSlaveRegister(axilReadMaster, v.axilReadSlave, axilStatus, addr, offset, reg);
+    end procedure;
+    procedure axilSlaveRegisterR (addr : in slv; offset : in integer; reg : in sl) is
+    begin
+      axiSlaveRegister(axilReadMaster, v.axilReadSlave, axilStatus, addr, offset, reg);
     end procedure;
     procedure axilSlaveRegisterR (addr : in slv; reg : in slv; ack : out sl) is
     begin
@@ -146,13 +166,15 @@ begin  -- mapping
     
     axilSlaveRegisterW(toSlv( 0,12), 0, v.irqEnable);
     axilSlaveRegisterR(toSlv( 4,12), sReg);
-    axilSlaveRegisterR(toSlv( 8,12), partitionAddr);
+    axilSlaveRegisterR(toSlv( 8,12), status.partitionAddr);
     axilSlaveRegisterW(toSlv(12,12),  0, v.dmaFullThr);
     axilSlaveRegisterW(toSlv(16,12),  0, v.countReset);
     axilSlaveRegisterW(toSlv(16,12),  1, v.dmaHistEna);
     axilSlaveRegisterW(toSlv(16,12),  2, v.config.dmaTest);
     axilSlaveRegisterW(toSlv(16,12),  3, v.adcSyncRst);
     axilSlaveRegisterW(toSlv(16,12),  4, v.dmaRst);
+    axilSlaveRegisterW(toSlv(16,12),  5, v.fbRst);
+    axilSlaveRegisterW(toSlv(16,12),  6, v.fbPLLRst);
     axilSlaveRegisterW(toSlv(16,12),  8, v.config.trigShift);
     axilSlaveRegisterW(toSlv(16,12), 31, v.config.acqEnable);
     axilSlaveRegisterW(toSlv(20,12),  0, v.config.rateSel);
@@ -165,22 +187,50 @@ begin  -- mapping
     axilSlaveRegisterW(toSlv(32,12),  0, v.config.prescale);
     axilSlaveRegisterW(toSlv(36,12),  0, v.config.offset);
     
-    axilSlaveRegisterR(toSlv(40,12), muxSlVectorArray(eventCount, 0));
-    axilSlaveRegisterR(toSlv(44,12), muxSlVectorArray(eventCount, 1));
-    axilSlaveRegisterR(toSlv(48,12), dmaCtrlCount);
-    axilSlaveRegisterR(toSlv(52,12), dmaFullQ);
-    axilSlaveRegisterR(toSlv(56,12), adcSyncRegS);
+    axilSlaveRegisterR(toSlv(40,12), muxSlVectorArray(status.eventCount, 0));
+    axilSlaveRegisterR(toSlv(44,12), muxSlVectorArray(status.eventCount, 1));
+    axilSlaveRegisterR(toSlv(48,12), status.dmaCtrlCount);
+    axilSlaveRegisterR(toSlv(52,12), status.dmaFullQ);
+    axilSlaveRegisterR(toSlv(56,12), status.adcSyncReg);
 
+    case cacheS.state is
+      when EMPTY_S   => cacheS_state := x"0";
+      when OPEN_S    => cacheS_state := x"1";
+      when CLOSED_S  => cacheS_state := x"2";
+      when READING_S => cacheS_state := x"3";
+      when others    => cacheS_state := x"4";
+    end case;
+    case cacheS.trigd is
+      when WAIT_T    => cacheS_trigd := x"0";
+      when ACCEPT_T  => cacheS_trigd := x"1";
+      when others    => cacheS_trigd := x"2";
+    end case;
+
+    axilSlaveRegisterW(toSlv(64,12),  0, v.cacheSel );
+    axilSlaveRegisterR(toSlv(68,12),  0, cacheS_state );
+    axilSlaveRegisterR(toSlv(68,12),  4, cacheS_trigd );
+    axilSlaveRegisterR(toSlv(68,12),  8, cacheS.skip );
+    axilSlaveRegisterR(toSlv(68,12),  9, cacheS.ovflow );
+    axilSlaveRegisterR(toSlv(72,12),  0, cacheS.baddr );
+    axilSlaveRegisterR(toSlv(72,12), 16, cacheS.eaddr );
+    
     axilSlaveDefault(AXI_RESP_OK_C);
     
     rin <= v;
   end process;
 
-  Sync_adcSyncReg : entity work.SynchronizerVector
-    generic map ( WIDTH_G => 32 )
+  U_ICache : entity work.SynchronizerVector
+    generic map ( WIDTH_G => 4 )
+    port map ( clk     => dmaClk,
+               dataIn  => r.cacheSel,
+               dataOut => cacheSel);
+  icache <= conv_integer(cacheSel);
+  cacheV <= cacheToSlv(status.eventCache(icache));
+  U_CacheS : entity work.SynchronizerVector
+    generic map ( WIDTH_G => cacheV'length )
     port map ( clk     => axiClk,
-               dataIn  => adcSyncReg,
-               dataOut => adcSyncRegS );
-  
+               dataIn  => cacheV,
+               dataOut => cacheSV );
+  cacheS <= toCacheType(cacheSV);
   
 end mapping;

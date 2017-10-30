@@ -5,7 +5,7 @@
 -- Author     : Larry Ruckman  <ruckman@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2016-02-12
--- Last update: 2017-08-22
+-- Last update: 2017-10-26
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -75,7 +75,6 @@ entity AxiPcieQuadAdcCore is
       sda            : inout sl;
       
       -- Timing
-      readoutReady   : in    sl;
       timingRefClkP  : in    sl;
       timingRefClkN  : in    sl;
       timingRxP      : in    sl;
@@ -86,6 +85,9 @@ entity AxiPcieQuadAdcCore is
       timingRecClkRst: out   sl;
       timingBus      : out   TimingBusType;
       exptBus        : out   ExptBusType;
+      timingFbClk    : out   sl;
+      timingFbRst    : out   sl;
+      timingFb       : in    TimingPhyType;
       
      -- PCIe Ports 
       pciRstL        : in    sl;
@@ -154,9 +156,7 @@ architecture mapping of AxiPcieQuadAdcCore is
    signal rxDecErr       : slv(1 downto 0);
    signal txUsrClk       : sl;
    signal txUsrRst       : sl;
-   signal txUsrClkActive : sl;
    signal txStatus       : TimingPhyStatusType := TIMING_PHY_STATUS_INIT_C;
-   signal timingPhy      : TimingPhyType := TIMING_PHY_INIT_C;
    signal loopback       : slv(2 downto 0);
 
    signal interrupt    : slv(DMA_SIZE_G-1 downto 0);
@@ -532,12 +532,12 @@ begin
          rxDispErr       => rxDispErr,
          rxDecErr        => rxDecErr,
          rxOutClk        => timingClk,
-         txControl       => timingPhy.control,
+         txControl       => timingFb.control,
          txStatus        => txStatus,
          txUsrClk        => txUsrClk,
-         txUsrClkActive  => txUsrClkActive,
-         txData          => timingPhy.data,
-         txDataK         => timingPhy.dataK,
+         txUsrClkActive  => '1',
+         txData          => timingFb.data,
+         txDataK         => timingFb.dataK,
          txOutClk        => txUsrClk,
          loopback        => loopback);
 
@@ -576,13 +576,16 @@ begin
          axilWriteMaster => timWriteMaster,
          axilWriteSlave  => timWriteSlave);
 
-   U_TxFb : entity work.DaqControlTx
-     port map ( txclk          => txUsrClk,
-                txrst          => txUsrRst,
-                rxrst          => timingClkRst,
-                ready          => readoutReady,
-                data           => timingPhy.data,
-                dataK          => timingPhy.dataK );
+   timingFbClk <= txUsrClk;
+   timingFbRst <= txUsrRst;
+   
+   --U_TxFb : entity work.DaqControlTx
+   --  port map ( txclk          => txUsrClk,
+   --             txrst          => txUsrRst,
+   --             rxrst          => timingClkRst,
+   --             ready          => readoutReady,
+   --             data           => timingPhy.data,
+   --             dataK          => timingPhy.dataK );
                 
    U_I2C : entity work.AxiI2cRegMaster
      generic map ( DEVICE_MAP_G   => DEVICE_MAP_C,

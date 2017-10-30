@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2016-01-04
--- Last update: 2017-08-30
+-- Last update: 2017-10-22
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -56,6 +56,7 @@ entity QuadAdcChannelFifo is
     l1v             : out slv       (3 downto 0);
     almost_full     : out sl;
     full            : out sl;
+    status          : out CacheArray(MAX_OVL_C-1 downto 0);
     -- readout interface
     axisMaster      : out AxiStreamMasterType;
     axisSlave       :  in AxiStreamSlaveType;
@@ -182,11 +183,15 @@ architecture mapping of QuadAdcChannelFifo is
            probe0 : in slv(255 downto 0) );
   end component;
 
+  signal cacheStatus : CacheStatusArray(NSTREAMS_C-1 downto 0);
+  
 begin  -- mapping
 
   rData <= r.axisMaster.tData(127 downto 0);
   sData <= axisMasters(0).tData(127 downto 0);
 
+  status <= cacheStatus(0);
+  
   GEN_DMADATA : for i in 0 to NSTREAMS_C-1 generate
     dmaData(i) <= axisMasters(i).tData(127 downto 0);
   end generate;
@@ -305,6 +310,7 @@ begin  -- mapping
                  l1ina             => r.l1ina (i),
                  free              => free            (i),
                  nfree             => nfree           (i),
+                 status            => cacheStatus     (i),
                  axisMaster        => axisMasters     (i),
                  axisSlave         => rin.axisSlaves    (i),
                  axilReadMaster    => maxilReadMasters (i+1),

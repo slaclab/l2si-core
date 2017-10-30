@@ -55,7 +55,10 @@ entity Application is
     evrRst              : in  sl;
     evrBus              : in  TimingBusType;
     exptBus             : in  ExptBusType;
-    ready               : out sl );
+--    ready               : out sl );
+    timingFbClk         : in  sl;
+    timingFbRst         : in  sl;
+    timingFb            : out TimingPhyType );
 end Application;
  
  
@@ -336,7 +339,10 @@ begin  -- rtl
       evrRst              => evrRst,
       evrBus              => evrBus,
       exptBus             => exptBus,
-      ready               => ready,
+--      ready               => ready,
+      timingFbClk         => timingFbClk,
+      timingFbRst         => timingFbRst,
+      timingFb            => timingFb,
       -- ADC
       gbClk               => gbClk,
       adcClk              => adcClk,
