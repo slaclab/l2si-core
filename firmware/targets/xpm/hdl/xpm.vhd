@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-12-14
--- Last update: 2017-09-20
+-- Last update: 2017-10-25
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -319,7 +319,7 @@ begin
    GEN_RINGD : for i in 0 to NDSLinks-1 generate
      U_Sync : entity work.SynchronizerFifo
        generic map ( DATA_WIDTH_G => 19 )
-       port map ( wr_clk => dsRxClk(i),
+       port map ( wr_clk            => dsRxClk(i),
                   din(18)           => dsRxErr  (i),
                   din(17 downto 16) => dsRxDataK(i),
                   din(15 downto  0) => dsRxData (i),
