@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2016-01-04
--- Last update: 2017-10-22
+-- Last update: 2017-12-12
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -41,6 +41,7 @@ entity QuadAdcCore is
     LCLSII_G    : boolean := TRUE;
     NFMC_G      : integer := 1;
     SYNC_BITS_G : integer := 4;
+    DMA_SIZE_G  : integer := 1;
     DMA_STREAM_CONFIG_G : AxiStreamConfigType;
     BASE_ADDR_C : slv(31 downto 0) := (others=>'0') );
   port (
@@ -54,8 +55,8 @@ entity QuadAdcCore is
     -- DMA
     dmaClk              : in  sl;
     dmaRst              : out sl;
-    dmaRxIbMaster       : out AxiStreamMasterArray(DMA_CHANNELS_C-1 downto 0);
-    dmaRxIbSlave        : in  AxiStreamSlaveArray (DMA_CHANNELS_C-1 downto 0);
+    dmaRxIbMaster       : out AxiStreamMasterArray(DMA_SIZE_G-1 downto 0);
+    dmaRxIbSlave        : in  AxiStreamSlaveArray (DMA_SIZE_G-1 downto 0);
     -- EVR Ports
     evrClk              : in  sl;
     evrRst              : in  sl;
@@ -218,8 +219,8 @@ begin
                   dmaFullS   => dmaFullS,
                   dmaFullQ   => dmaFullQ,
                   dmaMaster  => dmaRxIbMaster(0),
-                  dmaSlave   => dmaRxIbSlave (0),
-                  status     => status.cache );
+                  dmaSlave   => dmaRxIbSlave (0) );
+--                  status     => status.cache );
 
   GEN_HIST_DMA : if HIST_DMA generate
     U_FifoDepthH : entity work.HistogramDma
@@ -249,7 +250,7 @@ begin
                  mAxisSlave  => dmaRxIbSlave (1) );
   end generate;
 
-  NOGEN_HIST_DMA : if not HIST_DMA generate
+  NOGEN_HIST_DMA : if not HIST_DMA and DMA_SIZE_G > 1 generate
     dmaRxIbMaster(1) <= AXI_STREAM_MASTER_INIT_C;
   end generate;
     
@@ -313,7 +314,7 @@ begin
 
   Sync_partAddr : entity work.SynchronizerVector
     generic map ( TPD_G   => TPD_G,
-                  WIDTH_G => partitionAddr'length )
+                  WIDTH_G => status.partitionAddr'length )
     port map  ( clk     => axiClk,
                 dataIn  => exptBus.message.partitionAddr,
                 dataOut => status.partitionAddr );
@@ -330,7 +331,7 @@ begin
                   WIDTH_G => dmaFullQ'length )
     port map  ( clk     => axiClk,
                 dataIn  => dmaFullQ,
-                dataOut => status.dmaFullQS(dmaFullQ'range) );
+                dataOut => status.dmaFullQ(dmaFullQ'range) );
   
   seq: process (evrClk) is
   begin

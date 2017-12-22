@@ -5,7 +5,7 @@
 -- Author     : Larry Ruckman  <ruckman@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2016-02-12
--- Last update: 2017-10-26
+-- Last update: 2017-12-13
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -42,9 +42,10 @@ entity AxiPcieQuadAdcCore is
       TPD_G            : time                   := 1 ns;
       DRIVER_TYPE_ID_G : slv(31 downto 0)       := x"00000000";
       AXI_APP_BUS_EN_G : boolean                := false;
+      ENABLE_DMA_G     : boolean                := true;
       DMA_SIZE_G       : positive range 1 to 16 := 1;
       AXIS_CONFIG_G    : AxiStreamConfigArray;
-      LCLSII_G         : boolean                := true;
+      LCLSII_G         : boolean                := true;  -- obsolete
       BUILD_INFO_G     : BuildInfoType );
    port (
       -- System Clock and Reset
@@ -442,19 +443,20 @@ begin
                 flash_noe       => flashOe_n,
                 flash_nwe       => flashWe_n,
                 flash_nce       => flash_nce );
-   
-   ---------------
-   -- AXI PCIe DMA
-   ---------------   
-   U_AxiPcieDma : entity work.AxiPcieDma
-      generic map (
+
+   GEN_DMA : if ENABLE_DMA_G generate
+     ---------------
+     -- AXI PCIe DMA
+     ---------------   
+     U_AxiPcieDma : entity work.AxiPcieDma
+       generic map (
          TPD_G            => TPD_G,
          DMA_SIZE_G       => DMA_SIZE_G,
          USE_IP_CORE_G    => false,
          AXIL_BASE_ADDR_G => DMA_ADDR_C,
          AXI_ERROR_RESP_G => AXI_ERROR_RESP_C,
          AXIS_CONFIG_G    => AXIS_CONFIG_G)
-      port map (
+       port map (
          -- Clock and reset
          axiClk          => axiClk,
          axiRst          => axiRst,
@@ -478,7 +480,17 @@ begin
          dmaObSlaves     => dmaObSlaves,
          dmaIbMasters    => dmaIbMasters,
          dmaIbSlaves     => dmaIbSlaves);
+     end generate;
 
+     GEN_NO_DMA : if not ENABLE_DMA_G generate
+       dmaReadMaster     <= AXI_READ_MASTER_INIT_C;
+       dmaWriteMaster    <= AXI_WRITE_MASTER_INIT_C;
+       dmaCtrlReadSlave  <= AXI_LITE_READ_SLAVE_INIT_C;
+       dmaCtrlWriteSlave <= AXI_LITE_WRITE_SLAVE_INIT_C;
+       interrupt         <= (others=>'0');
+       dmaObMasters      <= (others=>AXI_STREAM_MASTER_INIT_C);
+       dmaIbSlaves       <= (others=>AXI_STREAM_SLAVE_FORCE_C);
+     end generate;
    
    ---------------
    -- Timing
@@ -507,7 +519,7 @@ begin
    
    U_TimingGth : entity work.TimingGthCoreWrapper
       generic map (
-         EXTREF_G         => LCLSII_G,  -- because Si5338 can't generate 371MHz
+         EXTREF_G         => true,  -- because Si5338 can't generate 371MHz
          AXIL_BASE_ADDR_G => GTH_ADDR_C )
       port map (
          axilClk         => axilClk,
@@ -546,7 +558,7 @@ begin
          TPD_G             => TPD_G,
          TPGEN_G           => false,
          ASYNC_G           => false,
-         CLKSEL_MODE_G     => "LCLSII",
+         CLKSEL_MODE_G     => ite(LCLSII_G,"LCLS-II","LCLS-I"),
 --         PROG_DELAY_G      => true,
          AXIL_BASE_ADDR_G  => TIM_ADDR_C,
          AXIL_ERROR_RESP_G => AXI_RESP_DECERR_C,

@@ -5,7 +5,7 @@
 -- File       : AxiStreamDmaWrite.vhd
 -- Author     : Ryan Herbst, rherbst@slac.stanford.edu
 -- Created    : 2014-04-25
--- Last update: 2017-04-06
+-- Last update: 2017-11-13
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -117,7 +117,7 @@ architecture rtl of AxiStreamDmaWrite is
    attribute dont_touch      : string;
    attribute dont_touch of r : signal is "true";
    
-   constant DEBUG_C : boolean := true;
+   constant DEBUG_C : boolean := false;
 
    component ila_0
      port ( clk : in sl;

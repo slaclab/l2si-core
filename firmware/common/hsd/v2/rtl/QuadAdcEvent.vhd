@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2016-01-04
--- Last update: 2017-10-28
+-- Last update: 2017-12-13
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -42,6 +42,7 @@ entity QuadAdcEvent is
     FIFO_ADDR_WIDTH_C : integer := 10;
     NFMC_G            : integer := 1;
     SYNC_BITS_G       : integer := 4;
+    DMA_SIZE_G        : integer := 4;
     DMA_STREAM_CONFIG_G : AxiStreamConfigType;
     BASE_ADDR_C       : slv(31 downto 0) := (others=>'0') );
   port (
@@ -75,13 +76,12 @@ entity QuadAdcEvent is
     dmaFullS      : out sl;
     dmaFullQ      : out slv(FIFO_ADDR_WIDTH_C-1 downto 0);
     status        : out CacheArray(MAX_OVL_C-1 downto 0);
-    dmaMaster     : out AxiStreamMasterArray(3 downto 0);
-    dmaSlave      : in  AxiStreamSlaveArray (3 downto 0) );
+    dmaMaster     : out AxiStreamMasterArray(DMA_SIZE_G-1 downto 0);
+    dmaSlave      : in  AxiStreamSlaveArray (DMA_SIZE_G-1 downto 0) );
 end QuadAdcEvent;
 
 architecture mapping of QuadAdcEvent is
 
-  constant ONE_STREAM : boolean := false;
   constant NCHAN_C : integer := 4*NFMC_G;
   
   type EventStateType is (E_IDLE, E_SYNC);
@@ -199,6 +199,7 @@ architecture mapping of QuadAdcEvent is
   end component;
 
   signal cacheStatus : CacheStatusArray(NCHAN_C-1 downto 0);
+  signal chstreams   : Slv4Array       (NCHAN_C-1 downto 0);
 
 begin  -- mapping
 
@@ -273,10 +274,26 @@ begin  -- mapping
       end generate GEN_IADC;
     end generate GEN_BIT;
 
-    eventHdr     (i) <= toSlv(0,29) & pllSync(i) &
-                        configA.enable & toSlv(0,6) &
-                        configA.samples(17 downto 4) & x"0" &
-                        eventHeader(i);
+    --
+    --  If readout is in one stream, put the mask of channels in the header
+    --
+    GEN_ONE_HDR : if DMA_SIZE_G=1 generate
+      eventHdr     (i) <= toSlv(0,29) & pllSync(i) &
+                          configA.enable & toSlv(0,6) &
+                          configA.samples(17 downto 4) & x"0" &
+                          eventHeader(i);
+    end generate;
+
+    --
+    --  If readout is in many streams, put the channel ID in the header
+    --
+    GEN_CHN_HDR : if DMA_SIZE_G>1 generate
+      eventHdr     (i) <= toSlv(0,29) & pllSync(i) &
+                          toSlv(i,8) & chstreams(i) & toSlv(0,2) &
+                          configA.samples(17 downto 4) & x"0" &
+                          eventHeader(i);
+    end generate;
+    
     hdrValid     (i) <= eventHeaderV(i) and pllSyncV(i);
     eventHeaderRd(i) <= hdrRd(i);
     
@@ -298,8 +315,8 @@ begin  -- mapping
       generic map ( BASE_ADDR_C => AXIL_XBAR_CONFIG_C(i).baseAddr,
                     AXIS_CONFIG_G => CHN_AXIS_CONFIG_C,
                     ALGORITHM_G => FEX_ALGORITHMS(i),
---                    DEBUG_G     => ite(i>0, false, true) )
-                    DEBUG_G     => false )
+                    DEBUG_G     => ite(i>0, false, true) )
+--                    DEBUG_G     => false )
       port map ( clk      => dmaClk,
                  rst      => dmaRst,
                  clear    => dmaRst,
@@ -320,9 +337,10 @@ begin  -- mapping
                  axilReadMaster  => mAxilReadMasters (i),
                  axilReadSlave   => mAxilReadSlaves  (i),
                  axilWriteMaster => mAxilWriteMasters(i),
-                 axilWriteSlave  => mAxilWriteSlaves (i) );
+                 axilWriteSlave  => mAxilWriteSlaves (i),
+                 streams         => chstreams        (i) );
 
-    GEN_DATA : if ONE_STREAM=false generate
+    GEN_DATA : if DMA_SIZE_G>1 generate
       U_DATA : entity work.QuadAdcChannelData
         generic map ( DMA_STREAM_CONFIG_G => DMA_STREAM_CONFIG_G )
         port map ( --eventClk    => eventClk,
@@ -348,7 +366,7 @@ begin  -- mapping
     end generate GEN_DATA;
   end generate;
 
-  GEN_ONE : if ONE_STREAM=true generate
+  GEN_ONE : if DMA_SIZE_G=1 generate
     U_DATA : entity work.QuadAdcChannelMux
       generic map ( NCHAN_C             => NCHAN_C,
                     DMA_STREAM_CONFIG_G => DMA_STREAM_CONFIG_G )

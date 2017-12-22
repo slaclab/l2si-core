@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2016-01-04
--- Last update: 2017-10-28
+-- Last update: 2017-12-12
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -54,7 +54,7 @@ entity DSReg is
     -- Status
     irqReq              : in  sl;
     rstCount            : out sl;
-    dmaClk              : in  sl;
+    dmaClk              : in  sl := '0';
     status              : in  QuadAdcStatusType );
 end DSReg;
 

@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2016-01-04
--- Last update: 2017-10-22
+-- Last update: 2017-12-13
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -66,7 +66,8 @@ entity QuadAdcChannelFifo is
     axilReadMaster  :  in AxiLiteReadMasterType;
     axilReadSlave   : out AxiLiteReadSlaveType;
     axilWriteMaster :  in AxiLiteWriteMasterType;
-    axilWriteSlave  : out AxiLiteWriteSlaveType );
+    axilWriteSlave  : out AxiLiteWriteSlaveType;
+    streams         : out slv(3 downto 0) );
 end QuadAdcChannelFifo;
 
 architecture mapping of QuadAdcChannelFifo is
@@ -176,7 +177,7 @@ architecture mapping of QuadAdcChannelFifo is
 
   signal dmaData : Slv128Array(NSTREAMS_C-1 downto 0);
 
-  constant DEBUG_C : boolean := false;
+  constant DEBUG_C : boolean := DEBUG_G;
   
   component ila_0
     port ( clk : in sl;
@@ -191,6 +192,7 @@ begin  -- mapping
   sData <= axisMasters(0).tData(127 downto 0);
 
   status <= cacheStatus(0);
+  streams <= resize(r.fexEnable,4);
   
   GEN_DMADATA : for i in 0 to NSTREAMS_C-1 generate
     dmaData(i) <= axisMasters(i).tData(127 downto 0);
@@ -207,22 +209,20 @@ begin  -- mapping
                  probe0(5)     => lopen(0),
                  probe0(6)     => lskip(0),
                  probe0(7)     => lclose(0),
-                 probe0(8)     => r.start(0),
-                 probe0(9)     => r.l1in (0),
-                 probe0(10)    => r.l1ina(0),
-                 probe0(11)    => axisMasters(0).tValid,
-                 probe0(12)    => axisMasters(0).tLast,
-                 probe0(13)    => rin.axisSlaves(0).tReady,
-                 probe0(14)    => r.fexEnable(0),
-                 probe0(18 downto 15) => r.npend,
-                 probe0(22 downto 19) => r.ntrig,
-                 probe0(26 downto 23) => r.nread,
+                 probe0( 9 downto  8) => r.start,
+                 probe0(11 downto 10) => r.l1in,
+                 probe0(13 downto 12) => r.l1ina,
+                 probe0(15 downto 14) => r.fexEnable,
+                 probe0(26 downto 16) => (others=>'0'),
                  probe0(27)           => maxilWriteMasters(0).awvalid,
                  probe0(28)           => maxilWriteMasters(0).wvalid,
                  probe0(29)           => maxilWriteMasters(0).bready,
                  probe0(61 downto 30) => maxilWriteMasters(0).awaddr,
                  probe0(93 downto 62) => maxilWriteMasters(0).wdata,
-                 probe0(255 downto 94) => (others=>'0') );
+                 probe0( 97 downto  94) => r.npend,
+                 probe0(101 downto  98) => r.ntrig,
+                 probe0(105 downto 102) => r.nread,
+                 probe0(255 downto 106) => (others=>'0') );
   end generate;
   
   --  Do we have to cross clock domains here or does VivadoHLS do it for us?
@@ -298,7 +298,9 @@ begin  -- mapping
     U_FEX : entity work.hsd_fex_wrapper
       generic map ( AXIS_CONFIG_G => SAXIS_CONFIG_C,
                     ALGORITHM_G   => ALGORITHM_G(i),
-                    DEBUG_G       => DEBUG_G )
+                    DEBUG_G       => ite(i>1,false,true) )
+--                    DEBUG_G       => false )
+--                    DEBUG_G       => DEBUG_G )
       port map ( clk               => clk,
                  rst               => clear,
                  din               => din,

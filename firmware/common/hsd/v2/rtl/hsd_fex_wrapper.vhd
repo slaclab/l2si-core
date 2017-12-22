@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2016-01-04
--- Last update: 2017-10-22
+-- Last update: 2017-11-13
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -132,6 +132,8 @@ architecture mapping of hsd_fex_wrapper is
   signal configSynct : sl;
   signal configSync  : sl;
   signal bWrite      : sl;
+  signal tin_dbg     : slv(2*ROW_SIZE-1 downto 0);
+  signal tout_dbg    : slv(2*ROW_SIZE+1 downto 0);
   
   constant DEBUG_C : boolean := DEBUG_G;
   
@@ -143,8 +145,18 @@ architecture mapping of hsd_fex_wrapper is
 begin
 
   status <= r.cache;
-  
+
   GEN_DEBUG : if DEBUG_C generate
+    process (r, tout) is
+    begin
+      for i in 0 to ROW_SIZE-1 loop
+        tin_dbg(2*i+1 downto 2*i) <= r.tin(i);
+      end loop;
+      for i in 0 to ROW_SIZE loop
+        tout_dbg(2*i+1 downto 2*i) <= tout(i);
+      end loop;
+    end process;
+    
     U_ILA : ila_0
       port map ( clk       => clk,
                  probe0(0) => lopen,
@@ -162,7 +174,9 @@ begin
                  probe0(94 downto 91) => r.iopened,
                  probe0(98 downto 95) => r.ireading,
                  probe0(102 downto 99) => r.itrigger,
-                 probe0(255 downto 103) => (others=>'0') );
+                 probe0(118 downto 103) => tin_dbg,
+                 probe0(136 downto 119) => tout_dbg,
+                 probe0(255 downto 137) => (others=>'0') );
   end generate;
   
   rstn <= not rst;

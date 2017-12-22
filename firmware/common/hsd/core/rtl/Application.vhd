@@ -24,6 +24,7 @@ entity Application is
      VERSION_625MHz : boolean := FALSE;
      LCLSII_G       : boolean := TRUE;
      NFMC_G         : integer := 1;
+     DMA_SIZE_G     : integer := 1;
      DMA_STREAM_CONFIG_G : AxiStreamConfigType );
   port (
     fmc_to_cpld      : inout Slv4Array(NFMC_G-1 downto 0);
@@ -48,8 +49,8 @@ entity Application is
     -- DMA
     dmaClk              : out sl;
     dmaRst              : out sl;
-    dmaRxIbMaster       : out AxiStreamMasterArray(DMA_CHANNELS_C-1 downto 0);
-    dmaRxIbSlave        : in  AxiStreamSlaveArray (DMA_CHANNELS_C-1 downto 0);
+    dmaRxIbMaster       : out AxiStreamMasterArray(DMA_SIZE_G-1 downto 0);
+    dmaRxIbSlave        : in  AxiStreamSlaveArray (DMA_SIZE_G-1 downto 0);
     -- EVR Ports
     evrClk              : in  sl;
     evrRst              : in  sl;
@@ -317,10 +318,10 @@ begin  -- rtl
   --cAxilReadMasters (1) <= AXI_LITE_READ_MASTER_INIT_C;
   
   U_Core : entity work.QuadAdcCore
-    generic map ( LCLSII_G    => LCLSII_G,
-                  NFMC_G      => NFMC_G,
+    generic map ( NFMC_G      => NFMC_G,
                   SYNC_BITS_G => SYNC_BITS,
                   BASE_ADDR_C => AXI_CROSSBAR_MASTERS_CONFIG_C(5).baseAddr,
+                  DMA_SIZE_G  => DMA_SIZE_G,
                   DMA_STREAM_CONFIG_G => DMA_STREAM_CONFIG_G )
     port map (
       axiClk              => axiClk,
