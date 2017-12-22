@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-12-14
--- Last update: 2017-10-25
+-- Last update: 2017-11-17
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -620,5 +620,7 @@ begin
 
   bpStatus(0).linkUp  <= bpTxLinkStatus.txReady;
   bpStatus(0).ibRecv  <= (others=>'0');
+  bpStatus(0).rxErrs  <= (others=>'0');
+  bpStatus(0).rxLate  <= (others=>'0');
     
 end top_level;
