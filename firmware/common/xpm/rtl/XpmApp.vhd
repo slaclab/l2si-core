@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-07-10
--- Last update: 2017-10-25
+-- Last update: 2017-12-21
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -233,7 +233,8 @@ begin
   GEN_PART : for i in 0 to NPartitions-1 generate
 
     U_Master : entity work.XpmAppMaster
-      generic map ( NDsLinks   => NDsLinks )
+      generic map ( NDsLinks   => NDsLinks,
+                    DEBUG_G    => ite(i>0, false, true) )
       port map ( regclk        => regclk,
                  update        => update          (i),
                  config        => config.partition(i),

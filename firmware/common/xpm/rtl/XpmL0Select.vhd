@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-12-14
--- Last update: 2017-07-27
+-- Last update: 2017-12-21
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -35,6 +35,7 @@ use work.TPGPkg.all;
 use work.XpmPkg.all;
 
 entity XpmL0Select is
+   generic ( DEBUG_G : boolean := false );
    port (
       clk              : in  sl;
       rst              : in  sl;
@@ -73,24 +74,25 @@ architecture rtl of XpmL0Select is
 
    signal uconfig : XpmL0SelectConfigType;
 
-   --component ila_1x256x1024
-   --   port ( clk    : in sl;
-   --          probe0 : in slv(255 downto 0) );
-   --end component;
+   component ila_3
+     port ( clk    : in sl;
+            probe0 : in slv(7 downto 0) );
+   end component;
 begin
-   --U_ILA : ila_1x256x1024
-   --   port map ( clk      => clk,
-   --              probe0(0) => timingBus.strobe,
-   --              probe0(1) => uconfig.enabled,
-   --              probe0(2) => strobe,
-   --              probe0(18 downto  3) => uconfig.rateSel,
-   --              probe0(34 downto 19) => uconfig.destSel,
-   --              probe0(44 downto 35) => timingBus.message.fixedRates(9 downto 0),
-   --              probe0(50 downto 45) => timingBus.message.acRates(5 downto 0),
-   --              probe0(66 downto 51) => timingBus.message.beamRequest(15 downto 0),
-   --              probe0(130 downto 67) => r.status.enabled,
-   --              probe0(255 downto 131) => (others=>'0') );
-   
+
+  GEN_DEBUG : if DEBUG_G generate
+    U_ILA : ila_3
+      port map ( clk      => clk,
+                 probe0(0) => timingBus.strobe,
+                 probe0(1) => uconfig.enabled,
+                 probe0(2) => strobe,
+                 probe0(3) => inhibit,
+                 probe0(4) => r.status.enabled  (0),
+                 probe0(5) => r.status.inhibited(0),
+                 probe0(6) => r.status.num      (0),
+                 probe0(7) => r.status.numInh   (0) );
+  end generate;
+  
    accept <= r.accept;
    rejecc <= r.rejecc;
    status <= r.status;

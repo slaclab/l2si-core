@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-12-14
--- Last update: 2017-10-06
+-- Last update: 2017-11-09
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -72,11 +72,11 @@ begin
                  dataIn (0)            => enabled,
                  dataOut(0)            => uenabled );
    
-   comb: process (r, push, uenabled) is
+   comb: process (r, push, skip, uenabled) is
       variable v : RegType;
    begin
       v := r;
-      if (push='1') then
+      if (push='1' or skip='1') then
          v.tag := r.tag+1;
       end if;
 

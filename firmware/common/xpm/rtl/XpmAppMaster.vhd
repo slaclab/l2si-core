@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-07-10
--- Last update: 2017-10-24
+-- Last update: 2017-12-21
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -29,6 +29,7 @@ use unisim.vcomponents.all;
 entity XpmAppMaster is
    generic (
       TPD_G               : time                := 1 ns;
+      DEBUG_G             : boolean             := false;
       NDsLinks            : integer             := 14 );
    port (
       -----------------------
@@ -161,6 +162,7 @@ begin
                inhibit        => inhibit );
   
   U_L0Select : entity work.XpmL0Select
+    generic map ( DEBUG_G => DEBUG_G )
     port map ( clk            => timingClk,
                rst            => timingRst,
                config         => config.l0Select,
