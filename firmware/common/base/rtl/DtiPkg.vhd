@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2016-03-25
--- Last update: 2017-10-11
+-- Last update: 2017-11-17
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -75,14 +75,15 @@ package DtiPkg is
    constant DTI_US_LINK_CONFIG_BITS_C : integer := MaxDsLinks+72;
 
    type QuadType is record
-     amcClk           : sl;
+     coreClk          : sl;
+     refClk           : sl;
      qplllock         : sl;
      qplloutclk       : sl;
      qplloutrefclk    : sl;
    end record;
 
    type QuadArray is array(natural range<>) of QuadType;
-   type AmcQuadArray is array(natural range<>) of QuadArray(1 downto 0);
+--   type AmcQuadArray is array(natural range<>) of QuadArray(1 downto 0);
    
    type DtiUsLinkConfigType is record
      enable     : sl;
@@ -182,22 +183,37 @@ package DtiPkg is
    constant DTI_BP_LINK_STATUS_INIT_C : DtiBpLinkStatusType := (
      linkUp    => '0',
      obSent    => (others=>'0') );
-   
+
+   --  Specialize for 156.25MHz operation
+   constant DTI_PLL_CONFIG_INIT_C : XpmPllConfigType := (
+     bwSel      => "0111",
+     frqTbl     => "10",
+     frqSel     => "01000101",
+     rate       => "1010",
+     sfOut      => "0110",
+     inc        => '0',
+     dec        => '0',
+     bypass     => '0',
+     rstn       => '1' );
+
    type DtiConfigType is record
      usLink     : DtiUsLinkConfigArray   (MaxUsLinks-1 downto 0);
-     bpPeriod   : slv(7 downto 0);
+     bpPeriod   : slv                    (7 downto 0);
+     amcPll     : XpmPllConfigArray      (1 downto 0);
    end record;
 
    constant DTI_CONFIG_INIT_C : DtiConfigType := (
      usLink     => (others=>DTI_US_LINK_CONFIG_INIT_C),
-     bpPeriod   => toSlv(33,8) );
+     bpPeriod   => toSlv(33,8),
+     amcPll     => (others=>DTI_PLL_CONFIG_INIT_C) );
 
    type DtiStatusType is record
      usLink     : DtiUsLinkStatusArray   (MaxUsLinks-1 downto 0);
      dsLink     : DtiDsLinkStatusArray   (MaxDsLinks-1 downto 0);
      bpLink     : DtiBpLinkStatusType;
      usApp      : DtiUsAppStatusArray    (MaxUsLinks-1 downto 0);
-     qplllock   : slv(3 downto 0);
+     qplllock   : slv                    (3 downto 0);
+     amcPll     : XpmPllStatusArray      (1 downto 0);
    end record;
 
    constant DTI_STATUS_INIT_C : DtiStatusType := (
@@ -205,7 +221,8 @@ package DtiPkg is
      dsLink     => (others=>DTI_DS_LINK_STATUS_INIT_C),
      bpLink     => DTI_BP_LINK_STATUS_INIT_C,
      usApp      => (others=>DTI_US_APP_STATUS_INIT_C),
-     qplllock   => "0000" );
+     qplllock   => "0000",
+     amcPll     => (others=>XPM_PLL_STATUS_INIT_C) );
 
    type DtiEventHeaderType is record
      timeStamp  : slv(63 downto 0);
