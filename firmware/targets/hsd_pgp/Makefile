@@ -1,9 +1,10 @@
+export GIT_BYPASS = 1
 
 # Define target output
 target: prom
 
 # Define Firmware Version Number
-export PRJ_VERSION = 00000001
+export PRJ_VERSION = 00000002
 
 # Define target part
 export PRJ_PART = XCKU085-FLVB1760-2-E
