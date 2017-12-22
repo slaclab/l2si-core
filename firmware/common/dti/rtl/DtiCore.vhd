@@ -5,7 +5,7 @@
 -- Author     : Larry Ruckman  <ruckman@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-07-08
--- Last update: 2017-10-02
+-- Last update: 2017-12-19
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -30,6 +30,7 @@ use work.AxiLitePkg.all;
 use work.AxiPkg.all;
 use work.TimingPkg.all;
 use work.XpmPkg.all;
+use work.EventPkg.all;
 use work.AmcCarrierSysRegPkg.all;
 use work.AmcCarrierPkg.all;
 
@@ -65,9 +66,10 @@ entity DtiCore is
       obAppSlaves       : out   AxiStreamSlaveArray (NAPP_LINKS_G-1 downto 0);
       -- Timing Interface (timingClk domain)
       timingData        : out   TimingRxType;
-      timingBus         : out   TimingBusType;  -- delayed
-      exptBus           : out   ExptBusType;    -- delayed
-      triggerBus        : out   ExptBusType;    -- prompt
+      timingHdr         : out   TimingHeaderType;  -- delayed
+      exptBus           : out   ExptBusType;       -- delayed
+      timingHdrP        : out   TimingHeaderType;  -- prompt
+      triggerBus        : out   ExptBusType;       -- prompt
       fullOut           : in    slv(15 downto 0);
       -- BSI Interface (bsiClk domain) 
       bsiBus            : out   BsiBusType;
@@ -122,26 +124,26 @@ entity DtiCore is
       hsrScl            : inout Slv3Array(1 downto 0);
       hsrSda            : inout Slv3Array(1 downto 0);
       -- DDR3L SO-DIMM Ports
-      ddrClkP           : in    sl;
-      ddrClkN           : in    sl;
-      ddrDm             : out   slv(7 downto 0);
-      ddrDqsP           : inout slv(7 downto 0);
-      ddrDqsN           : inout slv(7 downto 0);
-      ddrDq             : inout slv(63 downto 0);
-      ddrA              : out   slv(15 downto 0);
-      ddrBa             : out   slv(2 downto 0);
-      ddrCsL            : out   slv(1 downto 0);
-      ddrOdt            : out   slv(1 downto 0);
-      ddrCke            : out   slv(1 downto 0);
-      ddrCkP            : out   slv(1 downto 0);
-      ddrCkN            : out   slv(1 downto 0);
-      ddrWeL            : out   sl;
-      ddrRasL           : out   sl;
-      ddrCasL           : out   sl;
-      ddrRstL           : out   sl;
-      ddrAlertL         : in    sl;
-      ddrPg             : in    sl;
-      ddrPwrEnL         : out   sl;
+      --ddrClkP           : in    sl;
+      --ddrClkN           : in    sl;
+      --ddrDm             : out   slv(7 downto 0);
+      --ddrDqsP           : inout slv(7 downto 0);
+      --ddrDqsN           : inout slv(7 downto 0);
+      --ddrDq             : inout slv(63 downto 0);
+      --ddrA              : out   slv(15 downto 0);
+      --ddrBa             : out   slv(2 downto 0);
+      --ddrCsL            : out   slv(1 downto 0);
+      --ddrOdt            : out   slv(1 downto 0);
+      --ddrCke            : out   slv(1 downto 0);
+      --ddrCkP            : out   slv(1 downto 0);
+      --ddrCkN            : out   slv(1 downto 0);
+      --ddrWeL            : out   sl;
+      --ddrRasL           : out   sl;
+      --ddrCasL           : out   sl;
+      --ddrRstL           : out   sl;
+      --ddrAlertL         : in    sl;
+      --ddrPg             : in    sl;
+      --ddrPwrEnL         : out   sl;
       ddrScl            : inout sl;
       ddrSda            : inout sl;
       -- SYSMON Ports
@@ -162,9 +164,9 @@ architecture mapping of DtiCore is
 
    signal axiClk         : sl;
    signal axiRst         : sl;
-   signal axiWriteMaster : AxiWriteMasterType;
+   signal axiWriteMaster : AxiWriteMasterType := AXI_WRITE_MASTER_INIT_C;
    signal axiWriteSlave  : AxiWriteSlaveType;
-   signal axiReadMaster  : AxiReadMasterType;
+   signal axiReadMaster  : AxiReadMasterType := AXI_READ_MASTER_INIT_C;
    signal axiReadSlave   : AxiReadSlaveType;
 
    signal timingReadMaster  : AxiLiteReadMasterType;
@@ -178,11 +180,11 @@ architecture mapping of DtiCore is
    signal ethWriteSlave  : AxiLiteWriteSlaveType;
 
    signal ddrReadMaster  : AxiLiteReadMasterType;
-   signal ddrReadSlave   : AxiLiteReadSlaveType;
+   signal ddrReadSlave   : AxiLiteReadSlaveType := AXI_LITE_READ_SLAVE_INIT_C;
    signal ddrWriteMaster : AxiLiteWriteMasterType;
-   signal ddrWriteSlave  : AxiLiteWriteSlaveType;
-   signal ddrMemReady    : sl;
-   signal ddrMemError    : sl;
+   signal ddrWriteSlave  : AxiLiteWriteSlaveType := AXI_LITE_WRITE_SLAVE_INIT_C;
+   signal ddrMemReady    : sl := '1';
+   signal ddrMemError    : sl := '0';
  
    signal mpsReadMaster  : AxiLiteReadMasterType;
    signal mpsReadSlave   : AxiLiteReadSlaveType := AXI_LITE_READ_SLAVE_INIT_C;
@@ -208,7 +210,11 @@ architecture mapping of DtiCore is
    signal intTimingClk : sl;
    signal intTimingRst : sl;
    signal intTimingBus : TimingBusType;
+   signal intTimingHdr : TimingHeaderType;
    signal intExptBus   : ExptBusType;
+
+   signal tstrobe      : sl;
+   signal tmessage     : TimingMessageType := TIMING_MESSAGE_INIT_C;
 begin
 
   regClk       <= axilClk;
@@ -307,7 +313,6 @@ begin
          BUILD_INFO_G        => BUILD_INFO_G,
          AXI_ERROR_RESP_G    => AXI_ERROR_RESP_C,
          APP_TYPE_G          => APP_NULL_TYPE_C,
-         TIMING_MODE_G       => true,
          FSBL_G              => false)
       port map (
          -- Primary AXI-Lite Interface
@@ -451,69 +456,63 @@ begin
    ------------------
    -- DDR Memory Core
    ------------------
-   U_DdrMem : entity work.AmcCarrierDdrMem
-      generic map (
-         TPD_G            => TPD_G,
-         AXI_ERROR_RESP_G => AXI_ERROR_RESP_C,
-         FSBL_G           => false,
-         SIM_SPEEDUP_G    => false)
-      port map (
-         -- AXI-Lite Interface
-         axilClk         => axilClk,
-         axilRst         => axilRst,
-         axilReadMaster  => ddrReadMaster,
-         axilReadSlave   => ddrReadSlave,
-         axilWriteMaster => ddrWriteMaster,
-         axilWriteSlave  => ddrWriteSlave,
-         memReady        => ddrMemReady,
-         memError        => ddrMemError,
-         -- AXI4 Interface
-         axiClk          => axiClk,
-         axiRst          => axiRst,
-         axiWriteMaster  => axiWriteMaster,
-         axiWriteSlave   => axiWriteSlave,
-         axiReadMaster   => axiReadMaster,
-         axiReadSlave    => axiReadSlave,
-         ----------------
-         -- Core Ports --
-         ----------------   
-         -- DDR3L SO-DIMM Ports
-         ddrClkP         => ddrClkP,
-         ddrClkN         => ddrClkN,
-         ddrDqsP         => ddrDqsP,
-         ddrDqsN         => ddrDqsN,
-         ddrDm           => ddrDm,
-         ddrDq           => ddrDq,
-         ddrA            => ddrA,
-         ddrBa           => ddrBa,
-         ddrCsL          => ddrCsL,
-         ddrOdt          => ddrOdt,
-         ddrCke          => ddrCke,
-         ddrCkP          => ddrCkP,
-         ddrCkN          => ddrCkN,
-         ddrWeL          => ddrWeL,
-         ddrRasL         => ddrRasL,
-         ddrCasL         => ddrCasL,
-         ddrRstL         => ddrRstL,
-         ddrPwrEnL       => ddrPwrEnL,
-         ddrPg           => ddrPg,
-         ddrAlertL       => ddrAlertL);
+   --U_DdrMem : entity work.AmcCarrierDdrMem
+   --   generic map (
+   --      TPD_G            => TPD_G,
+   --      AXI_ERROR_RESP_G => AXI_ERROR_RESP_C,
+   --      FSBL_G           => false,
+   --      SIM_SPEEDUP_G    => false)
+   --   port map (
+   --      -- AXI-Lite Interface
+   --      axilClk         => axilClk,
+   --      axilRst         => axilRst,
+   --      axilReadMaster  => ddrReadMaster,
+   --      axilReadSlave   => ddrReadSlave,
+   --      axilWriteMaster => ddrWriteMaster,
+   --      axilWriteSlave  => ddrWriteSlave,
+   --      memReady        => ddrMemReady,
+   --      memError        => ddrMemError,
+   --      -- AXI4 Interface
+   --      axiClk          => axiClk,
+   --      axiRst          => axiRst,
+   --      axiWriteMaster  => axiWriteMaster,
+   --      axiWriteSlave   => axiWriteSlave,
+   --      axiReadMaster   => axiReadMaster,
+   --      axiReadSlave    => axiReadSlave,
+   --      ----------------
+   --      -- Core Ports --
+   --      ----------------   
+   --      -- DDR3L SO-DIMM Ports
+   --      ddrClkP         => ddrClkP,
+   --      ddrClkN         => ddrClkN,
+   --      ddrDqsP         => ddrDqsP,
+   --      ddrDqsN         => ddrDqsN,
+   --      ddrDm           => ddrDm,
+   --      ddrDq           => ddrDq,
+   --      ddrA            => ddrA,
+   --      ddrBa           => ddrBa,
+   --      ddrCsL          => ddrCsL,
+   --      ddrOdt          => ddrOdt,
+   --      ddrCke          => ddrCke,
+   --      ddrCkP          => ddrCkP,
+   --      ddrCkN          => ddrCkN,
+   --      ddrWeL          => ddrWeL,
+   --      ddrRasL         => ddrRasL,
+   --      ddrCasL         => ddrCasL,
+   --      ddrRstL         => ddrRstL,
+   --      ddrPwrEnL       => ddrPwrEnL,
+   --      ddrPg           => ddrPg,
+   --      ddrAlertL       => ddrAlertL);
 
-  U_Realign : entity work.ExptRealign
+  intTimingHdr <= toTimingHeader(intTimingBus);
+  timingHdrP   <= intTimingHdr;
+  
+  U_Realign : entity work.EventRealign
      port map ( clk            => intTimingClk,
                 rst            => intTimingRst,
-                timingI_strobe => intTimingBus.strobe,
-                timingI_pid    => intTimingBus.message.pulseId,
-                timingI_time   => intTimingBus.message.timeStamp,
+                timingI        => intTimingHdr,
                 exptBusI       => intExptBus,
-                timingO_strobe => timingBus.strobe,
-                timingO_pid    => timingBus.message.pulseId,
-                timingO_time   => timingBus.message.timeStamp,
+                timingO        => timingHdr,
                 exptBusO       => exptBus );
-  timingBus.valid  <= intTimingBus.valid;
-  timingBus.stream <= TIMING_STREAM_INIT_C;
-  timingBus.v1     <= LCLS_V1_TIMING_DATA_INIT_C;
-  timingBus.v2     <= intTimingBus.v2;
-  timingBus.message.version <= intTimingBus.message.version;
-
+  
 end mapping;
