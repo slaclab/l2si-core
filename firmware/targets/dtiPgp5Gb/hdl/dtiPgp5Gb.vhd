@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-12-14
--- Last update: 2017-10-05
+-- Last update: 2017-11-20
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -34,6 +34,7 @@ use work.SsiPkg.all;
 use work.AxiLitePkg.all;
 use work.TimingPkg.all;
 use work.XpmPkg.all;
+use work.EventPkg.all;
 use work.DtiPkg.all;
 use work.AmcCarrierPkg.all;
 
@@ -56,6 +57,17 @@ entity dtiPgp5Gb is
     amcTxP       : out   Slv7Array(1 downto 0);
     amcTxN       : out   Slv7Array(1 downto 0);
     --  AMC SMBus Ports
+    frqTbl       : inout slv      (1 downto 0);
+    frqSel       : inout Slv4Array(1 downto 0);
+    bwSel        : inout Slv2Array(1 downto 0);
+    inc          : out   slv      (1 downto 0);
+    dec          : out   slv      (1 downto 0);
+    sfOut        : inout Slv2Array(1 downto 0);
+    rate         : inout Slv2Array(1 downto 0);
+    bypass       : out   slv      (1 downto 0);
+    pllRst       : out   slv      (1 downto 0);
+    lol          : in    slv      (1 downto 0);
+    los          : in    slv      (1 downto 0);
     hsrScl       : inout Slv3Array(1 downto 0);
     hsrSda       : inout Slv3Array(1 downto 0);
     ------------------
@@ -92,8 +104,8 @@ entity dtiPgp5Gb is
     timingClkSel     : out   sl;
     timingClkScl     : inout sl;
     timingClkSda     : inout sl;
-    fpgaclk_P        : out   sl;
-    fpgaclk_N        : out   sl;
+    fpgaclk_P        : out   slv(3 downto 0);
+    fpgaclk_N        : out   slv(3 downto 0);
     -- Crossbar Ports
     xBarSin          : out   slv(1 downto 0);
     xBarSout         : out   slv(1 downto 0);
@@ -147,9 +159,10 @@ architecture top_level of dtiPgp5Gb is
 
   -- Timing Interface (timingClk domain)
   signal recTimingData  : TimingRxType;
-  signal recTimingBus   : TimingBusType;
+  signal recTimingHdr   : TimingHeaderType;
   signal recExptBus     : ExptBusType;
-  signal triggerBus     : ExptBusType;
+  signal timingHdr      : TimingHeaderType; -- prompt
+  signal triggerBus     : ExptBusType;      -- prompt
   
   -- Reference Clocks and Resets
   signal timingRefClk : sl;
@@ -210,24 +223,16 @@ architecture top_level of dtiPgp5Gb is
   signal dsRxErrs     : Slv32Array(MaxDsLinks-1 downto 0);
   signal dsFullIn     : slv       (MaxDsLinks-1 downto 0);
 
-  signal amcClockP   : slv         (1 downto 0);
-  signal amcClockN   : slv         (1 downto 0);
-  signal amcCoreClk  : slv         (1 downto 0);
-  signal amcCoreRst  : slv         (1 downto 0);
-  signal amcRefClk   : slv         (1 downto 0);
-  signal coreClk     : slv        (13 downto 0);
-  signal coreRst     : slv        (13 downto 0);
-  signal gtRefClk    : slv        (13 downto 0);
-  
-  signal iquad            : QuadArray(13 downto 0);
-  signal iamcRst          : slv(13 downto 0) := (others=>'0');
-  signal iamcRxP          : slv(13 downto 0);
-  signal iamcRxN          : slv(13 downto 0);
-  signal iamcTxP          : slv(13 downto 0);
-  signal iamcTxN          : slv(13 downto 0);
+  signal coreClk     : slv(13 downto 0);
+  signal gtRefClk    : slv(13 downto 0);
+  signal iamcRxP     : slv(13 downto 0);
+  signal iamcRxN     : slv(13 downto 0);
+  signal iamcTxP     : slv(13 downto 0);
+  signal iamcTxN     : slv(13 downto 0);
 
 --  constant NPGPAXI_C : integer := 7;
-  constant NPGPAXI_C : integer := 1;
+--  constant NPGPAXI_C : integer := 1;
+  constant NPGPAXI_C : integer := 0;
   constant NMASTERS_C : integer := 2*NPGPAXI_C+2+MaxUsLinks;
   
   signal mAxilReadMasters  : AxiLiteReadMasterArray (NMASTERS_C-1 downto 0);
@@ -242,11 +247,13 @@ architecture top_level of dtiPgp5Gb is
     ret(0).baseAddr := x"80000000";
     ret(0).addrBits := 24;
     ret(0).connectivity := x"FFFF";
-    for i in 0 to 2*NPGPAXI_C-1 loop
-      ret(i+1).baseAddr := x"90000000"+toSlv(i*256,32);
-      ret(i+1).addrBits := 8;
-      ret(i+1).connectivity := x"FFFF";
-    end loop;
+    if NPGPAXI_C > 0 then
+      for i in 0 to 2*NPGPAXI_C-1 loop
+        ret(i+1).baseAddr := x"90000000"+toSlv(i*256,32);
+        ret(i+1).addrBits := 8;
+        ret(i+1).connectivity := x"FFFF";
+      end loop;
+    end if;
     i := 2*NPGPAXI_C+1; 
     ret(i).baseAddr := x"A0000000";
     ret(i).addrBits := 24;
@@ -284,57 +291,64 @@ architecture top_level of dtiPgp5Gb is
   signal drpDo    : Slv16Array(MaxUsLinks-1 downto 0);
 begin
 
-  --
-  --  The AMC SFP channels are reordered - the mapping to MGT quads is non-trivial
-  --    amcTx/Rx indexed by MGT
-  --    iamcTx/Rx indexed by SFP
-  --
-  reorder_p : process (amcClkP,amcClkN,amcRxP,amcRxN,iamcTxP,iamcTxN,
-                       amcCoreClk,amcCoreRst,amcRefClk) is
-  begin
-    for i in 0 to 1 loop
-      amcClockP(i)  <= amcClkP(i)(0);
-      amcClockN(i)  <= amcClkN(i)(0);
-      for j in 0 to 3 loop
-        amcTxP(i)(j) <= iamcTxP(i*7+j+2);
-        amcTxN(i)(j) <= iamcTxN(i*7+j+2);
-        iamcRxP (i*7+j+2) <= amcRxP(i)(j);
-        iamcRxN (i*7+j+2) <= amcRxN(i)(j);
-        coreClk (i*7+j+2) <= amcCoreClk(i);
-        coreRst (i*7+j+2) <= amcCoreRst(i);
-        gtRefClk(i*7+j+2) <= amcRefClk(i);
-      end loop;
-      for j in 4 to 5 loop
-        amcTxP(i)(j) <= iamcTxP(i*7+j-4);
-        amcTxN(i)(j) <= iamcTxN(i*7+j-4);
-        iamcRxP (i*7+j-4) <= amcRxP(i)(j);
-        iamcRxN (i*7+j-4) <= amcRxN(i)(j);
-        coreClk (i*7+j-4) <= amcCoreClk(i);
-        coreRst (i*7+j-4) <= amcCoreRst(i);
-        gtRefClk(i*7+j-4) <= amcRefClk(i);
-      end loop;
-      for j in 6 to 6 loop
-        amcTxP(i)(j) <= iamcTxP(i*7+j);
-        amcTxN(i)(j) <= iamcTxN(i*7+j);
-        iamcRxP (i*7+j) <= amcRxP(i)(j);
-        iamcRxN (i*7+j) <= amcRxN(i)(j);
-        coreClk (i*7+j) <= amcCoreClk(i);
-        coreRst (i*7+j) <= amcCoreRst(i);
-        gtRefClk(i*7+j) <= amcRefClk(i);
-      end loop;
-    end loop;
-  end process;
+  GEN_AMC : for j in 0 to 1 generate
+    U_PLL : entity work.DtiCPllArray
+      port map ( amcClkP  => amcClkP (j)(0),
+                 amcClkN  => amcClkN (j)(0),
+                 amcTxP   => amcTxP  (j),
+                 amcTxN   => amcTxN  (j),
+                 amcRxP   => amcRxP  (j),
+                 amcRxN   => amcRxN  (j),
+                 --  channel ports
+                 chanClk    => coreClk (j*7+6 downto j*7),
+                 chanRefClk => gtRefClk(j*7+6 downto j*7),
+                 chanTxP    => iamcTxP (j*7+6 downto j*7),
+                 chanTxN    => iamcTxN (j*7+6 downto j*7),
+                 chanRxP    => iamcRxP (j*7+6 downto j*7),
+                 chanRxN    => iamcRxN (j*7+6 downto j*7) );
+  end generate;
 
   --
   --  Feed the AMC PLL for driving the Timing synchronous AMC devclk(3:2)
   --
-  U_FPGACLK : entity work.ClkOutBufDiff
+  U_FPGACLK0 : entity work.ClkOutBufDiff
     generic map (
       XIL_DEVICE_G => "ULTRASCALE")
-    port map (
-      clkIn   => recTimingClk,
-      clkOutP => fpgaclk_P,
-      clkOutN => fpgaclk_N);
+      port map (
+        clkIn   => ref156MHzClk,
+        clkOutP => fpgaclk_P(0),
+        clkOutN => fpgaclk_N(0));
+
+  U_FPGACLK2 : entity work.ClkOutBufDiff
+    generic map (
+      XIL_DEVICE_G => "ULTRASCALE")
+      port map (
+        clkIn   => ref156MHzClk,
+        clkOutP => fpgaclk_P(2),
+        clkOutN => fpgaclk_N(2));
+
+  fpgaclk_P(1) <= '0';
+  fpgaclk_N(1) <= '1';
+  fpgaclk_P(3) <= '0';
+  fpgaclk_N(3) <= '1';
+  
+   GEN_PLL : for i in 0 to 1 generate
+     U_Pll : entity work.XpmPll
+       port map (
+         config      => config.amcPll(i),
+         status      => status.amcPll(i),
+         frqTbl      => frqTbl       (i),
+         frqSel      => frqSel       (i),
+         bwSel       => bwSel        (i),
+         inc         => inc          (i),
+         dec         => dec          (i),
+         sfOut       => sfOut        (i),
+         rate        => rate         (i),
+         bypass      => bypass       (i),
+         pllRst      => pllRst       (i),
+         lol         => lol          (i),
+         los         => los          (i) );
+   end generate;
 
   ringData(15 downto  0) <= recTimingData.data;
   ringData(17 downto 16) <= recTimingData.dataK;
@@ -381,8 +395,9 @@ begin
       obAppSlaves       => ctlTxS,
       -- Timing Interface (timingClk domain)
       timingData        => recTimingData,
-      timingBus         => recTimingBus,
+      timingHdr         => recTimingHdr,
       exptBus           => recExptBus,
+      timingHdrP        => timingHdr,
       triggerBus        => triggerBus,
       fullOut           => fullOut,
       -- Reference Clocks and Resets
@@ -472,7 +487,7 @@ begin
                --
                timingClk    => recTimingClk,
                timingRst    => recTimingRst,
-               timingBus    => recTimingBus,
+               timingHdr    => recTimingHdr,
                ----------------
                -- Core Ports --
                ----------------
@@ -518,18 +533,19 @@ begin
                --      
                status          => status,
                config          => config,
-               monclk(0)       => amcCoreClk(0),
+               monclk(0)       => coreClk(0),
                monclk(1)       => usIbClk(0),
                monclk(2)       => bpMonClk(0),
                monclk(3)       => bpMonClk(1) );
 
-  U_PLL : entity work.DtiCPllArray
-    port map ( amcClkP  => amcClockP,
-               amcClkN  => amcClockN,
-               coreClk  => amcCoreClk,
-               gtRefClk => amcRefClk );
-
-  amcCoreRst <= (others=>'0');
+  --GEN_AMC : for j in 0 to 1 generate
+  --  U_PLL : entity work.DtiCPllArray
+  --    port map ( amcClkP  => amcClockP (j),
+  --               amcClkN  => amcClockN (j),
+  --               coreClk  => amcCoreClk(j),
+  --               gtRefClk => amcRefClk (j));
+  --end generate;
+  
   
   --
   --  Translate AMC I/O into AxiStream
@@ -560,8 +576,9 @@ begin
                  --
                  timingClk     => recTimingClk,  -- outbound data (to sensor)
                  timingRst     => recTimingRst,
-                 timingBus     => recTimingBus,
+                 timingHdr     => recTimingHdr,
                  exptBus       => recExptBus  ,
+                 timingHdrP    => timingHdr   ,
                  triggerBus    => triggerBus  ,
                  --
                  eventClk      => ref156MHzClk,      -- inbound data (from sensor)
@@ -600,11 +617,11 @@ begin
                  drpDo           => drpDo  (i) );
                  
     U_App : entity work.DtiUsPgp5Gb
-      generic map ( ID_G           => x"0" & toSlv(i,4),
+      generic map ( ID_G           => x"0" & toSlv(i,4) )
                     -- DEBUG_G        => ite(i>0, false, true),
-                    INCLUDE_AXIL_G => ite(i<NPGPAXI_C, true, false) )
+--                    INCLUDE_AXIL_G => ite(i<NPGPAXI_C, true, false) )
       port map ( coreClk  => coreClk(i),
-                 coreRst  => coreRst(i),
+                 coreRst  => '0',
                  gtRefClk => gtRefClk(i),
                  remLinkID => usRemLinkID(i),
                  status   => status.usApp(i),
@@ -680,9 +697,11 @@ begin
     
     U_App : entity work.DtiDsPgp5Gb
       generic map ( ID_G           => x"1" & toSlv(i,4),
-                    INCLUDE_AXIL_G => ite(i<NPGPAXI_C, true, false) )
+                    DEBUG_G        => false )
+--                    DEBUG_G        => ite(i>0,false,true) )
+--                    INCLUDE_AXIL_G => ite(i<NPGPAXI_C, true, false) )
       port map ( coreClk       => coreClk (13-i),
-                 coreRst       => coreRst (13-i),
+                 coreRst       => '0',
                  gtRefClk      => gtRefClk(13-i),
                  amcRxP        => iamcRxP (13-i),
                  amcRxN        => iamcRxN (13-i),

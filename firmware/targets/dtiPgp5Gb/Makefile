@@ -1,7 +1,8 @@
+export GIT_BYPASS = 1
 ##########################################################################################
 # Applications must define the 32-bitFirmware Version Number
 ##########################################################################################
-export PRJ_VERSION = 0x00000002
+export PRJ_VERSION = 0x00000003
 
 ##########################################################################################
 # Applications must define if using advance AMC carrier build
@@ -39,11 +40,11 @@ export RTM_ETH = 0
 # Controls inclusion of constraints
 # AMC_TYPE_BAY0 & AMC_INTF_BAY0 are defined by application
 export AMC_TYPE_BAY0 = AmcMpsSfp
-export AMC_INTF_BAY0 = 
+export AMC_INTF_BAY0 = Version2
 
 # AMC_TYPE_BAY1 & AMC_INTF_BAY1 are defined by application
 export AMC_TYPE_BAY1 = AmcMpsSfp
-export AMC_INTF_BAY1 = 
+export AMC_INTF_BAY1 = Version2
 
 # RTM_TYPE & RTM_INTF are defined by application
 export RTM_TYPE = RtmEmpty

@@ -43,26 +43,18 @@ set_property PACKAGE_PIN AK2 [get_ports {amcRxP[0][6]}]
 set_property PACKAGE_PIN AK1 [get_ports {amcRxN[0][6]}]
 set_property PACKAGE_PIN AL4 [get_ports {amcTxP[0][6]}]
 # MGTREFCLK1 Bank 224
-#  DEVCLK2
-#set_property PACKAGE_PIN AD6  [get_ports {amcClkP[0][0]}]
-#set_property PACKAGE_PIN AD5  [get_ports {amcClkN[0][0]}]
-#  DEVCLK1
-set_property PACKAGE_PIN AF5 [get_ports {amcClkN[0][0]}]
-set_property PACKAGE_PIN AF6 [get_ports {amcClkP[0][0]}]
+#  DEVCLK2   (output of AMC PLL)
+set_property PACKAGE_PIN AD6  [get_ports {amcClkP[0][0]}]
+set_property PACKAGE_PIN AD5  [get_ports {amcClkN[0][0]}]
+#  DEVCLK1   (oscillator on AMC)
+#set_property PACKAGE_PIN AF5 [get_ports {amcClkN[0][0]}]
+#set_property PACKAGE_PIN AF6 [get_ports {amcClkP[0][0]}]
 #  DEVCLK0
 #set_property PACKAGE_PIN AB6  [get_ports {amcClkP[0][0]}]
 #set_property PACKAGE_PIN AB5  [get_ports {amcClkN[0][0]}]
 # MGTREFCLK1 Bank 127
 #set_property PACKAGE_PIN N29  [get_ports {amcClkP[0][1]}]
 #set_property PACKAGE_PIN N30  [get_ports {amcClkN[0][1]}]
-
-
-set_property -dict {PACKAGE_PIN AN8 IOSTANDARD LVCMOS25} [get_ports {hsrScl[0][0]}]
-set_property -dict {PACKAGE_PIN AK10 IOSTANDARD LVCMOS25} [get_ports {hsrScl[0][1]}]
-set_property -dict {PACKAGE_PIN AN9 IOSTANDARD LVCMOS25} [get_ports {hsrScl[0][2]}]
-set_property -dict {PACKAGE_PIN AP8 IOSTANDARD LVCMOS25} [get_ports {hsrSda[0][0]}]
-set_property -dict {PACKAGE_PIN AL9 IOSTANDARD LVCMOS25} [get_ports {hsrSda[0][1]}]
-set_property -dict {PACKAGE_PIN AJ8 IOSTANDARD LVCMOS25} [get_ports {hsrSda[0][2]}]
 
 # AMC Bay 1
 set_property PACKAGE_PIN N3 [get_ports {amcTxN[1][0]}]
@@ -93,23 +85,15 @@ set_property PACKAGE_PIN B1 [get_ports {amcRxN[1][6]}]
 set_property PACKAGE_PIN C3 [get_ports {amcTxN[1][6]}]
 set_property PACKAGE_PIN B2 [get_ports {amcRxP[1][6]}]
 set_property PACKAGE_PIN C4 [get_ports {amcTxP[1][6]}]
-# MGTREFCLK1 Bank 228 (DEVCLK5)
-set_property PACKAGE_PIN K6 [get_ports {amcClkP[1][0]}]
-set_property PACKAGE_PIN K5 [get_ports {amcClkN[1][0]}]
-# MGTREFCLK1 Bank 228 (DEVCLK6)
-#set_property PACKAGE_PIN H6   [get_ports {amcClkP[1][0]}]
-#set_property PACKAGE_PIN H5   [get_ports {amcClkN[1][0]}]
+# MGTREFCLK1 Bank 228 (DEVCLK5)  (oscillator on AMC)
+#set_property PACKAGE_PIN K6 [get_ports {amcClkP[1][0]}]
+#set_property PACKAGE_PIN K5 [get_ports {amcClkN[1][0]}]
+# MGTREFCLK1 Bank 228 (DEVCLK6)  (output of AMC PLL)
+set_property PACKAGE_PIN H6   [get_ports {amcClkP[1][0]}]
+set_property PACKAGE_PIN H5   [get_ports {amcClkN[1][0]}]
 # MGTREFCLK1 Bank 128 (DEVCLK7)
 #set_property PACKAGE_PIN J29  [get_ports {amcClkP[1][1]}]
 #set_property PACKAGE_PIN J30  [get_ports {amcClkN[1][1]}]
-
-
-set_property -dict {PACKAGE_PIN AD9 IOSTANDARD LVCMOS25} [get_ports {hsrScl[1][0]}]
-set_property -dict {PACKAGE_PIN AD10 IOSTANDARD LVCMOS25} [get_ports {hsrScl[1][1]}]
-set_property -dict {PACKAGE_PIN AE8 IOSTANDARD LVCMOS25} [get_ports {hsrScl[1][2]}]
-set_property -dict {PACKAGE_PIN AD8 IOSTANDARD LVCMOS25} [get_ports {hsrSda[1][0]}]
-set_property -dict {PACKAGE_PIN AE10 IOSTANDARD LVCMOS25} [get_ports {hsrSda[1][1]}]
-set_property -dict {PACKAGE_PIN AH8 IOSTANDARD LVCMOS25} [get_ports {hsrSda[1][2]}]
 
 set_property PACKAGE_PIN AD16 [get_ports fpgaclk_P]
 set_property PACKAGE_PIN AD15 [get_ports fpgaclk_N]
@@ -148,20 +132,20 @@ set_property -dict {PACKAGE_PIN N23 IOSTANDARD LVCMOS25} [get_ports calSda]
 set_property -dict {PACKAGE_PIN L19 IOSTANDARD LVCMOS15} [get_ports ddrScl]
 set_property -dict {PACKAGE_PIN L18 IOSTANDARD LVCMOS15} [get_ports ddrSda]
 
-set_property -dict {PACKAGE_PIN SYSMONE1_X0Y0} [get_ports vPIn]
-set_property -dict {PACKAGE_PIN SYSMONE1_X0Y0} [get_ports vNIn]
+set_property -dict {PACKAGE_PIN V12} [get_ports vPIn]
+set_property -dict {PACKAGE_PIN W11} [get_ports vNIn]
 
 
 ####################################
 ## Application Timing Constraints ##
 ####################################
 
-#create_clock -name ddrClkIn   -period  5.000  [get_pins -hier -filter {NAME =~ *U_DdrMem/BUFG_Inst/O}]
-#create_clock -name fabClk     -period  6.400  [get_ports {fabClkP}]
-#create_clock -name ethRef     -period  6.400  [get_ports {ethClkP}]
-#create_clock -name timingRef  -period  2.691  [get_ports {timingRefClkInP}]
+create_clock -name ddrClkIn   -period  5.000  [get_pins -hier -filter {NAME =~ *U_DdrMem/BUFG_Inst/O}]
+create_clock -name fabClk     -period  6.400  [get_ports {fabClkP}]
+create_clock -name ethRef     -period  6.400  [get_ports {ethClkP}]
+create_clock -name timingRef  -period  2.691  [get_ports {timingRefClkInP}]
 
-create_generated_clock -name axilClk [get_pins U_Core/U_ClkAndRst/U_ClkManagerMps/MmcmGen.U_Mmcm/CLKOUT2]
+create_generated_clock -name axilClk [get_pins {U_Core/U_ClkAndRst/U_ClkManagerMps/MmcmGen.U_Mmcm/CLKOUT2}]
 create_generated_clock -name ddrIntClk0 [get_pins -hier -filter {NAME =~ *U_DdrMem/MigCore_Inst/inst/u_ddr3_infrastructure/gen_mmcme3.u_mmcme_adv_inst/CLKOUT0}]
 create_generated_clock -name ddrIntClk1 [get_pins -hier -filter {NAME =~ *U_DdrMem/MigCore_Inst/inst/u_ddr3_infrastructure/gen_mmcme3.u_mmcme_adv_inst/CLKOUT6}]
 
@@ -171,6 +155,21 @@ create_clock -period 6.400 -name fabClk [get_ports fabClkP]
 create_clock -period 5.000 -name ddrClkIn [get_ports ddrClkP]
 create_clock -period 10.000 -name bpClk [get_ports bpClkIn]
 
+create_generate_clock -name usClk0 [get_pins {GEN_US_PGP[0].U_App/U_Pgp2b/U_BUFG/O}]
+create_generate_clock -name usClk1 [get_pins {GEN_US_PGP[1].U_App/U_Pgp2b/U_BUFG/O}]
+create_generate_clock -name usClk2 [get_pins {GEN_US_PGP[2].U_App/U_Pgp2b/U_BUFG/O}]
+create_generate_clock -name usClk3 [get_pins {GEN_US_PGP[3].U_App/U_Pgp2b/U_BUFG/O}]
+create_generate_clock -name usClk4 [get_pins {GEN_US_PGP[4].U_App/U_Pgp2b/U_BUFG/O}]
+create_generate_clock -name usClk5 [get_pins {GEN_US_PGP[5].U_App/U_Pgp2b/U_BUFG/O}]
+create_generate_clock -name usClk6 [get_pins {GEN_US_PGP[6].U_App/U_Pgp2b/U_BUFG/O}]
+
+create_generate_clock -name dsClk0 [get_pins {GEN_DS_PGP[0].U_App/U_Pgp2b/U_BUFG/O}]
+create_generate_clock -name dsClk1 [get_pins {GEN_DS_PGP[1].U_App/U_Pgp2b/U_BUFG/O}]
+create_generate_clock -name dsClk2 [get_pins {GEN_DS_PGP[2].U_App/U_Pgp2b/U_BUFG/O}]
+create_generate_clock -name dsClk3 [get_pins {GEN_DS_PGP[3].U_App/U_Pgp2b/U_BUFG/O}]
+create_generate_clock -name dsClk4 [get_pins {GEN_DS_PGP[4].U_App/U_Pgp2b/U_BUFG/O}]
+create_generate_clock -name dsClk5 [get_pins {GEN_DS_PGP[5].U_App/U_Pgp2b/U_BUFG/O}]
+create_generate_clock -name dsClk6 [get_pins {GEN_DS_PGP[6].U_App/U_Pgp2b/U_BUFG/O}]
 
 set_clock_groups -asynchronous -group [get_clocks usClk0] -group [get_clocks usClk1] -group [get_clocks usClk2] -group [get_clocks usClk3] -group [get_clocks usClk4] -group [get_clocks usClk5] -group [get_clocks usClk6] -group [get_clocks -include_generated_clocks amcClk0]
 
@@ -193,6 +192,11 @@ set_clock_groups -asynchronous -group [get_clocks -include_generated_clocks timi
 
 set_false_path -to [get_cells -hierarchical -filter {NAME =~ *GEN_ULTRA_SCALE.IprogUltraScale_Inst/RstSync_Inst/syncRst_reg}]
 set_false_path -to [get_cells -hierarchical -filter {NAME =~ *GEN_ULTRA_SCALE.IprogUltraScale_Inst/RstSync_Inst/Synchronizer_1/GEN.ASYNC_RST.crossDomainSyncReg_reg[0]}]
+
+####################################################################################
+# Constraints from file : 'SaltUltraScaleTxOnly.xdc'
+####################################################################################
+
 
 ####################################################################################
 # Constraints from file : 'SaltUltraScaleTxOnly.xdc'
@@ -247,7 +251,8 @@ set_property CONFIG_VOLTAGE 3.3 [current_design]
 set_property UNAVAILABLE_DURING_CALIBRATION true [get_ports ddrPg]
 
 
-set_property CLKOUT0_PHASE 0 [get_cells U_Backplane/U_Clk/U_ClkManagerMps/MmcmGen.U_Mmcm]
+set_property CLKOUT0_PHASE 0.0 [get_cells U_Backplane/U_Clk/U_ClkManagerMps/MmcmGen.U_Mmcm]
+
 
 
 
