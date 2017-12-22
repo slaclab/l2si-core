@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-07-10
--- Last update: 2017-11-09
+-- Last update: 2017-12-22
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -148,7 +148,8 @@ begin
   hdrOut.count      <= doutb(183 downto 160);
   hdrOut.version    <= EVENT_HEADER_INIT_C.version;
   hdrOut.partitions <= doutb(143 downto 128);
-  hdrOut.l1t        <= EVENT_HEADER_INIT_C.l1t;
+--  hdrOut.l1t        <= EVENT_HEADER_INIT_C.l1t;
+  hdrOut.l1t        <= doutb(159 downto 144);
   pmsg             <= doutf(5);
   phdr             <= doutf(6);
   
