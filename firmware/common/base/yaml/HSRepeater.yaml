@@ -42,7 +42,7 @@ HSRepeater: &HSRepeater
       at:
         offset: 0x0008
       sizeBits: 6
-      mode: RO
+      mode: RW
       description: Overrride power down
     ##################################################
     SlaveRegCtrl:

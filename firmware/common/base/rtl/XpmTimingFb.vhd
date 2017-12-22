@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-07-08
--- Last update: 2017-10-29
+-- Last update: 2017-11-16
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -110,7 +110,10 @@ begin
   phy.dataK   <= r.txDataK;
   phy.control.pllReset <= pllReset;
   phy.control.reset    <= phyReset;
-
+  phy.control.inhibit  <= '0';
+  phy.control.polarity <= '0';
+  phy.control.bufferByRst <= '0';
+  
   comb: process (r, full, l1input, rst) is
     variable v : RegType;
   begin
