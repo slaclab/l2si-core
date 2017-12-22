@@ -39,6 +39,8 @@ use unisim.vcomponents.all;
 
 -------------------------------------------------------------------------------
 entity hsd_dual is
+  generic (
+    BUILD_INFO_G : BuildInfoType );
   port (
     -- PC821 Interface
     cpld_fpga_bus    : inout slv(8 downto 0);
@@ -119,9 +121,10 @@ end hsd_dual;
 architecture rtl of hsd_dual is
 
   --  Set timing specific clock parameters
---  constant LCLSII_C : boolean := false;
-  constant LCLSII_C : boolean := true;
+  constant LCLSII_C : boolean := false;
+--  constant LCLSII_C : boolean := true;
   constant NFMC_C   : integer := 2;
+  constant DMA_SIZE_C : integer := 1;
   
   signal regReadMaster  : AxiLiteReadMasterType;
   signal regReadSlave   : AxiLiteReadSlaveType;
@@ -137,10 +140,10 @@ architecture rtl of hsd_dual is
   signal timingBus      : TimingBusType;
   signal exptBus        : ExptBusType;
 
-  signal dmaIbMaster    : AxiStreamMasterType;
-  signal dmaIbSlave     : AxiStreamSlaveType;
+  signal dmaIbMaster    : AxiStreamMasterArray(DMA_SIZE_C-1 downto 0);
+  signal dmaIbSlave     : AxiStreamSlaveArray (DMA_SIZE_C-1 downto 0);
   
-  constant DMA_AXIS_CONFIG_C : AxiStreamConfigArray(0 downto 0) := (
+  constant DMA_AXIS_CONFIG_C : AxiStreamConfigArray(DMA_SIZE_C-1 downto 0) := (
     others=> (
      TSTRB_EN_C    => false,
      TDATA_BYTES_C => 32,
@@ -173,17 +176,18 @@ begin  -- rtl
   
   U_Core : entity work.AxiPcieQuadAdcCore
     generic map ( AXI_APP_BUS_EN_G => true,
+                  DMA_SIZE_G       => DMA_SIZE_C,
                   AXIS_CONFIG_G    => DMA_AXIS_CONFIG_C,
-                  LCLSII_G         => LCLSII_C )
-    port map ( sysClk         => sysClk,
+                  BUILD_INFO_G     => BUILD_INFO_G )
+   port map ( sysClk         => sysClk,
                sysRst         => sysRst,
                -- DMA Interfaces
                dmaClk      (0)=> dmaClk,
                dmaRst      (0)=> dmaRst,
                dmaObMasters   => open,
                dmaObSlaves    => (others=>AXI_STREAM_SLAVE_INIT_C),
-               dmaIbMasters(0)=> dmaIbMaster,
-               dmaIbSlaves (0)=> dmaIbSlave,
+               dmaIbMasters   => dmaIbMaster,
+               dmaIbSlaves    => dmaIbSlave,
                -- Application AXI-Lite
                regClk         => regClk,
                regRst         => regRst,
@@ -200,7 +204,6 @@ begin  -- rtl
                scl            => scl,
                sda            => sda,
                -- Timing
-               readoutReady   => readoutReady,
                timingRefClkP  => timingRefClkP,
                timingRefClkN  => timingRefClkN,
                timingRxP      => timingRxP,
@@ -211,6 +214,7 @@ begin  -- rtl
                timingRecClkRst=> timingRecClkRst,
                timingBus      => timingBus,
                exptBus        => exptBus,
+               timingFb       => TIMING_PHY_INIT_C,
                -- PCIE Ports
                pciRstL        => pciRstL,
                pciRefClkP     => pciRefClkP,
@@ -241,6 +245,8 @@ begin  -- rtl
   
   U_APP : entity work.Application
     generic map ( LCLSII_G => LCLSII_C,
+                  DMA_SIZE_G => DMA_SIZE_C,
+                  DMA_STREAM_CONFIG_G => DMA_AXIS_CONFIG_C(0),
                   NFMC_G   => NFMC_C )
     port map (
       fmc_to_cpld      => fmc_to_cpld,
@@ -274,6 +280,7 @@ begin  -- rtl
       evrRst              => timingRecClkRst,
       evrBus              => timingBus,
       exptBus             => exptBus,
-      ready               => readoutReady );
+      timingFbClk         => '0',
+      timingFbRst         => '0' );
 
 end rtl;

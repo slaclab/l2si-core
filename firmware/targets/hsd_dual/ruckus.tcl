@@ -19,6 +19,7 @@ loadRuckusTcl "${SURF_DIR}/xilinx"     "quiet"
 loadRuckusTcl "$::DIR_PATH/../../submodules/lcls-timing-core"
 loadRuckusTcl "$::DIR_PATH/../../common/hsd"
 loadRuckusTcl "$::DIR_PATH/../../common/hsd/v1"
+loadRuckusTcl "$::DIR_PATH/../../common/base"
 
 # Load target's source code and constraints
 loadSource      -dir  "$::DIR_PATH/hdl/"
