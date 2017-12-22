@@ -5,7 +5,7 @@
 -- Author     : Larry Ruckman  <ruckman@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-09-16
--- Last update: 2017-10-03
+-- Last update: 2017-11-16
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -167,7 +167,8 @@ begin
          PAYLOAD_CNT_TOP_G => PAYLOAD_CNT_TOP_G,
          NUM_VC_EN_G       => NUM_VC_EN_G,
          TX_ENABLE_G       => PGP_TX_ENABLE_G,
-         RX_ENABLE_G       => PGP_RX_ENABLE_G)
+         RX_ENABLE_G       => PGP_RX_ENABLE_G,
+         DEBUG_G           => DEBUG_G)
       port map (
          pgpTxClk         => pgpClk,
          pgpTxClkRst      => pgpRst,
