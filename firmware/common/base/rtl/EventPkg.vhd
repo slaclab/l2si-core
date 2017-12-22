@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2016-03-25
--- Last update: 2017-10-12
+-- Last update: 2017-12-22
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -24,6 +24,7 @@ library ieee;
 use ieee.std_logic_1164.all;
 
 use work.StdRtlPkg.all;
+use work.TimingPkg.all;
 
 package EventPkg is
 
@@ -37,33 +38,65 @@ package EventPkg is
       pulseId   => (others=>'0'),
       timeStamp => (others=>'0') );
 
+   function toTimingHeader(v : TimingBusType) return TimingHeaderType;
+
+   
+   constant EVENT_HEADER_VERSION_C : integer := 0;
+   constant L1A_INFO_C : slv(7 downto 0) := X"00";
+   
    type EventHeaderType is record
-     timeStamp  : slv(63 downto 0);
      pulseId    : slv(63 downto 0);
-     evttag     : slv(63 downto 0);
+     timeStamp  : slv(63 downto 0);
+     count      : slv(23 downto 0);
+     version    : slv( 7 downto 0);
+     partitions : slv(15 downto 0);
+     l1t        : slv(15 downto 0);   -- L1 trigger lines
+     --detenv     : slv(63 downto 0);  -- detector specific words
    end record;
 
    constant EVENT_HEADER_INIT_C : EventHeaderType := (
-     timeStamp  => (others=>'0'),
      pulseId    => (others=>'0'),
-     evttag     => (others=>'0') );
+     timeStamp  => (others=>'0'),
+     count      => (others=>'0'),
+     version    => toSlv(EVENT_HEADER_VERSION_C,8),
+     partitions => (others=>'0'),
+     l1t        => (others=>'0') );
 
    type EventHeaderArray is array(natural range<>) of EventHeaderType;
    
    function toSlv(v : EventHeaderType) return slv;
-
+   
 end package EventPkg;
 
 package body EventPkg is
 
+   function toTimingHeader(v : TimingBusType) return TimingHeaderType is
+     variable result : TimingHeaderType;
+   begin
+     result.strobe    := v.strobe;
+     result.pulseId   := v.message.pulseId;
+     result.timeStamp := v.message.timeStamp;
+     return result;
+   end function;
+   
    function toSlv(v : EventHeaderType) return slv is
      variable vector : slv(191 downto 0) := (others=>'0');
      variable i      : integer := 0;
    begin
-     assignSlv(i, vector, v.pulseId);
-     assignSlv(i, vector, v.timeStamp);
-     assignSlv(i, vector, v.evttag);
+     assignSlv(i, vector, v.pulseId(55 downto 0));
+     if v.l1t(15) = '1' then
+       assignSlv(i, vector, L1A_INFO_C);
+     else
+       -- XpmPartitionMsgType.hdr(7 downto 0)
+       assignSlv(i, vector, v.l1t(13 downto 6)); 
+     end if;
+     assignSlv(i, vector, v.timeStamp );
+     assignSlv(i, vector, v.count     );
+     assignSlv(i, vector, v.version   );
+     assignSlv(i, vector, v.partitions);
+     assignSlv(i, vector, v.l1t       );
      return vector;
    end function;
 
+   
 end package body EventPkg;

@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-07-10
--- Last update: 2017-10-13
+-- Last update: 2017-11-09
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -143,9 +143,12 @@ begin
   cntRdFifo        <= rd.cntRdF;
   rstFifo          <= wr.rstF;
 
-  hdrOut.pulseId   <= doutb( 63 downto   0);
-  hdrOut.timeStamp <= doutb(127 downto  64);
-  hdrOut.evttag    <= doutb(191 downto 128);
+  hdrOut.pulseId    <= doutb( 63 downto   0);
+  hdrOut.timeStamp  <= doutb(127 downto  64);
+  hdrOut.count      <= doutb(183 downto 160);
+  hdrOut.version    <= EVENT_HEADER_INIT_C.version;
+  hdrOut.partitions <= doutb(143 downto 128);
+  hdrOut.l1t        <= EVENT_HEADER_INIT_C.l1t;
   pmsg             <= doutf(5);
   phdr             <= doutf(6);
   
