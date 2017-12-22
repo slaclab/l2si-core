@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-07-10
--- Last update: 2017-10-22
+-- Last update: 2017-11-20
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -54,6 +54,7 @@ architecture rtl of DtiPgpFb is
   constant BOTH_AF_OPCODE   : slv(7 downto 0) := x"03";   -- both queues almost full
 
   type RegType is record
+    rx_full        : sl;
     rx_almost_full : sl;
     tx_almost_full : sl;
     tmo            : slv(11 downto 0);
@@ -61,6 +62,7 @@ architecture rtl of DtiPgpFb is
   end record;
 
   constant REG_INIT_C : RegType := (
+    rx_full        => '0',
     rx_almost_full => '1',
     tx_almost_full => '1',
     tmo            => (others=>'0'),
@@ -98,6 +100,8 @@ begin
       end case;
     end if;
 
+    v.rx_full := pgpRxOut.remPause(0);
+
     if r.tmo = 0 then
       if r.opCodeFound = '0' then
         v.rx_almost_full := '1';
@@ -112,7 +116,7 @@ begin
     
     r_in <= v;
 
-    rxAlmostFull <= r.rx_almost_full;
+    rxAlmostFull <= r.rx_almost_full or r.rx_full;
     txAlmostFull <= r.tx_almost_full;
   end process;
 
