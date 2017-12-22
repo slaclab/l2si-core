@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-07-10
--- Last update: 2017-05-15
+-- Last update: 2017-11-17
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -70,7 +70,14 @@ entity DtiUsJungFrauApp is
      obRst           : in  sl;
      obTrig          : in  XpmPartitionDataType;
      obMaster        : in  AxiStreamMasterType;
-     obSlave         : out AxiStreamSlaveType );
+     obSlave         : out AxiStreamSlaveType;
+     --
+     drpaddr_in      : in  slv(8 downto 0);
+     drpdi_in        : in  slv(15 downto 0);
+     drpen_in        : in  sl;
+     drpwe_in        : in  sl;
+     drpdo_out       : out slv(15 downto 0);
+     drprdy_out      : out sl );
 end DtiUsJungFrauApp;
 
 architecture top_level_app of DtiUsJungFrauApp is
@@ -195,7 +202,8 @@ begin
 
   U_TenGigEth : entity work.TenGigEthGthUltraScale
     generic map (
-      EN_AXI_REG_G => true )
+      EN_AXI_REG_G => true,
+      DEBUG_G      => DEBUG_G )
     port map (
       localMac            => MACADDR,
       -- Streaming DMA Interface 
@@ -224,6 +232,13 @@ begin
       --gtTxDiffCtrl        : in  slv(3 downto 0)                                := "1110";
       --gtRxPolarity        : in  sl                                             := '0';
       --gtTxPolarity        : in  sl                                             := '0';
+      -- DRP
+      drpaddr_in      => drpaddr_in,
+      drpdi_in        => drpdi_in,
+      drpen_in        => drpen_in,
+      drpwe_in        => drpwe_in,
+      drpdo_out       => drpdo_out,
+      drprdy_out      => drprdy_out,
       -- Quad PLL Ports
       qplllock            => qplllock,
       qplloutclk          => qplloutclk,

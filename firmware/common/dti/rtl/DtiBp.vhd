@@ -2,7 +2,7 @@
 -- File       : DtiBp.vhd
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-09-04
--- Last update: 2017-10-05
+-- Last update: 2017-12-11
 -------------------------------------------------------------------------------
 -- Description: 
 -------------------------------------------------------------------------------
@@ -31,6 +31,7 @@ use work.AxiStreamPkg.all;
 use work.SsiPkg.all;
 use work.DtiPkg.all;
 use work.TimingPkg.all;
+use work.EventPkg.all;
 
 library unisim;
 use unisim.vcomponents.all;
@@ -50,7 +51,7 @@ entity DtiBp is
       --
       timingClk       : in  sl;
       timingRst       : in  sl;
-      timingBus       : in  TimingBusType;
+      timingHdr       : in  TimingHeaderType;
       ----------------
       -- Core Ports --
       ----------------
@@ -192,13 +193,13 @@ begin
 
    U_TxStrobe : entity work.SynchronizerOneShot
      port map ( clk     => ref125MHzClk,
-                dataIn  => timingBus.strobe,
+                dataIn  => timingHdr.strobe,
                 dataOut => txStrobe );
 
    tstrobe : process ( timingClk ) is
    begin
      if rising_edge(timingClk) then
-       txHeaderT <= timingBus.message.pulseId(7 downto 0);
+       txHeaderT <= timingHdr.pulseId(7 downto 0);
      end if;
    end process;
 
@@ -222,7 +223,7 @@ begin
        v.cnt := (others=>'0');
      end if;
      v.master.tLast  := '1';
-     v.master.tData  := txHeader & r.ticks & rxFull(0);
+     v.master.tData(31 downto 0) := txHeader & r.ticks & rxFull(0);
      ssiSetUserSof(BP_CONFIG_C, v.master, '1');
 
      if r.master.tValid = '1' and bpSlave.tReady = '1' then
@@ -239,7 +240,7 @@ begin
      
      rin <= v;
 
-     status.obSent <= r.sent;
+     status.obSent <= resize(r.sent,status.obSent'length);
    end process;
    
    seq: process (ref125MHzClk) is

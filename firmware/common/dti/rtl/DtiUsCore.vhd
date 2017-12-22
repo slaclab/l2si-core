@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-07-10
--- Last update: 2017-10-09
+-- Last update: 2017-11-18
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -29,6 +29,7 @@ use ieee.std_logic_unsigned.all;
 
 use work.StdRtlPkg.all;
 use work.TimingPkg.all;
+use work.EventPkg.all;
 use work.XpmPkg.all;
 use work.DtiPkg.all;
 use work.ArbiterPkg.all;
@@ -46,7 +47,7 @@ entity DtiUsCore is
      clear           : in  sl := '0';
      update          : in  sl := '1';
      config          : in  DtiUsLinkConfigType;
-     remLinkID       : in  slv(7 downto 0);
+     remLinkID       : in  slv(7 downto 0) := x"FF";
      status          : out DtiUsLinkStatusType;
      fullOut         : out slv(15 downto 0);
      --  Ethernet control interface
@@ -59,9 +60,10 @@ entity DtiUsCore is
      --  Timing interface
      timingClk       : in  sl;
      timingRst       : in  sl;
-     timingBus       : in  TimingBusType; -- delayed
-     exptBus         : in  ExptBusType;   -- delayed
-     triggerBus      : in  ExptBusType;   -- prompt
+     timingHdr       : in  TimingHeaderType; -- delayed
+     exptBus         : in  ExptBusType;      -- delayed
+     timingHdrP      : in  TimingHeaderType; -- prompt
+     triggerBus      : in  ExptBusType;      -- prompt
      --  DSLinks interface
      eventClk        : in  sl;
      eventRst        : in  sl;
@@ -149,8 +151,9 @@ architecture rtl of DtiUsCore is
   signal phdr     : sl;
   signal pdata    : XpmPartitionDataType;
   signal pdataV   : sl;
-  signal eventHeader : DtiEventHeaderType;
-  signal eventHeaderV : sl;
+  signal eventHeader    : EventHeaderType;
+  signal eventHeaderVec : slv(191 downto 0);
+  signal eventHeaderV   : sl;
   
   signal configV, configSV, configTV : slv(DTI_US_LINK_CONFIG_BITS_C-1 downto 0);
   signal configS, configT : DtiUsLinkConfigType;
@@ -183,7 +186,7 @@ begin
     dbgl0r <= toPartitionWord(exptBus.message.partitionWord(0)).l0r;
     U_ILA : ila_0
       port map ( clk   => timingClk,
-                 probe0(0) => timingBus.strobe,
+                 probe0(0) => timingHdr.strobe,
                  probe0(1) => dbgl0r,
                  probe0(17 downto 2) => tfull,
                  probe0(33 downto 18) => t.full(0),
@@ -210,7 +213,7 @@ begin
   status.rxInh      <= t.ninh;
   
   eventTag        <= ibMaster.tId(eventTag'range);
-  
+
   U_Mux : entity work.DtiStreamDeMux
     generic map ( NUM_MASTERS_G  => MaxDsLinks,
                   TDEST_HIGH_G   => MAX_BIT,
@@ -223,20 +226,27 @@ begin
                axisClk      => eventClk,
                axisRst      => eventRst );
 
-  U_HdrCache : entity work.DtiHeaderCache
+  U_HdrCache : entity work.EventHeaderCache
     port map ( rst       => urst,
+               --  Cache Input
                wrclk     => timingClk,
+               --  configuration
                enable    => senable,
-               timingBus => timingBus,
-               exptBus   => exptBus,
-               triggerBus=> triggerBus,
                partition => config.partition(2 downto 0),
+               -- event input
+               timing_prompt  => timingHdrP,
+               expt_prompt    => triggerBus,
+               timing_aligned => timingHdr,
+               expt_aligned   => exptBus,
+               -- trigger output
                pdata     => pdata,
                pdataV    => pdataV,
                cntL0     => status.obL0,
                cntL1A    => status.obL1A,
                cntL1R    => status.obL1R,
                cntWrFifo => status.wrFifoD,
+               rstFifo   => open,
+               -- Cache Output
                rdclk     => eventClk,
                entag     => config.tagEnable,
                l0tag     => eventTag,
@@ -247,7 +257,8 @@ begin
                hdrOut    => eventHeader,
                valid     => eventHeaderV );
 
-  configV <= toSlv(config);
+  eventHeaderVec <= toSlv(eventHeader);
+  configV        <= toSlv(config);
   
   U_SyncConfig : entity work.SynchronizerVector
     generic map ( WIDTH_G => configV'length )
@@ -296,7 +307,7 @@ begin
   --    Arbitrate through forwarding mask
   --    Add event header
   --
-  comb : process ( r, ibMaster, tSlave, configS, eventRst, sclear, supdate, eventHeader, eventHeaderV,
+  comb : process ( r, ibMaster, tSlave, configS, eventRst, sclear, supdate, eventHeaderVec, eventHeaderV,
                    dsfull, ibFull,
                    pmsg, phdr, rin, shdrOnly ) is
     variable v : RegType;
@@ -341,7 +352,7 @@ begin
         if v.master.tValid='0' then
           v.dest          := fwd;
           v.master.tValid := '1';
-          v.master.tData(63 downto 0) := eventHeader.pulseId;
+          v.master.tData(63 downto 0) := eventHeaderVec(63 downto 0);
           v.master.tKeep  := genTKeep(US_IB_CONFIG_C);
           v.master.tLast  := '0';
           if r.msg = '1' or r.hdr = '1' then
@@ -357,14 +368,14 @@ begin
       when S_EVHDR2 =>
         if v.master.tValid='0' then
           v.master.tValid := '1';
-          v.master.tData(63 downto 0) := eventHeader.timeStamp;
+          v.master.tData(63 downto 0) := eventHeaderVec(127 downto 64);
           v.master.tUser  := (others=>'0');
           v.state         := S_EVHDR3;
         end if;
       when S_EVHDR3 =>
         if v.master.tValid='0' then
           v.master.tValid := '1';
-          v.master.tData(63 downto 0) := eventHeader.evttag;
+          v.master.tData(63 downto 0) := eventHeaderVec(191 downto 128);
           v.hdrRd         := '1';
           v.state         := S_EVHDR4;
         end if;
@@ -462,7 +473,7 @@ begin
     end if;
   end process;
 
-  tcomb: process (t, timingRst, timingBus, tclear, tfull, configT, triggerBus) is
+  tcomb: process (t, timingRst, timingHdrP, tclear, tfull, configT, triggerBus) is
     variable v : TRegType;
     variable ip : integer;
   begin
@@ -470,7 +481,7 @@ begin
 
     ip := conv_integer(configT.partition);
 
-    if timingBus.strobe = '1' then
+    if timingHdrP.strobe = '1' then
       if (toPartitionWord(triggerBus.message.partitionWord(ip)).l0r = '1' and
           t.full(t.full'left)(ip)='1') then
         v.ninh := t.ninh+1;

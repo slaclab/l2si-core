@@ -5,7 +5,7 @@
 -- Author     : Larry Ruckman  <ruckman@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-09-21
--- Last update: 2017-07-24
+-- Last update: 2017-12-17
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -193,8 +193,8 @@ begin
          TPD_G            => TPD_G,
          EN_WDT_G         => true,
          -- ETH Configurations
-         XAUI_20GIGE_G    => false,
-         REF_CLK_FREQ_G   => AXI_CLK_FREQ_C,
+--         XAUI_20GIGE_G    => false,
+--         REF_CLK_FREQ_G   => AXI_CLK_FREQ_C,
          -- AXI-Lite Configurations
          AXI_ERROR_RESP_G => AXI_ERROR_RESP_G,
          -- AXI Streaming Configurations

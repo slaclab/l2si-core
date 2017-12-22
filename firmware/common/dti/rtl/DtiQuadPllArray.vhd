@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-04-08
--- Last update: 2016-04-19
+-- Last update: 2017-11-15
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -36,23 +36,35 @@ entity DtiQuadPllArray is
       QPLL_REFCLK_SEL_G : slv(2 downto 0) := "001");
    port (
       -- MGT Clock Port (156.25 MHz or 312.5 MHz)
-      amcClkP       : in  slv         (1 downto 0);
-      amcClkN       : in  slv         (1 downto 0);
-      amcRst        : in  Slv2Array   (1 downto 0);
-      amcQuad       : out AmcQuadArray(1 downto 0) );
+      amcClkP       : in  sl;
+      amcClkN       : in  sl;
+      amcTxP        : out slv(6 downto 0);
+      amcTxN        : out slv(6 downto 0);
+      amcRxP        : in  slv(6 downto 0);
+      amcRxN        : in  slv(6 downto 0);
+      -- channel ports
+      chanPllRst    : in  slv(6 downto 0);
+      chanTxP       : in  slv(6 downto 0);
+      chanTxN       : in  slv(6 downto 0);
+      chanRxP       : out slv(6 downto 0);
+      chanRxN       : out slv(6 downto 0);
+      chanQuad      : out QuadArray(6 downto 0) );
 end DtiQuadPllArray;
 
 architecture mapping of DtiQuadPllArray is
 
   constant DIV_C : slv(2 downto 0) := ite((REF_CLK_FREQ_G = 156.25E+6), "000", "001");
 
-  signal amcRefClk     : slv(1 downto 0);
-  signal amcRefClkCopy : slv(1 downto 0);
-  signal amcCoreClk    : slv(1 downto 0);
-  
+  signal amcRefClk     : sl;
+  signal amcRefClkCopy : sl;
+  signal amcCoreClk    : sl;
+  signal amcQuad       : QuadArray(1 downto 0);
+  signal qplloutclk    : slv(1 downto 0);
+  signal qplloutrefclk : slv(1 downto 0);
+  signal qplllock      : slv(1 downto 0);
+  signal qpllRst       : slv(1 downto 0);
+  signal qpllRstI      : Slv4Array(1 downto 0) := (others=>x"0");
 begin
-
-  GEN_AMC : for j in 0 to 1 generate
 
     IBUFDS_GTE3_Inst : IBUFDS_GTE3
       generic map (
@@ -60,26 +72,27 @@ begin
         REFCLK_HROW_CK_SEL => "00",    -- 2'b00: ODIV2 = O
         REFCLK_ICNTL_RX    => "00")
       port map (
-        I     => amcClkP(j),
-        IB    => amcClkN(j),
+        I     => amcClkP,
+        IB    => amcClkN,
         CEB   => '0',
-        ODIV2 => amcRefClkCopy(j),
-        O     => amcRefClk(j));  
+        ODIV2 => amcRefClkCopy,
+        O     => amcRefClk);  
 
     BUFG_GT_Inst : BUFG_GT
       port map (
-        I       => amcRefClkCopy(j),
+        I       => amcRefClkCopy,
         CE      => '1',
         CEMASK  => '1',
         CLR     => '0',
         CLRMASK => '1',
         DIV     => DIV_C,
-        O       => amcCoreClk(j));
+        O       => amcCoreClk);
 
     GEN_TENGIGCLK : for i in 0 to 1 generate
 
-      amcQuad(j)(i).amcClk <= amcCoreClk(j);
-
+      amcQuad(i).coreClk <= amcCoreClk;
+      amcQuad(i).refClk  <= amcRefClk;
+      
       GthUltraScaleQuadPll_Inst : entity work.GthUltraScaleQuadPll
         generic map (
           -- Simulation Parameters
@@ -111,22 +124,56 @@ begin
           -- Clock Selects
           QPLL_REFCLK_SEL_G   => (others => "001"))
         port map (
-          qPllRefClk(0)     => amcRefClk(j),
+          qPllRefClk(0)     => amcRefClk,
           qPllRefClk(1)     => '0',
-          qPllOutClk(0)     => amcQuad(j)(i).qplloutclk,
+          qPllOutClk(0)     => amcQuad(i).qplloutclk,
           qPllOutClk(1)     => open,
-          qPllOutRefClk(0)  => amcQuad(j)(i).qplloutrefclk,
+          qPllOutRefClk(0)  => amcQuad(i).qplloutrefclk,
           qPllOutRefClk(1)  => open,
-          qPllLock(0)       => amcQuad(j)(i).qplllock,
+          qPllLock(0)       => amcQuad(i).qplllock,
           qPllLock(1)       => open,
           qPllLockDetClk(0) => '0',   -- IP Core ties this to GND (see note below) 
           qPllLockDetClk(1) => '0',   -- IP Core ties this to GND (see note below) 
           qPllPowerDown(0)  => '0',
           qPllPowerDown(1)  => '1',
-          qPllReset(0)      => amcRst(j)(i),
+          qPllReset(0)      => qpllRst(i),
           qPllReset(1)      => '1'); 
 
     end generate;
-  end generate;
+  --
+  --  The AMC SFP channels are reordered - the mapping to MGT quads is non-trivial
+  --    amcTx/Rx indexed by MGT
+  --    iamcTx/Rx indexed by SFP
+  --
+  reorder_p : process (amcRxP,amcRxN,chanTxP,chanTxN,
+                       amcCoreClk,amcRefClk,qpllRstI,chanPllRst,amcQuad) is
+  begin
+    qpllRst(0) <= uOr(qpllRstI(0));
+    qpllRst(1) <= uOr(qpllRstI(1));
+    for j in 0 to 3 loop
+      amcTxP    (j)   <= chanTxP(j+2);
+      amcTxN    (j)   <= chanTxN(j+2);
+      chanRxP   (j+2) <= amcRxP(j);
+      chanRxN   (j+2) <= amcRxN(j);
+      qpllRstI(0)(j) <= chanPllRst(j+2);
+      chanQuad  (j+2) <= amcQuad(0);
+    end loop;
+    for j in 4 to 5 loop
+      amcTxP    (j)   <= chanTxP(j-4);
+      amcTxN    (j)   <= chanTxN(j-4);
+      chanRxP   (j-4) <= amcRxP(j);
+      chanRxN   (j-4) <= amcRxN(j);
+      qpllRstI(1)(j-4) <= chanPllRst(j-4);
+      chanQuad  (j-4) <= amcQuad(1);
+    end loop;
+    for j in 6 to 6 loop
+      amcTxP    (j) <= chanTxP(j);
+      amcTxN    (j) <= chanTxN(j);
+      chanRxP   (j) <= amcRxP(j);
+      chanRxN   (j) <= amcRxN(j);
+      qpllRstI(1)(j-4) <= chanPllRst(j-4);
+      chanQuad  (j) <= amcQuad(1);
+    end loop;
+  end process;
 
 end mapping;

@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-10-30
--- Last update: 2017-01-11
+-- Last update: 2017-11-14
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -275,7 +275,7 @@ begin
    -- Transition the BSA waveform data stream into packetizer input format
    -- Convert to PGP clock
    -------------------------------------------------------------------------------------------------
-   AxiStreamFifo_PACKETIZER : entity work.AxiStreamFifo
+   AxiStreamFifo_PACKETIZER : entity work.AxiStreamFifoV2
       generic map (
          TPD_G               => TPD_G,
          SLAVE_READY_EN_G    => true,
@@ -319,7 +319,7 @@ begin
    -------------------------------------------------------------------------------------------------
    -- Convert the stream to pgp format (16-bit)
    -------------------------------------------------------------------------------------------------
-   AxiStreamFifo_PGP : entity work.AxiStreamFifo
+   AxiStreamFifo_PGP : entity work.AxiStreamFifoV2
       generic map (
          TPD_G               => TPD_G,
          SLAVE_READY_EN_G    => true,

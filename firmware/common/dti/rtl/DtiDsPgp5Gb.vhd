@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-07-10
--- Last update: 2017-09-19
+-- Last update: 2017-12-11
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -40,7 +40,8 @@ entity DtiDsPgp5Gb is
    generic (
       TPD_G               : time                := 1 ns;
       ID_G                : slv(7 downto 0)     := x"00";
-      INCLUDE_AXIL_G      : boolean             := false );
+      INCLUDE_AXIL_G      : boolean             := false;
+      DEBUG_G             : boolean             := false );
    port (
      coreClk         : in  sl;
      coreRst         : in  sl;
@@ -74,7 +75,7 @@ architecture rtl of DtiDsPgp5Gb is
   signal amcObMaster : AxiStreamMasterType;
   signal amcObSlave  : AxiStreamSlaveType;
 
-  signal locTxIn        : Pgp2bTxInType;
+  signal locTxIn        : Pgp2bTxInType := PGP2B_TX_IN_INIT_C;
   signal pgpTxIn        : Pgp2bTxInType;
   signal pgpTxOut       : Pgp2bTxOutType;
   signal pgpRxIn        : Pgp2bRxInType;
@@ -83,8 +84,6 @@ architecture rtl of DtiDsPgp5Gb is
   signal pgpTxSlaves    : AxiStreamSlaveArray (3 downto 0);
   signal pgpRxMasters   : AxiStreamMasterArray(3 downto 0);
   signal pgpRxCtrls     : AxiStreamCtrlArray  (3 downto 0) := (others=>AXI_STREAM_CTRL_UNUSED_C);
-
-  constant USER_ALMOST_FULL : integer := 0;
 
   signal pgpClk         : sl;
   signal pgpRst         : sl;
@@ -102,6 +101,7 @@ begin
     generic map (
       SLAVE_AXI_CONFIG_G  => US_OB_CONFIG_C,
       MASTER_AXI_CONFIG_G => SSI_PGP2B_CONFIG_C,
+      FIFO_ADDR_WIDTH_G   => 9,
       PIPE_STAGES_G       => 2 )
     port map ( 
       -- Slave Port
@@ -135,6 +135,8 @@ begin
                rxAlmostFull => full );
   
   U_Pgp2b : entity work.MpsPgpFrontEnd
+    generic map ( NUM_VC_EN_G => 1,
+                  DEBUG_G     => DEBUG_G )
     port map ( pgpClk       => pgpClk,
                pgpRst       => pgpRst,
                stableClk    => axilClk,

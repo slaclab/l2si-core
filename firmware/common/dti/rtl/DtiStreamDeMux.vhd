@@ -5,7 +5,7 @@
 -- File       : DtiStreamDeMux.vhd
 -- Author     : Ryan Herbst, rherbst@slac.stanford.edu
 -- Created    : 2014-04-25
--- Last update: 2017-07-25
+-- Last update: 2017-12-13
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -68,6 +68,8 @@ architecture structure of DtiStreamDeMux is
    signal pipeAxisMasters : AxiStreamMasterArray(NUM_MASTERS_G-1 downto 0);
    signal pipeAxisSlaves  : AxiStreamSlaveArray(NUM_MASTERS_G-1 downto 0);
 
+   signal axisRst_d : sl;
+  
    signal r   : RegType := REG_INIT_C;
    signal rin : RegType;
 
@@ -78,7 +80,7 @@ begin
       " is too small for NUM_MASTERS_G=" & integer'image(NUM_MASTERS_G)
       severity error;
 
-   comb : process (axisRst, pipeAxisSlaves, r, sAxisMaster, sFlood) is
+   comb : process (axisRst_d, pipeAxisSlaves, r, sAxisMaster, sFlood) is
       variable v   : RegType;
       variable idx : natural;
       variable i   : natural;
@@ -128,7 +130,7 @@ begin
       end if;
 
       -- Reset
-      if (axisRst = '1') then
+      if (axisRst_d = '1') then
          v := REG_INIT_C;
       end if;
 
@@ -161,6 +163,7 @@ begin
    seq : process (axisClk) is
    begin
       if (rising_edge(axisClk)) then
+         axisRst_d <= axisRst after TPD_G;
          r <= rin after TPD_G;
       end if;
    end process seq;

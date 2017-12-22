@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-12-14
--- Last update: 2017-10-04
+-- Last update: 2017-11-17
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -87,6 +87,9 @@ architecture rtl of DtiReg is
   signal monClkLock : slv       (3 downto 0);
   signal monClkFast : slv       (3 downto 0);
   signal monClkSlow : slv       (3 downto 0);
+
+  signal pllStat     : slv(3 downto 0);
+  signal pllCount    : SlVectorArray(3 downto 0, 2 downto 0);
 begin
 
   config         <= r.config;
@@ -244,12 +247,29 @@ begin
                  locClk      => axilClk,
                  refClk      => axilClk );
   end generate;
-    
+
+  U_StatLol : entity work.SyncStatusVector
+    generic map ( COMMON_CLK_G => true,
+                  WIDTH_G      => 4,
+                  CNT_WIDTH_G  => 3 )
+    port map ( statusIn(0) => status.amcPll(0).los,
+               statusIn(1) => status.amcPll(0).lol,
+               statusIn(2) => status.amcPll(1).los,
+               statusIn(3) => status.amcPll(1).lol,
+               statusOut => pllStat,
+               cntRstIn  => '0',
+               rollOverEnIn => (others=>'1'),
+               cntOut    => pllCount,
+               wrClk     => axilClk,
+               rdClk     => axilClk );
+
   comb : process (r, axilRst, axilReadMaster, axilWriteMaster, usApp,
                   usLinkUp, dsLinkUp, usStatus, dsStatus, bpStatus, qplllock,
-                  monClkRate, monClkLock, monClkFast, monClkSlow ) is
+                  monClkRate, monClkLock, monClkFast, monClkSlow,
+                  pllStat, pllCount) is
     variable v          : RegType;
     variable axilStatus : AxiLiteStatusType;
+    variable ra         : integer;
 
     -- Shorthand procedures for read/write register
     procedure axilRegRW(addr : in slv; offset : in integer; reg : inout slv) is
@@ -339,6 +359,22 @@ begin
       axilRegR (toSlv( 16*11+4*i+4, 12), 31, monClkLock(i));
     end loop;
 
+    for i in 0 to 1 loop
+      ra := 208+i*4;
+      axilRegRW(toSlv(ra,12),  0, v.config.amcPll(i).bwSel);
+      axilRegRW(toSlv(ra,12),  4, v.config.amcPll(i).frqTbl);
+      axilRegRW(toSlv(ra,12),  8, v.config.amcPll(i).frqSel);
+      axilRegRW(toSlv(ra,12), 16, v.config.amcPll(i).rate);
+      axilRegRW(toSlv(ra,12), 20, v.config.amcPll(i).inc);
+      axilRegRW(toSlv(ra,12), 21, v.config.amcPll(i).dec);
+      axilRegRW(toSlv(ra,12), 22, v.config.amcPll(i).bypass);
+      axilRegRW(toSlv(ra,12), 23, v.config.amcPll(i).rstn);
+      axilRegR (toSlv(ra,12), 24, muxSlVectorArray( pllCount, 2*i+0));
+      axilRegR (toSlv(ra,12), 27, pllStat(2*i+0));
+      axilRegR (toSlv(ra,12), 28, muxSlVectorArray( pllCount, 2*i+1));
+      axilRegR (toSlv(ra,12), 31, pllStat(2*i+1));
+    end loop;
+      
     -- Set the status
     axiSlaveDefault(axilWriteMaster, axilReadMaster, v.axilWriteSlave, v.axilReadSlave, axilStatus, AXI_RESP_OK_C);
 
