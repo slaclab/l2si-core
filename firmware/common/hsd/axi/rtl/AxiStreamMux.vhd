@@ -1,13 +1,8 @@
 -------------------------------------------------------------------------------
--- Title      : AXI Stream Multiplexer
--- Project    : General Purpose Core
--------------------------------------------------------------------------------
 -- File       : AxiStreamMux.vhd
--- Author     : Ryan Herbst, rherbst@slac.stanford.edu
+-- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2014-04-25
--- Last update: 2016-09-06
--- Platform   : 
--- Standard   : VHDL'93/02
+-- Last update: 2017-10-31
 -------------------------------------------------------------------------------
 -- Description:
 -- Block to connect multiple incoming AXI streams into a single encoded
@@ -21,9 +16,6 @@
 -- may be copied, modified, propagated, or distributed except according to 
 -- the terms contained in the LICENSE.txt file.
 -------------------------------------------------------------------------------
--- Modification history:
--- 04/25/2014: created.
--------------------------------------------------------------------------------
 
 library ieee;
 use ieee.std_logic_1164.all;
@@ -36,31 +28,35 @@ use work.AxiStreamPkg.all;
 
 entity AxiStreamMux is
    generic (
-      TPD_G          : time                  := 1 ns;
-      NUM_SLAVES_G   : integer range 1 to 32 := 4;
-      MODE_G         : string                := "INDEXED";          -- Or "ROUTED"
-      TDEST_ROUTES_G : Slv8Array             := (0 => "--------");  -- Only used in ROUTED mode
-      PIPE_STAGES_G  : integer range 0 to 16 := 0;
-      TDEST_HIGH_G   : integer range 0 to 7  := 7;
-      TDEST_LOW_G    : integer range 0 to 7  := 0;
-      ILEAVE_EN_G    : boolean               := false);  -- Set to true if interleaving dests, arbitrate on gaps
+      TPD_G                : time                  := 1 ns;
+      NUM_SLAVES_G         : integer range 1 to 32 := 4;
+      MODE_G               : string                := "INDEXED";  -- Or "ROUTED"
+      TDEST_ROUTES_G       : Slv8Array             := (0 => "--------");  -- Only used in ROUTED mode
+      PIPE_STAGES_G        : integer range 0 to 16 := 0;
+      TDEST_LOW_G          : integer range 0 to 7  := 0;   -- LSB of updated tdest for INDEX
+      ILEAVE_EN_G          : boolean               := false;  -- Set to true if interleaving dests, arbitrate on gaps
+      ILEAVE_ON_NOTVALID_G : boolean               := false;  -- Rearbitrate when tValid drops on selected channel
+      ILEAVE_REARB_G       : natural               := 0);  -- Max number of transactions between arbitrations, 0 = unlimited
    port (
-      -- Slaves
-      sAxisMasters : in  AxiStreamMasterArray(NUM_SLAVES_G-1 downto 0);
-      sAxisSlaves  : out AxiStreamSlaveArray(NUM_SLAVES_G-1 downto 0);
-      disableSel   : in  slv(NUM_SLAVES_G-1 downto 0) := (others => '0');
-      -- Master
-      mAxisMaster  : out AxiStreamMasterType;
-      mAxisSlave   : in  AxiStreamSlaveType;
       -- Clock and reset
       axisClk      : in  sl;
-      axisRst      : in  sl);
+      axisRst      : in  sl;
+      -- Slaves
+      disableSel   : in  slv(NUM_SLAVES_G-1 downto 0) := (others => '0');
+      rearbitrate  : in  sl                           := '0';
+      sAxisMasters : in  AxiStreamMasterArray(NUM_SLAVES_G-1 downto 0);
+      sAxisSlaves  : out AxiStreamSlaveArray(NUM_SLAVES_G-1 downto 0);
+
+      -- Master
+      mAxisMaster : out AxiStreamMasterType;
+      mAxisSlave  : in  AxiStreamSlaveType);
 end AxiStreamMux;
 
 architecture structure of AxiStreamMux is
 
    constant DEST_SIZE_C : integer := bitSize(NUM_SLAVES_G-1);
    constant ARB_BITS_C  : integer := 2**DEST_SIZE_C;
+   constant ACNT_SIZE_G : integer := bitSize(ILEAVE_REARB_G);
 
    type StateType is (
       IDLE_S,
@@ -71,6 +67,7 @@ architecture structure of AxiStreamMux is
       acks   : slv(ARB_BITS_C-1 downto 0);
       ackNum : slv(DEST_SIZE_C-1 downto 0);
       valid  : sl;
+      arbCnt : slv(ACNT_SIZE_G-1 downto 0);
       slaves : AxiStreamSlaveArray(NUM_SLAVES_G-1 downto 0);
       master : AxiStreamMasterType;
    end record RegType;
@@ -78,8 +75,9 @@ architecture structure of AxiStreamMux is
    constant REG_INIT_C : RegType := (
       state  => IDLE_S,
       acks   => (others => '0'),
-      ackNum => (others => '1'),
+      ackNum => toSlv(NUM_SLAVES_G-1, DEST_SIZE_C),
       valid  => '0',
+      arbCnt => (others => '0'),
       slaves => (others => AXI_STREAM_SLAVE_INIT_C),
       master => AXI_STREAM_MASTER_INIT_C);
 
@@ -92,8 +90,8 @@ architecture structure of AxiStreamMux is
 
 begin
 
-   assert (MODE_G /= "INDEXED" or (TDEST_HIGH_G - TDEST_LOW_G + 1 >= log2(NUM_SLAVES_G)))
-      report "In INDEXED mode, TDest range " & integer'image(TDEST_HIGH_G) & " downto " & integer'image(TDEST_LOW_G) &
+   assert (MODE_G /= "INDEXED" or (7 - TDEST_LOW_G + 1 >= log2(NUM_SLAVES_G)))
+      report "In INDEXED mode, TDest range 7 downto " & integer'image(TDEST_LOW_G) &
       " is too small for NUM_SLAVES_G=" & integer'image(NUM_SLAVES_G)
       severity error;
 
@@ -125,7 +123,7 @@ begin
       sAxisMastersTmp <= tmp;
    end process;
 
-   comb : process (axisRst, disableSel, pipeAxisSlave, r, sAxisMastersTmp) is
+   comb : process (axisRst, disableSel, pipeAxisSlave, r, rearbitrate, sAxisMastersTmp) is
       variable v        : RegType;
       variable requests : slv(ARB_BITS_C-1 downto 0);
       variable selData  : AxiStreamMasterType;
@@ -186,6 +184,7 @@ begin
                   v.state := MOVE_S;
                end if;
             end if;
+            v.arbCnt := (others => '0');
          ----------------------------------------------------------------------
          when MOVE_S =>
             -- Check if need to move data
@@ -194,14 +193,27 @@ begin
                v.slaves(conv_integer(r.ackNum)).tReady := '1';
                -- Move the AXIS data
                v.master                                := selData;
+               v.arbCnt                                := r.arbCnt + 1;
                -- Check for tLast
                if selData.tLast = '1' then
                   -- Next state
                   v.state := IDLE_S;
+
+
+               elsif (ILEAVE_EN_G) then
+                  if ((ILEAVE_REARB_G /= 0) and (r.arbCnt = ILEAVE_REARB_G-2)) or
+                     rearbitrate = '1' or
+                     disableSel(conv_integer(r.ackNum)) = '1' then
+                     -- rearbitrate after ILEAVE_REARB_G txns
+                     -- Or upon manual rearbitration input
+                     -- Or selected channel being disabled                  
+                     v.state := IDLE_S;
+                  end if;
                end if;
 
             -- RE-arbitrate on gaps if interleaving frames
-            elsif (v.master.tValid = '0') and (selData.tValid = '0') and (ILEAVE_EN_G = true) then
+            elsif (v.master.tValid = '0') and (selData.tValid = '0') and
+               (ILEAVE_EN_G and ILEAVE_ON_NOTVALID_G) then
                v.state := IDLE_S;
             end if;
       ----------------------------------------------------------------------
