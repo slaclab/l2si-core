@@ -148,16 +148,19 @@ begin  -- rtl
   calClkEnN <= not calClkEn;
   
   GEN_FRONT_IO : for i in 0 to NFMC_G-1 generate
-    U_FRONT_IOBUF0 : IOBUF
-      port map ( O  => open,
-                 IO => front_io_fmc(i)(0),
+    --U_FRONT_IOBUF0 : IOBUF
+      --port map ( O  => open,
+      --           IO => front_io_fmc(i)(0),
+    U_FRONT_IOBUF0 : OBUFT
+      port map ( O  => front_io_fmc(i)(0),
                  I  => pllRefClk(i),
                  T  => '0' );
-    U_FRONT_IOBUF1 : IOBUF
-      port map ( O  => open,
-                 IO => front_io_fmc(i)(1),
+    --U_FRONT_IOBUF1 : IOBUF
+    --  port map ( O  => open,
+    --             IO => front_io_fmc(i)(1),
+    U_FRONT_IOBUF1 : OBUFT
+      port map ( O  => front_io_fmc(i)(1),
                  I  => adcClk,     -- 156.25MHz
---                 I  => ddrClk,     -- 625MHz
                  T  => calClkEnN(i) );
 
     front_io_fmc(i)(3 downto 2) <= (others => 'Z');

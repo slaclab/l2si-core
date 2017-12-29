@@ -143,8 +143,8 @@ signal clock_count      : slv(15 downto 0);
 signal ext_trigger_buf  : std_logic;
 signal clk_to_fpga_buf  : std_logic;
 
-signal spi_irq_bus      : std_logic_vector(31 downto 0);
-signal rst              : std_logic;
+signal spi_irq_bus      : std_logic_vector(31 downto 0) := (others=>'0');
+signal rst              : std_logic := '0';
 
 signal adc_data         : bus128(3 downto 0);
 
@@ -237,7 +237,7 @@ begin
     axiSlaveWaitTxn(mAxilWriteMasters(0), mAxilReadMasters(0), v.axilWriteSlave, v.axilReadSlave, axilStatus);
     v.axilReadSlave.rdata := (others=>'0');
 
-    axilSlaveRegisterR(toSlv( 0,8), 0, v.irq);
+    axilSlaveRegisterR(toSlv( 0,8), 0, r.irq);
     axilSlaveRegisterW(toSlv( 4,8), 0, v.irq_en);
     axilSlaveRegisterR(toSlv(32,8), 0, prsnt_m2c_l);
     axilSlaveRegisterR(toSlv(32,8), 1, pg_m2c);
@@ -256,6 +256,7 @@ begin
 
     rin <= v;
 
+    irq_out             <= r.irq_out;
     mAxilWriteSlaves(0) <= r.axilWriteSlave;
     mAxilReadSlaves (0) <= r.axilReadSlave;
   end process comb;

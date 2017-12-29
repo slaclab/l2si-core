@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2016-01-04
--- Last update: 2017-12-13
+-- Last update: 2017-12-29
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -191,6 +191,12 @@ architecture mapping of QuadAdcEvent is
   
   constant AXIL_XBAR_CONFIG_C : AxiLiteCrossbarMasterConfigArray(NCHAN_C-1 downto 0) := AxilCrossbarConfig;
 
+  constant NSTREAMS_C : integer := FEX_ALGORITHMS(0)'length;
+  constant NRAM_C     : integer := NCHAN_C * NSTREAMS_C;
+  signal chBramWr : BRamWriteMasterArray(NRAM_C-1 downto 0);
+  signal chBramRd : BRamReadMasterArray (NRAM_C-1 downto 0);
+  signal chBRamSl : BRamReadSlaveArray  (NRAM_C-1 downto 0);
+  
   constant DEBUG_C : boolean := false;
 
   component ila_0
@@ -269,6 +275,7 @@ begin  -- mapping
           iadc(i)(k)(j) <= iadcs(i)(j)(k);
         end generate GEN_SHIFT;
         GEN_NOSHIFT : if not APPLY_SHIFT_C generate
+          adcs(i)(j)(k) <= '0'; -- suppress warnings
           iadc(i)(k)(j) <= adc(i).data(k)(j);
         end generate GEN_NOSHIFT;
       end generate GEN_IADC;
@@ -311,6 +318,22 @@ begin  -- mapping
                  valid  => pllSyncV(i) );
 
 --      This is the large buffer.
+    GEN_RAM : for j in 0 to NSTREAMS_C-1 generate
+      U_RAM : entity work.SimpleDualPortRam
+        generic map ( DATA_WIDTH_G => 16*ROW_SIZE,
+                      ADDR_WIDTH_G => RAM_ADDR_WIDTH_C )
+        port map ( clka   => dmaClk,
+                   ena    => '1',
+                   wea    => chBramWr(i*NSTREAMS_C+j).en,
+                   addra  => chBramWr(i*NSTREAMS_C+j).addr,
+                   dina   => chBramWr(i*NSTREAMS_C+j).data,
+                   clkb   => dmaClk,
+                   enb    => chBramRd(i*NSTREAMS_C+j).en,
+                   rstb   => dmaRst,
+                   addrb  => chBramRd(i*NSTREAMS_C+j).addr,
+                   doutb  => chBramSl(i*NSTREAMS_C+j).data );
+    end generate;
+    
     U_FIFO : entity work.QuadAdcChannelFifo
       generic map ( BASE_ADDR_C => AXIL_XBAR_CONFIG_C(i).baseAddr,
                     AXIS_CONFIG_G => CHN_AXIS_CONFIG_C,
@@ -332,6 +355,11 @@ begin  -- mapping
                  status          => cacheStatus(i),
                  axisMaster      => chmasters(i),
                  axisSlave       => chslaves (i),
+                 -- BRAM Interface (dmaClk domain)
+                 bramWriteMaster => chBramWr((i+1)*NSTREAMS_C-1 downto i*NSTREAMS_C),
+                 bramReadMaster  => chBramRd((i+1)*NSTREAMS_C-1 downto i*NSTREAMS_C),
+                 bramReadSlave   => chBramSl((i+1)*NSTREAMS_C-1 downto i*NSTREAMS_C),
+                 -- AXI-Lite Interface
                  axilClk         => axilClk,
                  axilRst         => axilRst,
                  axilReadMaster  => mAxilReadMasters (i),
@@ -386,7 +414,7 @@ begin  -- mapping
                  eventTrig(23 downto 16) => r.trig(2),
                  eventTrig(15 downto  8) => r.trig(1),
                  eventTrig( 7 downto  0) => r.trig(0),
-                 chenable    => configA.enable,
+                 chenable    => configA.enable(NCHAN_C-1 downto 0),
                  chmasters   => chmasters,
                  chslaves    => chslaves,
                  dmaMaster   => dmaMaster(0),

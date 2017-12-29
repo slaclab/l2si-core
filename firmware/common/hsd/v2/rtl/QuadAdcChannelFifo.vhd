@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2016-01-04
--- Last update: 2017-12-13
+-- Last update: 2017-12-29
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -60,6 +60,10 @@ entity QuadAdcChannelFifo is
     -- readout interface
     axisMaster      : out AxiStreamMasterType;
     axisSlave       :  in AxiStreamSlaveType;
+    -- RAM interface
+    bramWriteMaster : out BRamWriteMasterArray(ALGORITHM_G'range);
+    bramReadMaster  : out BRamReadMasterArray (ALGORITHM_G'range);
+    bramReadSlave   : in  BRamReadSlaveArray  (ALGORITHM_G'range);
     -- configuration interface
     axilClk         :  in sl;
     axilRst         :  in sl;
@@ -314,7 +318,12 @@ begin  -- mapping
                  nfree             => nfree           (i),
                  status            => cacheStatus     (i),
                  axisMaster        => axisMasters     (i),
-                 axisSlave         => rin.axisSlaves    (i),
+                 axisSlave         => rin.axisSlaves  (i),
+                 -- BRAM interface
+                 bramWriteMaster   => bramWriteMaster (i),
+                 bramReadMaster    => bramReadMaster  (i),
+                 bramReadSlave     => bramReadSlave   (i),
+                 --
                  axilReadMaster    => maxilReadMasters (i+1),
                  axilReadSlave     => maxilReadSlaves  (i+1),
                  axilWriteMaster   => maxilWriteMasters(i+1),

@@ -155,6 +155,39 @@ package QuadAdcPkg is
     dmaTest   => '0',
     trigShift => (others=>'0') );
 
+  type BRamWriteMasterType is record
+    en    : sl;
+    addr  : slv(RAM_ADDR_WIDTH_C-1 downto 0);
+    data  : slv(16*ROW_SIZE-1 downto 0);
+  end record;
+
+  constant BRAM_WRITE_MASTER_INIT_C : BRamWriteMasterType := (
+    en    => '0',
+    addr  => (others=>'0'),
+    data  => (others=>'0') );
+
+  type BRamWriteMasterArray is array(natural range<>) of BRamWriteMasterType;
+  
+  type BRamReadMasterType is record
+    en    : sl;
+    addr  : slv(RAM_ADDR_WIDTH_C-1 downto 0);
+  end record;
+
+  constant BRAM_READ_MASTER_INIT_C : BRamReadMasterType := (
+    en    => '0',
+    addr  => (others=>'0') );
+
+  type BRamReadMasterArray is array(natural range<>) of BRamReadMasterType;
+  
+  type BRamReadSlaveType is record
+    data  : slv(16*ROW_SIZE-1 downto 0);
+  end record;
+
+  constant BRAM_READ_SLAVE_INIT_C : BRamReadSlaveType := (
+    data  => (others=>'0') );
+
+  type BRamReadSlaveArray is array(natural range<>) of BRamReadSlaveType;
+  
   constant QUAD_ADC_EVENT_TAG : slv(15 downto 0) := X"0000";
   constant QUAD_ADC_DIAG_TAG  : slv(15 downto 0) := X"0001";
 

@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2016-01-04
--- Last update: 2017-11-13
+-- Last update: 2017-12-29
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -63,6 +63,10 @@ entity hsd_fex_wrapper is
     -- readout interface
     axisMaster      : out AxiStreamMasterType;
     axisSlave       :  in AxiStreamSlaveType;
+    -- BRAM interface (clk domain)
+    bramWriteMaster : out BRamWriteMasterType;
+    bramReadMaster  : out BRamReadMasterType;
+    bramReadSlave   : in  BRamReadSlaveType;
     -- configuration interface
     axilReadMaster  :  in AxiLiteReadMasterType;
     axilReadSlave   : out AxiLiteReadSlaveType;
@@ -95,6 +99,8 @@ architecture mapping of hsd_fex_wrapper is
     wraddr     : slv(RAM_ADDR_WIDTH_C-1 downto 0);
     free       : slv     (15 downto 0);
     nfree      : slv     ( 4 downto 0);
+    bramWr     : BramWriteMasterType;
+    bramRd     : BramReadMasterType;
     axisMaster : AxiStreamMasterType;
   end record;
   constant REG_INIT_C : RegType := (
@@ -116,6 +122,8 @@ architecture mapping of hsd_fex_wrapper is
     wraddr     => (others=>'0'),
     free       => (others=>'0'),
     nfree      => (others=>'0'),
+    bramWr     => BRAM_WRITE_MASTER_INIT_C,
+    bramRd     => BRAM_READ_MASTER_INIT_C,
     axisMaster => AXI_STREAM_MASTER_INIT_C );
 
   signal r    : RegType := REG_INIT_C;
@@ -145,7 +153,16 @@ architecture mapping of hsd_fex_wrapper is
 begin
 
   status <= r.cache;
+  
+  bramWriteMaster.en   <= '1';
+  bramWriteMaster.addr <= r.wraddr;
+  bramWriteMaster.data <= wrdata;
 
+  bramReadMaster.en    <= '1';
+  bramReadMaster.addr  <= r.rdaddr;
+
+  rddata <= bramReadSlave.data;
+  
   GEN_DEBUG : if DEBUG_C generate
     process (r, tout) is
     begin
@@ -190,19 +207,19 @@ begin
                asyncRst => configSynct,
                syncRst  => configSync );
   
-  U_RAM : entity work.SimpleDualPortRam
-    generic map ( DATA_WIDTH_G => 16*ROW_SIZE,
-                  ADDR_WIDTH_G => rdaddr'length )
-    port map ( clka   => clk,
-               ena    => '1',
-               wea    => '1',
-               addra  => r.wraddr,
-               dina   => wrdata,
-               clkb   => clk,
-               enb    => '1',
-               rstb   => rst,
-               addrb  => rdaddr,
-               doutb  => rddata );
+  --U_RAM : entity work.SimpleDualPortRam
+  --  generic map ( DATA_WIDTH_G => 16*ROW_SIZE,
+  --                ADDR_WIDTH_G => rdaddr'length )
+  --  port map ( clka   => clk,
+  --             ena    => '1',
+  --             wea    => '1',
+  --             addra  => r.wraddr,
+  --             dina   => wrdata,
+  --             clkb   => clk,
+  --             enb    => '1',
+  --             rstb   => rst,
+  --             addrb  => rdaddr,
+  --             doutb  => rddata );
   
   comb : process( r, rst, lopen, lskip, lclose, lphase, l1in, l1ina,
                   tout, dout, douten, rddata, maxisSlave ) is
