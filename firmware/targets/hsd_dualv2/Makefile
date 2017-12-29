@@ -1,12 +1,15 @@
 export GIT_BYPASS = 1
 
+export REMOVE_UNUSED_CODE = 1
+
 # Define target output
 target: prom
 
 # Define Firmware Version Number
 #  PRJ_VERSION 00000000 : LCLS-I implementation
 #  PRJ_VERSION 00000001 : LCLS-II implementation (generic in hsd_dual.vhd)
-export PRJ_VERSION = 000000001
+#  PRJ_VERSION 00000002 : factored out BRAM interface
+export PRJ_VERSION = 000000002
 
 # Define target part
 export PRJ_PART = XCKU085-FLVB1760-2-E

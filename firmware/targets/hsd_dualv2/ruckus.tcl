@@ -6,7 +6,8 @@
 source -quiet $::env(RUCKUS_DIR)/vivado_proc.tcl
 
 # Load submodules' code and constraints
-set SURF_DIR /u1/weaver/surf
+set SURF_DIR /u1/weaver/pgp-gen4-pcie-axis/firmware/submodules/surf
+#set SURF_DIR /u1/weaver/surf
 #loadRuckusTcl /u1/weaver/surf
 #loadRuckusTcl "$::SURF_DIR/axi"        "quiet"
 loadRuckusTcl "${SURF_DIR}/base"       "quiet"
