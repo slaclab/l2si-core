@@ -26,6 +26,7 @@ use ieee.std_logic_unsigned.all;
 library work;
 use work.StdRtlPkg.all;
 use work.AxiStreamPkg.all;
+use work.SsiPkg.all;
 use work.TimingPkg.all;
 
 package QuadAdcPkg is
@@ -62,8 +63,40 @@ package QuadAdcPkg is
   
   type AdcDataArray is array(natural range<>) of AdcData;
 
-  type QuadAdcFex is ( F_SAMPLE, F_SUM );
+  constant MAX_STREAMS_C : integer := 4;
+  subtype STREAMS_RG is natural range MAX_STREAMS_C-1 downto 0;
+  type FexConfigType is record
+    fexEnable    : slv       (STREAMS_RG);
+    fexPrescale  : Slv10Array(STREAMS_RG);
+    fexPreCount  : Slv10Array(STREAMS_RG);
+    fexBegin     : Slv14Array(STREAMS_RG);
+    fexLength    : Slv14Array(STREAMS_RG);
+    aFull        : Slv16Array(STREAMS_RG);
+    aFullN       : Slv5Array (STREAMS_RG);
+  end record;
 
+  constant FEX_CONFIG_INIT_C : FexConfigType := (
+    fexEnable    => (others=>'0'),
+    fexPrescale  => (others=>(others=>'0')),
+    fexPreCount  => (others=>(others=>'0')),
+    fexBegin     => (others=>(others=>'0')),
+    fexLength    => (others=>(others=>'0')),
+    aFull        => (others=>(others=>'0')),
+    aFullN       => (others=>(others=>'0')) );
+
+  type FexConfigArray is array(natural range<>) of FexConfigType;
+
+  type FexStatusType is record
+    free  : slv(15 downto 0);
+    nfree : slv( 4 downto 0);
+  end record;
+
+  constant FEX_STATUS_INIT_C : FexStatusType := (
+    free  => (others=>'0'),
+    nfree => (others=>'0') );
+
+  type FexStatusArray is array(natural range<>) of FexStatusType;
+  
   --
   --  Event Buffer Handling
   --
@@ -187,6 +220,8 @@ package QuadAdcPkg is
     data  => (others=>'0') );
 
   type BRamReadSlaveArray is array(natural range<>) of BRamReadSlaveType;
+
+  constant ILV_AXIS_CONFIG_C : AxiStreamConfigType := ssiAxiStreamConfig(16);
   
   constant QUAD_ADC_EVENT_TAG : slv(15 downto 0) := X"0000";
   constant QUAD_ADC_DIAG_TAG  : slv(15 downto 0) := X"0001";
