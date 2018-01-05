@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-07-10
--- Last update: 2017-10-22
+-- Last update: 2018-01-05
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -57,8 +57,8 @@ architecture top_level_app of hsd_dualv2_sim is
     -- DMA
    signal dmaClk            : sl;
    signal dmaRst            : sl;
-   signal dmaIbMaster       : AxiStreamMasterArray(4 downto 0);
-   signal dmaIbSlave        : AxiStreamSlaveArray (4 downto 0) := (others=>AXI_STREAM_SLAVE_FORCE_C);
+   signal dmaIbMaster       : AxiStreamMasterArray(3 downto 0);
+   signal dmaIbSlave        : AxiStreamSlaveArray (3 downto 0) := (others=>AXI_STREAM_SLAVE_FORCE_C);
 
    signal phyClk            : sl;
    signal adcO              : AdcDataArray(NCHAN_C-1 downto 0);
@@ -278,7 +278,7 @@ begin
   begin
     axilDone <= '0';
     wait until regRst='0';
-    wait for 200 ns;
+    wait for 1200 ns;
     wreg(16,x"00000000"); -- prescale
     wreg(20,x"00800004"); -- fexLength/Delay
     wreg(24,x"00040C00"); -- almostFull
@@ -316,12 +316,13 @@ begin
      end procedure;
   begin
     wait until regRst='0';
-    wait for 200 ns;
+    wait for 1200 ns;
     wreg(16,x"00000010");
     wreg(16,x"00000000");
     wreg(20,x"40000000");
     wreg(24,x"00000001");
     wreg(28,x"00000100");
+    wait until axilDone='1';
     wreg(16,x"80000000");
     wait;
   end process;
