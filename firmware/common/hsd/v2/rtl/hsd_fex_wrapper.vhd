@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2016-01-04
--- Last update: 2017-12-29
+-- Last update: 2018-01-05
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -49,6 +49,7 @@ entity hsd_fex_wrapper is
   port (
     clk             :  in sl;
     rst             :  in sl;
+    clear           :  in sl;
     din             :  in Slv11Array(7 downto 0);  -- row of data
     lopen           :  in sl;                      -- begin sampling
     lskip           :  in sl;                      -- skip sampling (cache
@@ -221,7 +222,7 @@ begin
   --             addrb  => rdaddr,
   --             doutb  => rddata );
   
-  comb : process( r, rst, lopen, lskip, lclose, lphase, l1in, l1ina,
+  comb : process( r, clear, lopen, lskip, lclose, lphase, l1in, l1ina,
                   tout, dout, douten, rddata, maxisSlave ) is
     variable v : RegType;
     variable n : integer range 0 to 2*ROW_SIZE-1;
@@ -356,7 +357,7 @@ begin
             end if;
             v.axisMaster.tData(31) := r.cache(i).ovflow;
             v.axisMaster.tData( 39 downto  32) := resize(r.cache(i).baddr(IDX_BITS-1 downto 0),8);
-            v.axisMaster.tData( 47 downto  40) := resize(r.cache(i).eaddr(IDX_BITS-1 downto 0),8);
+            v.axisMaster.tData( 47 downto  40) := toSlv(8-conv_integer(r.cache(i).eaddr(IDX_BITS-1 downto 0)),8);
             v.axisMaster.tData( 63 downto  48) := toSlv(i,16);
             v.axisMaster.tData( 95 downto  64) := resize(r.cache(i).toffs,32);
             v.axisMaster.tData(111 downto  96) := resize(r.cache(i).baddr,16);
@@ -429,7 +430,7 @@ begin
       v.rdtail := r.cache(i).baddr(r.rdaddr'left+IDX_BITS downto IDX_BITS);
     end if;
       
-    if rst='1' then
+    if clear='1' then
       v := REG_INIT_C;
     end if;
 

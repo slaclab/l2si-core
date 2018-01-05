@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2016-01-04
--- Last update: 2017-12-13
+-- Last update: 2018-01-02
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -394,13 +394,15 @@ begin
                dataIn  => evrBus.strobe,
                dataOut => dmaStrobe );
 
-  Sync_dmaRst : process (idmaRst, dmaClk, dmaStrobe, adcSyncLocked) is
+  Sync_dmaRst : process (dmaClk, adcSyncLocked) is
   begin
     adcSyncReg(31) <= adcSyncLocked;
     adcSyncReg(30 downto 0) <= (others=>'0');
     if rising_edge(dmaClk) then
       dmaRstI <= dmaRstI(dmaRstI'left-1 downto 0) & dmaRstI(0);
-      if idmaRst='0' and dmaStrobe='1' then
+      if idmaRst='1' then
+        dmaRstI(0) <= '1';
+      elsif dmaStrobe='1' then
         dmaRstI(0) <= '0';
       end if;
     end if;

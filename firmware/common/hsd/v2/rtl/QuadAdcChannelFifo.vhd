@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2016-01-04
--- Last update: 2017-12-29
+-- Last update: 2018-01-05
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -290,7 +290,7 @@ begin  -- mapping
 
     U_GATE : entity work.FexGate
       port map ( clk     => clk,
-                 rst     => clear,
+                 rst     => rst,
                  start   => r.start    (i),
                  handle  => r.skip     (i),
                  fbegin  => r.fexBegin (i),
@@ -306,7 +306,8 @@ begin  -- mapping
 --                    DEBUG_G       => false )
 --                    DEBUG_G       => DEBUG_G )
       port map ( clk               => clk,
-                 rst               => clear,
+                 rst               => rst,
+                 clear             => clear,
                  din               => din,
                  lopen             => lopen(i),
                  lskip             => lskip(i),

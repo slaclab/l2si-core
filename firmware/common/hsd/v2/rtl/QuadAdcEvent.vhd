@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2016-01-04
--- Last update: 2017-12-29
+-- Last update: 2018-01-05
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -110,6 +110,7 @@ architecture mapping of QuadAdcEvent is
   type RegType is record
     full     : sl;
     afull    : sl;
+    clear    : sl;
     start    : sl;
     syncState: SyncStateType;
     adcShift : slv(2 downto 0);
@@ -126,6 +127,7 @@ architecture mapping of QuadAdcEvent is
   constant REG_INIT_C : RegType := (
     full      => '0',
     afull     => '0',
+    clear     => '1',
     start     => '0',
     syncState => S_SHIFT_S,
     adcShift  => (others=>'0'),
@@ -342,7 +344,7 @@ begin  -- mapping
 --                    DEBUG_G     => false )
       port map ( clk      => dmaClk,
                  rst      => dmaRst,
-                 clear    => dmaRst,
+                 clear    => r.clear,
                  start    => r.start,
                  shift    => r.adcShift,
                  din      => iadc(i),
@@ -493,6 +495,8 @@ begin  -- mapping
       v.trig    := r.trigd2 & r.trig(r.trig'left downto 1);
       v.trigCnt := r.trigCnt+1;
     end if;
+
+    v.clear := not configA.acqEnable;
     
     v.start := '0';
     case (r.syncState) is
