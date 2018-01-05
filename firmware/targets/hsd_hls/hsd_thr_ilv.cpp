@@ -1,15 +1,29 @@
-#include "hsd_thr_v2.h"
+#include "hsd_thr_ilv.h"
+
+#define XTOY(x__v)  \
+  ((ap_fixed<64,64>((x__v >>  0) & 0x7ff) <<  0) |  \
+   (ap_fixed<64,64>((x__v >> 11) & 0x7ff) << 16) |  \
+   (ap_fixed<64,64>((x__v >> 22) & 0x7ff) << 32) |  \
+   (ap_fixed<64,64>((x__v >> 33) & 0x7ff) << 48) )
+// #define SKIP(s) \
+//   ap_fixed<64,64>(((0x8000ULL | ((s)&0x7fff)) <<  0) | \
+//                   ((0x8000ULL | ((s)&0x7fff)) << 16) | \
+//                   ((0x8000ULL | ((s)&0x7fff)) << 32) | \
+//                   ((0x8000ULL | ((s)&0x7fff)) << 48) )
+#define SKIP(s) ap_fixed<64,64>(0x8000800080008000ULL | ((4*(s))&0x7fff))
+#define SKIPT(s) ap_fixed<64,64>(0x8001800180018001ULL | ((4*(s))&0x7fff))
 
 //  AMAX : cache depth of sample groups (8 ADC samples per group)
 #define AMAX 16
-#define PSET(v) y##v=ap_fixed<16,16>(xsave##v[raddr%AMAX]) & 0x7ff;
+#define PSET(v) y##v=XTOY(xsave##v[raddr%AMAX]);
 #define TSET(v) to##v=tsave##v[raddr%AMAX];
-#define PSSH(u,v) y##u=ap_fixed<16,16>(xsave##v[raddr%AMAX]) & 0x7ff;
+#define PSSH(u,v) y##u=XTOY(xsave##v[raddr%AMAX]);
 #define TSSH(u,v) to##u=tsave##v[raddr%AMAX];
 
-#define PTEST(v) { unsigned xv = unsigned(x##v)&0x7ff; lkeep |= (xv < xlo || xv > xhi); }
+#define PTEST_I(v,i) { unsigned xv = (ap_fixed<64,64>(x##v)>>(11*i))&0x7ff; lkeep |= (xv < xlo || xv > xhi); }
+#define PTEST(v) { PTEST_I(v,0); PTEST_I(v,1); PTEST_I(v,2); PTEST_I(v,3); }
 
-#define AINIT(v) static adcin_t xsave##v[AMAX];
+#define AINIT(v) static adci_t xsave##v[AMAX];
 #define ASAVE(v) xsave##v[waddr%AMAX] = x##v;
 #define ARES(v)  DO_PRAGMA(HLS RESOURCE variable=xsave##v core=RAM_2P)
 #define ADEP(v)  DO_PRAGMA(HLS DEPENDENCE variable=xsave##v inter WAR false)
@@ -28,16 +42,16 @@
 //
 //   Pass individual arguments rather than an array to avoid memory access semantics
 //
-void hsd_thr(bool sync,
-             PROC_IN(XARG)  // input adc data
-             PROC_IN(TIARG)  // input trigger data
-             PROC_OUT(YARG)  // "y" outputs (16 values)
-             PROC_OUT(TOARG) // trigger outputs (9 values)
-             ap_fixed<4,4>& yv,
-             int config_a,  // low band
-             int config_b,  // high band
-             int config_c,  // early margin / presamples
-             int config_d)  // late margin / postsamples
+void hsd_thr_ilv(bool sync,
+                 PROC_IN(XARG)  // input adc data
+                 PROC_IN(TIARG)  // input trigger data
+                 PROC_OUT(YARG)  // "y" outputs (16 values)
+                 PROC_OUT(TOARG) // trigger outputs (9 values)
+                 ap_fixed<4,4>& yv,
+                 int config_a,  // low band
+                 int config_b,  // high band
+                 int config_c,  // early margin / presamples
+                 int config_d)  // late margin / postsamples
 {
   //  Require full pipelining (new data every clock cycle)
 #pragma HLS PIPELINE II=1
@@ -116,7 +130,7 @@ void hsd_thr(bool sync,
     if ((nopen || lopening) && lout) {
       if (lskipped) {
         // skip to the first position
-        y0 = 0x8000 | ((dcount-1)&0x7fff);
+        y0 = SKIP(dcount-1);
         to0 = 0;
         PROC_SHIFT(PSSH);
         PROC_SHIFT(TSSH);
@@ -125,7 +139,7 @@ void hsd_thr(bool sync,
       else {
         PROC_IN(PSET);
         PROC_IN(TSET);
-        y8  = ap_fixed<16,16>(xsave7[raddr%AMAX])&0x7ff;
+        y8 = XTOY(xsave7[raddr%AMAX]);
         to8 = tsave7[raddr%AMAX];
         yv = 8;
       }
@@ -134,7 +148,7 @@ void hsd_thr(bool sync,
     }
     else if (lopening) {
       // skip to the opening position
-      y0 = 0x8000 | ((dcount+iopen)&0x7fff);
+      y0 = SKIPT(dcount+iopen);
       to0 = lclosing ? 3 : 1;
       PROC_SHIFT(PSSH);
       PROC_SHIFT(TSSH);
@@ -144,7 +158,7 @@ void hsd_thr(bool sync,
     }
     else if (lclosing || dcount >= SKIP_THR) {
       // skip to the first position
-      y0 = 0x8000 | (dcount&0x7fff);
+      y0 = SKIP(dcount);
       to0 = lclosing ? 2 : 0;
       PROC_SHIFT(PSSH);
       PROC_SHIFT(TSSH);
@@ -153,7 +167,7 @@ void hsd_thr(bool sync,
       lskipped = true;
     }
     else {
-      y0 = 0x8000 | ((dcount-1)&0x7fff);
+      y0 = SKIP(dcount-1);  // just a filler
       to0 = 0;
       PROC_SHIFT(PSSH);
       PROC_SHIFT(TSSH);
@@ -165,8 +179,14 @@ void hsd_thr(bool sync,
     raddr++;
     waddr++;
 
-    if (lopening) nopen++;
-    if (lclosing) nopen--;
+    // if (lopening) nopen++;
+    // if (lclosing) nopen--;
+    if (lopening) {
+      if (!lclosing) nopen++;
+    }
+    else {
+      if (lclosing) nopen--;
+    }
 
     count += 8;
   }

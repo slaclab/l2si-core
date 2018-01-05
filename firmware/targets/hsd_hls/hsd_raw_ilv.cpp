@@ -1,8 +1,14 @@
-#include "hsd_raw_v2.h"
+#include "hsd_raw_ilv.h"
 
-#define PSET(v)  y##v=ap_fixed<16,16>(x##v) & 0x7ff;
+#define XTOY(x__v)  \
+  ((ap_fixed<64,64>((x__v >>  0) & 0x7ff) <<  0) |  \
+   (ap_fixed<64,64>((x__v >> 11) & 0x7ff) << 16) |  \
+   (ap_fixed<64,64>((x__v >> 22) & 0x7ff) << 32) |  \
+   (ap_fixed<64,64>((x__v >> 33) & 0x7ff) << 48) )
+
+#define PSET(v)  y##v=XTOY(x##v);
 #define TSET(v)  to##v=ti##v;
-#define PSSH(u,v)  y##u=ap_fixed<16,16>(x##v) & 0x7ff;
+#define PSSH(u,v)  y##u=XTOY(x##v);
 #define TSSH(u,v)  to##u=ti##v;
 #define OPENTEST(v) if (unsigned(ti##v)&1) lopening=true;
 #define CLOSTEST(v) if (unsigned(ti##v)&2) lclosing=true;
@@ -58,7 +64,12 @@ void hsd_raw_ilv(bool sync,
     if (lskipped) {
       // skip to the first position
       int dcount = count-count_last;
-      y0  = 0x8000 | ((dcount-1)&0x7fff);
+      y0  = 
+        ((0x8000ULL | ((dcount-1)&0x7fff)) <<  0) |
+        ((0x8000ULL | ((dcount-1)&0x7fff)) << 16) |
+        ((0x8000ULL | ((dcount-1)&0x7fff)) << 32) |
+        ((0x8000ULL | ((dcount-1)&0x7fff)) << 48);
+
       to0 = 0;
       // insert data
       PROC_SHIFT(PSSH);
@@ -79,7 +90,7 @@ void hsd_raw_ilv(bool sync,
     else if (nopen) {
       PROC_IN(PSET);
       PROC_IN(TSET);
-      y8 = ap_fixed<16,16>(x7) & 0x7ff;
+      y8 = XTOY(x7);
       to8 = 0;
       yv = 8;
       count_last = count+7;
@@ -88,7 +99,7 @@ void hsd_raw_ilv(bool sync,
     else {
       PROC_IN(PSET);
       PROC_IN(TSET);
-      y8 = ap_fixed<16,16>(x7) & 0x7ff;
+      y8 = XTOY(x7);
       to8 = 0;
       yv = 0;
       lskipped = true;
