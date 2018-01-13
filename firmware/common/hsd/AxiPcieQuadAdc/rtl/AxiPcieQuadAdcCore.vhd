@@ -5,7 +5,7 @@
 -- Author     : Larry Ruckman  <ruckman@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2016-02-12
--- Last update: 2017-12-13
+-- Last update: 2018-01-12
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -558,7 +558,7 @@ begin
          TPD_G             => TPD_G,
          TPGEN_G           => false,
          ASYNC_G           => false,
-         CLKSEL_MODE_G     => ite(LCLSII_G,"LCLS-II","LCLS-I"),
+         CLKSEL_MODE_G     => ite(LCLSII_G,"LCLSII","LCLSI"),
 --         PROG_DELAY_G      => true,
          AXIL_BASE_ADDR_G  => TIM_ADDR_C,
          AXIL_ERROR_RESP_G => AXI_RESP_DECERR_C,
