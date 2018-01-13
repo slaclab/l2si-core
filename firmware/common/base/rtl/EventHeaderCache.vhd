@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-07-10
--- Last update: 2017-12-22
+-- Last update: 2018-01-05
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -108,10 +108,12 @@ architecture rtl of EventHeaderCache is
   signal wr_in : WrRegType;
 
   type RdRegType is record
+    valid  : sl;
     cntRdF : slv( 3 downto 0);
   end record;
 
   constant RD_REG_INIT_C : RdRegType := (
+    valid  => '0',
     cntRdF => (others=>'0') );
 
   signal rd    : RdRegType := RD_REG_INIT_C;
@@ -131,6 +133,7 @@ architecture rtl of EventHeaderCache is
   signal ip           : integer;
   signal ptag         : slv(4 downto 0);
   signal hdrWe        : sl;
+  signal ivalid       : sl;
 begin
 
   --  trigger bus
@@ -152,6 +155,7 @@ begin
   hdrOut.l1t        <= doutb(159 downto 144);
   pmsg             <= doutf(5);
   phdr             <= doutf(6);
+  valid            <= rd.valid and ivalid;
   
   GEN_GROUPS : for i in 0 to NPartitions-1 generate
     gword(i) <= '1' when (toPartitionWord(expt_aligned.message.partitionWord(i)).l0a='1') else
@@ -213,7 +217,7 @@ begin
                rd_en           => advance,
                rd_data_count   => rd_data_count,
                dout            => doutf,
-               valid           => valid );
+               valid           => ivalid );
 
   U_SPartition : entity work.SynchronizerVector
     generic map ( WIDTH_G => 3 )
@@ -295,11 +299,13 @@ begin
     end if;
   end process;
 
-  rdcomb : process( rd, rdrst, advance, rd_data_count ) is
+  rdcomb : process( rd, rdrst, advance, rd_data_count, ivalid ) is
     variable v  : RdRegType;
   begin
     v := rd;
 
+    v.valid := ivalid;
+    
     if advance = '1' then
       v.cntRdF := rd_data_count;
     end if;
