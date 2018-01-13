@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-07-10
--- Last update: 2018-01-05
+-- Last update: 2018-01-10
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -30,6 +30,7 @@ use ieee.std_logic_textio.all;
 use work.StdRtlPkg.all;
 use work.AxiLitePkg.all;
 use work.AxiStreamPkg.all;
+use work.AxiPkg.all;
 use work.TimingPkg.all;
 use work.TPGPkg.all;
 use work.QuadAdcPkg.all;
@@ -61,6 +62,7 @@ architecture top_level_app of hsd_dualv2_sim is
    signal dmaIbSlave        : AxiStreamSlaveArray (3 downto 0) := (others=>AXI_STREAM_SLAVE_FORCE_C);
 
    signal phyClk            : sl;
+   signal refTimingClk      : sl;
    signal adcO              : AdcDataArray(NCHAN_C-1 downto 0);
    signal trigIn            : Slv8Array(3 downto 0);
    signal trigSel, trigSlot : sl;
@@ -110,7 +112,15 @@ architecture top_level_app of hsd_dualv2_sim is
    signal cfgReadMaster     : AxiLiteReadMasterType := AXI_LITE_READ_MASTER_INIT_C;
    signal cfgReadSlave      : AxiLiteReadSlaveType;
    signal timingFb          : TimingPhyType;
-   
+
+   constant DMA_AXIS_CONFIG_C : AxiStreamConfigType := ssiAxiStreamConfig(16);
+
+   signal txSimMasters : AxiStreammasterArray(7 downto 0);
+   signal txSimLWM     : AxiLiteWriteMasterType := AXI_LITE_WRITE_MASTER_INIT_C;
+   signal txSimLWS     : AxiLiteWriteSlaveType;
+   signal txSimLRM     : AxiLiteReadMasterType := AXI_LITE_READ_MASTER_INIT_C;
+   signal txSimLRS     : AxiLiteReadSlaveType;
+
 begin
 
    dmaData <= dmaIbMaster(0).tData(dmaData'range);
@@ -118,7 +128,6 @@ begin
 
    U_QIN : entity work.AdcRamp
 --   U_QIN : entity work.AdcStrobe
-     generic map ( NCHAN_C => NCHAN_C )
      port map ( phyClk   => phyClk,
                 dmaClk   => dmaClk,
                 ready    => axilDone,
@@ -126,13 +135,9 @@ begin
                 trigSel  => trigSel,
                 trigOut  => trigIn );
 
-  process is
-   begin
-     phyClk <= '1';
-     wait for 0.4 ns;
-     phyClk <= '0';
-     wait for 0.4 ns;
-   end process;
+   U_ClkSim : entity work.ClkSim
+     port map ( phyClk   => phyClk,
+                evrClk   => refTimingClk );
 
    process is
    begin
@@ -154,8 +159,10 @@ begin
    end process;
      
    U_XPM : entity work.XpmSim
-     generic map ( RATE_DIV_G => 8 )
-     port map ( dsRxClk   => (others=>recTimingClk),
+     generic map ( USE_TX_REF => true,
+                   RATE_DIV_G => 8 )
+     port map ( txRefClk  => refTimingClk,
+                dsRxClk   => (others=>recTimingClk),
                 dsRxRst   => (others=>'0'),
                 dsRxData  => (others=>(others=>'0')),
                 dsRxDataK => (others=>"00"),
@@ -380,6 +387,71 @@ begin
     end loop;
     file_close(results);
   end process;
-     
+
+  U_RamFifo : entity work.RamFifo
+    generic map ( DMA_AXIS_CONFIG_C => DMA_AXIS_CONFIG_C )
+    port map ( axilClk         => regClk,
+               axilRst         => regRst,
+               axilReadMaster  => AXI_LITE_READ_MASTER_INIT_C,
+               axilWriteMaster => AXI_LITE_WRITE_MASTER_INIT_C,
+               ibClk           => dmaClk,
+               ibRst           => dmaRst,
+               ibMasters       => dmaIbMaster(3),
+               ibSlaves        => dmaIbSlave (3),
+               obSlaves        => AXI_STREAM_SLAVE_INIT_C,
+               memClk          => dmaClk,
+               memRst          => dmaRst,
+               memReady        => '1',
+               memWriteSlaves  => (others=>AXI_WRITE_SLAVE_FORCE_C),
+               memReadSlaves   => (others=>AXI_READ_SLAVE_FORCE_C) );
+
+  U_TxSim : entity work.AppTxSim
+    generic map ( DMA_AXIS_CONFIG_C => DMA_AXIS_CONFIG_C )
+    port map ( axilClk         => regClk,
+               axilRst         => regRst,
+               axilReadMaster  => txSimLRM,
+               axilReadSlave   => txSimLRS,
+               axilWriteMaster => txSimLWM,
+               axilWriteSlave  => txSimLWS,
+               --
+               clk             => dmaClk,
+               rst             => dmaRst,
+               saxisMasters    => (others=>AXI_STREAM_MASTER_INIT_C),
+               saxisSlaves     => open,
+               maxisMasters    => txSimMasters,
+               maxisSlaves     => (others=>AXI_STREAM_SLAVE_FORCE_C),
+               rxOpCodeEn      => (others=>'0'),
+               rxOpCode        => (others=>x"00"),
+               txFull          => open );
+
+   process is
+     procedure wreg(addr : integer; data : slv(31 downto 0)) is
+     begin
+       wait until regClk='0';
+       txSimLWM.awaddr  <= toSlv(addr,32);
+       txSimLWM.awvalid <= '1';
+       txSimLWM.wdata   <= data;
+       txSimLWM.wvalid  <= '1';
+       txSimLWM.bready  <= '1';
+       wait until regClk='1';
+       wait until txSimLWS.bvalid='1';
+       wait until regClk='0';
+       wait until regClk='1';
+       wait until regClk='0';
+       txSimLWM.awvalid <= '0';
+       txSimLWM.wvalid  <= '0';
+       txSimLWM.bready  <= '0';
+       wait for 50 ns;
+     end procedure;
+  begin
+    wait until regRst='0';
+    wait until dmaRst='0';
+    wait for 1200 ns;
+    wreg(256,x"40000000");
+    wreg(260,x"00000020");
+    wreg(256,x"40007f01");
+    wait;
+  end process;
+
 end top_level_app;
 
