@@ -100,8 +100,6 @@ architecture mapping of hsd_fex_wrapper is
     wraddr     : slv(RAM_ADDR_WIDTH_C-1 downto 0);
     free       : slv     (15 downto 0);
     nfree      : slv     ( 4 downto 0);
-    bramWr     : BramWriteMasterType;
-    bramRd     : BramReadMasterType;
     axisMaster : AxiStreamMasterType;
   end record;
   constant REG_INIT_C : RegType := (
@@ -123,8 +121,6 @@ architecture mapping of hsd_fex_wrapper is
     wraddr     => (others=>'0'),
     free       => (others=>'0'),
     nfree      => (others=>'0'),
-    bramWr     => BRAM_WRITE_MASTER_INIT_C,
-    bramRd     => BRAM_READ_MASTER_INIT_C,
     axisMaster => AXI_STREAM_MASTER_INIT_C );
 
   signal r    : RegType := REG_INIT_C;
@@ -160,7 +156,7 @@ begin
   bramWriteMaster.data <= wrdata;
 
   bramReadMaster.en    <= '1';
-  bramReadMaster.addr  <= r.rdaddr;
+  bramReadMaster.addr  <= rdaddr;
 
   rddata <= bramReadSlave.data;
   
