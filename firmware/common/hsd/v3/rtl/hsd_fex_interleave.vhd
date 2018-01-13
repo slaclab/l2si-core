@@ -88,12 +88,14 @@ architecture mapping of hsd_fex_interleave is
   type AxisRegType is record
     ireading   : slv(MAX_OVL_BITS_C-1 downto AXIS_SZ_BITS);
     rdaddr     : slv(RAM_ADDR_WIDTH_C-1 downto 0);
+    irdsel     : integer;
     axisMaster : AxiStreamMasterType;
   end record;
 
   constant AXIS_REG_INIT_C : AxisRegType := (
     ireading   => (others=>'0'),
     rdaddr     => (others=>'0'),
+    irdsel     => 0,
     axisMaster => AXI_STREAM_MASTER_INIT_C );
 
   type AxisRegArray is array(natural range<>) of AxisRegType;
@@ -160,19 +162,21 @@ begin
   status <= r.cache;
 
   GEN_FIFO : for i in 0 to AXIS_SIZE_G-1 generate
-    U_FIFO : entity work.AxiStreamFifoV2
-      generic map ( SLAVE_AXI_CONFIG_G  => SAXIS_CONFIG_C,
-                    MASTER_AXI_CONFIG_G => AXIS_CONFIG_G )
-      port map ( -- Slave Port
-        sAxisClk    => clk,
-        sAxisRst    => rst,
-        sAxisMaster => r.axisReg   (i).axisMaster,
-        sAxisSlave  => maxisSlave  (i),
-        -- Master Port
-        mAxisClk    => clk,
-        mAxisRst    => rst,
-        mAxisMaster => axisMaster  (i),
-        mAxisSlave  => axisSlave   (i) );
+    --U_FIFO : entity work.AxiStreamFifoV2
+    --  generic map ( SLAVE_AXI_CONFIG_G  => SAXIS_CONFIG_C,
+    --                MASTER_AXI_CONFIG_G => AXIS_CONFIG_G )
+    --  port map ( -- Slave Port
+    --    sAxisClk    => clk,
+    --    sAxisRst    => rst,
+    --    sAxisMaster => r.axisReg   (i).axisMaster,
+    --    sAxisSlave  => maxisSlave  (i),
+    --    -- Master Port
+    --    mAxisClk    => clk,
+    --    mAxisRst    => rst,
+    --    mAxisMaster => axisMaster  (i),
+    --    mAxisSlave  => axisSlave   (i) );
+    axisMaster(i) <= r.axisReg(i).axisMaster;
+    maxisSlave(i) <= axisSlave(i);
   end generate;
   
   GEN_CHAN : for j in 0 to 3 generate
@@ -362,10 +366,11 @@ begin
                 q.axisMaster.tData( 95 downto  64) := resize(r.cache(i).toffs,32);
                 q.axisMaster.tData(111 downto  96) := resize(r.cache(i).baddr,16);
                 q.axisMaster.tData(127 downto 112) := resize(r.cache(i).eaddr,16);
---                q.axisMaster.tKeep := genTKeep(16);
-                q.axisMaster.tKeep := genTKeep(64);  -- Drop the upper 48 bytes
+                q.axisMaster.tKeep := genTKeep(16);
+                ssiSetUserSof(AXIS_CONFIG_G, q.axisMaster, '1');
+--                q.axisMaster.tKeep := genTKeep(64);  -- Drop the upper 48 bytes
                                                      -- on the master side
-                ssiSetUserSof(SAXIS_CONFIG_C, q.axisMaster, '1');
+--                ssiSetUserSof(SAXIS_CONFIG_C, q.axisMaster, '1');
                 v.cache(i).state := READING_S;
                 if skip = '1' then
                   q.axisMaster.tLast := '1';
@@ -379,15 +384,23 @@ begin
             --  Continue streaming data from RAM
             --
             q.axisMaster.tValid := '1';
-            q.axisMaster.tData(rddata'range) := rddata;
-            q.axisMaster.tKeep := genTKeep(64);
-            ssiSetUserSof(SAXIS_CONFIG_C, q.axisMaster, '0');
-            if q.rdaddr = r.cache(i).eaddr(q.rdaddr'left+IDX_BITS downto IDX_BITS) then
-              q.axisMaster.tLast := '1';
-              v.cache(i) := CACHE_INIT_C;
-              q.ireading := q.ireading+1;
+--            q.axisMaster.tData(rddata'range) := rddata;
+--            q.axisMaster.tKeep := genTKeep(64);
+--            ssiSetUserSof(SAXIS_CONFIG_C, q.axisMaster, '0');
+            q.axisMaster.tData(127 downto 0) := rddata(q.irdsel*128+127 downto q.irdsel*128);
+            q.axisMaster.tKeep := genTKeep(16);
+            ssiSetUserSof(AXIS_CONFIG_G, q.axisMaster, '0');
+            if q.irdsel = 3 then
+              if q.rdaddr = r.cache(i).eaddr(q.rdaddr'left+IDX_BITS downto IDX_BITS) then
+                q.axisMaster.tLast := '1';
+                v.cache(i) := CACHE_INIT_C;
+                q.ireading := q.ireading+1;
+              end if;
+              q.rdaddr := q.rdaddr+1;
+              q.irdsel := 0;
+            else
+              q.irdsel := q.irdsel+1;
             end if;
-            q.rdaddr := q.rdaddr+1;
           end if;
         end if;
 

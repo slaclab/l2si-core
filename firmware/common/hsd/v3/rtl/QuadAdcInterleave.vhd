@@ -103,7 +103,7 @@ architecture mapping of QuadAdcInterleave is
 
   type PendArray is array(natural range<>) of PendType;
 
-  type AxisStateType is ( EHDR, FHDR0, FHDR1, FHDR2, FHDR3, PAYLOAD );
+  type AxisStateType is ( SHIFT_S, READ_S );
   
   type AxisRegType is record
     fexb       : slv(NSTREAMS_C-1 downto 0);
@@ -116,7 +116,7 @@ architecture mapping of QuadAdcInterleave is
   constant AXIS_REG_INIT_C : AxisRegType := (
     fexb       => (others=>'0'),
     fexn       => NSTREAMS_C-1,
-    axisState  => PAYLOAD,
+    axisState  => READ_S,
     axisMaster => AXI_STREAM_MASTER_INIT_C,
     axisSlaves => (others=>AXI_STREAM_SLAVE_INIT_C) );
   
@@ -366,13 +366,13 @@ begin  -- mapping
             if i mod AXIS_SIZE_G = j then
               if msgV = '1' then  -- first priority is to forward msg
                 q.axisMaster.tValid := '1';
-                if q.axisState = PAYLOAD then
-                  q.axisState := EHDR;
+                if q.axisState = READ_S then
+                  q.axisState := SHIFT_S;
                   q.axisMaster.tData(127 downto 0) := hdr(127 downto 0);
                   ssiSetUserSof( AXIS_CONFIG_G, q.axisMaster, '1');
                 else
                   v.hdrRd     := '1';
-                  q.axisState := PAYLOAD;
+                  q.axisState := READ_S;
                   q.axisMaster.tLast  := '1';
                   q.axisMaster.tData( 63 downto  0) := hdr(191 downto 128);
                   q.axisMaster.tData( 95 downto 64) := toSlv(IFMC_G,8) & toSlv(0,24);
@@ -388,7 +388,7 @@ begin  -- mapping
                                                       config.samples(17 downto 4) & toSlv(0,6);
                 q.axisMaster.tData(255 downto 224) := toSlv(0,29) & pllSync;
                 ssiSetUserSof( AXIS_CONFIG_G, q.axisMaster, '1');
-                q.axisState := EHDR;
+                q.axisState := SHIFT_S;
                 v.hdrV(i) := '0';
               elsif r.ropend(i).trigd = REJECT_T then
                 v.nread := r.nread+1;
@@ -396,32 +396,23 @@ begin  -- mapping
             end if;
           else
             q.fexn := q.fexn+1;
-            q.axisState := FHDR0;
+            q.axisState := READ_S;
           end if;
-        elsif q.axisState = EHDR then
+        elsif q.axisState = SHIFT_S then
           q.axisMaster.tValid := '1';
           q.axisMaster.tData(127 downto 0) := q.axisMaster.tData(255 downto 128);
-          q.axisState := FHDR0;
+          q.axisState := READ_S;
         elsif am(q.fexn).tValid='1' then
           q.axisSlaves(q.fexn).tReady := '1';
-          case q.axisState is
-            when FHDR1 => q.axisState := FHDR2;
-            when FHDR2 => q.axisState := FHDR3;
-            when FHDR3 => q.axisState := PAYLOAD;
-            when others =>
-              q.axisMaster.tValid := '1';
-              q.axisMaster.tLast  := '0';
-              q.axisMaster.tData  := am(q.fexn).tData;
-              if am(q.fexn).tLast='1' then
-                q.fexb(q.fexn) := '0';
-                if q.fexb=0 then
-                  q.axisMaster.tLast := '1';
-                end if;
-              end if;
-              if q.axisState = FHDR0 then
-                q.axisState := FHDR1;
-              end if;
-          end case;
+          q.axisMaster.tValid := '1';
+          q.axisMaster.tLast  := '0';
+          q.axisMaster.tData  := am(q.fexn).tData;
+          if am(q.fexn).tLast='1' then
+            q.fexb(q.fexn) := '0';
+            if q.fexb=0 then
+              q.axisMaster.tLast := '1';
+            end if;
+          end if;
         end if;
       end if;
       v.axisReg(j) := q;
