@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2016-01-04
--- Last update: 2017-08-18
+-- Last update: 2018-01-11
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -344,7 +344,8 @@ begin  -- mapping
     v.hdrRd   := '0';
     v.rdFifo  := (others=>'0');
     v.trigd1  := trigIn(0);
-    v.trigd2  := (r.trigd1 and configA.trigShift) or (trigIn(0) and not configA.trigShift);
+--    v.trigd2  := (r.trigd1 and configA.trigShift) or (trigIn(0) and not configA.trigShift);
+    v.trigd2  := r.trigd1;
     
     --v.datacnt := (others=>'0');
     --for i in 0 to NCHAN_C-1 loop

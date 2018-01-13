@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2016-01-04
--- Last update: 2017-12-12
+-- Last update: 2018-01-11
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -38,7 +38,6 @@ use work.QuadAdcPkg.all;
 entity QuadAdcCore is
   generic (
     TPD_G       : time    := 1 ns;
-    LCLSII_G    : boolean := TRUE;
     NFMC_G      : integer := 1;
     SYNC_BITS_G : integer := 4;
     DMA_SIZE_G  : integer := 1;
@@ -150,40 +149,23 @@ begin
                full       => (others=>'0'),
                phy        => timingFb );
 
-  GEN_EV1 : if not LCLSII_G generate
-    U_EventSel : entity work.QuadAdcEventV1Select
-      port map ( evrClk     => evrClk,
-                 evrRst     => evrRst,
-                 enabled    => configE.acqEnable,
-                 eventCode  => configE.rateSel(7 downto 0),
-                 delay      => configE.offset,
-                 evrBus     => evrBus,
-                 strobe     => trigSlot,
-                 oneHz      => open,
-                 eventSel   => eventSel,
-                 eventId    => eventId );
-    dmaHistDump <= '0';
-  end generate GEN_EV1;
+  U_EventSel : entity work.QuadAdcEventV1Select
+    port map ( evrClk     => evrClk,
+               evrRst     => evrRst,
+               enabled    => configE.acqEnable,
+               eventCode  => configE.rateSel(7 downto 0),
+               delay      => configE.offset,
+               evrBus     => evrBus,
+               strobe     => trigSlot,
+               oneHz      => open,
+               eventSel   => eventSel,
+               eventId    => eventId );
+  dmaHistDump <= '0';
 
-  GEN_EV2 : if LCLSII_G generate
-    U_EventSel : entity work.QuadAdcEventV2Select
-      port map ( evrClk     => evrClk,
-                 evrRst     => evrRst,
-                 config     => configE,
-                 evrBus     => evrBus,
-                 exptBus    => exptBus,
-                 strobe     => trigSlot,
-                 oneHz      => oneHz,
-                 eventSel   => eventSel,
-                 eventId    => eventId );
-
-    dmaHistDump <= oneHz and dmaHistEnaS;
-
-    Sync_dmaHistDump : entity work.SynchronizerOneShot
-      port map ( clk     => dmaClk,
-                 dataIn  => dmaHistDump,
-                 dataOut => dmaHistDumpS );
-  end generate GEN_EV2;
+  Sync_dmaHistDump : entity work.SynchronizerOneShot
+    port map ( clk     => dmaClk,
+               dataIn  => dmaHistDump,
+               dataOut => dmaHistDumpS );
 
   adcQ <= adc_test when configA.dmaTest='1' else
           adc;
