@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-07-10
--- Last update: 2017-10-16
+-- Last update: 2018-01-05
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -39,12 +39,14 @@ library unisim;
 use unisim.vcomponents.all;
 
 entity XpmSim is
-  generic ( ENABLE_DS_LINKS_G : slv(NDSLinks-1 downto 0) := (others=>'0');
+  generic ( USE_TX_REF        : boolean := false;
+            ENABLE_DS_LINKS_G : slv(NDSLinks-1 downto 0) := (others=>'0');
             ENABLE_BP_LINKS_G : slv(NBPLinks-1 downto 0) := (others=>'0');
             RATE_DIV_G        : integer := 4;
             RATE_SELECT_G     : integer := 1;
             PIPELINE_DEPTH_G  : integer := 200 );
-  port ( dsRxClk      : in  slv       (NDSLinks-1 downto 0);
+  port ( txRefClk     : in  sl := '0';
+         dsRxClk      : in  slv       (NDSLinks-1 downto 0);
          dsRxRst      : in  slv       (NDSLinks-1 downto 0);
          dsRxData     : in  Slv16Array(NDSLinks-1 downto 0);
          dsRxDataK    : in  Slv2Array (NDSLinks-1 downto 0);
@@ -139,15 +141,21 @@ begin
   end process;
 
   recTimingRst <= regRst;
-  
-  process is
-  begin
-    recTimingClk <= '0';
-    wait for 2.692 ns;
-    recTimingClk <= '1';
-    wait for 2.692 ns;
-  end process;
 
+  NOGEN_REFCLK : if USE_TX_REF=true generate
+    recTimingClk <= txRefClk;
+  end generate;
+
+  GEN_REFCLK : if USE_TX_REF=false generate
+    process is
+    begin
+      recTimingClk <= '0';
+      wait for 2.692 ns;
+      recTimingClk <= '1';
+      wait for 2.692 ns;
+    end process;
+  end generate;
+  
   dsTxClk <= (others=>recTimingClk);
   dsTxRst <= (others=>recTimingRst);
   bpTxClk <= recTimingClk;
