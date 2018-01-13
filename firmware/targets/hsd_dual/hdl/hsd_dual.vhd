@@ -178,8 +178,9 @@ begin  -- rtl
     generic map ( AXI_APP_BUS_EN_G => true,
                   DMA_SIZE_G       => DMA_SIZE_C,
                   AXIS_CONFIG_G    => DMA_AXIS_CONFIG_C,
+                  LCLSII_G         => LCLSII_C,
                   BUILD_INFO_G     => BUILD_INFO_G )
-   port map ( sysClk         => sysClk,
+    port map ( sysClk         => sysClk,
                sysRst         => sysRst,
                -- DMA Interfaces
                dmaClk      (0)=> dmaClk,
