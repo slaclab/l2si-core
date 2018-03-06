@@ -9,6 +9,7 @@ namespace Pds {
   namespace HSD {
     class AxiVersion;
     class TprCore;
+    class FexCfg;
 
     class Module {
     public:
@@ -16,6 +17,7 @@ namespace Pds {
       //  High level API
       //
       static Module* create(int fd);
+      static Module* create(int fd, TimingType);
       
       ~Module();
 
@@ -27,6 +29,8 @@ namespace Pds {
 
       //  Initialize busses
       void init();
+
+      unsigned ncards() const;
 
       //  Initialize clock tree and IO training
       void fmc_init          (TimingType =LCLS);
@@ -67,6 +71,10 @@ namespace Pds {
       void setRxAlignTarget(unsigned);
       void setRxResetLength(unsigned);
       void dumpRxAlign     () const;
+      void dumpPgp         () const;
+      void dumpBase        () const;
+
+      FexCfg* fex();
 
       //  Zero copy read semantics
       //      ssize_t dequeue(void*&);

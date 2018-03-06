@@ -29,6 +29,7 @@ namespace Pds {
       uint32_t          reserved;
       volatile uint32_t TxRefClks;
       volatile uint32_t BypassCnts;
+      volatile uint32_t Version;
     };
   };
 };

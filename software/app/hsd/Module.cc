@@ -7,6 +7,7 @@
 #include "hsd/Mmcm.hh"
 #include "hsd/DmaCore.hh"
 #include "hsd/PhyCore.hh"
+#include "hsd/Pgp2bAxi.hh"
 #include "hsd/RingBuffer.hh"
 #include "hsd/I2cSwitch.hh"
 #include "hsd/LocalCpld.hh"
@@ -17,6 +18,7 @@
 #include "hsd/AdcCore.hh"
 #include "hsd/AdcSync.hh"
 #include "hsd/FmcCore.hh"
+#include "hsd/FexCfg.hh"
 #include "hsd/FlashController.hh"
 
 #include <string>
@@ -25,6 +27,8 @@
 #include <fcntl.h>
 #include <sys/mman.h>
 #include <poll.h>
+
+#define DISABLE_READOUT_B
 
 namespace Pds {
   namespace HSD {
@@ -48,7 +52,7 @@ namespace Pds {
       void setRxAlignTarget(unsigned);
       void setRxResetLength(unsigned);
       void dumpRxAlign     () const;
-
+      void dumpPgp         () const;
       //
       //  Low level API
       //
@@ -77,7 +81,14 @@ namespace Pds {
 
       // PHY
       PhyCore           phy_core; // 0x30000
-      uint32_t rsvd_to_0x40000[(0x10000-sizeof(PhyCore))/4];
+      uint32_t rsvd_to_0x31000[(0x1000-sizeof(PhyCore))/4];
+
+      // GTH
+      uint32_t gthAlign[10];     // 0x31000
+      uint32_t rsvd_to_0x31100  [54];
+      uint32_t gthAlignTarget;
+      uint32_t gthAlignLast;
+      uint32_t rsvd_to_0x40000[(0xF000-0x108)/4];
 
       // Timing
       Pds::HSD::TprCore  tpr;     // 0x40000
@@ -100,12 +111,15 @@ namespace Pds {
       FmcCore  fmcb_core;        // 0x81800
       AdcCore  adcb_core;        // 0x81C00
       AdcSync  adc_sync;
-      uint32_t rsvd_to_0x90000  [(0xE000-sizeof(AdcSync))/4];
+      uint32_t rsvd_to_0x88000  [(0x6000-sizeof(AdcSync))/4];
 
-      uint32_t gthAlign[10];     // 0x90000
-      uint32_t rsvd_to_0x90100  [54];
-      uint32_t gthAlignTarget;
-      uint32_t gthAlignLast;
+      FexCfg   fex_chan[4];      // 0x88000
+      uint32_t rsvd_to_0x90000  [(0x8000-4*sizeof(FexCfg))/4];
+
+      //  Pgp (optional)  
+      Pgp2bAxi pgp[4];           // 0x90000
+      uint32_t pgp_fmc1;
+      uint32_t pgp_fmc2;
     };
   };
 };
@@ -123,6 +137,52 @@ Module* Module::create(int fd)
   Pds::HSD::Module* m = new Pds::HSD::Module;
   m->p = reinterpret_cast<Pds::HSD::Module::PrivateData*>(ptr);
   m->_fd = fd;
+
+  return m;
+}
+
+Module* Module::create(int fd, TimingType timing)
+{
+  Module* m = create(fd);
+
+  //
+  //  Verify clock synthesizer is setup
+  //
+  if (timing != EXTERNAL) {
+    timespec tvb;
+    clock_gettime(CLOCK_REALTIME,&tvb);
+    unsigned vvb = m->tpr().TxRefClks;
+
+    usleep(10000);
+
+    timespec tve;
+    clock_gettime(CLOCK_REALTIME,&tve);
+    unsigned vve = m->tpr().TxRefClks;
+    
+    double dt = double(tve.tv_sec-tvb.tv_sec)+1.e-9*(double(tve.tv_nsec)-double(tvb.tv_nsec));
+    double txclkr = 16.e-6*double(vve-vvb)/dt;
+    printf("TxRefClk: %f MHz\n", txclkr);
+
+    static const double TXCLKR_MIN[] = { 118., 185. };
+    static const double TXCLKR_MAX[] = { 120., 187. };
+    if (txclkr < TXCLKR_MIN[timing] ||
+        txclkr > TXCLKR_MAX[timing]) {
+      m->fmc_clksynth_setup(timing);
+
+      usleep(100000);
+      if (timing==LCLS)
+        m->tpr().setLCLS();
+      else
+        m->tpr().setLCLSII();
+      m->tpr().resetRxPll();
+      usleep(10000);
+      m->tpr().resetRx();
+
+      usleep(100000);
+      m->fmc_init(timing);
+      m->train_io(0);
+    }
+  }
 
   return m;
 }
@@ -407,50 +467,167 @@ void Module::PrivateData::dumpRxAlign     () const
   printf("\n");
 }
 
+void Module::PrivateData::dumpPgp     () const
+{
+  //  Need to reset after clocks come back
+  //  const_cast<Module::PrivateData*>(this)->pgp_fmc2 = 0x9;
+  //  const_cast<Module::PrivateData*>(this)->base.resetDma();
+  
+  // for(unsigned i=0; i<4; i++) {
+  //   printf("Lane %d [%p]:\n",i, &pgp[i]);
+  //   pgp[i].dump();
+  // }
+  {
+#define LPRINT(title,field) {                     \
+      printf("\t%20.20s :",title);                \
+      for(unsigned i=0; i<4; i++)                 \
+        printf(" %11x",pgp[i].field);             \
+      printf("\n"); }
+    
+#define LPRBF(title,field,shift,mask) {                 \
+      printf("\t%20.20s :",title);                      \
+      for(unsigned i=0; i<4; i++)                       \
+        printf(" %11x",(pgp[i].field>>shift)&mask);     \
+      printf("\n"); }
+    
+#define LPRVC(title,field) {                      \
+      printf("\t%20.20s :",title);                \
+      for(unsigned i=0; i<4; i++)                 \
+        printf(" %2x %2x %2x %2x",                \
+               pgp[i].field##0,                   \
+             pgp[i].field##1,                     \
+             pgp[i].field##2,                     \
+             pgp[i].field##3 );                   \
+    printf("\n"); }
+
+#define LPRFRQ(title,field) {                           \
+      printf("\t%20.20s :",title);                      \
+      for(unsigned i=0; i<4; i++)                       \
+        printf(" %11.4f",double(pgp[i].field)*1.e-6);   \
+      printf("\n"); }
+    
+    LPRINT("loopback",_loopback);
+    LPRINT("txUserData",_txUserData);
+    LPRBF ("rxPhyReady",_status,0,1);
+    LPRBF ("txPhyReady",_status,1,1);
+    LPRBF ("localLinkReady",_status,2,1);
+    LPRBF ("remoteLinkReady",_status,3,1);
+    LPRBF ("transmitReady",_status,4,1);
+    LPRBF ("rxPolarity",_status,8,3);
+    LPRBF ("remotePause",_status,12,0xf);
+    LPRBF ("localPause",_status,16,0xf);
+    LPRBF ("remoteOvfl",_status,20,0xf);
+    LPRBF ("localOvfl",_status,24,0xf);
+    LPRINT("remoteData",_remoteUserData);
+    LPRINT("cellErrors",_cellErrCount);
+    LPRINT("linkDown",_linkDownCount);
+    LPRINT("linkErrors",_linkErrCount);
+    LPRVC ("remoteOvflVC",_remoteOvfVc);
+    LPRINT("framesRxErr",_rxFrameErrs);
+    LPRINT("framesRx",_rxFrames);
+    LPRVC ("localOvflVC",_localOvfVc);
+    LPRINT("framesTxErr",_txFrameErrs);
+    LPRINT("framesTx",_txFrames);
+    LPRFRQ("rxClkFreq",_rxClkFreq);
+    LPRFRQ("txClkFreq",_txClkFreq);
+    LPRINT("lastTxOp",_lastTxOpcode);
+    LPRINT("lastRxOp",_lastRxOpcode);
+    LPRINT("nTxOps",_txOpcodes);
+    LPRINT("nRxOps",_rxOpcodes);
+
+#undef LPRINT
+#undef LPRBF
+#undef LPRVC
+#undef LPRFRQ
+  }
+
+  printf("pgp_fmc: %08x:%08x\n",
+         pgp_fmc1, pgp_fmc2);
+  printf("\n");
+
+  // for(unsigned i=0; i<4; i++)
+  //    const_cast<Module::PrivateData*>(this)->pgp[i]._countReset = 1;
+  // usleep(10);
+  // for(unsigned i=0; i<4; i++)
+  //    const_cast<Module::PrivateData*>(this)->pgp[i]._countReset = 0;
+
+  //   These registers are not yet writable
+#if 0
+  for(unsigned i=0; i<4; i++)
+    const_cast<Module::PrivateData*>(this)->pgp[i]._loopback = 2;
+  for(unsigned i=0; i<4; i++)
+    const_cast<Module::PrivateData*>(this)->pgp[i]._rxReset = 1;
+  usleep(10);
+  for(unsigned i=0; i<4; i++)
+    const_cast<Module::PrivateData*>(this)->pgp[i]._rxReset = 0;
+#endif
+}
+
+void Module::dumpBase() const
+{
+  p->base.dump();
+}
+
 void Module::PrivateData::setAdcMux(bool     interleave,
                                     unsigned channels)
 {
+  unsigned ch = channels&0xf;
   if (interleave) {
     base.setChannels(channels);
     base.setMode( QABase::Q_ABCD );
     i2c_sw_control.select(I2cSwitch::PrimaryFmc); 
-    fmc_spi.setAdcMux(interleave, channels&0x0f);
-    if (fmcb_core.present())
+    fmc_spi.setAdcMux(interleave, ch);
+#ifndef DISABLE_READOUT_B
+    if (fmcb_core.present()) {
       i2c_sw_control.select(I2cSwitch::SecondaryFmc); 
-      fmc_spi.setAdcMux(interleave, (channels>>4)&0x0f);
+      fmc_spi.setAdcMux(interleave, ch);
+    }
+#endif
   }
   else {
+#ifdef DISABLE_READOUT_B
+    {
+#else
     if (fmcb_core.present()) {
-      base.setChannels(0xff);
+      base.setChannels(ch | (ch<<4));
       base.setMode( QABase::Q_NONE );
       i2c_sw_control.select(I2cSwitch::PrimaryFmc); 
-      fmc_spi.setAdcMux(interleave, (channels>>0)&0xf);
+      fmc_spi.setAdcMux(interleave, ch);
       i2c_sw_control.select(I2cSwitch::SecondaryFmc); 
-      fmc_spi.setAdcMux(interleave, (channels>>4)&0xf);
+      fmc_spi.setAdcMux(interleave, ch);
     }
     else {
-      base.setChannels(0xff);
+#endif
+      base.setChannels(ch);
       base.setMode( QABase::Q_NONE );
       i2c_sw_control.select(I2cSwitch::PrimaryFmc); 
-      fmc_spi.setAdcMux(interleave, channels&0xf);
+      fmc_spi.setAdcMux(interleave, ch);
     }
   }
 }
 
 void Module::init() { p->init(); }
 
+unsigned Module::ncards() const { 
+#ifdef DISABLE_READOUT_B
+  return 1;
+#else
+  return p->fmcb_core.present() ? 2 : 1; 
+#endif
+}
+
 void Module::fmc_init(TimingType timing) { p->fmc_init(timing); }
 
 void Module::fmc_dump() {
   if (p->fmca_core.present())
-    for(unsigned i=0; i<8; i++) {
+    for(unsigned i=0; i<16; i++) {
       p->fmca_core.selectClock(i);
       usleep(100000);
       printf("Clock [%i]: rate %f MHz\n", i, p->fmca_core.clockRate()*1.e-6);
     }
   
   if (p->fmcb_core.present())
-    for(unsigned i=0; i<8; i++) {
+    for(unsigned i=0; i<9; i++) {
       p->fmcb_core.selectClock(i);
       usleep(100000);
       printf("Clock [%i]: rate %f MHz\n", i, p->fmcb_core.clockRate()*1.e-6);
@@ -540,19 +717,29 @@ void Module::disable_cal() { p->disable_cal(); }
 
 void Module::setAdcMux(unsigned channels)
 {
+  unsigned ch = channels&0xf;
+#ifdef DISABLE_READOUT_B
+  {
+#else
   if (p->fmcb_core.present()) {
-    p->base.setChannels(0xff);
+    //    p->base.setChannels(0xff);
+    p->base.setChannels(ch | (ch<<4));
     p->base.setMode( QABase::Q_NONE );
     p->i2c_sw_control.select(I2cSwitch::PrimaryFmc); 
-    p->fmc_spi.setAdcMux((channels>>0)&0xf);
+    //    p->fmc_spi.setAdcMux((channels>>0)&0xf);
+    p->fmc_spi.setAdcMux(0);
     p->i2c_sw_control.select(I2cSwitch::SecondaryFmc); 
-    p->fmc_spi.setAdcMux((channels>>4)&0xf);
+    //    p->fmc_spi.setAdcMux((channels>>4)&0xf);
+    p->fmc_spi.setAdcMux(0);
   }
   else {
-    p->base.setChannels(0xf);
+#endif
+    //    p->base.setChannels(0xf);
+    p->base.setChannels(ch);
     p->base.setMode( QABase::Q_NONE );
     p->i2c_sw_control.select(I2cSwitch::PrimaryFmc); 
-    p->fmc_spi.setAdcMux(channels&0xf);
+    //    p->fmc_spi.setAdcMux(channels&0xf);
+    p->fmc_spi.setAdcMux(0);
   }
 }
 
@@ -566,6 +753,7 @@ Pds::HSD::TprCore&    Module::tpr    () { return p->tpr; }
 void Module::setRxAlignTarget(unsigned v) { p->setRxAlignTarget(v); }
 void Module::setRxResetLength(unsigned v) { p->setRxResetLength(v); }
 void Module::dumpRxAlign     () const { p->dumpRxAlign(); }
+void Module::dumpPgp         () const { p->dumpPgp(); }
 
 void Module::sample_init(unsigned length, 
                          unsigned delay,
@@ -573,7 +761,8 @@ void Module::sample_init(unsigned length,
 {
   p->base.init();
   p->base.samples  = length;
-  p->base.prescale = (delay<<6) | (prescale&0x3f);
+  p->base.prescale = (prescale&0x3f);
+  p->base.offset   = delay;
 
   p->dma_core.init(32+48*length);
 
@@ -581,10 +770,6 @@ void Module::sample_init(unsigned length,
 
   //  p->dma.setEmptyThr(emptyThr);
   //  p->base.dmaFullThr=fullThr;
-
-  p->base.dump();
-  //  p->dma.dump();
-  p->tpr.dump();
 
   //  flush out all the old
   { printf("flushing\n");
@@ -623,7 +808,6 @@ void Module::trig_daq   (unsigned partition)
 
 void Module::start()
 {
-  p->base.resetDma();
   p->base.start();
 }
 
@@ -666,3 +850,5 @@ void Module::set_gain(unsigned channel, unsigned value)
 }
 
 void* Module::reg() { return (void*)p; }
+
+FexCfg* Module::fex() { return &p->fex_chan[0]; }

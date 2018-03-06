@@ -60,9 +60,19 @@ void TprCore::dump() const {
   printf("RxRstDone: %08x\n", RxRstDone);
   printf("RxDecErrs: %08x\n", RxDecErrs);
   printf("RxDspErrs: %08x\n", RxDspErrs);
-  printf("CSR      : %08x\n", CSR); 
+  { unsigned v = CSR;
+    printf("CSR      : %08x", v); 
+    printf(" %s", v&(1<<1) ? "LinkUp":"LinkDn");
+    if (v&(1<<2)) printf(" RXPOL");
+    printf(" %s", v&(1<<4) ? "LCLSII":"LCLS");
+    if (v&(1<<5)) printf(" LinkDnL");
+    printf("\n");
+    //  Acknowledge linkDownL bit
+    const_cast<TprCore*>(this)->CSR = v & ~(1<<5);
+  }
   printf("RxDspErrs: %08x\n", RxDspErrs);
   printf("TxRefClks: %08x\n", TxRefClks);
   printf("BypDone  : %04x\n", (BypassCnts>> 0)&0xffff);
   printf("BypResets: %04x\n", (BypassCnts>>16)&0xffff);
+  printf("Version  : %08x\n", Version);
 }

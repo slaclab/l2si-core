@@ -8,14 +8,21 @@ using namespace Pds::HSD;
 void QABase::init()
 {
   unsigned v = csr;
-  csr = v & ~(1<<31);
+  v &= ~(1<<31);
+  csr = v | (1<<4);
+  usleep(10);
+  csr = v & ~(1<<4);
 }
 
 void QABase::start()
 {
-  unsigned v = csr;
+  unsigned v = control;
+  v &= ~(1<<20);  // remove inhibit
+  control = v;
+
+  v = csr;
   //  csr = v | (1<<31) | (1<<1);
-  v &= ~(1<<4);
+  v &= ~(1<<4);   // remove reset
   csr = v | (1<<31);
 
   irqEnable = 1;
@@ -53,7 +60,11 @@ void QABase::setMode (Interleave q)
 
 void QABase::setupDaq(unsigned partition)
 {
-  acqSelect = (1<<30) | (3<<11) | partition;
+  acqSelect = (1<<30) | (3<<11) | partition;  // obsolete
+  { unsigned v = control;
+    v &= ~(0xf << 16);
+    v |= (partition&0xf) << 16;
+    control = v; }
   unsigned v = csr & ~(1<<0);
   csr = v | (1<<0);
 }
@@ -112,6 +123,28 @@ void QABase::resetDma()
   usleep(10);
   v &= ~(1<<4);
   csr = v;
+}
+
+void QABase::resetFb()
+{
+  unsigned v = csr;
+  v |= (1<<5);
+  csr = v;
+  usleep(10);
+  v &= ~(1<<5);
+  csr = v;
+  usleep(10);
+}
+
+void QABase::resetFbPLL()
+{
+  unsigned v = csr;
+  v |= (1<<6);
+  csr = v;
+  usleep(10);
+  v &= ~(1<<6);
+  csr = v;
+  usleep(10);
 }
 
 bool QABase::clockLocked() const

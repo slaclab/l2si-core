@@ -16,6 +16,7 @@
 #include "hsd/Globals.hh"
 #include "hsd/AxiVersion.hh"
 #include "hsd/TprCore.hh"
+#include "hsd/RingBuffer.hh"
 
 #include <string>
 
@@ -30,7 +31,6 @@ void usage(const char* p) {
   printf("\t-R <reset timing frame counters>\n");
   printf("\t-X <reset gtx timing receiver>\n");
   printf("\t-P <reverse gtx rx polarity>\n");
-  printf("\t-A <dump gtx alignment>\n");
   printf("\t-0 <dump raw timing receive buffer>\n");
   printf("\t-1 <dump timing message buffer>\n");
   printf("\t-2 <configure for LCLSII>\n");
@@ -51,11 +51,8 @@ int main(int argc, char** argv) {
   bool lPolarity = false;
   bool lRing0 = false;
   bool lRing1 = false;
-  bool lDumpAlign = false;
   bool lTrain = false;
   bool lTrainNoReset = false;
-  bool lTestSync = false;
-  unsigned syncDelay[4] = {0,0,0,0};
   TimingType timing=LCLS;
 
   const char* fWrite=0;
@@ -64,17 +61,9 @@ int main(int argc, char** argv) {
   unsigned delay_int=0, delay_frac=0;
 #endif
   unsigned trainRefDelay = 0;
-  unsigned alignTarget = 16;
-  int      alignRstLen = -1;
 
-  while ( (c=getopt( argc, argv, "CRS:XPA:0123D:d:htT:W:")) != EOF ) {
+  while ( (c=getopt( argc, argv, "CRXP0123D:d:htT:W:")) != EOF ) {
     switch(c) {
-    case 'A':
-      lDumpAlign = true;
-      alignTarget = strtoul(optarg,&endptr,0);
-      if (endptr[0])
-        alignRstLen = strtoul(endptr+1,NULL,0);
-      break;
     case 'C':
       lSetupClkSynth = true;
       break;
@@ -83,12 +72,6 @@ int main(int argc, char** argv) {
       break;
     case 'R':
       lReset = true;
-      break;
-    case 'S':
-      lTestSync = true;
-      syncDelay[0] = strtoul(optarg,&endptr,0);
-      for(unsigned i=1; i<4; i++)
-        syncDelay[i] = strtoul(endptr+1,&endptr,0);
       break;
     case 'X':
       lResetRx = true;
@@ -151,22 +134,20 @@ int main(int argc, char** argv) {
 
   p->board_status();
 
-  if (lTrain) {
-    p->fmc_init(timing);
-    p->train_io(trainRefDelay);
-  }
-
-  if (lTrainNoReset) {
-    p->train_io(trainRefDelay);
-  }
-
   p->fmc_dump();
 
   if (lSetupClkSynth) {
     p->fmc_clksynth_setup(timing);
   }
-    
+
+  if (lPolarity) {
+    p->tpr().rxPolarity(!p->tpr().rxPolarity());
+  }
+
   if (lResetRx) {
+    if (lSetupClkSynth)
+      sleep(1);
+
     switch(timing) {
     case LCLS:
       p->tpr().setLCLS();
@@ -182,6 +163,9 @@ int main(int argc, char** argv) {
     usleep(10000);
     p->tpr().resetRx();
   }
+
+  if (lReset)
+    p->tpr().resetCounts();
 
   printf("TPR [%p]\n", &(p->tpr()));
   p->tpr().dump();
@@ -216,12 +200,32 @@ int main(int argc, char** argv) {
     printf("RxRecClk rate = %f MHz\n", 16.e-6*double(vve-vvb)/dt);
   }
 
+  if (lTrain) {
+    if (lResetRx)
+      sleep(1);
+    p->fmc_init(timing);
+    p->train_io(trainRefDelay);
+  }
+
+  if (lTrainNoReset) {
+    p->train_io(trainRefDelay);
+  }
+
   if (fWrite) {
     FILE* f = fopen(fWrite,"r");
     if (f)
       p->flash_write(f);
     else 
       perror("Failed opening prom file\n");
+  }
+
+  if (lRing0 || lRing1) {
+    RingBuffer& b = *new((char*)p->reg()+(lRing0 ? 0x50000 : 0x60000)) RingBuffer;
+    b.clear ();
+    b.enable(true);
+    usleep(100);
+    b.enable(false);
+    b.dump();
   }
 
   return 0;

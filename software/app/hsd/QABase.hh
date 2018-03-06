@@ -21,6 +21,8 @@ namespace Pds {
       void resetCounts();
       void resetClock (bool);
       void resetDma   ();
+      void resetFb    ();
+      void resetFbPLL ();
       bool clockLocked() const;
       void dump() const;
     public:
@@ -35,6 +37,7 @@ namespace Pds {
       // [ 2:2]  dma test pattern enable
       // [ 3:3]  adc sync reset
       // [ 4:4]  dma reset
+      // [ 5:5]  fb phy reset
       // [ 8:15] trigger bit mask shift
       // [31:31] acqEnable
       uint32_t acqSelect;
@@ -62,16 +65,20 @@ namespace Pds {
       //  [40..47]     60             20.8 MHz
       //  [48..55]     70             17.9 MHz
       //  [56..63]     80             15.6 MHz
-      //  Delay (bits 6:31) [units of TimingRef clk]
-      uint32_t offset;        //  Not implemented
+      uint32_t offset;        //  Delay (bits 19:0) [TimingRef clks]
       uint32_t countAcquire;
       uint32_t countEnable;
       uint32_t countInhibit;
       uint32_t dmaFullQ;
       uint32_t adcSync;
+      uint32_t reserved_60;
       //
-      uint32_t status;
-      uint32_t statusCount[32];
+      uint32_t cacheSel;
+      uint32_t cacheState;
+      uint32_t cacheAddr;
+      //
+      //      uint32_t status;
+      //      uint32_t statusCount[32];
     };
   };
 };
