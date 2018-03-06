@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-07-10
--- Last update: 2017-12-19
+-- Last update: 2018-02-22
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -43,6 +43,7 @@ entity DtiUsPgp3 is
       TPD_G               : time                := 1 ns;
       ID_G                : slv(7 downto 0)     := (others=>'0');
       ENABLE_TAG_G        : boolean             := false ;
+      EN_AXIL_G           : boolean             := false ;
       DEBUG_G             : boolean             := false ;
       AXIL_BASE_ADDR_G    : slv(31 downto 0)    := (others=>'0') );
    port (
@@ -55,10 +56,10 @@ entity DtiUsPgp3 is
      amcTxN          : out sl;
      fifoRst         : in  sl;
      -- Quad PLL Ports
-     qplllock        : in  sl;
-     qplloutclk      : in  sl;
-     qplloutrefclk   : in  sl;
-     qpllRst         : out sl;
+     qplllock        : in  slv(1 downto 0);
+     qplloutclk      : in  slv(1 downto 0);
+     qplloutrefclk   : in  slv(1 downto 0);
+     qpllRst         : out slv(1 downto 0);
      --
      axilClk         : in  sl;
      axilRst         : in  sl;
@@ -71,6 +72,7 @@ entity DtiUsPgp3 is
      ibRst           : in  sl;
      ibMaster        : out AxiStreamMasterArray(NUM_DTI_VC_C-1 downto 0);
      ibSlave         : in  AxiStreamSlaveArray (NUM_DTI_VC_C-1 downto 0);
+     loopback        : in  sl;
      linkUp          : out sl;
      remLinkID       : out slv( 7 downto 0);
      rxErrs          : out slv(31 downto 0);
@@ -122,7 +124,6 @@ architecture top_level_app of DtiUsPgp3 is
   signal itxfull        : sl;
 
   signal iibMaster      : AxiStreamMasterArray(NUM_DTI_VC_C-1 downto 0);
-  signal iqpllRst       : sl;
 
   component ila_0
     port ( clk : in sl;
@@ -131,32 +132,34 @@ architecture top_level_app of DtiUsPgp3 is
   
 begin
 
-  GEN_DBUG : if DEBUG_G generate
-    U_ILA : ila_0
-      port map ( clk                  => ibClk,
-                 probe0(0)            => ibSlave  (VC_EVT).tReady,
-                 probe0(1)            => iibMaster(VC_EVT).tValid,
-                 probe0(65 downto  2) => iibMaster(VC_EVT).tData(63 downto 0),
-                 probe0(67 downto 66) => iibMaster(VC_EVT).tUser( 1 downto 0),
-                 probe0(255 downto 68) => (others=>'0') );
-    U_ILA_P : ila_0
-      port map ( clk                  => pgpClk,
-                 probe0(0)            => pgpRxCtrls(0).pause,
-                 probe0(1)            => pgpRxMasters(0).tValid,
-                 probe0(17 downto  2) => pgpRxMasters(0).tData(15 downto 0),
-                 probe0(19 downto 18) => pgpRxMasters(0).tUser( 1 downto 0),
-                 probe0(255 downto 20) => (others=>'0') );
-  end generate;
+  --GEN_DBUG : if DEBUG_G generate
+  --  U_ILA : ila_0
+  --    port map ( clk                  => ibClk,
+  --               probe0(0)            => ibSlave  (VC_EVT).tReady,
+  --               probe0(1)            => iibMaster(VC_EVT).tValid,
+  --               probe0(65 downto  2) => iibMaster(VC_EVT).tData(63 downto 0),
+  --               probe0(67 downto 66) => iibMaster(VC_EVT).tUser( 1 downto 0),
+  --               probe0(255 downto 68) => (others=>'0') );
+  --  U_ILA_P : ila_0
+  --    port map ( clk                  => pgpClk,
+  --               probe0(0)            => pgpRxCtrls(0).pause,
+  --               probe0(1)            => pgpRxMasters(0).tValid,
+  --               probe0(17 downto  2) => pgpRxMasters(0).tData(15 downto 0),
+  --               probe0(19 downto 18) => pgpRxMasters(0).tUser( 1 downto 0),
+  --               probe0(255 downto 20) => (others=>'0') );
+  --end generate;
 
   ibMaster <= iibMaster;
   
   linkUp                   <= pgpRxOut.linkReady;
+  pgpRxIn.loopback         <= '0' & loopback & '0';
 --  remLinkID                <= pgpRxOut.remLinkData;
   remLinkID                <= (others=>'0');
   
   locTxIn.disable          <= '0';
   locTxIn.flowCntlDis      <= '1';
-  locTxIn.skpInterval      <= (others=>'0');
+--  locTxIn.skpInterval      <= (others=>'0');
+  locTxIn.skpInterval      <= X"0000FFF0";  -- override bad default
   locTxIn.opCodeEn         <= r.opCodeEn;
   locTxIn.opCodeNumber     <= toSlv(1,3);
   locTxIn.opCodeData       <= resize(r.opCode,48);
@@ -164,7 +167,6 @@ begin
   pgpTxIn                  <= locTxIn;
   
   status                   <= DTI_US_APP_STATUS_INIT_C;
-  qpllRst                  <= '0';  -- Will multiple channels compete for this?
   monClk                   <= pgpClk;
   
   U_PgpFb : entity work.DtiPgp3Fb
@@ -175,22 +177,19 @@ begin
 
   U_Pgp3 : entity work.Pgp3GthUs
     generic map ( NUM_VC_G     => NUM_DTI_VC_C,
-                  EN_DRP_G     => true,
-                  EN_PGP_MON_G => true,
+                  DEBUG_G      => DEBUG_G,
+                  EN_DRP_G     => EN_AXIL_G,
+                  EN_PGP_MON_G => EN_AXIL_G,
                   AXIL_CLK_FREQ_G  => 156.25e+6,
                   AXIL_BASE_ADDR_G => AXIL_BASE_ADDR_G )
     port map ( -- Stable Clock and Reset
                stableClk    => axilClk,
                stableRst    => axilRst,
                -- QPLL Interface
-               qpllLock  (0)=> qplllock,
-               qpllLock  (1)=> '0',
-               qpllclk   (0)=> qplloutclk,
-               qpllclk   (1)=> '0',
-               qpllrefclk(0)=> qplloutrefclk,
-               qpllrefclk(1)=> '0',
-               qpllRst   (0)=> iqpllRst,
-               qpllRst   (1)=> open,
+               qpllLock     => qplllock,
+               qpllclk      => qplloutclk,
+               qpllrefclk   => qplloutrefclk,
+               qpllRst      => qpllRst,
                -- Gt Serial IO
                pgpGtTxP     => amcTxP,
                pgpGtTxN     => amcTxN,

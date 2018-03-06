@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-12-14
--- Last update: 2017-11-17
+-- Last update: 2018-02-18
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -34,6 +34,7 @@ use work.AmcCarrierPkg.all;  -- ETH_AXIS_CONFIG_C
 use work.DtiPkg.all;
 
 entity DtiReg is
+   generic ( AXIL_BASE_ADDR_G : slv(31 downto 0) := x"00000000" );
    port (
       axilClk          : in  sl;
       axilRst          : in  sl;
@@ -51,26 +52,32 @@ end DtiReg;
 
 architecture rtl of DtiReg is
 
+  constant AXIL_XBAR_CONFIG_C : AxiLiteCrossbarMasterConfigArray(1 downto 0) := genAxiLiteConfig(2, AXIL_BASE_ADDR_G, 8, 7);
+  signal axilWriteMasters : AxiLiteWriteMasterArray(1 downto 0);
+  signal axilWriteSlaves  : AxiLiteWriteSlaveArray (1 downto 0);
+  signal axilReadMasters  : AxiLiteReadMasterArray (1 downto 0);
+  signal axilReadSlaves   : AxiLiteReadSlaveArray  (1 downto 0);
+  
   type StateType is (IDLE_S, READING_S);
   
   type RegType is record
-    update         : sl;
-    clear          : sl;
-    config         : DtiConfigType;
-    usLink         : slv(3 downto 0);
-    dsLink         : slv(3 downto 0);
-    axilReadSlave  : AxiLiteReadSlaveType;
-    axilWriteSlave : AxiLiteWriteSlaveType;
+    update          : sl;
+    clear           : sl;
+    config          : DtiConfigType;
+    usLink          : slv(3 downto 0);
+    dsLink          : slv(3 downto 0);
+    axilReadSlaves  : AxiLiteReadSlaveArray (1 downto 0);
+    axilWriteSlaves : AxiLiteWriteSlaveArray(1 downto 0);
   end record RegType;
 
   constant REG_INIT_C : RegType := (
-    update         => '1',
-    clear          => '0',
-    config         => DTI_CONFIG_INIT_C,
-    usLink         => (others=>'0'),
-    dsLink         => (others=>'0'),
-    axilReadSlave  => AXI_LITE_READ_SLAVE_INIT_C,
-    axilWriteSlave => AXI_LITE_WRITE_SLAVE_INIT_C );
+    update          => '1',
+    clear           => '0',
+    config          => DTI_CONFIG_INIT_C,
+    usLink          => (others=>'0'),
+    dsLink          => (others=>'0'),
+    axilReadSlaves  => (others=>AXI_LITE_READ_SLAVE_INIT_C),
+    axilWriteSlaves => (others=>AXI_LITE_WRITE_SLAVE_INIT_C) );
 
   signal r    : RegType := REG_INIT_C;
   signal r_in : RegType;
@@ -93,14 +100,29 @@ architecture rtl of DtiReg is
 begin
 
   config         <= r.config;
-  axilReadSlave  <= r.axilReadSlave;
-  axilWriteSlave <= r.axilWriteSlave;
   axilClear      <= r.clear;
   axilUpdate     <= r.update;
 
   iusStatus      <= status.usLink(conv_integer(r.usLink));
   idsStatus      <= status.dsLink(conv_integer(r.dsLink));
   iusApp         <= status.usApp (conv_integer(r.usLink));
+
+  U_AXIL_XBAR : entity work.AxiLiteCrossbar
+      generic map (
+         NUM_SLAVE_SLOTS_G  => 1,
+         NUM_MASTER_SLOTS_G => 2,
+         MASTERS_CONFIG_G   => AXIL_XBAR_CONFIG_C)
+      port map (
+         axiClk              => axilClk,
+         axiClkRst           => axilRst,
+         sAxiWriteMasters(0) => axilWriteMaster,
+         sAxiWriteSlaves(0)  => axilWriteSlave,
+         sAxiReadMasters(0)  => axilReadMaster,
+         sAxiReadSlaves(0)   => axilReadSlave,
+         mAxiWriteMasters    => axilWriteMasters,
+         mAxiWriteSlaves     => r.axilWriteSlaves,
+         mAxiReadMasters     => axilReadMasters,
+         mAxiReadSlaves      => r.axilReadSlaves);
 
   GEN_USLINKUP : for i in 0 to MaxUsLinks-1 generate
     U_SYNC : entity work.Synchronizer
@@ -263,121 +285,132 @@ begin
                wrClk     => axilClk,
                rdClk     => axilClk );
 
-  comb : process (r, axilRst, axilReadMaster, axilWriteMaster, usApp,
+  comb : process (r, axilRst, axilReadMasters, axilWriteMasters, usApp,
                   usLinkUp, dsLinkUp, usStatus, dsStatus, bpStatus, qplllock,
                   monClkRate, monClkLock, monClkFast, monClkSlow,
                   pllStat, pllCount) is
     variable v          : RegType;
-    variable axilStatus : AxiLiteStatusType;
     variable ra         : integer;
-
+    variable ep         : AxiLiteEndpointType;
+    variable ia         : integer;
+    
     -- Shorthand procedures for read/write register
     procedure axilRegRW(addr : in slv; offset : in integer; reg : inout slv) is
     begin
-      axiSlaveRegister(axilWriteMaster, axilReadMaster,
-                       v.axilWriteSlave, v.axilReadSlave, axilStatus,
-                       addr, offset, reg, false, "0");
+      axiSlaveRegister(ep, addr, offset, reg, "0");
     end procedure;
     procedure axilRegRW(addr : in slv; offset : in integer; reg : inout sl) is
     begin
-      axiSlaveRegister(axilWriteMaster, axilReadMaster,
-                       v.axilWriteSlave, v.axilReadSlave, axilStatus,
-                       addr, offset, reg, false, '0');
+      axiSlaveRegister(ep, addr, offset, reg, '0');
     end procedure;
     -- Shorthand procedures for read only registers
     procedure axilRegR (addr : in slv; offset : in integer; reg : in slv) is
     begin
-      axiSlaveRegister(axilReadMaster, v.axilReadSlave, axilStatus,
-                       addr, offset, reg);
+      axiSlaveRegisterR(ep, addr, offset, reg);
     end procedure;
     procedure axilRegR (addr : in slv; offset : in integer; reg : in sl) is
     begin
-      axiSlaveRegister(axilReadMaster, v.axilReadSlave, axilStatus,
-                       addr, offset, reg);
+      axiSlaveRegisterR(ep, addr, offset, reg);
     end procedure;
 
   begin
     v := r;
 
     -- Determine the transaction type
-    axiSlaveWaitTxn(axilWriteMaster, axilReadMaster, v.axilWriteSlave, v.axilReadSlave, axilStatus);
-    v.axilReadSlave.rdata := (others=>'0');
+    axiSlaveWaitTxn(ep, axilWriteMasters(0), axilReadMasters(0),
+                    v.axilWriteSlaves(0),  v.axilReadSlaves(0) );
+    v.axilReadSlaves(0).rdata := (others=>'0');
 
     for i in 0 to MaxUsLinks-1 loop
-      axilRegRW (toSlv(  16*i+0,12),  0, v.config.usLink(i).enable );
-      axilRegRW (toSlv(  16*i+0,12),  1, v.config.usLink(i).tagEnable );
-      axilRegRW (toSlv(  16*i+0,12),  2, v.config.usLink(i).l1Enable );
-      axilRegRW (toSlv(  16*i+0,12),  3, v.config.usLink(i).hdrOnly );
-      axilRegRW (toSlv(  16*i+0,12),  4, v.config.usLink(i).partition );
---      axilRegRW (toSlv(  16*i+0,12),  8, v.config.usLink(i).trigDelay );
-      axilRegRW (toSlv(  16*i+0,12), 16, v.config.usLink(i).fwdMask );
-      axilRegRW (toSlv(  16*i+0,12), 31, v.config.usLink(i).fwdMode );
-      axilRegRW (toSlv(  16*i+4,12),  0, v.config.usLink(i).dataSrc );
-      axilRegRW (toSlv(  16*i+8,12),  0, v.config.usLink(i).dataType );
+      axilRegRW (toSlv(  16*i+0,7),  0, v.config.usLink(i).enable );
+      axilRegRW (toSlv(  16*i+0,7),  1, v.config.usLink(i).tagEnable );
+      axilRegRW (toSlv(  16*i+0,7),  2, v.config.usLink(i).l1Enable );
+      axilRegRW (toSlv(  16*i+0,7),  3, v.config.usLink(i).hdrOnly );
+      axilRegRW (toSlv(  16*i+0,7),  4, v.config.usLink(i).partition );
+--      axilRegRW (toSlv(  16*i+0,7),  8, v.config.usLink(i).trigDelay );
+      axilRegRW (toSlv(  16*i+0,7), 16, v.config.usLink(i).fwdMask );
+      axilRegRW (toSlv(  16*i+0,7), 31, v.config.usLink(i).fwdMode );
+      axilRegRW (toSlv(  16*i+4,7),  0, v.config.usLink(i).dataSrc );
+      axilRegRW (toSlv(  16*i+8,7),  0, v.config.usLink(i).dataType );
     end loop;
 
     for i in 0 to MaxUsLinks-1 loop
-      axilRegR (toSlv( 16*7+0,12),  i, usLinkUp(i) );
+      axilRegR (toSlv( 16*7+0,7),  i, usLinkUp(i) );
     end loop;    
-    axilRegR (toSlv( 16*7+0,12),  15, bpStatus.linkUp);
+    axilRegR (toSlv( 16*7+0,7),  15, bpStatus.linkUp);
     for i in 0 to MaxDsLinks-1 loop
-      axilRegR (toSlv( 16*7+0,12), 16+i, dsLinkUp(i) );
+      axilRegR (toSlv( 16*7+0,7), 16+i, dsLinkUp(i) );
     end loop;    
 
-    axilRegRW (toSlv( 16*7+4,12),  0, v.usLink);
-    axilRegRW (toSlv( 16*7+4,12), 16, v.dsLink);
-    axilRegRW (toSlv( 16*7+4,12), 30, v.clear );
-    axilRegRW (toSlv( 16*7+4,12), 31, v.update);
+    axilRegRW (toSlv( 16*7+4,7),  0, v.usLink);
+    axilRegRW (toSlv( 16*7+4,7), 16, v.dsLink);
+    axilRegRW (toSlv( 16*7+4,7), 30, v.clear );
+    axilRegRW (toSlv( 16*7+4,7), 31, v.update);
 
-    axilRegR (toSlv( 16*7+8,12), 0, bpStatus.obSent);
+    axilRegR (toSlv( 16*7+8,7), 0, bpStatus.obSent);
+    axilRegR (toSlv( 16*7+12,7), 0, AXIL_BASE_ADDR_G);
+
+    -- Set the status
+    axiSlaveDefault(ep, v.axilWriteSlaves(0), v.axilReadSlaves(0),
+                    AXI_RESP_OK_C);
+
+    -- Determine the transaction type
+    axiSlaveWaitTxn(ep, axilWriteMasters(1), axilReadMasters(1),
+                    v.axilWriteSlaves(1),  v.axilReadSlaves(1));
+    v.axilReadSlaves(1).rdata := (others=>'0');
     
-    axilRegR (toSlv( 16*8+0 ,12),  0, usStatus.rxErrs(23 downto 0) );
-    axilRegR (toSlv( 16*8+0 ,12), 24, usStatus.remLinkID);
-    axilRegR (toSlv( 16*8+4 ,12),  0, usStatus.rxFull );
---    axilRegR (toSlv( 16*8+8 ,12),  0, usStatus.ibRecv (31 downto 0));
-    axilRegR (toSlv( 16*8+8 ,12),  0, usStatus.rxInh(23 downto 0) );
-    axilRegR (toSlv( 16*8+8 ,12), 24, usStatus.wrFifoD );
-    axilRegR (toSlv( 16*8+8 ,12), 28, usStatus.rdFifoD );
-    axilRegR (toSlv( 16*8+12,12),  0, usStatus.ibEvt );
+    axilRegR (toSlv( 16*0+0 ,7),  0, usStatus.rxErrs(23 downto 0) );
+    axilRegR (toSlv( 16*0+0 ,7), 24, usStatus.remLinkID);
+    axilRegR (toSlv( 16*0+4 ,7),  0, usStatus.rxFull );
+--    axilRegR (toSlv( 16*0+8 ,7),  0, usStatus.ibRecv (31 downto 0));
+    axilRegR (toSlv( 16*0+8 ,7),  0, usStatus.rxInh(23 downto 0) );
+    axilRegR (toSlv( 16*0+8 ,7), 24, usStatus.wrFifoD );
+    axilRegR (toSlv( 16*0+8 ,7), 28, usStatus.rdFifoD );
+    axilRegR (toSlv( 16*0+12,7),  0, usStatus.ibEvt );
 
-    axilRegR (toSlv( 16*9+0 ,12),  0, dsStatus.rxErrs(23 downto 0));
-    axilRegR (toSlv( 16*9+0 ,12), 24, dsStatus.remLinkID);
-    axilRegR (toSlv( 16*9+4 ,12),  0, dsStatus.rxFull);
-    axilRegR (toSlv( 16*9+8 ,12),  0, dsStatus.obSent(31 downto 0));
-    axilRegR (toSlv( 16*9+12,12),  0, dsStatus.obSent(47 downto 32));
+    axilRegR (toSlv( 16*1+0 ,7),  0, dsStatus.rxErrs(23 downto 0));
+    axilRegR (toSlv( 16*1+0 ,7), 24, dsStatus.remLinkID);
+    axilRegR (toSlv( 16*1+4 ,7),  0, dsStatus.rxFull);
+    axilRegR (toSlv( 16*1+8 ,7),  0, dsStatus.obSent(31 downto 0));
+    axilRegR (toSlv( 16*1+12,7),  0, dsStatus.obSent(47 downto 32));
 
-    axilRegR (toSlv( 16*10+0 ,12),  0, usApp.obReceived);
-    axilRegR (toSlv( 16*10+8 ,12),  0, usApp.obSent);
+    axilRegR (toSlv( 16*2+0 ,7),  0, usApp.obReceived);
+    axilRegR (toSlv( 16*2+8 ,7),  0, usApp.obSent);
 
-    axilRegR (toSlv( 16*11+0, 12),  0, qplllock);
-    axilRegRW(toSlv( 16*11+0 ,12), 16, v.config.bpPeriod );
+    axilRegR (toSlv( 16*3+0, 12),  0, qplllock);
+    axilRegRW(toSlv( 16*3+0 ,7), 16, v.config.bpPeriod );
     
     for i in 0 to 3 loop
-      axilRegR (toSlv( 16*11+4*i+4, 12),  0, monClkRate(i)(28 downto 0));
-      axilRegR (toSlv( 16*11+4*i+4, 12), 29, monClkSlow(i));
-      axilRegR (toSlv( 16*11+4*i+4, 12), 30, monClkFast(i));
-      axilRegR (toSlv( 16*11+4*i+4, 12), 31, monClkLock(i));
+      axilRegR (toSlv( 16*3+4*i+4, 12),  0, monClkRate(i)(28 downto 0));
+      axilRegR (toSlv( 16*3+4*i+4, 12), 29, monClkSlow(i));
+      axilRegR (toSlv( 16*3+4*i+4, 12), 30, monClkFast(i));
+      axilRegR (toSlv( 16*3+4*i+4, 12), 31, monClkLock(i));
     end loop;
 
     for i in 0 to 1 loop
-      ra := 208+i*4;
-      axilRegRW(toSlv(ra,12),  0, v.config.amcPll(i).bwSel);
-      axilRegRW(toSlv(ra,12),  4, v.config.amcPll(i).frqTbl);
-      axilRegRW(toSlv(ra,12),  8, v.config.amcPll(i).frqSel);
-      axilRegRW(toSlv(ra,12), 16, v.config.amcPll(i).rate);
-      axilRegRW(toSlv(ra,12), 20, v.config.amcPll(i).inc);
-      axilRegRW(toSlv(ra,12), 21, v.config.amcPll(i).dec);
-      axilRegRW(toSlv(ra,12), 22, v.config.amcPll(i).bypass);
-      axilRegRW(toSlv(ra,12), 23, v.config.amcPll(i).rstn);
-      axilRegR (toSlv(ra,12), 24, muxSlVectorArray( pllCount, 2*i+0));
-      axilRegR (toSlv(ra,12), 27, pllStat(2*i+0));
-      axilRegR (toSlv(ra,12), 28, muxSlVectorArray( pllCount, 2*i+1));
-      axilRegR (toSlv(ra,12), 31, pllStat(2*i+1));
+      ra := 16*5+i*4;
+      axilRegRW(toSlv(ra,7),  0, v.config.amcPll(i).bwSel);
+      axilRegRW(toSlv(ra,7),  4, v.config.amcPll(i).frqTbl);
+      axilRegRW(toSlv(ra,7),  8, v.config.amcPll(i).frqSel);
+      axilRegRW(toSlv(ra,7), 16, v.config.amcPll(i).rate);
+      axilRegRW(toSlv(ra,7), 20, v.config.amcPll(i).inc);
+      axilRegRW(toSlv(ra,7), 21, v.config.amcPll(i).dec);
+      axilRegRW(toSlv(ra,7), 22, v.config.amcPll(i).bypass);
+      axilRegRW(toSlv(ra,7), 23, v.config.amcPll(i).rstn);
+      axilRegR (toSlv(ra,7), 24, muxSlVectorArray( pllCount, 2*i+0));
+      axilRegR (toSlv(ra,7), 27, pllStat(2*i+0));
+      axilRegR (toSlv(ra,7), 28, muxSlVectorArray( pllCount, 2*i+1));
+      axilRegR (toSlv(ra,7), 31, pllStat(2*i+1));
     end loop;
-      
-    -- Set the status
-    axiSlaveDefault(axilWriteMaster, axilReadMaster, v.axilWriteSlave, v.axilReadSlave, axilStatus, AXI_RESP_OK_C);
 
+    ra := 16*6;
+    axilRegRW(toSlv(ra,7), 0, v.config.loopback);
+    axilRegR (toSlv(ra+4,7), 0, AXIL_BASE_ADDR_G);
+    
+    -- Set the status
+    axiSlaveDefault(ep, v.axilWriteSlaves(1), v.axilReadSlaves(1),
+                    AXI_RESP_OK_C);
+    
     ----------------------------------------------------------------------------------------------
     -- Reset
     ----------------------------------------------------------------------------------------------

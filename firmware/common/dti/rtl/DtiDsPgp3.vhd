@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-07-10
--- Last update: 2017-12-19
+-- Last update: 2018-02-22
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -43,6 +43,7 @@ entity DtiDsPgp3 is
       TPD_G               : time                := 1 ns;
       ID_G                : slv(7 downto 0)     := (others=>'0');
       ENABLE_TAG_G        : boolean             := false ;
+      EN_AXIL_G           : boolean             := false ;
       DEBUG_G             : boolean             := false ;
       AXIL_BASE_ADDR_G    : slv(31 downto 0)    := (others=>'0') );
    port (
@@ -54,10 +55,10 @@ entity DtiDsPgp3 is
      amcTxN          : out sl;
      fifoRst         : in  sl;
      -- Quad PLL Ports
-     qplllock        : in  sl;
-     qplloutclk      : in  sl;
-     qplloutrefclk   : in  sl;
-     qpllRst         : out sl;
+     qplllock        : in  slv(1 downto 0);
+     qplloutclk      : in  slv(1 downto 0);
+     qplloutrefclk   : in  slv(1 downto 0);
+     qpllRst         : out slv(1 downto 0);
      --
      axilClk         : in  sl;
      axilRst         : in  sl;
@@ -67,10 +68,12 @@ entity DtiDsPgp3 is
      axilWriteSlave  : out AxiLiteWriteSlaveType;
      --
      ibRst           : in  sl;
+     loopback        : in  sl;
      linkUp          : out sl;
      remLinkID       : out slv(7 downto 0);
      rxErrs          : out slv(31 downto 0);
      full            : out sl;
+     monClk          : out sl;
      --
      obClk           : in  sl;
      obMaster        : in  AxiStreamMasterType;
@@ -82,7 +85,14 @@ architecture top_level_app of DtiDsPgp3 is
   signal amcObMaster : AxiStreamMasterType;
   signal amcObSlave  : AxiStreamSlaveType;
 
-  signal pgpTxIn        : Pgp3TxInType := PGP3_TX_IN_INIT_C;
+--  signal pgpTxIn        : Pgp3TxInType := PGP3_TX_IN_INIT_C;
+  signal pgpTxIn        : Pgp3TxInType := (
+      disable      => '0',
+      flowCntlDis  => '0',
+      skpInterval  => X"0000FFF0",  -- bad default in PGP3_TX_IN_INIT_C
+      opCodeEn     => '0',
+      opCodeNumber => (others => '0'),
+      opCodeData   => (others => '0'));
   signal pgpTxOut       : Pgp3TxOutType;
   signal pgpRxIn        : Pgp3RxInType := PGP3_RX_IN_INIT_C;
   signal pgpRxOut       : Pgp3RxOutType;
@@ -94,15 +104,14 @@ architecture top_level_app of DtiDsPgp3 is
   signal pgpClk         : sl;
   signal pgpRst         : sl;
 
-  signal iqpllRst       : sl;
-
 begin
 
 --  locTxIn.locData          <= ID_G;
+  pgpRxIn.loopback         <= '0' & loopback & '0';
   linkUp                   <= pgpRxOut.linkReady;
 --  remLinkID                <= pgpRxOut.remLinkData;
   remLinkID                <= (others=>'0');
-  qpllRst                  <= '0';
+  monClk                   <= pgpClk;
   
   U_Fifo : entity work.AxiStreamFifo
     generic map (
@@ -143,21 +152,19 @@ begin
 
   U_Pgp3 : entity work.Pgp3GthUs
     generic map ( NUM_VC_G     => NUM_DTI_VC_C,
-                  EN_DRP_G     => false,
-                  EN_PGP_MON_G => false,
+                  DEBUG_G      => DEBUG_G,
+                  EN_DRP_G     => EN_AXIL_G,
+                  EN_PGP_MON_G => EN_AXIL_G,
+                  AXIL_CLK_FREQ_G  => 156.25e+6,
                   AXIL_BASE_ADDR_G => AXIL_BASE_ADDR_G )
     port map ( -- Stable Clock and Reset
                stableClk    => axilClk,
                stableRst    => axilRst,
                -- QPLL Interface
-               qpllLock  (0)=> qplllock,
-               qpllLock  (1)=> '0',
-               qpllclk   (0)=> qplloutclk,
-               qpllclk   (1)=> '0',
-               qpllrefclk(0)=> qplloutrefclk,
-               qpllrefclk(1)=> '0',
-               qpllRst   (0)=> iqpllRst,
-               qpllRst   (1)=> open,
+               qpllLock     => qplllock,
+               qpllclk      => qplloutclk,
+               qpllrefclk   => qplloutrefclk,
+               qpllRst      => qpllRst,
                -- Gt Serial IO
                pgpGtTxP     => amcTxP,
                pgpGtTxN     => amcTxN,

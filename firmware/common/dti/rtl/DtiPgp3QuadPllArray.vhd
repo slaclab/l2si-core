@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-04-08
--- Last update: 2017-11-15
+-- Last update: 2018-02-17
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -45,7 +45,7 @@ entity DtiPgp3QuadPllArray is
       amcRxP        : in  slv(6 downto 0);
       amcRxN        : in  slv(6 downto 0);
       -- channel ports
-      chanPllRst    : in  slv(6 downto 0);
+      chanPllRst    : in  Slv2Array(6 downto 0);
       chanTxP       : in  slv(6 downto 0);
       chanTxN       : in  slv(6 downto 0);
       chanRxP       : out slv(6 downto 0);
@@ -106,9 +106,9 @@ begin
       
       amcQuad(i).coreClk       <= amcCoreClk;
       amcQuad(i).refClk        <= amcRefClk;
-      amcQuad(i).qplloutclk    <= qpllclk   (4*i)(0);
-      amcQuad(i).qplloutrefclk <= qpllrefclk(4*i)(0);
-      amcQuad(i).qplllock      <= qplllock  (4*i)(0);
+      amcQuad(i).qplloutclk    <= qpllclk   (4*i);
+      amcQuad(i).qplloutrefclk <= qpllrefclk(4*i);
+      amcQuad(i).qplllock      <= qplllock  (4*i);
     end generate;
   --
   --  The AMC SFP channels are reordered - the mapping to MGT quads is non-trivial
@@ -123,7 +123,7 @@ begin
       amcTxN    (j)   <= chanTxN(j+2);
       chanRxP   (j+2) <= amcRxP(j);
       chanRxN   (j+2) <= amcRxN(j);
-      qpllrst   (j)(0) <= chanPllRst(j+2);
+      qpllrst   (j)   <= chanPllRst(j+2);
       chanQuad  (j+2) <= amcQuad(0);
     end loop;
     for j in 4 to 5 loop
@@ -131,7 +131,7 @@ begin
       amcTxN    (j)   <= chanTxN(j-4);
       chanRxP   (j-4) <= amcRxP(j);
       chanRxN   (j-4) <= amcRxN(j);
-      qpllrst   (j-4)(0) <= chanPllRst(j-4);
+      qpllrst   (j-4) <= chanPllRst(j-4);
       chanQuad  (j-4) <= amcQuad(1);
     end loop;
     for j in 6 to 6 loop
@@ -139,7 +139,7 @@ begin
       amcTxN    (j) <= chanTxN(j);
       chanRxP   (j) <= amcRxP(j);
       chanRxN   (j) <= amcRxN(j);
-      qpllrst   (j)(0) <= chanPllRst(j);
+      qpllrst   (j) <= chanPllRst(j);
       chanQuad  (j) <= amcQuad(1);
     end loop;
   end process;

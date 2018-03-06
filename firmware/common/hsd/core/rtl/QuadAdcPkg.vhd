@@ -165,8 +165,8 @@ package QuadAdcPkg is
     partition : slv( 3 downto 0);  -- LCLS: not used
     intlv     : slv( 1 downto 0);
     samples   : slv(17 downto 0);
-    prescale  : slv( 5 downto 0);
-    offset    : slv(19 downto 0);
+    prescale  : slv( 5 downto 0);  -- subsampling factor
+    offset    : slv(19 downto 0);  -- delay, clks
     acqEnable : sl;
     rateSel   : slv(12 downto 0);  -- LCLS: eventCode
     destSel   : slv(18 downto 0);  -- LCLS: not used

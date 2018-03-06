@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2016-03-25
--- Last update: 2017-11-17
+-- Last update: 2018-02-17
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -77,9 +77,9 @@ package DtiPkg is
    type QuadType is record
      coreClk          : sl;
      refClk           : sl;
-     qplllock         : sl;
-     qplloutclk       : sl;
-     qplloutrefclk    : sl;
+     qplllock         : slv(1 downto 0);
+     qplloutclk       : slv(1 downto 0);
+     qplloutrefclk    : slv(1 downto 0);
    end record;
 
    type QuadArray is array(natural range<>) of QuadType;
@@ -198,14 +198,16 @@ package DtiPkg is
 
    type DtiConfigType is record
      usLink     : DtiUsLinkConfigArray   (MaxUsLinks-1 downto 0);
-     bpPeriod   : slv                    (7 downto 0);
-     amcPll     : XpmPllConfigArray      (1 downto 0);
+     bpPeriod   : slv                    ( 7 downto 0);
+     amcPll     : XpmPllConfigArray      ( 1 downto 0);
+     loopback   : slv                    (31 downto 0);
    end record;
 
    constant DTI_CONFIG_INIT_C : DtiConfigType := (
      usLink     => (others=>DTI_US_LINK_CONFIG_INIT_C),
      bpPeriod   => toSlv(33,8),
-     amcPll     => (others=>DTI_PLL_CONFIG_INIT_C) );
+     amcPll     => (others=>DTI_PLL_CONFIG_INIT_C),
+     loopback   => (others=>'0') );
 
    type DtiStatusType is record
      usLink     : DtiUsLinkStatusArray   (MaxUsLinks-1 downto 0);
