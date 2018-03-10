@@ -281,7 +281,7 @@ begin  -- rtl
       delayOut            => adcSdelayIn,
       delayIn             => adcSdelayOut );              
 
-  U_MMCM_t : entity work.ClockManagerUltraScale
+  U_MMCM_t : entity work.mmcm_fineps
     -- LCLS   : Fvco = 119M * 10.5 = 1249.5M
     --          Fout = 119M * 10.5/125 = 9.996M
     -- LCLSII : Fvco = 1300M/7 * 6 = 1114.3M
@@ -290,8 +290,7 @@ begin  -- rtl
                   CLKIN_PERIOD_G     => ite(LCLSII_G, 5.37, 8.40),
                   CLKFBOUT_MULT_F_G  => ite(LCLSII_G, 6.0, 10.5),
                   CLKOUT0_DIVIDE_F_G => ite(LCLSII_G, 75.0, 125.0),
-                  CLKOUT1_DIVIDE_G   => ite(LCLSII_G, 75  , 125  ),
-                  CLKOUT1_USE_FINE_PS_G => true )
+                  CLKOUT1_DIVIDE_G   => ite(LCLSII_G, 75  , 125  ) )
     port map ( clkIn          => evrClk,
                rstIn          => adcSyncRst,
                clkOut(0)      => pllRefClk(0),
