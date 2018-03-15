@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-07-10
--- Last update: 2017-11-18
+-- Last update: 2018-03-14
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -90,7 +90,8 @@ architecture rtl of DtiUsCore is
 
   constant MAX_BIT : integer := bitSize(MaxDsLinks)-1;
 
-  type StateType is (S_IDLE, S_EVHDR1, S_EVHDR2, S_EVHDR3, S_EVHDR4, S_FIRST_PAYLOAD, S_PAYLOAD, S_DUMP);
+  type StateType is (S_IDLE, S_EVHDR1, S_EVHDR2, S_EVHDR3, S_EVHDR4, S_FIRST_PAYLOAD, S_PAYLOAD,
+                     S_DUMP, S_RSTFIFO);
   
   type RegType is record
     ena     : sl;
@@ -171,17 +172,22 @@ architecture rtl of DtiUsCore is
   signal senable : sl;
   signal shdrOnly : sl;
   signal tfull   : slv(15 downto 0);
+  signal rstFifo : sl;
   
   component ila_0
     port ( clk    : sl;
            probe0 : slv(255 downto 0) );
   end component;
 
-  signal r_state : slv(2 downto 0);
+  signal r_state : slv(3 downto 0);
   signal dbgl0r  : sl;
-  
+  signal eready  : slv(MaxDsLinks-1 downto 0);
+  signal evalid  : slv(MaxDsLinks-1 downto 0);
+  signal ieventM : AxiStreamMasterArray(MaxDsLinks-1 downto 0);
 begin
 
+  eventMasters <= ieventM;
+  
   GEN_DEBUG : if DEBUG_G generate
     dbgl0r <= toPartitionWord(exptBus.message.partitionWord(0)).l0r;
     U_ILA : ila_0
@@ -194,6 +200,38 @@ begin
                  probe0(81 downto 50) => t.ninh,
                  probe0(129 downto 82) => exptBus.message.partitionWord(0),
                  probe0(255 downto 130) => (others=>'0') );
+
+    r_state <= x"0" when r.state = S_IDLE else
+               x"1" when r.state = S_EVHDR1 else
+               x"2" when r.state = S_EVHDR2 else
+               x"3" when r.state = S_EVHDR3 else
+               x"4" when r.state = S_EVHDR4 else
+               x"5" when r.state = S_FIRST_PAYLOAD else
+               x"6" when r.state = S_PAYLOAD else
+               x"7" when r.state = S_DUMP else
+               x"8";
+
+    GEN_EREADY : for i in 0 to MaxDsLinks-1 generate
+      eready(i) <= eventSlaves(i).tReady;
+      evalid(i) <= ieventM    (i).tValid;
+    end generate;
+    
+    U_ILA_HDR : ila_0
+      port map ( clk   => eventClk,
+                 probe0(0) => pmsg,
+                 probe0(1) => phdr,
+                 probe0(2) => r.hdrRd,
+                 probe0(3) => eventHeaderV,
+                 probe0(19 downto 4) => eventHeader.l1t,
+                 probe0(23 downto 20) => r_state,
+                 probe0(24) => tMaster.tValid,
+                 probe0(25) => tSlave .tReady,
+                 probe0( 89 downto  26) => tMaster.tData(63 downto 0),
+                 probe0( 97 downto  90) => resize(eready,8),
+                 probe0(105 downto  98) => resize(evalid,8),
+                 probe0(109 downto 106) => tMaster   .tDest(3 downto 0),
+                 probe0(113 downto 110) => ieventM(0).tDest(3 downto 0),
+                 probe0(255 downto 114) => (others=>'0') );
   end generate;
   
   obClk         <= timingClk;
@@ -221,7 +259,9 @@ begin
     port map ( sAxisMaster  => tMaster,
                sAxisSlave   => tSlave,
                sFlood       => r.msg,
-               mAxisMasters => eventMasters,
+               sFloodMask   => configS.fwdMask,
+--               mAxisMasters => eventMasters,
+               mAxisMasters => ieventM,
                mAxisSlaves  => eventSlaves,
                axisClk      => eventClk,
                axisRst      => eventRst );
@@ -245,7 +285,7 @@ begin
                cntL1A    => status.obL1A,
                cntL1R    => status.obL1R,
                cntWrFifo => status.wrFifoD,
-               rstFifo   => open,
+               rstFifo   => rstFifo,
                -- Cache Output
                rdclk     => eventClk,
                entag     => config.tagEnable,
@@ -309,7 +349,7 @@ begin
   --
   comb : process ( r, ibMaster, tSlave, configS, eventRst, sclear, supdate, eventHeaderVec, eventHeaderV,
                    dsfull, ibFull,
-                   pmsg, phdr, rin, shdrOnly ) is
+                   pmsg, phdr, rin, shdrOnly, rstFifo ) is
     variable v : RegType;
     variable selv : sl;
     variable fwd  : slv(MAX_BIT downto 0);
@@ -421,10 +461,28 @@ begin
             v.state  := S_IDLE;
           end if;
         end if;
+      when S_RSTFIFO =>
+        --  terminate outgoing stream
+        if r.master.tLast = '0' then
+          if v.master.tValid = '0' then
+            v.master.tValid := '1';
+            v.master.tLast  := '1';
+            ssiSetUserEofe(US_IB_CONFIG_C, v.master, '1');
+          end if;
+        --  drain the incoming stream (no guaranteed way of emptying)
+        elsif ibMaster.tValid = '1' then
+          v.slave.tReady := '1';
+        else
+          v.state := S_IDLE;
+        end if;
       when others =>
         null;
     end case;
 
+    if rstFifo = '1' then
+      v.state := S_RSTFIFO;
+    end if;
+    
     v.full := (others=>'0');
     if configS.fwdMode = '0' then    -- Round robin mode
       v.mask := configS.fwdMask;

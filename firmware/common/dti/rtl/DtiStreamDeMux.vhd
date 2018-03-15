@@ -5,7 +5,7 @@
 -- File       : DtiStreamDeMux.vhd
 -- Author     : Ryan Herbst, rherbst@slac.stanford.edu
 -- Created    : 2014-04-25
--- Last update: 2017-12-13
+-- Last update: 2018-03-14
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -41,6 +41,7 @@ entity DtiStreamDeMux is
    port (
       -- Slave
       sFlood       : in  sl;
+      sFloodMask   : in  slv(NUM_MASTERS_G-1 downto 0);
       sAxisMaster  : in  AxiStreamMasterType;
       sAxisSlave   : out AxiStreamSlaveType;
       -- Masters
@@ -80,7 +81,7 @@ begin
       " is too small for NUM_MASTERS_G=" & integer'image(NUM_MASTERS_G)
       severity error;
 
-   comb : process (axisRst_d, pipeAxisSlaves, r, sAxisMaster, sFlood) is
+   comb : process (axisRst_d, pipeAxisSlaves, r, sAxisMaster, sFlood, sFloodMask) is
       variable v   : RegType;
       variable idx : natural;
       variable i   : natural;
@@ -98,7 +99,7 @@ begin
          if pipeAxisSlaves(i).tReady = '1' then
             v.masters(i).tValid := '0';
          end if;
-         if v.masters(i).tValid = '1' then
+         if (v.masters(i).tValid = '1' and sFloodMask(i) = '1') then
            allReady := '0';
          end if;
       end loop;
@@ -109,7 +110,10 @@ begin
           v.slave.tReady := '1';
           -- Move the data
           for idx in 0 to NUM_MASTERS_G-1 loop
-            v.masters(idx) := sAxisMaster;
+            if sFloodMask(idx) = '1' then
+              v.masters(idx) := sAxisMaster;
+              v.masters(idx).tDest(TDEST_HIGH_G downto TDEST_LOW_G) := (others=>'0');
+            end if;
           end loop;
         end if;
       else
@@ -126,6 +130,7 @@ begin
           v.slave.tReady := '1';
           -- Move the data
           v.masters(idx) := sAxisMaster;
+          v.masters(idx).tDest(TDEST_HIGH_G downto TDEST_LOW_G) := (others=>'0');
         end if;
       end if;
 

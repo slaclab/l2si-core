@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver  <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-07-08
--- Last update: 2017-11-17
+-- Last update: 2018-03-07
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -36,6 +36,8 @@ entity DtiClkAndRst is
       -- Reference Clocks and Resets
       ref62MHzClk  : out sl;
       ref62MHzRst  : out sl;
+      ref100MHzClk : out sl;
+      ref100MHzRst : out sl;
       ref125MHzClk : out sl;
       ref125MHzRst : out sl;
       ref156MHzClk : out sl;
@@ -93,6 +95,9 @@ begin
       end if;
    end process;
 
+   ref100MHzClk <= clkOut(0);
+   ref100MHzRst <= rstOut(0);
+
    ref125MHzClk <= clkOut(2);
    ref125MHzRst <= rstOut(2);
 
@@ -145,7 +150,7 @@ begin
          CLKIN_PERIOD_G     => 6.4,
          DIVCLK_DIVIDE_G    => 1,
          CLKFBOUT_MULT_F_G  => 8.0,  -- 1.25 GHz
-         CLKOUT0_DIVIDE_F_G => 2.0,                         -- 625 MHz = 1.25 GHz/2.0
+         CLKOUT0_DIVIDE_F_G => 12.5,                        -- 100 MHz = 1.25 GHz/12.5
          CLKOUT1_DIVIDE_G   => 20,                          -- 62.5 MHz = 1.25 GHz/20
          CLKOUT2_DIVIDE_G   => 10)                          -- 125 MHz = 1.25 GHz/10
       port map(

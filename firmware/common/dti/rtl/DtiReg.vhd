@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-12-14
--- Last update: 2018-02-18
+-- Last update: 2018-03-08
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -64,6 +64,7 @@ architecture rtl of DtiReg is
     update          : sl;
     clear           : sl;
     config          : DtiConfigType;
+    qplllock        : slv(status.qplllock'range);
     usLink          : slv(3 downto 0);
     dsLink          : slv(3 downto 0);
     axilReadSlaves  : AxiLiteReadSlaveArray (1 downto 0);
@@ -74,6 +75,7 @@ architecture rtl of DtiReg is
     update          => '1',
     clear           => '0',
     config          => DTI_CONFIG_INIT_C,
+    qplllock        => (others=>'0'),
     usLink          => (others=>'0'),
     dsLink          => (others=>'0'),
     axilReadSlaves  => (others=>AXI_LITE_READ_SLAVE_INIT_C),
@@ -97,6 +99,7 @@ architecture rtl of DtiReg is
 
   signal pllStat     : slv(3 downto 0);
   signal pllCount    : SlVectorArray(3 downto 0, 2 downto 0);
+
 begin
 
   config         <= r.config;
@@ -258,6 +261,7 @@ begin
   GEN_MONCLK : for i in 0 to 3 generate
     U_SYNC : entity work.SyncClockFreq
       generic map ( REF_CLK_FREQ_G => 156.25E+6,
+                    COMMON_CLK_G   => true,
                     CLK_LOWER_LIMIT_G =>  95.0E+6,
                     CLK_UPPER_LIMIT_G => 186.0E+6 )
       port map ( freqOut     => monClkRate(i),
@@ -377,14 +381,15 @@ begin
     axilRegR (toSlv( 16*2+0 ,7),  0, usApp.obReceived);
     axilRegR (toSlv( 16*2+8 ,7),  0, usApp.obSent);
 
-    axilRegR (toSlv( 16*3+0, 12),  0, qplllock);
+    axilRegRW(toSlv( 16*3+0, 7),  0, v.qplllock);
     axilRegRW(toSlv( 16*3+0 ,7), 16, v.config.bpPeriod );
+    v.qplllock := qplllock;
     
     for i in 0 to 3 loop
-      axilRegR (toSlv( 16*3+4*i+4, 12),  0, monClkRate(i)(28 downto 0));
-      axilRegR (toSlv( 16*3+4*i+4, 12), 29, monClkSlow(i));
-      axilRegR (toSlv( 16*3+4*i+4, 12), 30, monClkFast(i));
-      axilRegR (toSlv( 16*3+4*i+4, 12), 31, monClkLock(i));
+      axilRegR (toSlv( 16*3+4*i+4, 7),  0, monClkRate(i)(28 downto 0));
+      axilRegR (toSlv( 16*3+4*i+4, 7), 29, monClkSlow(i));
+      axilRegR (toSlv( 16*3+4*i+4, 7), 30, monClkFast(i));
+      axilRegR (toSlv( 16*3+4*i+4, 7), 31, monClkLock(i));
     end loop;
 
     for i in 0 to 1 loop
@@ -427,4 +432,5 @@ begin
       r <= r_in;
     end if;
   end process;
+
 end rtl;
