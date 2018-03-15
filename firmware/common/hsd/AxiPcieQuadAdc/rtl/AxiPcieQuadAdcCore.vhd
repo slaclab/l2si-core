@@ -5,7 +5,7 @@
 -- Author     : Larry Ruckman  <ruckman@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2016-02-12
--- Last update: 2018-01-12
+-- Last update: 2018-03-12
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -530,6 +530,7 @@ begin
          axilWriteSlave  => gthWriteSlave,
          stableClk       => axilClk,
          gtRefClk        => timingRefClk,
+         gtRefClkDiv2    => '0',
          gtRxP           => timingRxP,
          gtRxN           => timingRxN,
          gtTxP           => timingTxP,

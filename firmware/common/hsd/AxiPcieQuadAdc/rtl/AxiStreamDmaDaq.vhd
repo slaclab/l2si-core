@@ -1,11 +1,11 @@
--------------------------------------------------------------------------------
+------------------------------------------------------------------------------
 -- Title      : SSI Stream DMA Controller
 -- Project    : General Purpose Core
 -------------------------------------------------------------------------------
 -- File       : AxiStreamDma.vhd
 -- Author     : Ryan Herbst, rherbst@slac.stanford1.edu
 -- Created    : 2014-04-25
--- Last update: 2017-04-06
+-- Last update: 2018-03-13
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -481,8 +481,8 @@ begin
          AXIS_CONFIG_G     => AXIS_CONFIG_G,
          AXI_CONFIG_G      => AXI_CONFIG_G,
          AXI_BURST_G       => AXI_BURST_G,
-         AXI_CACHE_G       => AXI_CACHE_G,
-         AXI_BURST_BYTES_G => 256 -- set to negotiated MaxPayload
+         AXI_CACHE_G       => AXI_CACHE_G 
+--         AXI_BURST_BYTES_G => 256 -- set to negotiated MaxPayload
       ) port map (
          axiClk          => axiClk,
          axiRst          => axiRst,
@@ -601,8 +601,7 @@ begin
          AXIS_CONFIG_G    => AXIS_CONFIG_G,
          AXI_CONFIG_G     => AXI_CONFIG_G,
          AXI_BURST_G      => AXI_BURST_G,
-         AXI_CACHE_G      => AXI_CACHE_G,
-         MAX_PEND_G       => MAX_PEND_G 
+         AXI_CACHE_G      => AXI_CACHE_G
       ) port map (
          axiClk          => axiClk,
          axiRst          => axiRst,

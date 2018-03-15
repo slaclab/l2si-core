@@ -5,7 +5,7 @@
 -- Author     : Larry Ruckman  <ruckman@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2016-02-12
--- Last update: 2017-08-22
+-- Last update: 2018-03-13
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -269,7 +269,7 @@ begin
       --------------------------
       U_IbFifo : entity work.AxiStreamFifo
          generic map (
-            DEBUG_G             => false,
+--            DEBUG_G             => false,
             TPD_G               => TPD_G,
 --            PIPE_STAGES_G       => 1,
 --  Seeing incorrect response to mAxisSlave.tReady            
