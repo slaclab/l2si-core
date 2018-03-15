@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-07-10
--- Last update: 2018-01-10
+-- Last update: 2018-01-15
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -453,5 +453,18 @@ begin
     wait;
   end process;
 
+  U_AxiMem : entity work.AxiLiteToAxi
+    port map (
+      axiClk    => regClk,
+      axiClkRst => regRst,
+      axilWriteMaster => regWriteMaster,
+      axilWriteSlave  => open,
+      axilReadMaster  => regReadMaster,
+      axilReadSlave   => open,
+      axiWriteMaster  => open,
+      axiWriteSlave   => AXI_WRITE_SLAVE_FORCE_C,
+      axiReadMaster   => open,
+      axiReadSlave    => AXI_READ_SLAVE_FORCE_C );
+     
 end top_level_app;
 
