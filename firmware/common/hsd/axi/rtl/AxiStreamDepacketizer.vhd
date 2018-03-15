@@ -1,17 +1,13 @@
 -------------------------------------------------------------------------------
--- Title      : 
--------------------------------------------------------------------------------
 -- File       : AxiStreamDepacketizer
--- Author     : Benjamin Reese  <bareese@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-09-29
 -- Last update: 2016-07-13
--- Platform   : 
--- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
--- Description: Formats an AXI-Stream for a transport link.
--- Sideband fields are placed into the data stream in a header.
--- Long frames are broken into smaller packets.
+-- Description: AXI stream DePacketerizer Module (non-interleave only)
+--    Formats an AXI-Stream for a transport link.
+--    Sideband fields are placed into the data stream in a header.
+--    Long frames are broken into smaller packets.
 -------------------------------------------------------------------------------
 -- This file is part of 'SLAC Firmware Standard Library'.
 -- It is subject to the license terms in the LICENSE.txt file found in the 
@@ -67,7 +63,7 @@ architecture rtl of AxiStreamDepacketizer is
 
    constant VERSION_C : slv(3 downto 0) := "0000";
 
-   type StateType is (HEADER_S, BLEED_S, MOVE_S);
+   type StateType is (HEADER_S, BLEED_S, MOVE_S, DONE_S);
 
    type RegType is record
       state            : StateType;
@@ -144,6 +140,7 @@ begin
          v.sof := '1';
       end if;
 
+      v.inputAxisSlave.tready := '0';
       if (outputAxisSlave.tReady = '1') then
          v.outputAxisMaster(1).tValid := '0';
          v.outputAxisMaster(0).tValid := '0';
@@ -196,7 +193,7 @@ begin
          when BLEED_S =>
             -- Blead an entire packet
             -- Set startup and sof true when done
-            v.inputAxisSlave.tReady      := outputAxisSlave.tReady;
+            v.inputAxisSlave.tready      := '1';
             v.outputAxisMaster(1).tvalid := '0';
             v.sof                        := '1';
             v.startup                    := '1';
@@ -205,12 +202,15 @@ begin
             end if;
 
          when MOVE_S =>
-            v.inputAxisSlave.tReady      := outputAxisSlave.tReady;
+            -- Keep the caches copy
             v.outputAxisMaster(1).tvalid := r.outputAxisMaster(1).tvalid;
-
+            -- Check if we can move data
             if (inputAxisMaster.tValid = '1' and v.outputAxisMaster(0).tValid = '0') then
+               -- Accept the data
+               v.inputAxisSlave.tReady      := '1';
                -- Advance the pipeline
                v.outputAxisMaster(1)       := inputAxisMaster;
+               v.outputAxisMaster(0)       := r.outputAxisMaster(1);
                -- Keep sideband data from header
                v.outputAxisMaster(1).tDest := r.outputAxisMaster(1).tDest;
                v.outputAxisMaster(1).tId   := r.outputAxisMaster(1).tId;
@@ -219,15 +219,10 @@ begin
                   v.outputAxisMaster(1).tUser := r.outputAxisMaster(1).tUser;
                   v.sideband                  := '0';
                end if;
-
-               v.outputAxisMaster(0) := r.outputAxisMaster(1);
-
                -- End of frame
                if (inputAxisMaster.tLast = '1') then
                   -- Check tkeep to find tail byte (and strip it out)
-                  v.state                     := HEADER_S;
                   v.outputAxisMaster(1).tKeep := '0' & inputAxisMaster.tKeep(15 downto 1);
-
                   case (inputAxisMaster.tKeep(7 downto 0)) is
                      when X"01" =>
                         -- Single byte tail, append tUser to previous txn which has been held
@@ -260,21 +255,34 @@ begin
                         null;
                   end case;
                   v.outputAxisMaster(1).tLast := v.sof;
+                  v.state := DONE_S;
                end if;
             end if;
 
+
+         when DONE_S =>
+            -- Keep the caches copy
+            v.outputAxisMaster(1).tvalid := r.outputAxisMaster(1).tvalid;
+            -- Check if we can move data
+            if (v.outputAxisMaster(0).tValid = '0') then
+               -- Advance the pipeline
+               v.outputAxisMaster(1).tValid := '0';
+               v.outputAxisMaster(0)        := r.outputAxisMaster(1);         
+               v.state := HEADER_S;
+            end if;            
+            
       end case;
 
-      ----------------------------------------------------------------------------------------------
-      -- Reset and output assignment
-      ----------------------------------------------------------------------------------------------
+      -- Combinatorial outputs before the reset
+      inputAxisSlave <= v.inputAxisSlave;
+      
+      -- Reset
       if (axisRst = '1') then
          v := REG_INIT_C;
       end if;
 
+      -- Register the variable for next clock cycle
       rin <= v;
-
-      inputAxisSlave <= v.inputAxisSlave;
 
       -- Hold each out tvalid until next in tvalid arrives
       outputAxisMaster <= r.outputAxisMaster(0);

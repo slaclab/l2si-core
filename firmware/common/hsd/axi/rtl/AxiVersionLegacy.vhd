@@ -1,11 +1,9 @@
 -------------------------------------------------------------------------------
--- File       : AxiVersion.vhd
+-- File       : AxiVersionLegacy.vhd
 -- Company    : SLAC National Accelerator Laboratory
--- Created    : 2013-05-20
--- Last update: 2017-02-15
 -------------------------------------------------------------------------------
 -- Description: Creates AXI accessible registers containing configuration
--- information.
+-- information. This is a legacy version for backward compatibility.
 -------------------------------------------------------------------------------
 -- This file is part of 'SLAC Firmware Standard Library'.
 -- It is subject to the license terms in the LICENSE.txt file found in the 
@@ -24,14 +22,14 @@ use ieee.std_logic_unsigned.all;
 use work.StdRtlPkg.all;
 use work.AxiLitePkg.all;
 
-entity AxiVersion is
+entity AxiVersionLegacy is
    generic (
       TPD_G              : time                   := 1 ns;
       BUILD_INFO_G       : BuildInfoType;
       SIM_DNA_VALUE_G    : slv                    := X"000000000000000000000000";
       AXI_ERROR_RESP_G   : slv(1 downto 0)        := AXI_RESP_DECERR_C;
       DEVICE_ID_G        : slv(31 downto 0)       := (others => '0');
-      CLK_PERIOD_G       : real                   := 8.0E-9;  -- units of seconds
+      CLK_PERIOD_G       : real                   := 8.0E-9;     -- units of seconds
       XIL_DEVICE_G       : string                 := "7SERIES";  -- Either "7SERIES" or "ULTRASCALE"
       EN_DEVICE_DNA_G    : boolean                := false;
       EN_DS2411_G        : boolean                := false;
@@ -39,7 +37,7 @@ entity AxiVersion is
       USE_SLOWCLK_G      : boolean                := false;
       BUFR_CLK_DIV_G     : positive               := 8;
       AUTO_RELOAD_EN_G   : boolean                := false;
-      AUTO_RELOAD_TIME_G : real range 0.0 to 30.0 := 10.0;  -- units of seconds
+      AUTO_RELOAD_TIME_G : real range 0.0 to 30.0 := 10.0;       -- units of seconds
       AUTO_RELOAD_ADDR_G : slv(31 downto 0)       := (others => '0'));
    port (
       -- AXI-Lite Interface
@@ -64,9 +62,9 @@ entity AxiVersion is
       userValues     : in    Slv32Array(0 to 63) := (others => X"00000000");
       -- Optional: DS2411 interface
       fdSerSdio      : inout sl                  := 'Z');
-end AxiVersion;
+end AxiVersionLegacy;
 
-architecture rtl of AxiVersion is
+architecture rtl of AxiVersionLegacy is
 
    constant RELOAD_COUNT_C : integer          := integer(AUTO_RELOAD_TIME_G / CLK_PERIOD_G);
    constant TIMEOUT_1HZ_C  : natural          := (getTimeRatio(1.0, CLK_PERIOD_G) -1);
@@ -95,7 +93,7 @@ architecture rtl of AxiVersion is
       scratchPad     => (others => '0'),
       counter        => (others => '0'),
       counterRst     => '0',
-      userReset      => '0',
+      userReset      => '1',            -- Asserted on powerup
       fpgaReload     => '0',
       haltReload     => '0',
       fpgaReloadAddr => AUTO_RELOAD_ADDR_G,
@@ -105,8 +103,8 @@ architecture rtl of AxiVersion is
    signal r   : RegType := REG_INIT_C;
    signal rin : RegType;
 
-   signal dnaValue     : slv(127 downto 0) := (others => '0');
-   signal fdValue      : slv(63 downto 0)  := (others => '0');
+   signal dnaValue : slv(127 downto 0) := (others => '0');
+   signal fdValue  : slv(63 downto 0)  := (others => '0');
 
    attribute rom_style                         : string;
    attribute rom_style of BUILD_STRING_ROM_C   : constant is "distributed";
@@ -162,8 +160,8 @@ begin
             bootAddress => r.fpgaReloadAddr);
    end generate;
 
-   comb : process (axiReadMaster, axiRst, axiWriteMaster, dnaValue, fdValue,
-                   fpgaEnReload, r, userValues) is
+   comb : process (axiReadMaster, axiRst, axiWriteMaster, dnaValue, fdValue, fpgaEnReload, r,
+                   userValues) is
       variable v      : RegType;
       variable axilEp : AxiLiteEndpointType;
    begin
@@ -185,33 +183,34 @@ begin
 
       ------------------------      
       -- AXI-Lite Transactions
-      ------------------------      
+      ------------------------
+      ------------------------
 
       -- Determine the transaction type
       axiSlaveWaitTxn(axilEp, axiWriteMaster, axiReadMaster, v.axiWriteSlave, v.axiReadSlave);
 
-      axiSlaveRegisterR(axilEp, x"000", 0, BUILD_INFO_C.fwVersion);
-      axiSlaveRegister(axilEp, x"004", 0, v.scratchPad);
-      axiSlaveRegisterR(axilEp, x"008", 0, r.upTimeCnt);
+      axiSlaveRegisterR(axilEp, X"000", 0, BUILD_INFO_C.fwVersion);
+      axiSlaveRegister(axilEp, X"004", 0, v.scratchPad);
+      axiSlaveRegisterR(axilEp, X"008", 0, dnaValue(63 downto 0));
+      axiSlaveRegisterR(axilEp, X"010", 0, fdValue);
+      axiSlaveRegister(axilEp, X"018", 0, v.userReset);
 
-      axiSlaveRegister(axilEp, x"100", 0, v.haltReload);
-      axiSlaveRegister(axilEp, x"104", 0, v.fpgaReload);
-      axiSlaveRegister(axilEp, x"108", 0, v.fpgaReloadAddr);
-      axiSlaveRegister(axilEp, x"10C", 0, v.userReset);
+      axiSlaveRegister(axilEp, X"01C", 0, v.fpgaReload);
+      axiSlaveRegister(axilEp, X"020", 0, v.fpgaReloadAddr);
+      axiSlaveRegister(axilEp, X"024", 0, v.counter, COUNTER_ZERO_C);
+      axiSlaveRegister(axilEp, X"028", 0, v.haltReload);
+      axiSlaveRegisterR(axilEp, X"02C", 0, r.upTimeCnt);
+      axiSlaveRegisterR(axilEp, X"030", 0, DEVICE_ID_G);
 
-      axiSlaveRegisterR(axilEp, x"300", 0, fdValue);
-      axiSlaveRegisterR(axilEp, x"400", userValues);
-      axiSlaveRegisterR(axilEp, x"500", 0, DEVICE_ID_G);
-      
-      -- axiSlaveRegisterR(axilEp, x"600", 0, BUILD_INFO_C.gitHash);-- axiSlaveRegisterR() Broken, only first 32-bit show up in software
-      axiSlaveRegisterR(axilEp, x"600", 0, BUILD_INFO_C.gitHash(31 downto 0));
-      axiSlaveRegisterR(axilEp, x"604", 0, BUILD_INFO_C.gitHash(63 downto 32));
-      axiSlaveRegisterR(axilEp, x"608", 0, BUILD_INFO_C.gitHash(95 downto 64));
-      axiSlaveRegisterR(axilEp, x"60C", 0, BUILD_INFO_C.gitHash(127 downto 96));
-      axiSlaveRegisterR(axilEp, x"610", 0, BUILD_INFO_C.gitHash(159 downto 128));
-      
-      axiSlaveRegisterR(axilEp, x"700", 0, dnaValue);
-      axiSlaveRegisterR(axilEp, x"800", BUILD_STRING_ROM_C);
+--      axiSlaveRegisterR(axilEp, X"100", 0, BUILD_INFO_C.gitHash(63 downto 32));
+       axiSlaveRegisterR(axilEp, X"100", 0, BUILD_INFO_C.gitHash(31 downto 0));
+       axiSlaveRegisterR(axilEp, x"104", 0, BUILD_INFO_C.gitHash(63 downto 32));
+       axiSlaveRegisterR(axilEp, x"108", 0, BUILD_INFO_C.gitHash(95 downto 64));
+       axiSlaveRegisterR(axilEp, x"10C", 0, BUILD_INFO_C.gitHash(127 downto 96));
+       axiSlaveRegisterR(axilEp, x"110", 0, BUILD_INFO_C.gitHash(159 downto 128));
+
+      axiSlaveRegisterR(axilEp, X"400", userValues);
+      axiSlaveRegisterR(axilEp, X"800", BUILD_STRING_ROM_C);
 
       axiSlaveDefault(axilEp, v.axiWriteSlave, v.axiReadSlave, AXI_ERROR_RESP_G);
 

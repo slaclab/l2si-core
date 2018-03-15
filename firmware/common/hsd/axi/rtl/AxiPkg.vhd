@@ -1,15 +1,10 @@
 -------------------------------------------------------------------------------
--- Title      : AXI-4 Package File
--------------------------------------------------------------------------------
 -- File       : AxiPkg.vhd
--- Author     : Ryan Herbst <rherbst@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2013-04-02
--- Last update: 2016-04-26
--- Platform   : 
--- Standard   : VHDL'93/02
+-- Last update: 2017-12-12
 -------------------------------------------------------------------------------
--- Description: Package file for AXI Busses
+-- Description: AXI4 Package File
 -------------------------------------------------------------------------------
 -- This file is part of 'SLAC Firmware Standard Library'.
 -- It is subject to the license terms in the LICENSE.txt file found in the 
@@ -224,7 +219,7 @@ package AxiPkg is
       constant ADDR_WIDTH_C : in positive range 12 to 64 := 32;
       constant DATA_BYTES_C : in positive range 1 to 128 := 4;
       constant ID_BITS_C    : in positive range 1 to 32  := 12;
-      constant LEN_BITS_C   : in natural range 0 to 8   := 4)
+      constant LEN_BITS_C   : in natural range 0 to 8    := 4)
       return AxiConfigType;
 
    constant AXI_CONFIG_INIT_C : AxiConfigType := axiConfig(
@@ -256,10 +251,21 @@ package AxiPkg is
       burstBytes : integer range 1 to 4096 := 4096)
       return slv;
 
+   -- Calculate number of txns in a burst based upon burst size, total remaining bytes,
+   -- current address and bus configuration.
+   -- Address is used to set a transaction size aligned to 4k boundaries
+   -- Returned value is number of txns-1, so can be assigned to AWLEN/ARLEN
+   function getAxiLen (
+      axiConfig  : AxiConfigType;
+      burstBytes : integer range 1 to 4096 := 4096;
+      totalBytes : slv;
+      address    : slv)
+      return slv;
+
    -- Caclulate the byte count for a read request
    function getAxiReadBytes (
-      axiConfig  : AxiConfigType;
-      axiRead    : AxiReadMasterType)
+      axiConfig : AxiConfigType;
+      axiRead   : AxiReadMasterType)
       return slv;
 
 end package AxiPkg;
@@ -270,7 +276,7 @@ package body AxiPkg is
       constant ADDR_WIDTH_C : in positive range 12 to 64 := 32;
       constant DATA_BYTES_C : in positive range 1 to 128 := 4;
       constant ID_BITS_C    : in positive range 1 to 32  := 12;
-      constant LEN_BITS_C   : in natural range 0 to 8   := 4)
+      constant LEN_BITS_C   : in natural range 0 to 8    := 4)
       return AxiConfigType is
       variable ret : AxiConfigType;
    begin
@@ -325,25 +331,57 @@ package body AxiPkg is
       return slv is
    begin
       -- burstBytes / data bytes width is number of txns required.
-      -- Subtract by 1 for A*LEN value.
+      -- Subtract by 1 for A*LEN value for even divides.
       -- Convert to SLV and truncate to size of A*LEN port for this AXI bus
-      -- This limits number of txns approraiately based on size of len port
+      -- This limits number of txns appropriately based on size of len port
       -- Then resize to 8 bits because our records define A*LEN as 8 bits always.
-      return resize(toSlv(burstBytes/axiConfig.DATA_BYTES_C-1, axiConfig.LEN_BITS_C), 8);
+      return resize(toSlv(wordCount(burstBytes, axiConfig.DATA_BYTES_C)-1, axiConfig.LEN_BITS_C), 8);
+   end function getAxiLen;
+
+   -- Calculate number of txns in a burst based upon burst size, total remaining bytes,
+   -- current address and bus configuration.
+   -- Address is used to set a transaction size aligned to 4k boundaries
+   -- Returned value is number of txns-1, so can be assigned to AWLEN/ARLEN
+   function getAxiLen (
+      axiConfig  : AxiConfigType;
+      burstBytes : integer range 1 to 4096 := 4096;
+      totalBytes : slv;
+      address    : slv)
+      return slv is
+      variable max : natural;
+      variable req : natural;
+      variable min : natural;
+
+   begin
+
+      -- Check for 4kB boundary
+      max := 4096 - conv_integer(unsigned(address(11 downto 0)));
+
+      if (totalBytes < burstBytes) then
+         req := conv_integer(totalBytes);
+      else
+         req := burstBytes;
+      end if;
+
+      min := minimum(req, max);
+
+      -- Return the AXI Length value
+      return getAxiLen(axiConfig, min);
+
    end function getAxiLen;
 
    -- Calculate the byte count for a read request
    function getAxiReadBytes (
-      axiConfig  : AxiConfigType;
-      axiRead    : AxiReadMasterType)
+      axiConfig : AxiConfigType;
+      axiRead   : AxiReadMasterType)
       return slv is
       constant addrLsb : natural := bitSize(AxiConfig.DATA_BYTES_C-1);
       variable tempSlv : slv(AxiConfig.LEN_BITS_C+addrLsb downto 0);
    begin
-      tempSlv := (others=>'0');
+      tempSlv := (others => '0');
 
-      tempSlv(AxiConfig.LEN_BITS_C+addrLsb downto addrLsb) 
-         := axiRead.arlen(AxiConfig.LEN_BITS_C-1 downto 0) + toSlv(1,AxiConfig.LEN_BITS_C+1);
+      tempSlv(AxiConfig.LEN_BITS_C+addrLsb downto addrLsb)
+         := axiRead.arlen(AxiConfig.LEN_BITS_C-1 downto 0) + toSlv(1, AxiConfig.LEN_BITS_C+1);
 
       tempSlv := tempSlv - axiRead.araddr(addrLsb-1 downto 0);
 

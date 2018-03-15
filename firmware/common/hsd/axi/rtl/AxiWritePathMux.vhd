@@ -1,13 +1,8 @@
 -------------------------------------------------------------------------------
--- Title      : AXI Write Path Multiplexer
--- Project    : General Purpose Core
--------------------------------------------------------------------------------
 -- File       : AxiWritePathMux.vhd
--- Author     : Ryan Herbst, rherbst@slac.stanford.edu
+-- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2014-04-25
--- Last update: 2014-04-29
--- Platform   : 
--- Standard   : VHDL'93/02
+-- Last update: 2018-03-11
 -------------------------------------------------------------------------------
 -- Description:
 -- Block to connect multiple incoming AXI write path interfaces.
@@ -19,9 +14,6 @@
 -- No part of 'SLAC Firmware Standard Library', including this file, 
 -- may be copied, modified, propagated, or distributed except according to 
 -- the terms contained in the LICENSE.txt file.
--------------------------------------------------------------------------------
--- Modification history:
--- 04/25/2014: created.
 -------------------------------------------------------------------------------
 
 library ieee;
@@ -211,9 +203,6 @@ begin
          when S_MOVE_C =>
             v.dataAck  := '0';
 
-            -- Pass ready
-            v.slaves(conv_integer(r.dataAckNum)).wready := mAxiWriteSlave.wready;
-
             -- Advance pipeline 
             if r.master.wvalid = '0' or mAxiWriteSlave.wready = '1' then
                v.master.wdata  := selData.wdata;
@@ -221,6 +210,9 @@ begin
                v.master.wvalid := selData.wvalid;
                v.master.wstrb  := selData.wstrb;
                v.master.wid    := selData.wid;
+
+               -- Ready
+               v.slaves(conv_integer(r.dataAckNum)).wready := '1';
 
                -- wlast to be presented
                if selData.wlast = '1' and selData.wvalid = '1' then
@@ -263,30 +255,30 @@ begin
       else
          v.master.bready := '0';
       end if;
-   
-      if (axiRst = '1') or (NUM_SLAVES_G = 1) then
-         v := REG_INIT_C;
-      end if;
-
-      rin <= v;
 
       -- Bypass if single slave
       if NUM_SLAVES_G = 1 then
          sAxiWriteSlaves(0) <= mAxiWriteSlave;
          mAxiWriteMaster    <= sAxiWritemasters(0);
       else
-
          -- Output data
          sAxiWriteSlaves <= r.slaves;
          mAxiWriteMaster <= r.master;
 
+         -- Combinatorial outputs before the reset
          -- Readies are direct
          for i in 0 to (NUM_SLAVES_G-1) loop
-            sAxiWriteSlaves(i).awready <= v.slaves(i).awready;
-            sAxiWriteSlaves(i).wready  <= v.slaves(i).wready;
+           sAxiWriteSlaves(i).awready <= v.slaves(i).awready;
+           sAxiWriteSlaves(i).wready  <= v.slaves(i).wready;
          end loop;
          mAxiWriteMaster.bready <= v.master.bready;
+      end if;      
+   
+      if (axiRst = '1') or (NUM_SLAVES_G = 1) then
+         v := REG_INIT_C;
       end if;
+
+      rin <= v;
 
    end process comb;
 

@@ -1,8 +1,8 @@
 -------------------------------------------------------------------------------
--- Title         : AXI Lite Empty End Point
--- File          : AxiLiteAsync.vhd
--- Author        : Ryan Herbst, rherbst@slac.stanford.edu
--- Created       : 03/10/2014
+-- File       : AxiLiteAsync.vhd
+-- Company    : SLAC National Accelerator Laboratory
+-- Created    : 2013-04-02
+-- Last update: 2017-11-07
 -------------------------------------------------------------------------------
 -- Description:
 -- Asynchronous bridge for AXI Lite bus. Allows AXI transactions to cross 
@@ -16,9 +16,7 @@
 -- may be copied, modified, propagated, or distributed except according to 
 -- the terms contained in the LICENSE.txt file.
 -------------------------------------------------------------------------------
--- Modification history:
--- 03/10/2014: created.
--------------------------------------------------------------------------------
+
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.std_logic_arith.all;
@@ -29,7 +27,8 @@ use work.AxiLitePkg.all;
 
 entity AxiLiteAsync is
    generic (
-      TPD_G           : time                  := 1 ns;
+      TPD_G            : time                  := 1 ns;
+      AXI_ERROR_RESP_G : slv(1 downto 0)       := AXI_RESP_SLVERR_C;
       COMMON_CLK_G    : boolean               := false;    
       NUM_ADDR_BITS_G : natural               := 32;
       PIPE_STAGES_G   : integer range 0 to 16 := 0);
@@ -182,7 +181,7 @@ begin
    process (readSlaveToMastDout)
    begin
       mAxiReadMaster.araddr <= (others => '0');
-      mAxiReadMaster.araddr <= readSlaveToMastDout(NUM_ADDR_BITS_G+2 downto 3);
+      mAxiReadMaster.araddr(NUM_ADDR_BITS_G-1 downto 0) <= readSlaveToMastDout(NUM_ADDR_BITS_G+2 downto 3);
    end process;
 
    -- Read control and valid
@@ -243,7 +242,7 @@ begin
    readMastToSlaveWrite  <= mAxiReadSlave.rvalid and (not readMastToSlaveFull);
 
    -- Data Out
-   sAxiReadSlave.rresp <= ite(m2sRst = '0', readMastToSlaveDout(1 downto 0), AXI_RESP_SLVERR_C);
+   sAxiReadSlave.rresp <= ite(m2sRst = '0', readMastToSlaveDout(1 downto 0), AXI_ERROR_RESP_G);
    sAxiReadSlave.rdata <= readMastToSlaveDout(33 downto 2);
 
    -- Read control and valid
@@ -309,7 +308,7 @@ begin
    process (writeAddrSlaveToMastDout)
    begin
       mAxiWriteMaster.awaddr <= (others => '0');
-      mAxiWriteMaster.awaddr <= writeAddrSlaveToMastDout(NUM_ADDR_BITS_G+2 downto 3);
+      mAxiWriteMaster.awaddr(NUM_ADDR_BITS_G-1 downto 0) <= writeAddrSlaveToMastDout(NUM_ADDR_BITS_G+2 downto 3);
    end process;
 
    -- Read control and valid
@@ -430,7 +429,7 @@ begin
    writeMastToSlaveWrite  <= mAxiWriteSlave.bvalid and (not writeMastToSlaveFull);
 
    -- Data Out
-   sAxiWriteSlave.bresp <= ite(m2sRst = '0', writeMastToSlaveDout, AXI_RESP_SLVERR_C);
+   sAxiWriteSlave.bresp <= ite(m2sRst = '0', writeMastToSlaveDout, AXI_ERROR_RESP_G);
 
    -- Read control and valid
    sAxiWriteSlave.bvalid <= ite(m2sRst = '0', writeMastToSlaveValid, '1');

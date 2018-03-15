@@ -1,8 +1,8 @@
 -------------------------------------------------------------------------------
--- Title         : AXI Lite FIFO Read Module
--- File          : AxiLiteFifoPushPop.vhd
--- Author        : Ryan Herbst, rherbst@slac.stanford.edu
--- Created       : 09/03/2013
+-- File       : AxiLiteFifoPush.vhd
+-- Company    : SLAC National Accelerator Laboratory
+-- Created    : 2013-04-02
+-- Last update: 2018-03-13
 -------------------------------------------------------------------------------
 -- Description:
 -- Supports reading of general purpose FIFOs from the AxiLite bus.

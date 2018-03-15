@@ -1,13 +1,8 @@
 -------------------------------------------------------------------------------
--- Title      : AXI Bus To AXI Lite Bus Bridge
--------------------------------------------------------------------------------
 -- File       : AxiToAxiLite.vhd
--- Author     : Ryan Herbst <rherbst@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2014-03-06
--- Last update: 2016-09-28
--- Platform   : 
--- Standard   : VHDL'93/02
+-- Last update: 2017-11-03
 -------------------------------------------------------------------------------
 -- Description: AXI4-to-AXI-Lite bridge
 --
@@ -33,7 +28,8 @@ use work.AxiPkg.all;
 
 entity AxiToAxiLite is
    generic (
-      TPD_G : time := 1 ns);
+      TPD_G           : time    := 1 ns;
+      EN_SLAVE_RESP_G : boolean := true);
    port (
       -- Clocks & Reset
       axiClk          : in  sl;
@@ -57,13 +53,11 @@ begin
    axilWriteMaster.awaddr  <= axiWriteMaster.awaddr(31 downto 0);
    axilWriteMaster.awprot  <= axiWriteMaster.awprot;
    axilWriteMaster.awvalid <= axiWriteMaster.awvalid;
---   axilWriteMaster.wdata   <= axiWriteMaster.wdata(31 downto 0);
---   axilWriteMaster.wstrb   <= axiWriteMaster.wstrb(3 downto 0);
    axilWriteMaster.wvalid  <= axiWriteMaster.wvalid;
    axilWriteMaster.bready  <= axiWriteMaster.bready;
 
    axiWriteSlave.awready <= axilWriteSlave.awready;
-   axiWriteSlave.bresp   <= axilWriteSlave.bresp;
+   axiWriteSlave.bresp   <= axilWriteSlave.bresp when(EN_SLAVE_RESP_G) else AXI_RESP_OK_C;
    axiWriteSlave.bvalid  <= axilWriteSlave.bvalid;
    axiWriteSlave.wready  <= axilWriteSlave.wready;
 
@@ -73,7 +67,7 @@ begin
    axilReadMaster.rready  <= axiReadMaster.rready;
 
    axiReadSlave.arready <= axilReadSlave.arready;
-   axiReadSlave.rresp   <= axilReadSlave.rresp;
+   axiReadSlave.rresp   <= axilReadSlave.rresp when(EN_SLAVE_RESP_G) else AXI_RESP_OK_C;
    axiReadSlave.rlast   <= '1';
    axiReadSlave.rvalid  <= axilReadSlave.rvalid;
 
@@ -86,14 +80,14 @@ begin
       variable i     : integer;
       variable wdata : slv(31 downto 0);
    begin
-      wdata := (others=>'0');
+      wdata := (others => '0');
       for i in 0 to 31 loop
          wdata := wdata or axiWriteMaster.wdata(32*i+31 downto 32*i);
       end loop;
       axilWriteMaster.wdata <= wdata;
       axilWriteMaster.wstrb <= x"F";
    end process;
-  
+
    process(axilReadSlave)
       variable i     : integer;
       variable rdata : slv(1023 downto 0);

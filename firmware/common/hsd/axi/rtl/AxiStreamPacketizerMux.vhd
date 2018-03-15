@@ -1,17 +1,12 @@
 -------------------------------------------------------------------------------
--- Title      : 
--------------------------------------------------------------------------------
 -- File       : AxiStreamPacketizer
--- Author     : Benjamin Reese  <bareese@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-09-29
 -- Last update: 2016-04-30
--- Platform   : 
--- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
 -- Description: Formats an AXI-Stream for a transport link.
 -- Sideband fields are placed into the data stream in a header.
--- Long frames are broken into smaller packets.
+-- Long frames are broken into smaller packets.  (non-interleave only)
 -------------------------------------------------------------------------------
 -- This file is part of 'SLAC Firmware Standard Library'.
 -- It is subject to the license terms in the LICENSE.txt file found in the 
@@ -321,17 +316,19 @@ begin
             end if;
 
       end case;
+      
+      -- Combinatorial outputs before the reset
+      inputAxisSlaves <= v.inputAxisSlaves;
 
-      ----------------------------------------------------------------------------------------------
-      -- Reset and output assignment
-      ----------------------------------------------------------------------------------------------
+      -- Reset
       if (axisRst = '1') then
          v := REG_INIT_C;
       end if;
 
+      -- Register the variable for next clock cycle
       rin <= v;
 
-      inputAxisSlaves   <= v.inputAxisSlaves;
+      -- Registered Outputs
       outputAxisMaster <= r.outputAxisMaster;
 
    end process comb;

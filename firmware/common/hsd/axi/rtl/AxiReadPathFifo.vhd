@@ -1,16 +1,10 @@
 -------------------------------------------------------------------------------
--- Title      : AXI Write Path FIFO
--- Project    : General Purpose Core
--------------------------------------------------------------------------------
 -- File       : AxiReadPathFifo.vhd
--- Author     : Ryan Herbst, rherbst@slac.stanford.edu
+-- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2014-04-25
 -- Last update: 2014-05-01
--- Platform   : 
--- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
--- Description:
--- FIFO for AXI write path transactions.
+-- Description: FIFO for AXI write path transactions.
 -------------------------------------------------------------------------------
 -- This file is part of 'SLAC Firmware Standard Library'.
 -- It is subject to the license terms in the LICENSE.txt file found in the 
@@ -19,9 +13,6 @@
 -- No part of 'SLAC Firmware Standard Library', including this file, 
 -- may be copied, modified, propagated, or distributed except according to 
 -- the terms contained in the LICENSE.txt file.
--------------------------------------------------------------------------------
--- Modification history:
--- 04/25/2014: created.
 -------------------------------------------------------------------------------
 
 library ieee;
@@ -87,7 +78,7 @@ architecture rtl of AxiReadPathFifo is
 
    constant ADDR_BITS_C  : integer := AXI_CONFIG_G.ADDR_WIDTH_C - ADDR_LSB_G;
    constant ID_BITS_C    : integer := ite(ID_FIXED_EN_G,0,AXI_CONFIG_G.ID_BITS_C);
-   constant LEN_BITS_C   : integer := ite(LEN_FIXED_EN_G,0,4);
+   constant LEN_BITS_C   : integer := ite(LEN_FIXED_EN_G,0,AXI_CONFIG_G.LEN_BITS_C);
    constant SIZE_BITS_C  : integer := ite(SIZE_FIXED_EN_G,0,3);
    constant BURST_BITS_C : integer := ite(BURST_FIXED_EN_G,0,2);
    constant LOCK_BITS_C  : integer := ite(LOCK_FIXED_EN_G,0,2);

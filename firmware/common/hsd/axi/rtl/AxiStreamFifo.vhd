@@ -1,13 +1,8 @@
 -------------------------------------------------------------------------------
--- Title      : AXI Stream FIFO / Re-sizer
--- Project    : General Purpose Core
--------------------------------------------------------------------------------
 -- File       : AxiStreamFifo.vhd
--- Author     : Ryan Herbst, rherbst@slac.stanford.edu
+-- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2014-04-25
--- Last update: 2017-03-13
--- Platform   : 
--- Standard   : VHDL'93/02
+-- Last update: 2016-08-31
 -------------------------------------------------------------------------------
 -- Description:
 -- Block to serve as an async FIFO for AXI Streams. This block also allows the
@@ -22,9 +17,6 @@
 -- may be copied, modified, propagated, or distributed except according to 
 -- the terms contained in the LICENSE.txt file.
 -------------------------------------------------------------------------------
--- Modification history:
--- 04/25/2014: created.
--------------------------------------------------------------------------------
 
 library ieee;
 use ieee.std_logic_1164.all;
@@ -36,7 +28,7 @@ use work.AxiStreamPkg.all;
 
 entity AxiStreamFifo is
    generic (
-      DEBUG_G             : boolean := false;
+
       -- General Configurations
       TPD_G               : time                       := 1 ns;
       INT_PIPE_STAGES_G   : natural range 0 to 16      := 0;  -- Internal FIFO setting
@@ -80,15 +72,14 @@ entity AxiStreamFifo is
       sAxisCtrl   : out AxiStreamCtrlType;
 
       -- FIFO status & config , synchronous to sAxisClk
-      fifoWriteCnt    : out slv(FIFO_ADDR_WIDTH_G-1 downto 0);
-      fifoPauseThresh : in  slv(FIFO_ADDR_WIDTH_G-1 downto 0) := (others => '1');
+      fifoPauseThresh : in slv(FIFO_ADDR_WIDTH_G-1 downto 0) := (others => '1');
 
       -- Master Port
       mAxisClk    : in  sl;
       mAxisRst    : in  sl;
       mAxisMaster : out AxiStreamMasterType;
       mAxisSlave  : in  AxiStreamSlaveType;
-      mTLastTUser : out slv(511 downto 0));  -- when VALID_THOLD_G /= 1, used to look ahead at tLast's tUser
+      mTLastTUser : out slv(127 downto 0));  -- when VALID_THOLD_G /= 1, used to look ahead at tLast's tUser
 end AxiStreamFifo;
 
 architecture rtl of AxiStreamFifo is
@@ -332,8 +323,6 @@ architecture rtl of AxiStreamFifo is
 
 begin
 
-  fifoWriteCnt <= fifoWrCount;
-  
    assert ((SLAVE_AXI_CONFIG_G.TDATA_BYTES_C >= MASTER_AXI_CONFIG_G.TDATA_BYTES_C and
             SLAVE_AXI_CONFIG_G.TDATA_BYTES_C mod MASTER_AXI_CONFIG_G.TDATA_BYTES_C = 0)
            or

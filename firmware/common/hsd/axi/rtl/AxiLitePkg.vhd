@@ -1,11 +1,10 @@
 -------------------------------------------------------------------------------
--- Title         : ARM Based RCE Generation 3, Package File
--- File          : AxiLitePkg.vhd
--- Author        : Ryan Herbst, rherbst@slac.stanford.edu
--- Created       : 04/02/2013
+-- File       : AxiLitePkg.vhd
+-- Company    : SLAC National Accelerator Laboratory
+-- Created    : 2013-04-02
+-- Last update: 2018-01-29
 -------------------------------------------------------------------------------
--- Description:
--- Package file for ARM based rce generation 3 processor core.
+-- Description: AXI-Lite Package File
 -------------------------------------------------------------------------------
 -- This file is part of 'SLAC Firmware Standard Library'.
 -- It is subject to the license terms in the LICENSE.txt file found in the 
@@ -15,9 +14,7 @@
 -- may be copied, modified, propagated, or distributed except according to 
 -- the terms contained in the LICENSE.txt file.
 -------------------------------------------------------------------------------
--- Modification history:
--- 04/02/2013: created.
--------------------------------------------------------------------------------
+
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.NUMERIC_STD.all;
@@ -40,7 +37,7 @@ package AxiLitePkg is
    --
    --          1) Any accesses with AWSIZE information other than 32-bit receives a SLVERR response.
    --          2) Any accesses with AWLEN information other than zero receives a SLVERR response.
-   --          3) Any access that is unaligned, for example, where AWADDRP[1:0] is not equal to 2’b00, 
+   --          3) Any access that is unaligned, for example, where AWADDRP[1:0] is not equal to 2'b00, 
    --             returns a SLVERR response where a read access returns all zeros and a write access 
    --             does not modify the address location.
    --          4) Any write access that attempts to make use of the WSTRB lines, 
@@ -99,6 +96,15 @@ package AxiLitePkg is
       rresp   => (others => '0'),
       rvalid  => '0'
       );
+
+   function axiLiteReadSlaveEmptyInit (
+      rresp : slv(1 downto 0)  := AXI_RESP_OK_C;
+      rdata : slv(31 downto 0) := (others => '0'))
+      return AxiLiteReadSlaveType;
+
+   constant AXI_LITE_READ_SLAVE_EMPTY_OK_C     : AxiLiteReadSlaveType := axiLiteReadSlaveEmptyInit(rresp => AXI_RESP_OK_C);
+   constant AXI_LITE_READ_SLAVE_EMPTY_SLVERR_C : AxiLiteReadSlaveType := axiLiteReadSlaveEmptyInit(rresp => AXI_RESP_SLVERR_C);
+   constant AXI_LITE_READ_SLAVE_EMPTY_DECERR_C : AxiLiteReadSlaveType := axiLiteReadSlaveEmptyInit(rresp => AXI_RESP_DECERR_C);
 
    -- Array
    type AxiLiteReadSlaveArray is array (natural range<>) of AxiLiteReadSlaveType;
@@ -161,6 +167,15 @@ package AxiLitePkg is
       bvalid  => '0'
       );
 
+   function axiLiteWriteSlaveEmptyInit (
+      bresp : slv(1 downto 0) := AXI_RESP_OK_C)
+      return AxiLiteWriteSlaveType;
+
+   constant AXI_LITE_WRITE_SLAVE_EMPTY_OK_C     : AxiLiteWriteSlaveType := axiLiteWriteSlaveEmptyInit(bresp => AXI_RESP_OK_C);
+   constant AXI_LITE_WRITE_SLAVE_EMPTY_SLVERR_C : AxiLiteWriteSlaveType := axiLiteWriteSlaveEmptyInit(bresp => AXI_RESP_SLVERR_C);
+   constant AXI_LITE_WRITE_SLAVE_EMPTY_DECERR_C : AxiLiteWriteSlaveType := axiLiteWriteSlaveEmptyInit(bresp => AXI_RESP_DECERR_C);
+
+
    -- Array
    type AxiLiteWriteSlaveArray is array (natural range<>) of AxiLiteWriteSlaveType;
 
@@ -201,6 +216,20 @@ package AxiLitePkg is
    end record;
 
    type AxiLiteCrossbarMasterConfigArray is array (natural range <>) of AxiLiteCrossbarMasterConfigType;
+
+   constant AXIL_XBAR_CFG_DEFAULT_C : AxiLiteCrossbarMasterConfigArray(0 to 3) := (
+      0                  => (baseAddr => X"00000000",
+            addrBits     => 16,
+            connectivity => X"FFFF"),
+      1                  => (baseAddr => X"00010000",
+            addrBits     => 16,
+            connectivity => X"FFFF"),
+      2                  => (baseAddr => X"00020000",
+            addrBits     => 16,
+            connectivity => X"FFFF"),
+      3                  => (baseAddr => X"00030000",
+            addrBits     => 16,
+            connectivity => X"FFFF"));
 
    -------------------------------------------------------------------------------------------------
    -- Initilize masters with uppder address bits already set to configuration base address
@@ -289,7 +318,8 @@ package AxiLitePkg is
       variable axiWriteSlave : inout AxiLiteWriteSlaveType;
       variable axiReadSlave  : inout AxiLiteReadSlaveType;
       variable axiStatus     : in    AxiLiteStatusType;
-      axiResp                : in    slv(1 downto 0) := AXI_RESP_OK_C);
+      axiResp                : in    slv(1 downto 0) := AXI_RESP_OK_C;
+      extTxn                 : in    sl              := '0');
 
 
    -------------------------------------------------------------------------------------------------
@@ -338,13 +368,17 @@ package AxiLitePkg is
       addr        : in    slv;
       regs        : in    slv32Array);
 
-
+   procedure axiWrDetect (
+      variable ep : inout AxiLiteEndpointType;
+      addr        : in    slv;
+      reg         : inout sl);
 
    procedure axiSlaveDefault (
       variable ep            : inout AxiLiteEndpointType;
       variable axiWriteSlave : inout AxiLiteWriteSlaveType;
       variable axiReadSlave  : inout AxiLiteReadSlaveType;
-      axiResp                : in    slv(1 downto 0) := AXI_RESP_OK_C);
+      axiResp                : in    slv(1 downto 0) := AXI_RESP_OK_C;
+      extTxn                 : in    sl              := '0');
 
 
    -------------------------------------------------------------------------------------------------
@@ -378,10 +412,35 @@ package AxiLitePkg is
       data                  : out slv;
       debug                 : in  boolean := false);
 
+   function ite(i : boolean; t : AxiLiteReadMasterType; e : AxiLiteReadMasterType) return AxiLiteReadMasterType;
+   function ite(i : boolean; t : AxiLiteReadSlaveType; e : AxiLiteReadSlaveType) return AxiLiteReadSlaveType;
+   function ite(i : boolean; t : AxiLiteWriteMasterType; e : AxiLiteWriteMasterType) return AxiLiteWriteMasterType;
+   function ite(i : boolean; t : AxiLiteWriteSlaveType; e : AxiLiteWriteSlaveType) return AxiLiteWriteSlaveType;
 
 end AxiLitePkg;
 
 package body AxiLitePkg is
+
+   function axiLiteReadSlaveEmptyInit (
+      rresp : slv(1 downto 0)  := AXI_RESP_OK_C;
+      rdata : slv(31 downto 0) := (others => '0'))
+      return AxiLiteReadSlaveType is
+   begin
+      return (arready => '1',
+              rdata   => rdata,
+              rresp   => rresp,
+              rvalid  => '1');
+   end function axiLiteReadSlaveEmptyInit;
+
+   function axiLiteWriteSlaveEmptyInit (
+      bresp : slv(1 downto 0) := AXI_RESP_OK_C)
+      return AxiLiteWriteSlaveType is
+   begin
+      return (awready => '1',
+              wready => '1',
+              bresp => bresp,
+              bvalid => '1');
+   end function axiLiteWriteSlaveEmptyInit;
 
    function axiReadMasterInit (constant config : AxiLiteCrossbarMasterConfigType) return AxiLiteReadMasterType is
       variable ret : AxiLiteReadMasterType;
@@ -461,6 +520,7 @@ package body AxiLitePkg is
       -- Reset rvalid upon rready
       if (axiReadMaster.rready = '1') then
          axiReadSlave.rvalid := '0';
+         axiReadSlave.rdata  := (others => '0');
       end if;
    end procedure axiSlaveWaitReadTxn;
 
@@ -587,13 +647,14 @@ package body AxiLitePkg is
       variable axiWriteSlave : inout AxiLiteWriteSlaveType;
       variable axiReadSlave  : inout AxiLiteReadSlaveType;
       variable axiStatus     : in    AxiLiteStatusType;
-      axiResp                : in    slv(1 downto 0) := AXI_RESP_OK_C) is
+      axiResp                : in    slv(1 downto 0) := AXI_RESP_OK_C;
+      extTxn                 : in    sl              := '0') is
    begin
-      if (axiStatus.writeEnable = '1' and axiWriteSlave.awready = '0') then
+      if (axiStatus.writeEnable = '1' and axiWriteSlave.awready = '0' and extTxn = '0') then
          axiSlaveWriteResponse(axiWriteSlave, axiResp);
       end if;
 
-      if (axiStatus.readEnable = '1' and axiReadSlave.arready = '0') then
+      if (axiStatus.readEnable = '1' and axiReadSlave.arready = '0' and extTxn = '0') then
          axiSlaveReadResponse(axiReadSlave, axiResp);
       end if;
    end procedure;
@@ -631,39 +692,49 @@ package body AxiLitePkg is
       constVal    : in    slv := "X")
    is
       -- Need to remap addr range to be (length-1 downto 0)
-      constant ADDR_LEN_C     : integer                    := addr'length;
-      constant ADDR_C         : slv(ADDR_LEN_C-1 downto 0) := addr;
-      constant REG_HIGH_BIT_C : integer                    := minimum(31-offset+reg'low, reg'high);
-      constant BUS_HIGH_BIT_C : integer                    := minimum(offset+reg'length-1, 31);
-      variable strobeMask     : slv(3 downto 0)            := (others => '-');
+      constant ADDR_LEN_C   : integer                    := addr'length;
+      constant ADDR_C       : slv(ADDR_LEN_C-1 downto 0) := addr;
+      -- Offset as measured from addr[1:0]="00"
+      constant ABS_OFFSET_C : integer                    := offset + (to_integer(unsigned(ADDR_C(1 downto 0)))*8);
+      -- Normalized address and offset (for when addr[1:0]!=00)
+      constant NORMAL_ADDR_C : slv(ADDR_LEN_C-1 downto 0) := ite(ABS_OFFSET_C /= 0,
+                                                                 slv((unsigned(slv(ADDR_C))) + ((ABS_OFFSET_C/32)*4)),
+                                                                 ADDR_C);
+      constant NORMAL_OFFSET_C : integer := ABS_OFFSET_C mod 32;
+      -- Most significant register bit before wrapping to the next word address
+      constant REG_HIGH_BIT_C  : integer := minimum(31-NORMAL_OFFSET_C+reg'low, reg'high);
+      -- Most significant data bus bit to be used in this recursion (max out at 31)
+      constant BUS_HIGH_BIT_C  : integer := minimum(NORMAL_OFFSET_C+reg'length-1, 31);
+
+      variable strobeMask : slv(3 downto 0) := (others => '-');
    begin
 
-      for i in BUS_HIGH_BIT_C downto offset loop
+      for i in BUS_HIGH_BIT_C downto NORMAL_OFFSET_C loop
          strobeMask(i/8) := '1';
       end loop;
 
       -- Read must come first so as not to overwrite the variable if read and write happen at once
       if (ep.axiStatus.readEnable = '1') then
-         if (std_match(ep.axiReadMaster.araddr(ADDR_LEN_C-1 downto 2), ADDR_C(ADDR_LEN_C-1 downto 2))) then
-            ep.axiReadSlave.rdata(BUS_HIGH_BIT_C downto offset) := reg(REG_HIGH_BIT_C downto reg'low);
+         if (std_match(ep.axiReadMaster.araddr(ADDR_LEN_C-1 downto 2), NORMAL_ADDR_C(ADDR_LEN_C-1 downto 2))) then
+            ep.axiReadSlave.rdata(BUS_HIGH_BIT_C downto NORMAL_OFFSET_C) := reg(REG_HIGH_BIT_C downto reg'low);
             axiSlaveReadResponse(ep.axiReadSlave);
          end if;
       end if;
 
       if (ep.axiStatus.writeEnable = '1') then
-         if (std_match(ep.axiWriteMaster.awaddr(ADDR_LEN_C-1 downto 2), ADDR_C(ADDR_LEN_C-1 downto 2)) and
+         if (std_match(ep.axiWriteMaster.awaddr(ADDR_LEN_C-1 downto 2), NORMAL_ADDR_C(ADDR_LEN_C-1 downto 2)) and
              std_match(ep.axiWriteMaster.wstrb, strobeMask)) then
             if (constVal /= "X") then
                reg(REG_HIGH_BIT_C downto reg'low) := constVal;
             else
-               reg(REG_HIGH_BIT_C downto reg'low) := ep.axiWriteMaster.wdata(BUS_HIGH_BIT_C downto offset);
+               reg(REG_HIGH_BIT_C downto reg'low) := ep.axiWriteMaster.wdata(BUS_HIGH_BIT_C downto NORMAL_OFFSET_C);
             end if;
             axiSlaveWriteResponse(ep.axiWriteSlave);
          end if;
       end if;
 
       if (REG_HIGH_BIT_C < reg'high) then
-         axiSlaveRegister(ep, slv(unsigned(ADDR_C)+4), 0, reg(reg'high downto REG_HIGH_BIT_C+1));
+         axiSlaveRegister(ep, slv(unsigned(NORMAL_ADDR_C)+4), 0, reg(reg'high downto REG_HIGH_BIT_C+1), "X");
       end if;
 
    end procedure;
@@ -677,7 +748,7 @@ package body AxiLitePkg is
       variable regTmp : slv(reg'length-1 downto 0);
    begin
       regTmp := reg;
-      axiSlaveRegister(ep, addr, offset, regTmp);
+      axiSlaveRegister(ep, addr, offset, regTmp, "X");
    end procedure;
 
    procedure axiSlaveRegister (
@@ -733,21 +804,41 @@ package body AxiLitePkg is
       tmp := regs(to_integer(unsigned(ep.axiReadMaster.araddr(ADDR_BITS_C+2-1 downto 2))));
 
       addrLocal                           := addr;
-      addrLocal(ADDR_BITS_C+2-1 downto 0) := (others => '-');
+      addrLocal(ADDR_BITS_C+2-1 downto 2) := (others => '-');
+      addrLocal(1 downto 0)               := "00";
+--      print("MULTI! - Addr: " & hstr(addrLocal));
       axiSlaveRegister(ep, addrLocal, 0, tmp);
+   end procedure;
+
+   procedure axiWrDetect (
+      variable ep : inout AxiLiteEndpointType;
+      addr        : in    slv;
+      reg         : inout sl)
+   is
+      -- Need to remap addr range to be (length-1 downto 0)
+      constant ADDR_LEN_C : integer                    := addr'length;
+      constant ADDR_C     : slv(ADDR_LEN_C-1 downto 0) := addr;
+   begin
+      if (ep.axiStatus.writeEnable = '1') then
+         if std_match(ep.axiWriteMaster.awaddr(ADDR_LEN_C-1 downto 2), ADDR_C(ADDR_LEN_C-1 downto 2)) then
+            reg := '1';
+            axiSlaveWriteResponse(ep.axiWriteSlave);
+         end if;
+      end if;
    end procedure;
 
    procedure axiSlaveDefault (
       variable ep            : inout AxiLiteEndpointType;
       variable axiWriteSlave : inout AxiLiteWriteSlaveType;
       variable axiReadSlave  : inout AxiLiteReadSlaveType;
-      axiResp                : in    slv(1 downto 0) := AXI_RESP_OK_C) is
+      axiResp                : in    slv(1 downto 0) := AXI_RESP_OK_C;
+      extTxn                 : in    sl              := '0') is
    begin
-      if (ep.axiStatus.writeEnable = '1' and ep.axiWriteSlave.awready = '0') then
+      if (ep.axiStatus.writeEnable = '1' and ep.axiWriteSlave.awready = '0' and extTxn = '0') then
          axiSlaveWriteResponse(ep.axiWriteSlave, axiResp);
       end if;
 
-      if (ep.axiStatus.readEnable = '1' and ep.axiReadSlave.arready = '0') then
+      if (ep.axiStatus.readEnable = '1' and ep.axiReadSlave.arready = '0' and extTxn = '0') then
          axiSlaveReadResponse(ep.axiReadSlave, axiResp);
       end if;
       axiWriteSlave := ep.axiWriteSlave;
@@ -909,6 +1000,27 @@ package body AxiLitePkg is
 
 
    end procedure axiLiteBusSimRead;
+
+   function ite (i : boolean; t : AxiLiteReadMasterType; e : AxiLiteReadMasterType) return AxiLiteReadMasterType is
+   begin
+      if (i) then return t; else return e; end if;
+   end function ite;
+
+   function ite (i : boolean; t : AxiLiteReadSlaveType; e : AxiLiteReadSlaveType) return AxiLiteReadSlaveType is
+   begin
+      if (i) then return t; else return e; end if;
+   end function ite;
+
+   function ite (i : boolean; t : AxiLiteWriteMasterType; e : AxiLiteWriteMasterType) return AxiLiteWriteMasterType is
+   begin
+      if (i) then return t; else return e; end if;
+   end function ite;
+
+   function ite (i : boolean; t : AxiLiteWriteSlaveType; e : AxiLiteWriteSlaveType) return AxiLiteWriteSlaveType is
+   begin
+      if (i) then return t; else return e; end if;
+   end function ite;
+
 
 end package body AxiLitePkg;
 

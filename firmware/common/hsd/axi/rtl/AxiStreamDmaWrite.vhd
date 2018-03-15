@@ -1,13 +1,8 @@
 -------------------------------------------------------------------------------
--- Title      : AXI Stream DMA Write
--- Project    : General Purpose Core
--------------------------------------------------------------------------------
 -- File       : AxiStreamDmaWrite.vhd
--- Author     : Ryan Herbst, rherbst@slac.stanford.edu
+-- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2014-04-25
--- Last update: 2017-11-13
--- Platform   : 
--- Standard   : VHDL'93/02
+-- Last update: 2018-03-13
 -------------------------------------------------------------------------------
 -- Description:
 -- Block to transfer a single AXI Stream frame into memory using an AXI
@@ -34,15 +29,17 @@ use work.AxiDmaPkg.all;
 
 entity AxiStreamDmaWrite is
    generic (
-      TPD_G              : time                := 1 ns;
-      AXI_READY_EN_G     : boolean             := false;
-      AXIS_CONFIG_G      : AxiStreamConfigType := AXI_STREAM_CONFIG_INIT_C;
-      AXI_CONFIG_G       : AxiConfigType       := AXI_CONFIG_INIT_C;
-      AXI_BURST_G        : slv(1 downto 0)     := "01";
-      AXI_CACHE_G        : slv(3 downto 0)     := "1111";
-      AXI_BURST_BYTES_G  : natural             := 4096;
-      ACK_WAIT_BVALID_G  : boolean             := true;
-      PIPE_STAGES_G      : natural             := 1 );
+      TPD_G             : time                := 1 ns;
+      AXI_READY_EN_G    : boolean             := false;
+      AXIS_CONFIG_G     : AxiStreamConfigType := AXI_STREAM_CONFIG_INIT_C;
+      AXI_CONFIG_G      : AxiConfigType       := AXI_CONFIG_INIT_C;
+      AXI_BURST_G       : slv(1 downto 0)     := "01";
+      AXI_CACHE_G       : slv(3 downto 0)     := "1111";
+      SW_CACHE_EN_G     : boolean             := false;
+      ACK_WAIT_BVALID_G : boolean             := true;
+      PIPE_STAGES_G     : natural             := 1;
+      BYP_SHIFT_G       : boolean             := false;
+      BYP_CACHE_G       : boolean             := false);
    port (
       -- Clock/Reset
       axiClk         : in  sl;
@@ -50,6 +47,7 @@ entity AxiStreamDmaWrite is
       -- DMA Control Interface
       dmaReq         : in  AxiWriteDmaReqType;
       dmaAck         : out AxiWriteDmaAckType;
+      swCache        : in  slv(3 downto 0) := "0000";
       -- Streaming Interface 
       axisMaster     : in  AxiStreamMasterType;
       axisSlave      : out AxiStreamSlaveType;
@@ -61,9 +59,19 @@ end AxiStreamDmaWrite;
 
 architecture rtl of AxiStreamDmaWrite is
 
-   constant DATA_BYTES_C : integer         := AXIS_CONFIG_G.TDATA_BYTES_C;
-   constant ADDR_LSB_C   : integer         := bitSize(DATA_BYTES_C-1);
-   constant AWLEN_C      : slv(7 downto 0) := getAxiLen(AXI_CONFIG_G, AXI_BURST_BYTES_G);
+   constant LOC_AXIS_CONFIG_C : AxiStreamConfigType := (
+      TSTRB_EN_C    => AXIS_CONFIG_G.TSTRB_EN_C,
+      TDATA_BYTES_C => AXIS_CONFIG_G.TDATA_BYTES_C,
+      TDEST_BITS_C  => AXIS_CONFIG_G.TDEST_BITS_C,
+      TID_BITS_C    => AXIS_CONFIG_G.TID_BITS_C,
+      TKEEP_MODE_C  => TKEEP_NORMAL_C,  -- Override
+      TUSER_BITS_C  => AXIS_CONFIG_G.TUSER_BITS_C, 
+      TUSER_MODE_C  => TUSER_NORMAL_C); -- Override
+
+   constant DATA_BYTES_C      : integer         := LOC_AXIS_CONFIG_C.TDATA_BYTES_C;
+   constant ADDR_LSB_C        : integer         := bitSize(DATA_BYTES_C-1);
+   constant AWLEN_C           : slv(7 downto 0) := getAxiLen(AXI_CONFIG_G, 4096);
+   constant FIFO_ADDR_WIDTH_C : natural         := (AXI_CONFIG_G.LEN_BITS_C+1);
 
    type StateType is (
       IDLE_S,
@@ -75,98 +83,67 @@ architecture rtl of AxiStreamDmaWrite is
       DONE_S);
 
    type RegType is record
-      dmaReq   : AxiWriteDmaReqType;
-      dmaAck   : AxiWriteDmaAckType;
-      shift    : slv(5 downto 0);
-      shiftEn  : sl;
-      first    : sl;
-      last     : sl;
-      reqCount : slv(31 downto 0);
-      ackCount : slv(31 downto 0);
-      stCount  : slv(15 downto 0);
-      awlen    : slv(AXI_CONFIG_G.LEN_BITS_C-1 downto 0);
-      wMaster  : AxiWriteMasterType;
-      slave    : AxiStreamSlaveType;
-      state    : StateType;
-      ptest    : slv(2 downto 0);
+      dmaReq    : AxiWriteDmaReqType;
+      dmaAck    : AxiWriteDmaAckType;
+      threshold : slv(FIFO_ADDR_WIDTH_C-1 downto 0);
+      shift     : slv(5 downto 0);
+      shiftEn   : sl;
+      first     : sl;
+      last      : sl;
+      reqCount  : slv(31 downto 0);
+      ackCount  : slv(31 downto 0);
+      stCount   : slv(15 downto 0);
+      awlen     : slv(AXI_CONFIG_G.LEN_BITS_C-1 downto 0);
+      wMaster   : AxiWriteMasterType;
+      slave     : AxiStreamSlaveType;
+      state     : StateType;
    end record RegType;
 
    constant REG_INIT_C : RegType := (
-      dmaReq   => AXI_WRITE_DMA_REQ_INIT_C,
-      dmaAck   => AXI_WRITE_DMA_ACK_INIT_C,
-      shift    => (others => '0'),
-      shiftEn  => '0',
-      first    => '0',
-      last     => '0',
-      reqCount => (others => '0'),
-      ackCount => (others => '0'),
-      stCount  => (others => '0'),
-      awlen    => (others => '0'),
-      wMaster  => axiWriteMasterInit(AXI_CONFIG_G, '1', AXI_BURST_G, AXI_CACHE_G),
-      slave    => AXI_STREAM_SLAVE_INIT_C,
-      state    => IDLE_S,
-      ptest    => "010" );
+      dmaReq    => AXI_WRITE_DMA_REQ_INIT_C,
+      dmaAck    => AXI_WRITE_DMA_ACK_INIT_C,
+      threshold => (others => '1'),
+      shift     => (others => '0'),
+      shiftEn   => '0',
+      first     => '0',
+      last      => '0',
+      reqCount  => (others => '0'),
+      ackCount  => (others => '0'),
+      stCount   => (others => '0'),
+      awlen     => (others => '0'),
+      wMaster   => axiWriteMasterInit(AXI_CONFIG_G, '1', AXI_BURST_G, AXI_CACHE_G),
+      slave     => AXI_STREAM_SLAVE_INIT_C,
+      state     => IDLE_S);
 
    signal r             : RegType := REG_INIT_C;
    signal rin           : RegType;
    signal pause         : sl;
+   signal shiftMaster   : AxiStreamMasterType;
+   signal shiftSlave    : AxiStreamSlaveType;
+   signal cache         : AxiStreamCtrlType;
    signal intAxisMaster : AxiStreamMasterType;
    signal intAxisSlave  : AxiStreamSlaveType;
-   signal taxisSlave    : AxiStreamSlaveType;
+   signal wrEn          : sl;
+   signal rdEn          : sl;
+   signal lastDet       : sl;
 
-   attribute dont_touch      : string;
-   attribute dont_touch of r : signal is "true";
-   
-   constant DEBUG_C : boolean := false;
-
-   component ila_0
-     port ( clk : in sl;
-            probe0 : in slv(255 downto 0) );
-   end component;
-  
-   signal r_state : slv(2 downto 0);
+   -- attribute dont_touch      : string;
+   -- attribute dont_touch of r : signal is "true";
    
 begin
 
-  GEN_DEBUG : if DEBUG_C generate
-    r_state <= "000" when r.state = IDLE_S else
-               "001" when r.state = FIRST_S else
-               "010" when r.state = NEXT_S else
-               "011" when r.state = MOVE_S else
-               "100" when r.state = DUMP_S else
-               "101" when r.state = WAIT_S else
-               "110" when r.state = DONE_S else
-               "111";
-    U_ILA : ila_0
-      port map ( clk       => axiClk,
-                 probe0(2 downto 0) => r_state,
-                 probe0(3)          => r.last,
-                 probe0(4)          => intAxisMaster.tValid,
-                 probe0(5)          => intAxisMaster.tLast,
-                 probe0(6)          => intAxisSlave .tReady,
-                 probe0(7)          => axisMaster   .tValid,
-                 probe0(8)          => axisMaster   .tLast,
-                 probe0(9)          => taxisSlave   .tReady,
-                 probe0(73 downto 10) => axisMaster.tData(63 downto 0),
-                 probe0(255 downto 74) => (others=>'0') );
-    intAxisMaster <= axisMaster;
-    taxisSlave    <= intAxisSlave;
-  end generate;
-  
-    assert AXIS_CONFIG_G.TDATA_BYTES_C = AXI_CONFIG_G.DATA_BYTES_C
-      report "AXIS (" & integer'image(AXIS_CONFIG_G.TDATA_BYTES_C) & ") and AXI ("
+   assert LOC_AXIS_CONFIG_C.TDATA_BYTES_C = AXI_CONFIG_G.DATA_BYTES_C
+      report "AXIS (" & integer'image(LOC_AXIS_CONFIG_C.TDATA_BYTES_C) & ") and AXI ("
       & integer'image(AXI_CONFIG_G.DATA_BYTES_C) & ") must have equal data widths" severity failure;
 
-   axisSlave <= taxisSlave;
-    
    pause <= '0' when (AXI_READY_EN_G) else axiWriteCtrl.pause;
 
-   GEN_NODEBUG : if not DEBUG_C generate
    U_AxiStreamShift : entity work.AxiStreamShift
       generic map (
-         TPD_G         => TPD_G,
-         PIPE_STAGES_G => PIPE_STAGES_G,
-         AXIS_CONFIG_G => AXIS_CONFIG_G) 
+         TPD_G             => TPD_G,
+         PIPE_STAGES_G     => PIPE_STAGES_G,
+         AXIS_CONFIG_G     => LOC_AXIS_CONFIG_C,
+         BYP_SHIFT_G       => BYP_SHIFT_G) 
       port map (
          axisClk     => axiClk,
          axisRst     => axiRst,
@@ -174,19 +151,86 @@ begin
          axiShiftDir => '0',
          axiShiftCnt => r.shift,
          sAxisMaster => axisMaster,
-         sAxisSlave  => taxisSlave,
-         mAxisMaster => intAxisMaster,
-         mAxisSlave  => intAxisSlave);
+         sAxisSlave  => axisSlave,
+         mAxisMaster => shiftMaster,
+         mAxisSlave  => shiftSlave);
+
+   GEN_CACHE : if (BYP_CACHE_G = false) generate
+      
+      U_Cache : entity work.AxiStreamFifoV2
+         generic map (
+            TPD_G               => TPD_G,
+            INT_PIPE_STAGES_G   => PIPE_STAGES_G,
+            PIPE_STAGES_G       => PIPE_STAGES_G,
+            SLAVE_READY_EN_G    => true,
+            VALID_THOLD_G       => 1,
+            BRAM_EN_G           => true,
+            GEN_SYNC_FIFO_G     => true,
+            CASCADE_SIZE_G      => 1,
+            FIFO_ADDR_WIDTH_G   => FIFO_ADDR_WIDTH_C,
+            FIFO_FIXED_THRESH_G => false,  -- Using r.threshold
+            SLAVE_AXI_CONFIG_G  => LOC_AXIS_CONFIG_C,
+            MASTER_AXI_CONFIG_G => LOC_AXIS_CONFIG_C) 
+         port map (
+            -- Slave Port
+            sAxisClk        => axiClk,
+            sAxisRst        => axiRst,
+            sAxisMaster     => shiftMaster,
+            sAxisSlave      => shiftSlave,
+            sAxisCtrl       => cache,
+            -- FIFO Port
+            fifoPauseThresh => r.threshold,
+            -- Master Port
+            mAxisClk        => axiClk,
+            mAxisRst        => axiRst,
+            mAxisMaster     => intAxisMaster,
+            mAxisSlave      => intAxisSlave);    
+
+      wrEn <= shiftMaster.tValid and shiftMaster.tLast and shiftSlave.tReady;
+      rdEn <= intAxisMaster.tValid and intAxisMaster.tLast and intAxisSlave.tReady;
+
+      U_Last : entity work.FifoSync
+         generic map (
+            TPD_G        => TPD_G,
+            BYP_RAM_G    => true,
+            FWFT_EN_G    => true,
+            ADDR_WIDTH_G => FIFO_ADDR_WIDTH_C)
+         port map (
+            clk   => axiClk,
+            rst   => axiRst,
+            wr_en => wrEn,
+            rd_en => rdEn,
+            din   => (others => '0'),
+            valid => lastDet);            
+
    end generate;
-   
-   comb : process (axiRst, axiWriteSlave, dmaReq, intAxisMaster, pause, r) is
-      variable v     : RegType;
-      variable bytes : natural;
+
+   BYP_CACHE : if (BYP_CACHE_G = true) generate
+
+      intAxisMaster  <= shiftMaster;
+      shiftSlave     <= intAxisSlave;
+      cache.pause    <= '1';
+      cache.overflow <= '0';
+      cache.idle     <= '0';
+      lastDet        <= '0';
+      
+   end generate;
+
+   comb : process (axiRst, axiWriteSlave, cache, dmaReq, intAxisMaster, lastDet, pause, r, swCache) is
+      variable v       : RegType;
+      variable bytes   : natural;
+      variable ibValid : sl;
    begin
       -- Latch the current value
       v := r;
 
+      -- Set cache value if enabled in software
+      if SW_CACHE_EN_G then
+         v.wMaster.awcache := swCache;
+      end if;
+
       -- Reset strobing Signals
+      ibValid        := '0';
       v.slave.tReady := '0';
       v.shiftEn      := '0';
       if (axiWriteSlave.awready = '1') or (AXI_READY_EN_G = false) then
@@ -219,17 +263,23 @@ begin
       -- Count number of bytes in return data
       bytes := getTKeep(intAxisMaster.tKeep(DATA_BYTES_C-1 downto 0));
 
+      -- Check the AXI stream data cache
+      if (lastDet = '1') or (cache.pause = '1') then
+         ibValid := '1';
+      end if;
+
       -- State machine
       case r.state is
          ----------------------------------------------------------------------
          when IDLE_S =>
             -- Update the variables
-            v.dmaReq   := dmaReq;
-            -- Reset the counters
-            v.reqCount := (others => '0');
-            v.ackCount := (others => '0');
-            v.shift    := (others => '0');
-            v.stCount  := (others => '0');
+            v.dmaReq    := dmaReq;
+            -- Reset the counters and threshold
+            v.reqCount  := (others => '0');
+            v.ackCount  := (others => '0');
+            v.shift     := (others => '0');
+            v.stCount   := (others => '0');
+            v.threshold := (others => '1');
             -- Align shift and address to transfer size
             if (DATA_BYTES_C /= 1) then
                v.dmaReq.address(ADDR_LSB_C-1 downto 0) := (others => '0');
@@ -272,21 +322,23 @@ begin
                   end if;
                end if;
                -- Latch AXI awlen value
-               v.awlen := v.wMaster.awlen(AXI_CONFIG_G.LEN_BITS_C-1 downto 0);
+               v.awlen     := v.wMaster.awlen(AXI_CONFIG_G.LEN_BITS_C-1 downto 0);
+               -- Update the threshold
+               v.threshold := '0' & v.awlen;
+               v.threshold := v.threshold + 1;
                -- DMA request has dropped. Abort. This is needed to disable engine while it
                -- is still waiting for an inbound frame.
                if dmaReq.request = '0' then
                   -- Next state
                   v.state := IDLE_S;
                -- Check if enough room and data to move
-               elsif (pause = '0') and (intAxisMaster.tValid = '1') then
+               elsif (pause = '0') and (ibValid = '1') then
                   -- Set the flag
                   v.wMaster.awvalid := '1';
                   -- Increment the counter
                   v.reqCount        := r.reqCount + 1;
                   -- Next state
                   v.state           := MOVE_S;
-                  v.ptest(0)        := '1';
                end if;
             end if;
          ----------------------------------------------------------------------
@@ -301,18 +353,17 @@ begin
                   v.wMaster.awlen := resize(r.dmaReq.maxSize(ADDR_LSB_C+AXI_CONFIG_G.LEN_BITS_C-1 downto ADDR_LSB_C)-1, 8);
                end if;
                -- Latch AXI awlen value
-               v.awlen := v.wMaster.awlen(AXI_CONFIG_G.LEN_BITS_C-1 downto 0);
+               v.awlen     := v.wMaster.awlen(AXI_CONFIG_G.LEN_BITS_C-1 downto 0);
+               -- Update the threshold
+               v.threshold := '0' & v.awlen;
+               v.threshold := v.threshold + 1;
                -- DMA request has dropped. Abort. This is needed to disable engine while it
                -- is still waiting for an inbound frame.
                if dmaReq.request = '0' then
                   -- Next state
                   v.state := IDLE_S;
                -- Check if enough room and data to move
-               elsif (r.dmaReq.maxSize=toSlv(0,r.dmaReq.maxSize'length)) then
-                  -- Set the error flag
-                  v.dmaAck.overflow := '1';
-                  v.state := DUMP_S;
-               elsif (pause = '0') and (intAxisMaster.tValid = '1') then
+               elsif (pause = '0') and (ibValid = '1') then
                   -- Set the flag
                   v.wMaster.awvalid := '1';
                   -- Increment the counter
@@ -323,6 +374,8 @@ begin
             end if;
          ----------------------------------------------------------------------
          when MOVE_S =>
+            -- Reset the threshold
+            v.threshold := (others => '1');
             -- Check if ready to move data
             if (v.wMaster.wvalid = '0') and ((intAxisMaster.tValid = '1') or (r.last = '1')) then
                -- Accept the data
@@ -333,17 +386,6 @@ begin
                -- Address and size increment
                v.dmaReq.address                             := r.dmaReq.address + DATA_BYTES_C;
                v.dmaReq.address(ADDR_LSB_C-1 downto 0)      := (others => '0');
-
-               --
-               v.ptest(0) := '0';
-               v.ptest(2) := '0';
-               if r.ptest(0)='1' then
-                 v.ptest(1) := intAxisMaster.tData(31);
-                 if r.ptest(1)=intAxisMaster.tData(31) then
-                   v.ptest(2) := '1';
-                 end if;
-               end if;
-                 
                -- Check if tLast not registered yet
                if (r.last = '0') then
                   -- Increment the byte counter
@@ -356,14 +398,14 @@ begin
                   -- Latch the tDest/tId/tUser values
                   v.dmaAck.dest                                             := intAxisMaster.tDest;
                   v.dmaAck.id                                               := intAxisMaster.tId;
-                  v.dmaAck.firstUser(AXIS_CONFIG_G.TUSER_BITS_C-1 downto 0) := axiStreamGetUserField(AXIS_CONFIG_G, intAxisMaster, conv_integer(r.shift));
+                  v.dmaAck.firstUser(LOC_AXIS_CONFIG_C.TUSER_BITS_C-1 downto 0) := axiStreamGetUserField(LOC_AXIS_CONFIG_C, intAxisMaster, conv_integer(r.shift));
                end if;
                -- -- Check for last AXIS word
                if (intAxisMaster.tLast = '1') and (r.last = '0') then
                   -- Set the flag
                   v.last                                                   := '1';
                   -- Latch the tUser value
-                  v.dmaAck.lastUser(AXIS_CONFIG_G.TUSER_BITS_C-1 downto 0) := axiStreamGetUserField(AXIS_CONFIG_G, intAxisMaster);
+                  v.dmaAck.lastUser(LOC_AXIS_CONFIG_C.TUSER_BITS_C-1 downto 0) := axiStreamGetUserField(LOC_AXIS_CONFIG_C, intAxisMaster);
                end if;
                -- Check if done
                if (r.last = '1') then
@@ -416,12 +458,12 @@ begin
                   -- Latch the tDest/tId/tUser values
                   v.dmaAck.dest                                             := intAxisMaster.tDest;
                   v.dmaAck.id                                               := intAxisMaster.tId;
-                  v.dmaAck.firstUser(AXIS_CONFIG_G.TUSER_BITS_C-1 downto 0) := axiStreamGetUserField(AXIS_CONFIG_G, intAxisMaster, conv_integer(r.shift));
+                  v.dmaAck.firstUser(LOC_AXIS_CONFIG_C.TUSER_BITS_C-1 downto 0) := axiStreamGetUserField(LOC_AXIS_CONFIG_C, intAxisMaster, conv_integer(r.shift));
                end if;
                -- Check for last AXIS word
                if (intAxisMaster.tLast = '1') then
                   -- Latch the tUser value
-                  v.dmaAck.lastUser(AXIS_CONFIG_G.TUSER_BITS_C-1 downto 0) := axiStreamGetUserField(AXIS_CONFIG_G, intAxisMaster);
+                  v.dmaAck.lastUser(LOC_AXIS_CONFIG_C.TUSER_BITS_C-1 downto 0) := axiStreamGetUserField(LOC_AXIS_CONFIG_C, intAxisMaster);
                   -- Next state
                   v.state                                                  := WAIT_S;
                end if;
@@ -463,6 +505,9 @@ begin
          -- Reset the flag
          v.dmaAck.idle := '0';
       end if;
+      
+      -- Combinatorial outputs before the reset
+      intAxisSlave <= v.slave;
 
       -- Reset      
       if (axiRst = '1') then
@@ -472,9 +517,8 @@ begin
       -- Register the variable for next clock cycle      
       rin <= v;
 
-      -- Outputs   
+      -- Registered Outputs 
       dmaAck         <= r.dmaAck;
-      intAxisSlave   <= v.slave;
       axiWriteMaster <= r.wMaster;
       
    end process comb;

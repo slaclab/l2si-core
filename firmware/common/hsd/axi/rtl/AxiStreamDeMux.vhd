@@ -1,13 +1,8 @@
 -------------------------------------------------------------------------------
--- Title      : AXI Stream De-Multiplexer
--- Project    : General Purpose Core
--------------------------------------------------------------------------------
 -- File       : AxiStreamDeMux.vhd
--- Author     : Ryan Herbst, rherbst@slac.stanford.edu
+-- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2014-04-25
--- Last update: 2016-09-06
--- Platform   : 
--- Standard   : VHDL'93/02
+-- Last update: 2017-04-07
 -------------------------------------------------------------------------------
 -- Description:
 -- Block to connect a single incoming AXI stream to multiple outgoing AXI
@@ -20,9 +15,6 @@
 -- No part of 'SLAC Firmware Standard Library', including this file, 
 -- may be copied, modified, propagated, or distributed except according to 
 -- the terms contained in the LICENSE.txt file.
--------------------------------------------------------------------------------
--- Modification history:
--- 04/25/2014: created.
 -------------------------------------------------------------------------------
 
 library ieee;
@@ -42,15 +34,15 @@ entity AxiStreamDeMux is
       TDEST_HIGH_G   : integer range 0 to 7  := 7;
       TDEST_LOW_G    : integer range 0 to 7  := 0);
    port (
+      -- Clock and reset
+      axisClk      : in  sl;
+      axisRst      : in  sl;
       -- Slave
       sAxisMaster  : in  AxiStreamMasterType;
       sAxisSlave   : out AxiStreamSlaveType;
       -- Masters
       mAxisMasters : out AxiStreamMasterArray(NUM_MASTERS_G-1 downto 0);
-      mAxisSlaves  : in  AxiStreamSlaveArray(NUM_MASTERS_G-1 downto 0);
-      -- Clock and reset
-      axisClk      : in  sl;
-      axisRst      : in  sl);
+      mAxisSlaves  : in  AxiStreamSlaveArray(NUM_MASTERS_G-1 downto 0));
 end AxiStreamDeMux;
 
 architecture structure of AxiStreamDeMux is
@@ -128,6 +120,9 @@ begin
          v.masters(idx) := sAxisMaster;
       end if;
 
+      -- Combinatorial outputs before the reset
+      sAxisSlave <= v.slave;
+      
       -- Reset
       if (axisRst = '1') then
          v := REG_INIT_C;
@@ -136,8 +131,7 @@ begin
       -- Register the variable for next clock cycle
       rin <= v;
 
-      -- Outputs
-      sAxisSlave      <= v.slave;
+      -- Registered Outputs
       pipeAxisMasters <= r.masters;
 
    end process comb;
