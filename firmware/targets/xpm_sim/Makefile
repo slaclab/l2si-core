@@ -39,11 +39,11 @@ export RTM_ETH = 0
 # Controls inclusion of constraints
 # AMC_TYPE_BAY0 & AMC_INTF_BAY0 are defined by application
 export AMC_TYPE_BAY0 = AmcMpsSfp
-export AMC_INTF_BAY0 = 
+export AMC_INTF_BAY0 = Version1
 
 # AMC_TYPE_BAY1 & AMC_INTF_BAY1 are defined by application
 export AMC_TYPE_BAY1 = AmcMpsSfp
-export AMC_INTF_BAY1 = 
+export AMC_INTF_BAY1 = Version1
 
 # RTM_TYPE & RTM_INTF are defined by application
 export RTM_TYPE = RtmEmpty

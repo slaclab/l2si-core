@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-07-10
--- Last update: 2017-09-25
+-- Last update: 2018-03-12
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -165,7 +165,7 @@ begin
        wait until regClk = '1';
        wait until regClk = '0';
        pconfig.message.insert  <= '1';
-       pconfig.message.hdr     <= toSlv(msg,15);
+       pconfig.message.hdr     <= toSlv(msg,9);
        word := toSlv(msgCount,4);
        pconfig.message.payload <= x"0" & word &
                                   x"1" & word &

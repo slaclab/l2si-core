@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-07-10
--- Last update: 2017-10-09
+-- Last update: 2018-03-12
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -36,6 +36,7 @@ use work.TimingPkg.all;
 use work.XpmPkg.all;
 use work.DtiPkg.all;
 use work.DtiSimPkg.all;
+use work.EventPkg.all;
 
 entity dti_sim is
 end dti_sim;
@@ -63,7 +64,7 @@ architecture top_level_app of dti_sim is
   signal ctlRxM, ctlTxM : AxiStreamMasterArray(1 downto 0) := (others=>AXI_STREAM_MASTER_INIT_C);
   signal ctlRxS, ctlTxS : AxiStreamSlaveArray (1 downto 0) := (others=>AXI_STREAM_SLAVE_INIT_C);
 
-  signal timingBus : TimingBusType;
+  signal timingMsg : TimingMessageType;
   signal exptBus   : ExptBusType;
 
   type UsMasterArray is array (natural range<>) of AxiStreamMasterArray(MaxDsLinks-1 downto 0);
@@ -97,13 +98,14 @@ architecture top_level_app of dti_sim is
   signal dsFullIn     : slv(MaxDsLinks-1 downto 0);
   
   -- for debug only --
-  signal tbusI : TimingBusType;
-  signal tbus  : TimingBusType;
+  signal tbusI : TimingHeaderType;
+  signal tbus  : TimingHeaderType;
   signal xbusI : ExptBusType;
   signal xbus  : ExptBusType;
   signal p0l0a : sl;
 
-  signal timingBusO     : TimingBusType;
+  signal timingHdr      : TimingHeaderType;
+  signal timingHdrP     : TimingHeaderType;
   signal exptBusO       : ExptBusType;
 
     function HexChar(v : in slv(3 downto 0)) return character is
@@ -180,20 +182,20 @@ begin
    process (clk186) is
    begin
      if rising_edge(clk186) then
-       tbusI.strobe <= timingBus.strobe;
-       if timingBus.strobe='1' then
-         tbusI <= timingBus;
+       tbusI.strobe <= timingHdrP.strobe;
+       if timingHdrP.strobe='1' then
+         tbusI <= timingHdrP;
          xbusI <= exptBus;
        end if;
-       tbus.strobe <= timingBusO.strobe;
-       if timingBusO.strobe='1' then
-         tbus.message           <= timingBusO.message;
+       tbus.strobe <= timingHdr.strobe;
+       if timingHdr.strobe='1' then
+         tbus                   <= timingHdr;
          xbus                   <= exptBusO;
        end if;
      end if;
    end process;
    
-   p0l0a <= exptBus.message.partitionWord(0)(0) when timingBus.strobe='1' else
+   p0l0a <= exptBus.message.partitionWord(0)(0) when timingHdrP.strobe='1' else
             '0';
    
    process is
@@ -249,10 +251,6 @@ begin
                 bpRxLinkFull    => bpRxLinkFull );
 
    rst186           <= fifoRst;
-   timingBus.valid  <= '1';
-   timingBus.stream <= TIMING_STREAM_INIT_C;
-   timingBus.v1     <= LCLS_V1_TIMING_DATA_INIT_C;
-   timingBus.v2     <= LCLS_V2_TIMING_DATA_INIT_C;
 
    U_RxLcls2 : entity work.TimingFrameRx
      port map ( rxClk               => clk186,
@@ -263,21 +261,24 @@ begin
                 rxData.dspErr       => "00",
                 messageDelay        => (others=>'0'),
                 messageDelayRst     => '0',
-                timingMessage       => timingBus.message,
-                timingMessageStrobe => timingBus.strobe,
+                timingMessage       => timingMsg,
+                timingMessageStrobe => timingHdrP.strobe,
                 exptMessage         => exptBus.message,
                 exptMessageValid    => exptBus.valid );
 
+   timingHdrP.pulseId   <= timingMsg.pulseId;
+   timingHdrP.timeStamp <= timingMsg.timeStamp;
+   
    U_Realign : entity work.ExptRealign
      port map ( clk    => clk186,
                 rst    => rst186,
-                timingI_strobe => timingBus.strobe,
-                timingI_pid    => timingBus.message.pulseId,
-                timingI_time   => timingBus.message.timeStamp,
+                timingI_strobe => timingHdrP.strobe,
+                timingI_pid    => timingHdrP.pulseId,
+                timingI_time   => timingHdrP.timeStamp,
                 exptBusI       => exptBus,
-                timingO_strobe => timingBusO.strobe,
-                timingO_pid    => timingBusO.message.pulseId,
-                timingO_time   => timingBusO.message.timeStamp,
+                timingO_strobe => timingHdr.strobe,
+                timingO_pid    => timingHdr.pulseId,
+                timingO_time   => timingHdr.timeStamp,
                 exptBusO       => exptBusO );
    
    GEN_US : for i in 0 to 1 generate
@@ -299,8 +300,9 @@ begin
                   ----
                   timingClk    => clk186,
                   timingRst    => rst186,
-                  timingBus    => timingBusO,
+                  timingHdr    => timingHdr,
                   exptBus      => exptBusO,
+                  timingHdrP   => timingHdrP,
                   triggerBus   => exptBus,
                   --
                   eventClk     => clk156,
