@@ -29,7 +29,8 @@ use work.SsiPkg.all;
 use work.QuadAdcPkg.all;
 use work.TimingPkg.all;
 use work.TPGPkg.all;
- 
+use work.Pgp3Pkg.all;
+
 library unisim;            
 use unisim.vcomponents.all;  
 -------------------------------------------------------------------------------
@@ -199,8 +200,6 @@ architecture rtl of hsd_pgp3 is
      TKEEP_MODE_C  => TKEEP_NORMAL_C,
      TUSER_BITS_C  => 0,
      TUSER_MODE_C  => TUSER_NORMAL_C ));
-  constant PGP_AXIS_CONFIG_C : AxiStreamConfigArray(3 downto 0) := (
-    others => ssiAxiStreamConfig(4) );
 
   constant SIM_TIMING : boolean := false;
   
@@ -364,7 +363,7 @@ begin  -- rtl
 
   U_APP : entity work.Application
     generic map ( LCLSII_G => LCLSII_C,
-                  DMA_STREAM_CONFIG_G => PGP_AXIS_CONFIG_C(0),
+                  DMA_STREAM_CONFIG_G => PGP3_AXIS_CONFIG_C,
                   DMA_SIZE_G          => 4*NFMC_C,
                   NFMC_G              => NFMC_C )
     port map (
@@ -480,7 +479,7 @@ begin  -- rtl
     U_Pgp : entity work.Pgp3Hsd
       generic map ( ID_G             => toSlv(3*16+i,8),
                     AXIL_BASE_ADDR_G => AXI_CROSSBAR_MASTERS_CONFIG_C(i+1).baseAddr,
-                    AXIS_CONFIG_G    => PGP_AXIS_CONFIG_C(i) )
+                    AXIS_CONFIG_G    => PGP3_AXIS_CONFIG_C )
       port map ( coreClk         => pgpCoreClk,  -- unused
                  coreRst         => '0',
                  pgpRxP          => pgpRxP(i),
