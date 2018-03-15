@@ -5,7 +5,7 @@
 -- Author     : Larry Ruckman  <ruckman@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-07-08
--- Last update: 2017-09-15
+-- Last update: 2018-03-09
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -288,6 +288,9 @@ begin
          axilReadSlave     => ethReadSlave,
          axilWriteMaster   => ethWriteMaster,
          axilWriteSlave    => ethWriteSlave,
+         --
+         obTimingEthMsgMaster => AXI_STREAM_MASTER_INIT_C,
+         ibTimingEthMsgSlave  => AXI_STREAM_SLAVE_FORCE_C,
          -- BSA Ethernet Interface
          obBsaMasters      => (others=>AXI_STREAM_MASTER_INIT_C),
          ibBsaSlaves       => (others=>AXI_STREAM_SLAVE_FORCE_C),

@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-07-10
--- Last update: 2017-12-21
+-- Last update: 2018-03-12
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -60,7 +60,6 @@ architecture rtl of XpmAppMaster is
   type RegType is record
     result     : slv(result'range);
     latch      : sl;
-    queueMsg   : sl;
     insertMsg  : sl;
     strobeMsg  : sl;
     partStrobe : sl;
@@ -69,7 +68,6 @@ architecture rtl of XpmAppMaster is
   constant REG_INIT_C : RegType := (
     result     => (others=>'0'),
     latch      => '0',
-    queueMsg   => '0',
     insertMsg  => '0',
     strobeMsg  => '0',
     partStrobe => '0',
@@ -79,6 +77,8 @@ architecture rtl of XpmAppMaster is
   signal rin : RegType;
 
   signal msgConfig      : XpmPartMsgConfigType;
+  signal messageDin     : slv(msgConfig.hdr'length+msgConfig.payload'length-1 downto 0);
+  signal messageDout    : slv(msgConfig.hdr'length+msgConfig.payload'length-1 downto 0);
   
   --  input data from sensor links
   --  L0 inhibit decision
@@ -178,7 +178,7 @@ begin
     port map ( clk            => timingClk,
                rst            => timingRst,
                config         => config.l0Tag,
-               enabled        => config.l0Select.enabled,
+               clear          => config.l0Select.reset,
                timingBus      => r.timingBus,
                push           => l0Accept,     -- allocate a tag for a trigger
                skip           => r.strobeMsg,  -- allocate a tag for a message
@@ -207,20 +207,20 @@ begin
   --             rdvalid        => status.anaRd,
   --             tag            => analysisTag );
 
-  U_SyncMsgPayload : entity work.SynchronizerVector
-    generic map ( WIDTH_G => config.message.payload'length )
-    port map ( clk     => timingClk,
-               dataIn  => config.message.payload,
-               dataOut => msgConfig.payload );
-  U_SyncMsgHeader : entity work.SynchronizerVector
-    generic map ( WIDTH_G => config.message.hdr'length )
-    port map ( clk     => timingClk,
-               dataIn  => config.message.hdr,
-               dataOut => msgConfig.hdr );
-  U_SyncMsgInsert : entity work.SynchronizerOneShot
-    port map ( clk       => timingClk,
-               dataIn    => config.message.insert,
-               dataOut   => msgConfig.insert );
+  messageDin        <= config.message.payload & config.message.hdr;
+  msgConfig.hdr     <= messageDout(config.message.hdr'range);
+  msgConfig.payload <= messageDout(config.message.payload'left+config.message.hdr'length downto config.message.hdr'length);
+  
+  U_SyncMsgPayload : entity work.SynchronizerFifo
+    generic map ( DATA_WIDTH_G => messageDin'length )
+    port map ( wr_clk  => regClk,
+               wr_en   => config.message.insert,
+               din     => messageDin,
+               rd_clk  => timingClk,
+               rd_en   => r.insertMsg,
+               valid   => msgConfig.insert,
+               dout    => messageDout );
+
   U_SyncReset : entity work.RstSync
     port map ( clk       => timingClk,
                asyncRst  => config.l0Select.reset,
@@ -242,12 +242,7 @@ begin
     v.latch      := r.partStrobe;
     v.strobeMsg  := '0';
     
-    if msgConfig.insert = '1' then  -- latch the strobed request and
-      v.queueMsg := '1';            -- disable L0 logic
-    end if;
-
-    if r.queueMsg = '1' and r.timingBus.strobe = '1' then
-      v.queueMsg  := '0';
+    if msgConfig.insert = '1' and r.timingBus.strobe = '1' then
       v.insertMsg := '1';
     end if;
 

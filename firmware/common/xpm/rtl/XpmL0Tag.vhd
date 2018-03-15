@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-12-14
--- Last update: 2017-11-09
+-- Last update: 2018-03-12
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -41,7 +41,7 @@ entity XpmL0Tag is
       clk              : in  sl;
       rst              : in  sl;
       config           : in  XpmL0TagConfigType;
-      enabled          : in  sl;
+      clear            : in  sl;
       timingBus        : in  TimingBusType;
       push             : in  sl;
       skip             : in  sl;
@@ -61,7 +61,7 @@ architecture rtl of XpmL0Tag is
    signal r    : RegType := REG_INIT_C;
    signal rin  : RegType;
 
-   signal uenabled : sl;
+   signal uclear : sl;
 begin
    push_tag  <= r.tag;
    pop_frame <= XPM_ACCEPT_FRAME_INIT_C;
@@ -69,10 +69,10 @@ begin
    U_SYNC: entity work.SynchronizerVector
       generic map ( WIDTH_G  => 1 )
       port map ( clk                   => clk,
-                 dataIn (0)            => enabled,
-                 dataOut(0)            => uenabled );
+                 dataIn (0)            => clear,
+                 dataOut(0)            => uclear );
    
-   comb: process (r, push, skip, uenabled) is
+   comb: process (r, push, skip, uclear) is
       variable v : RegType;
    begin
       v := r;
@@ -80,7 +80,7 @@ begin
          v.tag := r.tag+1;
       end if;
 
-      if (uenabled='0') then
+      if (uclear='1') then
          v := REG_INIT_C;
       end if;
       

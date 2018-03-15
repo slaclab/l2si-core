@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-12-14
--- Last update: 2017-07-21
+-- Last update: 2018-03-09
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -131,7 +131,7 @@ END COMPONENT;
   signal rxPmaResetDone, txPmaResetDone : slv(NLINKS_G-1 downto 0);
   signal rxErrL    : slv(NLINKS_G-1 downto 0);
   signal rxErrS    : slv(NLINKS_G-1 downto 0);
-  signal rxErrCnts : Slv32Array(NLINKS_G-1 downto 0);
+  signal rxErrCnts : Slv16Array(NLINKS_G-1 downto 0);
 
   signal rxOutClk  : slv(NLINKS_G-1 downto 0);
   signal rxUsrClk  : slv(NLINKS_G-1 downto 0);
@@ -191,7 +191,7 @@ begin
     rxReset   (i)             <= '0';
     
     U_STATUS : entity work.SynchronizerOneShotCnt
-      generic map ( CNT_WIDTH_G => 32 )
+      generic map ( CNT_WIDTH_G => 16 )
       port map ( dataIn       => rxErrL(i),
                  dataOut      => rxErrS(i),
                  rollOverEn   => '1',
