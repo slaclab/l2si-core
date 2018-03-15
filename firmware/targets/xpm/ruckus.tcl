@@ -14,6 +14,9 @@ loadRuckusTcl $::env(TOP_DIR)/submodules
 #loadSource      -dir  "/u1/weaver/amc-carrier-core/AmcCarrierCore/core/"
 #loadSource      -dir  "/u1/weaver/amc-carrier-core/AppMps/rtl/"
 
+# Makefile export USE_XVC_DEBUG = 0 isn't working
+loadSource -path "$::DIR_PATH/../../submodules/amc-carrier-core/AmcCarrierCore/debug/dcp/Stub/images/UdpDebugBridge.dcp"
+
 #loadRuckusTcl $::env(TOP_DIR)/submodules/lcls-timing-core
 #loadRuckusTcl $::env(TOP_DIR)/submodules/surf
 #loadRuckusTcl /u1/weaver/lcls-timing-core

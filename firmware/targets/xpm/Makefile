@@ -2,7 +2,7 @@ export GIT_BYPASS = 1
 ##########################################################################################
 # Applications must define the 32-bitFirmware Version Number
 ##########################################################################################
-export PRJ_VERSION = 0x00000010
+export PRJ_VERSION = 0x00000011
 
 ##########################################################################################
 # Applications must define if using advance AMC carrier build
@@ -19,6 +19,8 @@ export PRJ_VERSION = 0x00000010
 ##########################################################################################
 # AMC_ADV_BUILD is defined by application
 export AMC_ADV_BUILD = 1
+
+export USE_XVC_DEBUG = 0
 
 ##########################################################################################
 # Applications must define if using zone3 (RTM) ETH (instead of zone2 ETH)

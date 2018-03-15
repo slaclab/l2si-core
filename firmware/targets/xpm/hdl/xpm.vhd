@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-12-14
--- Last update: 2017-11-17
+-- Last update: 2018-03-13
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -107,8 +107,10 @@ entity xpm is
       timingClkSel     : out   sl;
       timingClkScl     : inout sl;  -- jitter cleaner (unused)
       timingClkSda     : inout sl;
-      fpgaclk_P        : out   slv(3 downto 0);
-      fpgaclk_N        : out   slv(3 downto 0);
+      fpgaclk0_P       : out   sl;
+      fpgaclk0_N       : out   sl;
+      fpgaclk2_P       : out   sl;
+      fpgaclk2_N       : out   sl;
       -- Crossbar Ports
       xBarSin          : out   slv(1 downto 0);
       xBarSout         : out   slv(1 downto 0);
@@ -276,22 +278,17 @@ begin
       XIL_DEVICE_G => "ULTRASCALE")
       port map (
         clkIn   => recTimingClk,
-        clkOutP => fpgaclk_P(0),
-        clkOutN => fpgaclk_N(0));
+        clkOutP => fpgaclk0_P,
+        clkOutN => fpgaclk0_N);
 
   U_FPGACLK2 : entity work.ClkOutBufDiff
     generic map (
       XIL_DEVICE_G => "ULTRASCALE")
       port map (
         clkIn   => recTimingClk,
-        clkOutP => fpgaclk_P(2),
-        clkOutN => fpgaclk_N(2));
+        clkOutP => fpgaclk2_P,
+        clkOutN => fpgaclk2_N);
 
-  fpgaclk_P(1) <= '0';
-  fpgaclk_N(1) <= '1';
-  fpgaclk_P(3) <= '0';
-  fpgaclk_N(3) <= '1';
-  
    U_XBAR : entity work.AxiLiteCrossbar
       generic map (
          DEC_ERROR_RESP_G   => AXI_RESP_DECERR_C,

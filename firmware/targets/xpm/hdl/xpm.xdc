@@ -142,6 +142,9 @@ set_property -dict { PACKAGE_PIN N23 IOSTANDARD LVCMOS25 } [get_ports {calSda}]
 set_property -dict { PACKAGE_PIN L19 IOSTANDARD LVCMOS15 } [get_ports {ddrScl}] 
 set_property -dict { PACKAGE_PIN L18 IOSTANDARD LVCMOS15 } [get_ports {ddrSda}] 
 
+set_property -dict { PACKAGE_PIN V12 } [get_ports {vPIn}] 
+set_property -dict { PACKAGE_PIN W11 } [get_ports {vNIn}] 
+
 
 set_property -dict { PACKAGE_PIN A4 } [get_ports {usRxP}]
 set_property -dict { PACKAGE_PIN A3 } [get_ports {usRxN}]
