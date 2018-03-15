@@ -97,10 +97,6 @@ set_property PACKAGE_PIN H6 [get_ports {amcClkP[1][0]}]
 #set_property PACKAGE_PIN J30  [get_ports {amcClkN[1][1]}]
 
 
-set_property PACKAGE_PIN AD16 [get_ports fpgaclk_P]
-set_property PACKAGE_PIN AD15 [get_ports fpgaclk_N]
-
-
 # Backplane BP Ports
 set_property -dict {PACKAGE_PIN AD19 IOSTANDARD LVDS DIFF_TERM_ADV TERM_NONE} [get_ports bpRxP]
 set_property -dict {PACKAGE_PIN AD18 IOSTANDARD LVDS DIFF_TERM_ADV TERM_NONE} [get_ports bpRxN]
@@ -142,19 +138,15 @@ set_property -dict {PACKAGE_PIN W11} [get_ports vNIn]
 ## Application Timing Constraints ##
 ####################################
 
-create_clock -period 5.000 -name ddrClkIn [get_pins -hier -filter {NAME =~ *U_DdrMem/BUFG_Inst/O}]
 create_clock -period 6.400 -name fabClk [get_ports fabClkP]
 create_clock -period 6.400 -name ethRef [get_ports ethClkP]
 create_clock -period 2.691 -name timingRef [get_ports timingRefClkInP]
 
 create_generated_clock -name axilClk [get_pins U_Core/U_ClkAndRst/U_ClkManagerMps/MmcmGen.U_Mmcm/CLKOUT2]
-create_generated_clock -name ddrIntClk0 [get_pins -hier -filter {NAME =~ *U_DdrMem/MigCore_Inst/inst/u_ddr3_infrastructure/gen_mmcme3.u_mmcme_adv_inst/CLKOUT0}]
-create_generated_clock -name ddrIntClk1 [get_pins -hier -filter {NAME =~ *U_DdrMem/MigCore_Inst/inst/u_ddr3_infrastructure/gen_mmcme3.u_mmcme_adv_inst/CLKOUT6}]
 
 create_clock -period 6.400 -name amcClk0 [get_ports {amcClkP[0][0]}]
 create_clock -period 6.400 -name amcClk1 [get_ports {amcClkP[1][0]}]
 create_clock -period 6.400 -name fabClk [get_ports fabClkP]
-create_clock -period 5.000 -name ddrClkIn [get_ports ddrClkP]
 create_clock -period 10.000 -name bpClk [get_ports bpClkIn]
 
 create_generate_clock -name usClk0 [get_pins {GEN_US_PGP[0].U_App/U_Pgp3/U_Pgp3GthUsIpWrapper_1/U_Pgp3GthUsIp_1//O}]
@@ -188,7 +180,14 @@ create_generated_clock -name bpClk125MHz [get_pins U_Backplane/U_Clk/U_ClkManage
 #set_clock_groups -asynchronous -group [get_clocks {axilClk}] -group [get_clocks {iprogClk}]
 #set_clock_groups -asynchronous -group [get_clocks {axilClk}] -group [get_clocks {dnaClk}]
 
-set_clock_groups -asynchronous -group [get_clocks -include_generated_clocks timingRef] -group [get_clocks -include_generated_clocks ddrClkIn] -group [get_clocks -include_generated_clocks axilClk] -group [get_clocks -include_generated_clocks fabClk] -group [get_clocks -include_generated_clocks ethRef] -group [get_clocks -include_generated_clocks bpClk] -group [get_clocks -include_generated_clocks amcClk0] -group [get_clocks -include_generated_clocks amcClk1]
+set_clock_groups -asynchronous \
+                 -group [get_clocks -include_generated_clocks timingRef] \
+                 -group [get_clocks -include_generated_clocks axilClk] \
+                 -group [get_clocks -include_generated_clocks fabClk] \
+                 -group [get_clocks -include_generated_clocks ethRef] \
+                 -group [get_clocks -include_generated_clocks bpClk] \
+                 -group [get_clocks -include_generated_clocks amcClk0] \
+                 -group [get_clocks -include_generated_clocks amcClk1]
 
 
 set_false_path -to [get_cells -hierarchical -filter {NAME =~ *GEN_ULTRA_SCALE.IprogUltraScale_Inst/RstSync_Inst/syncRst_reg}]
@@ -234,10 +233,6 @@ set_false_path -to [get_cells -hierarchical -filter {NAME =~ *GEN_ULTRA_SCALE.Ip
 #  Asynchronous reset? (no parallel inputs)
 #####
 set_false_path -through [get_cells {U_Core/U_ClkAndRst/rstDly_reg[2]}]
-
-#set_property CLOCK_DEDICATED_ROUTE FALSE    [get_nets -hier -filter {NAME =~ *U_DdrMem/refClock}]
-set_property CLOCK_DEDICATED_ROUTE FALSE [get_nets U_Core/U_DdrMem/IBUFDS_Inst/O]
-set_property CLOCK_DEDICATED_ROUTE BACKBONE [get_nets -hier -filter {NAME =~ *U_DdrMem/refClkBufg}]
 
 ##########################
 ## Misc. Configurations ##

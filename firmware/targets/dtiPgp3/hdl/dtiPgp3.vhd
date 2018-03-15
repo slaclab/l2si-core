@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-12-14
--- Last update: 2017-12-19
+-- Last update: 2018-03-13
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -202,6 +202,7 @@ architecture top_level of dtiPgp3 is
   
   signal dsStatus     : DtiDsLinkStatusArray(MaxDsLinks-1 downto 0);
   signal dsRemLinkID  : Slv8Array           (MaxDsLinks-1 downto 0);
+  signal dsMonClk     : slv                 (MaxDsLinks-1 downto 0);
   
   signal ctlRxM, ctlTxM : AxiStreamMasterArray(MaxUsLinks-1 downto 0) := (others=>AXI_STREAM_MASTER_INIT_C);
   signal ctlRxS, ctlTxS : AxiStreamSlaveArray (MaxUsLinks-1 downto 0) := (others=>AXI_STREAM_SLAVE_INIT_C);
@@ -225,9 +226,7 @@ architecture top_level of dtiPgp3 is
   signal dsFullIn     : slv       (MaxDsLinks-1 downto 0);
 
   signal iquad            : QuadArray(13 downto 0);
-  signal iqpllrst         : slv(13 downto 0);
-  signal coreClk          : slv(13 downto 7);
-  signal refClk           : slv(13 downto 7);
+  signal iqpllrst         : Slv2Array(13 downto 0);
   signal iamcRxP          : slv(13 downto 0);
   signal iamcRxN          : slv(13 downto 0);
   signal iamcTxP          : slv(13 downto 0);
@@ -274,6 +273,16 @@ architecture top_level of dtiPgp3 is
   
   constant AXI_CROSSBAR_MASTERS_CONFIG_C : AxiLiteCrossbarMasterConfigArray(NMASTERS_C-1 downto 0) := crossBarConfig;
 
+  constant US_AXIL_BASE_ADDR_C : Slv32Array(MaxUsLinks-1 downto 0) := ( toSlv(0,32), toSlv(0,32), toSlv(0,32),
+                                                                        x"B000C000", x"B0008000", x"B0004000", x"B0000000" );
+  constant DS_AXIL_BASE_ADDR_C : Slv32Array(MaxDsLinks-1 downto 0) := ( toSlv(0,32), toSlv(0,32), toSlv(0,32), toSlv(0,32),
+                                                                        x"B0018000", x"B0014000", x"B0010000" );
+  
+  signal usAxilReadMasters  : AxiLiteReadMasterArray (MaxUsLinks-1 downto 0) := (others=>AXI_LITE_READ_MASTER_INIT_C);
+  signal usAxilReadSlaves   : AxiLiteReadSlaveArray  (MaxUsLinks-1 downto 0);
+  signal usAxilWriteMasters : AxiLiteWriteMasterArray(MaxUsLinks-1 downto 0) := (others=>AXI_LITE_WRITE_MASTER_INIT_C);
+  signal usAxilWriteSlaves  : AxiLiteWriteSlaveArray (MaxUsLinks-1 downto 0);
+
   signal dsAxilReadMasters  : AxiLiteReadMasterArray (MaxDsLinks-1 downto 0) := (others=>AXI_LITE_READ_MASTER_INIT_C);
   signal dsAxilReadSlaves   : AxiLiteReadSlaveArray  (MaxDsLinks-1 downto 0);
   signal dsAxilWriteMasters : AxiLiteWriteMasterArray(MaxDsLinks-1 downto 0) := (others=>AXI_LITE_WRITE_MASTER_INIT_C);
@@ -291,7 +300,21 @@ architecture top_level of dtiPgp3 is
   signal drpDo    : Slv16Array(MaxUsLinks-1 downto 0);
 begin
 
-  status.qplllock <= "00" & iquad(1).qpllLock & iquad(0).qpllLock;
+  status.qplllock <= iquad(1).qpllLock & iquad(0).qpllLock;
+
+  GEN_USAXIL : for i in 0 to 3 generate
+    usAxilReadMasters (i) <= mAxilReadMasters (i+2*NPGPAXI_C+2);
+    usAxilWriteMasters(i) <= mAxilWriteMasters(i+2*NPGPAXI_C+2);
+    mAxilReadSlaves  (i+2*NPGPAXI_C+2) <= usAxilReadSlaves(i);
+    mAxilWriteSlaves (i+2*NPGPAXI_C+2) <= usAxilWriteSlaves(i);
+  end generate;
+  
+  GEN_DSAXIL : for i in 0 to 2 generate
+    dsAxilReadMasters (i) <= mAxilReadMasters (i+2*NPGPAXI_C+6);
+    dsAxilWriteMasters(i) <= mAxilWriteMasters(i+2*NPGPAXI_C+6);
+    mAxilReadSlaves  (i+2*NPGPAXI_C+6) <= dsAxilReadSlaves(i);
+    mAxilWriteSlaves (i+2*NPGPAXI_C+6) <= dsAxilWriteSlaves(i);
+  end generate;
   
   GEN_AMC : for j in 0 to 1 generate
     U_QPLL : entity work.DtiPgp3QuadPllArray
@@ -526,6 +549,7 @@ begin
       mAxiReadSlaves   => mAxilReadSlaves);
 
   U_Reg : entity work.DtiReg
+    generic map ( AXIL_BASE_ADDR_G => AXI_CROSSBAR_MASTERS_CONFIG_C(0).baseAddr )
     port map ( axilClk         => regClk,
                axilRst         => regRst,
                axilUpdate      => regUpdate,
@@ -537,10 +561,10 @@ begin
                --      
                status          => status,
                config          => config,
-               monclk(0)       => iquad(0).coreClk,
-               monclk(1)       => usIbClk(0),
-               monclk(2)       => bpMonClk(0),
-               monclk(3)       => usMonClk(0) );
+               monclk(0)       => bpMonClk(0),
+               monclk(1)       => bpMonClk(1),
+               monclk(2)       => usMonClk(0),
+               monclk(3)       => dsMonClk(0) );
 
   --
   --  Translate AMC I/O into AxiStream
@@ -552,7 +576,7 @@ begin
 
   GEN_US_PGP : for i in 0 to MaxUsLinks-1 generate
     U_Core : entity work.DtiUsCore
---      generic map ( DEBUG_G     => ite(i>0, false, true) )
+      generic map ( DEBUG_G     => (i=0) )
       port map ( sysClk        => regClk,
                  sysRst        => regRst,
                  clear         => regClear,
@@ -595,8 +619,9 @@ begin
 
     U_App : entity work.DtiUsPgp3
       generic map ( ID_G             => x"0" & toSlv(i,4),
-                    AXIL_BASE_ADDR_G => AXI_CROSSBAR_MASTERS_CONFIG_C(i+2*NPGPAXI_C+2).baseAddr )
---                    DEBUG_G        => ite(i>0, false, true),
+                    AXIL_BASE_ADDR_G => US_AXIL_BASE_ADDR_C(i),
+                    EN_AXIL_G        => ite(i<4, true, false),
+                    DEBUG_G          => ite(i>5, true, false) )
 --                    INCLUDE_AXIL_G => ite(i<NPGPAXI_C, true, false) )
       port map ( amcClk   => iquad(i).coreClk,
                  amcRst   => '0',
@@ -614,10 +639,10 @@ begin
                  -- DRP Interface
                  axilClk          => regClk,
                  axilRst          => regRst,
-                 axilReadMaster   => mAxilReadMasters (i+2*NPGPAXI_C+2),
-                 axilReadSlave    => mAxilReadSlaves  (i+2*NPGPAXI_C+2),
-                 axilWriteMaster  => mAxilWriteMasters(i+2*NPGPAXI_C+2),
-                 axilWriteSlave   => mAxilWriteSlaves (i+2*NPGPAXI_C+2),
+                 axilReadMaster   => usAxilReadMasters (i),
+                 axilReadSlave    => usAxilReadSlaves  (i),
+                 axilWriteMaster  => usAxilWriteMasters(i),
+                 axilWriteSlave   => usAxilWriteSlaves (i),
                  --
                  ibClk            => usIbClk    (i),
                  ibRst            => regRst,
@@ -625,6 +650,7 @@ begin
                  ibMaster(VC_CTL) => ctlTxM     (i),
                  ibSlave (VC_EVT) => usIbSlave  (i),
                  ibSlave (VC_CTL) => ctlTxS     (i),
+                 loopback         => config.loopback(i),
                  linkUp           => usLinkUp   (i),
                  remLinkID        => usRemLinkID(i),
                  rxErrs           => usRxErrs   (i),
@@ -666,10 +692,9 @@ begin
     
     U_App : entity work.DtiDsPgp3
       generic map ( ID_G             => x"1" & toSlv(i,4),
-                    AXIL_BASE_ADDR_G => (others=>'0'),
-                    DEBUG_G          => false )
---                    DEBUG_G        => ite(i>0,false,true) )
---                    INCLUDE_AXIL_G => ite(i<NPGPAXI_C, true, false) )
+                    AXIL_BASE_ADDR_G => DS_AXIL_BASE_ADDR_C(i),
+                    EN_AXIL_G        => ite(i<3, true, false),
+                    DEBUG_G          => ite(i=2, true, false) )
       port map ( amcClk   => iquad(13-i).coreClk,
                  amcRst   => '0',
                  amcRxP   => iamcRxP(13-i),
@@ -691,10 +716,12 @@ begin
                  --
                  ibRst         => '0',
                  --
+                 loopback      => config.loopback(i+16),
                  linkUp        => dsLinkUp    (i),
                  remLinkID     => dsRemLinkID (i),
                  rxErrs        => dsRxErrs    (i),
                  full          => dsFullIn    (i),
+                 monClk        => dsMonClk    (i),
                  obClk         => dsObClk     (i),
                  obMaster      => dsObMaster  (i),
                  obSlave       => dsObSlave   (i));

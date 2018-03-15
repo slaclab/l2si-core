@@ -2,7 +2,7 @@ export GIT_BYPASS = 1
 ##########################################################################################
 # Applications must define the 32-bitFirmware Version Number
 ##########################################################################################
-export PRJ_VERSION = 0x00000003
+export PRJ_VERSION = 0x00000004
 
 ##########################################################################################
 # Applications must define if using advance AMC carrier build
