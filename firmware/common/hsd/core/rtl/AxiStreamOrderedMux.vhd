@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2016-01-04
--- Last update: 2018-02-02
+-- Last update: 2018-03-12
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -113,7 +113,7 @@ begin  -- mapping
     rin <= v;
 
     enableAck   <= r.enableAck;
-    mAxisMaster <= r.master;
+    mAxisMaster <= r.axisMaster;
   end process;
 
   process (clk)
