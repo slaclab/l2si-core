@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-12-14
--- Last update: 2018-03-13
+-- Last update: 2018-03-24
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -107,10 +107,12 @@ entity xpm is
       timingClkSel     : out   sl;
       timingClkScl     : inout sl;  -- jitter cleaner (unused)
       timingClkSda     : inout sl;
-      fpgaclk0_P       : out   sl;
-      fpgaclk0_N       : out   sl;
-      fpgaclk2_P       : out   sl;
-      fpgaclk2_N       : out   sl;
+      fpgaclk_P        : out   slv(3 downto 0);
+      fpgaclk_N        : out   slv(3 downto 0);
+      --fpgaclk0_P       : out   sl;
+      --fpgaclk0_N       : out   sl;
+      --fpgaclk2_P       : out   sl;
+      --fpgaclk2_N       : out   sl;
       -- Crossbar Ports
       xBarSin          : out   slv(1 downto 0);
       xBarSout         : out   slv(1 downto 0);
@@ -123,26 +125,26 @@ entity xpm is
       calScl           : inout sl;
       calSda           : inout sl;
       -- DDR3L SO-DIMM Ports
-      ddrClkP          : in    sl;
-      ddrClkN          : in    sl;
-      ddrDm            : out   slv(7 downto 0);
-      ddrDqsP          : inout slv(7 downto 0);
-      ddrDqsN          : inout slv(7 downto 0);
-      ddrDq            : inout slv(63 downto 0);
-      ddrA             : out   slv(15 downto 0);
-      ddrBa            : out   slv(2 downto 0);
-      ddrCsL           : out   slv(1 downto 0);
-      ddrOdt           : out   slv(1 downto 0);
-      ddrCke           : out   slv(1 downto 0);
-      ddrCkP           : out   slv(1 downto 0);
-      ddrCkN           : out   slv(1 downto 0);
-      ddrWeL           : out   sl;
-      ddrRasL          : out   sl;
-      ddrCasL          : out   sl;
-      ddrRstL          : out   sl;
-      ddrAlertL        : in    sl;
-      ddrPg            : in    sl;
-      ddrPwrEnL        : out   sl;
+      --ddrClkP          : in    sl;
+      --ddrClkN          : in    sl;
+      --ddrDm            : out   slv(7 downto 0);
+      --ddrDqsP          : inout slv(7 downto 0);
+      --ddrDqsN          : inout slv(7 downto 0);
+      --ddrDq            : inout slv(63 downto 0);
+      --ddrA             : out   slv(15 downto 0);
+      --ddrBa            : out   slv(2 downto 0);
+      --ddrCsL           : out   slv(1 downto 0);
+      --ddrOdt           : out   slv(1 downto 0);
+      --ddrCke           : out   slv(1 downto 0);
+      --ddrCkP           : out   slv(1 downto 0);
+      --ddrCkN           : out   slv(1 downto 0);
+      --ddrWeL           : out   sl;
+      --ddrRasL          : out   sl;
+      --ddrCasL          : out   sl;
+      --ddrRstL          : out   sl;
+      --ddrAlertL        : in    sl;
+      --ddrPg            : in    sl;
+      --ddrPwrEnL        : out   sl;
       ddrScl           : inout sl;
       ddrSda           : inout sl;
       -- SYSMON Ports
@@ -166,9 +168,9 @@ architecture top_level of xpm is
    signal regWriteSlave  : AxiLiteWriteSlaveType;
 
    -- Timing Interface (timingClk domain)
+   signal recTimingDataI : TimingRxType;
    signal recTimingData  : TimingRxType;
-   signal recTimingBus   : TimingBusType;
-   signal recExptBus     : ExptBusType;
+   signal recTimingBus   : TimingBusType;  -- only used for bp latency monitoring
    signal timingPhy      : TimingPhyType;
    
    -- Reference Clocks and Resets
@@ -217,20 +219,12 @@ architecture top_level of xpm is
    signal ringDataI : Slv19Array(NDsLinks-1 downto 0);
    signal ringDataV : slv       (NDsLinks-1 downto 0);
    
-   constant AXI_CROSSBAR_MASTERS_CONFIG_C : AxiLiteCrossbarMasterConfigArray(1 downto 0) := (
-     1              => (
-       baseAddr     => x"80010000",
-       addrBits     => 16,
-       connectivity => x"FFFF"),
-     0              => (
-       baseAddr     => x"80000000",
-       addrBits     => 16,
-       connectivity => x"FFFF"));
+   constant AXI_CROSSBAR_MASTERS_CONFIG_C : AxiLiteCrossbarMasterConfigArray(2 downto 0) := genAxiLiteConfig( 3, x"80000000", 23, 16);
 
-   signal axilReadMasters  : AxiLiteReadMasterArray (1 downto 0);
-   signal axilReadSlaves   : AxiLiteReadSlaveArray  (1 downto 0);
-   signal axilWriteMasters : AxiLiteWriteMasterArray(1 downto 0);
-   signal axilWriteSlaves  : AxiLiteWriteSlaveArray (1 downto 0);
+   signal axilReadMasters  : AxiLiteReadMasterArray (2 downto 0);
+   signal axilReadSlaves   : AxiLiteReadSlaveArray  (2 downto 0);
+   signal axilWriteMasters : AxiLiteWriteMasterArray(2 downto 0);
+   signal axilWriteSlaves  : AxiLiteWriteSlaveArray (2 downto 0);
 
    signal ibDebugMaster    : AxiStreamMasterType;
    signal ibDebugSlave     : AxiStreamSlaveType;
@@ -272,28 +266,11 @@ begin
     end loop;
   end process;
 
-  
-  U_FPGACLK0 : entity work.ClkOutBufDiff
-    generic map (
-      XIL_DEVICE_G => "ULTRASCALE")
-      port map (
-        clkIn   => recTimingClk,
-        clkOutP => fpgaclk0_P,
-        clkOutN => fpgaclk0_N);
-
-  U_FPGACLK2 : entity work.ClkOutBufDiff
-    generic map (
-      XIL_DEVICE_G => "ULTRASCALE")
-      port map (
-        clkIn   => recTimingClk,
-        clkOutP => fpgaclk2_P,
-        clkOutN => fpgaclk2_N);
-
    U_XBAR : entity work.AxiLiteCrossbar
       generic map (
          DEC_ERROR_RESP_G   => AXI_RESP_DECERR_C,
          NUM_SLAVE_SLOTS_G  => 1,
-         NUM_MASTER_SLOTS_G => 2,
+         NUM_MASTER_SLOTS_G => 3,
          MASTERS_CONFIG_G   => AXI_CROSSBAR_MASTERS_CONFIG_C)
       port map (
          axiClk              => regClk,
@@ -352,6 +329,12 @@ begin
        axilReadSlave           => axilReadSlaves  (1),
        axilWriteMaster         => axilWriteMasters(1),
        axilWriteSlave          => axilWriteSlaves (1));
+
+  U_PLLCLK : entity work.XpmPllClk
+    port map ( clkIn    => recTimingClk,
+               rstIn    => recTimingRst,
+               clkOutP  => fpgaclk_P,
+               clkOutN  => fpgaclk_N );
 
    GEN_PLL : for i in 0 to 1 generate
      U_Pll : entity work.XpmPll
@@ -458,9 +441,9 @@ begin
          ibDebugMaster     => ibDebugMaster,
          ibDebugSlave      => ibDebugSlave,
          -- Timing Interface (timingClk domain)
-         timingData        => recTimingData,
+         timingData        => recTimingDataI,
          timingBus         => recTimingBus,
-         exptBus           => recExptBus,
+         exptBus           => open,
          timingPhy         => timingPhy,
          -- Reference Clocks and Resets
          timingPhyClk      => timingPhyClk,
@@ -520,26 +503,26 @@ begin
          calScl            => calScl,
          calSda            => calSda,
          -- DDR3L SO-DIMM Ports
-         ddrClkP           => ddrClkP,
-         ddrClkN           => ddrClkN,
-         ddrDqsP           => ddrDqsP,
-         ddrDqsN           => ddrDqsN,
-         ddrDm             => ddrDm,
-         ddrDq             => ddrDq,
-         ddrA              => ddrA,
-         ddrBa             => ddrBa,
-         ddrCsL            => ddrCsL,
-         ddrOdt            => ddrOdt,
-         ddrCke            => ddrCke,
-         ddrCkP            => ddrCkP,
-         ddrCkN            => ddrCkN,
-         ddrWeL            => ddrWeL,
-         ddrRasL           => ddrRasL,
-         ddrCasL           => ddrCasL,
-         ddrRstL           => ddrRstL,
-         ddrPwrEnL         => ddrPwrEnL,
-         ddrPg             => ddrPg,
-         ddrAlertL         => ddrAlertL,
+         --ddrClkP           => ddrClkP,
+         --ddrClkN           => ddrClkN,
+         --ddrDqsP           => ddrDqsP,
+         --ddrDqsN           => ddrDqsN,
+         --ddrDm             => ddrDm,
+         --ddrDq             => ddrDq,
+         --ddrA              => ddrA,
+         --ddrBa             => ddrBa,
+         --ddrCsL            => ddrCsL,
+         --ddrOdt            => ddrOdt,
+         --ddrCke            => ddrCke,
+         --ddrCkP            => ddrCkP,
+         --ddrCkN            => ddrCkN,
+         --ddrWeL            => ddrWeL,
+         --ddrRasL           => ddrRasL,
+         --ddrCasL           => ddrCasL,
+         --ddrRstL           => ddrRstL,
+         --ddrPwrEnL         => ddrPwrEnL,
+         --ddrPg             => ddrPg,
+         --ddrAlertL         => ddrAlertL,
          ddrScl            => ddrScl,
          ddrSda            => ddrSda,
          -- SYSMON Ports
@@ -566,6 +549,19 @@ begin
                monClk(3)       => bpMonClk,
                config          => xpmConfig,
                dbgChan         => dbgChan );
+
+  U_Seq : entity work.XpmSequence
+    generic map ( AXIL_BASEADDR_G => AXI_CROSSBAR_MASTERS_CONFIG_C(2).baseAddr )
+    port map ( axilClk         => regClk,
+               axilRst         => regRst,
+               axilReadMaster  => axilReadMasters (2),
+               axilReadSlave   => axilReadSlaves  (2),
+               axilWriteMaster => axilWriteMasters(2),
+               axilWriteSlave  => axilWriteSlaves (2),
+               timingClk       => recTimingClk,
+               timingRst       => recTimingRst,
+               timingDataIn    => recTimingDataI,
+               timingDataOut   => recTimingData );
 
   GEN_AMC_MGT : for i in 0 to 1 generate
     U_Rcvr : entity work.XpmGthUltrascaleWrapper

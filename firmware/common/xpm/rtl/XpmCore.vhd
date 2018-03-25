@@ -5,7 +5,7 @@
 -- Author     : Larry Ruckman  <ruckman@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-07-08
--- Last update: 2018-03-09
+-- Last update: 2018-03-23
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -134,26 +134,26 @@ entity XpmCore is
       hsrScl            : inout Slv3Array(1 downto 0);
       hsrSda            : inout Slv3Array(1 downto 0);
       -- DDR3L SO-DIMM Ports
-      ddrClkP           : in    sl;
-      ddrClkN           : in    sl;
-      ddrDm             : out   slv(7 downto 0);
-      ddrDqsP           : inout slv(7 downto 0);
-      ddrDqsN           : inout slv(7 downto 0);
-      ddrDq             : inout slv(63 downto 0);
-      ddrA              : out   slv(15 downto 0);
-      ddrBa             : out   slv(2 downto 0);
-      ddrCsL            : out   slv(1 downto 0);
-      ddrOdt            : out   slv(1 downto 0);
-      ddrCke            : out   slv(1 downto 0);
-      ddrCkP            : out   slv(1 downto 0);
-      ddrCkN            : out   slv(1 downto 0);
-      ddrWeL            : out   sl;
-      ddrRasL           : out   sl;
-      ddrCasL           : out   sl;
-      ddrRstL           : out   sl;
-      ddrAlertL         : in    sl;
-      ddrPg             : in    sl;
-      ddrPwrEnL         : out   sl;
+      --ddrClkP           : in    sl;
+      --ddrClkN           : in    sl;
+      --ddrDm             : out   slv(7 downto 0);
+      --ddrDqsP           : inout slv(7 downto 0);
+      --ddrDqsN           : inout slv(7 downto 0);
+      --ddrDq             : inout slv(63 downto 0);
+      --ddrA              : out   slv(15 downto 0);
+      --ddrBa             : out   slv(2 downto 0);
+      --ddrCsL            : out   slv(1 downto 0);
+      --ddrOdt            : out   slv(1 downto 0);
+      --ddrCke            : out   slv(1 downto 0);
+      --ddrCkP            : out   slv(1 downto 0);
+      --ddrCkN            : out   slv(1 downto 0);
+      --ddrWeL            : out   sl;
+      --ddrRasL           : out   sl;
+      --ddrCasL           : out   sl;
+      --ddrRstL           : out   sl;
+      --ddrAlertL         : in    sl;
+      --ddrPg             : in    sl;
+      --ddrPwrEnL         : out   sl;
       ddrScl            : inout sl;
       ddrSda            : inout sl;
       -- SYSMON Ports
@@ -190,11 +190,11 @@ architecture mapping of XpmCore is
    signal ethWriteSlave  : AxiLiteWriteSlaveType;
 
    signal ddrReadMaster  : AxiLiteReadMasterType;
-   signal ddrReadSlave   : AxiLiteReadSlaveType;
+   signal ddrReadSlave   : AxiLiteReadSlaveType := AXI_LITE_READ_SLAVE_INIT_C;
    signal ddrWriteMaster : AxiLiteWriteMasterType;
-   signal ddrWriteSlave  : AxiLiteWriteSlaveType;
-   signal ddrMemReady    : sl;
-   signal ddrMemError    : sl;
+   signal ddrWriteSlave  : AxiLiteWriteSlaveType := AXI_LITE_WRITE_SLAVE_INIT_C;
+   signal ddrMemReady    : sl := '1';
+   signal ddrMemError    : sl := '0';
 
    signal hsrReadMaster  : AxiLiteReadMasterType;
    signal hsrReadSlave   : AxiLiteReadSlaveType;
@@ -462,52 +462,52 @@ begin
    ------------------
    -- DDR Memory Core
    ------------------
-   U_DdrMem : entity work.AmcCarrierDdrMem
-      generic map (
-         TPD_G            => TPD_G,
-         AXI_ERROR_RESP_G => AXI_ERROR_RESP_C,
-         FSBL_G           => FSBL_G,
-         SIM_SPEEDUP_G    => SIM_SPEEDUP_G)
-      port map (
-         -- AXI-Lite Interface
-         axilClk         => axilClk,
-         axilRst         => axilRst,
-         axilReadMaster  => ddrReadMaster,
-         axilReadSlave   => ddrReadSlave,
-         axilWriteMaster => ddrWriteMaster,
-         axilWriteSlave  => ddrWriteSlave,
-         memReady        => ddrMemReady,
-         memError        => ddrMemError,
-         -- AXI4 Interface
-         axiClk          => axiClk,
-         axiRst          => axiRst,
-         axiWriteMaster  => axiWriteMaster,
-         axiWriteSlave   => axiWriteSlave,
-         axiReadMaster   => axiReadMaster,
-         axiReadSlave    => axiReadSlave,
-         ----------------
-         -- Core Ports --
-         ----------------   
-         -- DDR3L SO-DIMM Ports
-         ddrClkP         => ddrClkP,
-         ddrClkN         => ddrClkN,
-         ddrDqsP         => ddrDqsP,
-         ddrDqsN         => ddrDqsN,
-         ddrDm           => ddrDm,
-         ddrDq           => ddrDq,
-         ddrA            => ddrA,
-         ddrBa           => ddrBa,
-         ddrCsL          => ddrCsL,
-         ddrOdt          => ddrOdt,
-         ddrCke          => ddrCke,
-         ddrCkP          => ddrCkP,
-         ddrCkN          => ddrCkN,
-         ddrWeL          => ddrWeL,
-         ddrRasL         => ddrRasL,
-         ddrCasL         => ddrCasL,
-         ddrRstL         => ddrRstL,
-         ddrPwrEnL       => ddrPwrEnL,
-         ddrPg           => ddrPg,
-         ddrAlertL       => ddrAlertL);
+   --U_DdrMem : entity work.AmcCarrierDdrMem
+   --   generic map (
+   --      TPD_G            => TPD_G,
+   --      AXI_ERROR_RESP_G => AXI_ERROR_RESP_C,
+   --      FSBL_G           => FSBL_G,
+   --      SIM_SPEEDUP_G    => SIM_SPEEDUP_G)
+   --   port map (
+   --      -- AXI-Lite Interface
+   --      axilClk         => axilClk,
+   --      axilRst         => axilRst,
+   --      axilReadMaster  => ddrReadMaster,
+   --      axilReadSlave   => ddrReadSlave,
+   --      axilWriteMaster => ddrWriteMaster,
+   --      axilWriteSlave  => ddrWriteSlave,
+   --      memReady        => ddrMemReady,
+   --      memError        => ddrMemError,
+   --      -- AXI4 Interface
+   --      axiClk          => axiClk,
+   --      axiRst          => axiRst,
+   --      axiWriteMaster  => axiWriteMaster,
+   --      axiWriteSlave   => axiWriteSlave,
+   --      axiReadMaster   => axiReadMaster,
+   --      axiReadSlave    => axiReadSlave,
+   --      ----------------
+   --      -- Core Ports --
+   --      ----------------   
+   --      -- DDR3L SO-DIMM Ports
+   --      ddrClkP         => ddrClkP,
+   --      ddrClkN         => ddrClkN,
+   --      ddrDqsP         => ddrDqsP,
+   --      ddrDqsN         => ddrDqsN,
+   --      ddrDm           => ddrDm,
+   --      ddrDq           => ddrDq,
+   --      ddrA            => ddrA,
+   --      ddrBa           => ddrBa,
+   --      ddrCsL          => ddrCsL,
+   --      ddrOdt          => ddrOdt,
+   --      ddrCke          => ddrCke,
+   --      ddrCkP          => ddrCkP,
+   --      ddrCkN          => ddrCkN,
+   --      ddrWeL          => ddrWeL,
+   --      ddrRasL         => ddrRasL,
+   --      ddrCasL         => ddrCasL,
+   --      ddrRstL         => ddrRstL,
+   --      ddrPwrEnL       => ddrPwrEnL,
+   --      ddrPg           => ddrPg,
+   --      ddrAlertL       => ddrAlertL);
 
 end mapping;

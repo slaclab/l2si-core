@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-07-10
--- Last update: 2018-01-05
+-- Last update: 2018-03-24
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -83,6 +83,7 @@ architecture top_level_app of XpmSim is
    -- Timing Interface (timingClk domain) 
    signal xData     : TimingRxType := TIMING_RX_INIT_C;
    signal timingBus : TimingBusType;
+   signal timingBusL: TimingBusType;
    signal exptBus   : ExptBusType;
    
    signal pconfig : XpmPartitionConfigArray(NPartitions-1 downto 0) := (others=>XPM_PARTITION_CONFIG_INIT_C);
@@ -362,4 +363,15 @@ begin
 --         timingBus         => timingBus,
 --         exptBus           => exptBus );
 
+     busL: process( recTimingClk ) is
+     begin
+       if rising_edge(recTimingClk) then
+         if timingBus.strobe = '1' then
+           timingBusL <= timingBus;
+         else
+           timingBusL.strobe <= '0';
+         end if;
+       end if;
+     end process busL;
+     
 end top_level_app;
