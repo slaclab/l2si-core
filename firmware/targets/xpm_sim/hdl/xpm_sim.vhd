@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-07-10
--- Last update: 2018-03-12
+-- Last update: 2018-03-24
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -28,6 +28,7 @@ use ieee.std_logic_1164.all;
 use ieee.std_logic_unsigned.all;
 
 use work.StdRtlPkg.all;
+use work.AxiLitePkg.all;
 use work.TimingPkg.all;
 use work.XpmPkg.all;
 use work.TPGPkg.all;
@@ -73,17 +74,23 @@ architecture top_level_app of xpm_sim is
    -- Timing Interface (timingClk domain) 
    signal dsPhy     : TimingPhyType;
    signal xData     : TimingRxType := TIMING_RX_INIT_C;
-   signal timingBus : TimingBusType;
-   signal exptBus   : ExptBusType;
+   signal yData     : TimingRxType := TIMING_RX_INIT_C;
+   signal yBus      : TimingBusType;
+   signal yMsg      : TimingMessageType;
    
-   signal regClk    : sl;
-   signal regRst    : sl;
-
+   signal regClk         : sl;
+   signal regRst         : sl;
+   signal regReadMaster  : AxiLiteReadMasterType  := AXI_LITE_READ_MASTER_INIT_C;
+   signal regReadSlave   : AxiLiteReadSlaveType   := AXI_LITE_READ_SLAVE_INIT_C;
+   signal regWriteMaster : AxiLiteWriteMasterType := AXI_LITE_WRITE_MASTER_INIT_C;
+   signal regWriteSlave  : AxiLiteWriteSlaveType  := AXI_LITE_WRITE_SLAVE_INIT_C;
+   
    signal pconfig  : XpmPartitionConfigType := XPM_PARTITION_CONFIG_INIT_C;
    signal dsFull   : slv(NPartitions-1 downto 0) := toSlv(1,NPartitions);
    signal timingFb : TimingPhyType := TIMING_PHY_INIT_C;
 
    signal msgCount : integer := 0;
+   signal axilDone : sl;
 begin
 
    xpmConfig.partition(1) <= pconfig;
@@ -255,6 +262,51 @@ begin
                 bpRxLinkUp   => (others=>'0'),
                 bpRxLinkFull => (others=>(others=>'0')) );
 
+   U_Seq : entity work.XpmSequence
+     generic map ( AXIL_BASEADDR_G  => X"00000000" )
+     port map (
+      -- AXI-Lite Interface (on axiClk domain)
+      axilClk          => regClk,
+      axilRst          => regRst,
+      axilReadMaster   => regReadMaster,
+      axilReadSlave    => regReadSlave,
+      axilWriteMaster  => regWriteMaster,
+      axilWriteSlave   => regWriteSlave,
+      -- Configuration/Status (on clk domain)
+      timingClk        => recTimingClk,
+      timingRst        => recTimingRst,
+      timingDataIn     => xData,
+      timingDataOut    => yData );
+
+   U_RCV : entity work.TimingFrameRx
+   port map (
+      rxClk               => recTimingClk,
+      rxRst               => recTimingRst,
+      rxData              => yData,
+
+      messageDelay        => (others=>'0'),
+      messageDelayRst     => '0',
+      
+      timingMessage       => yBus.message,
+      timingMessageStrobe => yBus.strobe,
+      timingMessageValid  => yBus.valid,
+
+      exptMessage         => open,
+      exptMessageValid    => open,
+
+      rxVersion           => open,
+      staData             => open
+      );
+
+   yproc : process (recTimingClk) is
+   begin
+     if rising_edge(recTimingClk) then
+       if yBus.strobe = '1' then
+         yMsg <= yBus.message;
+       end if;
+     end if;
+   end process yproc;
+   
    U_DUT : entity work.XpmApp
       generic map ( NDSLinks => NDSLinks,
                     NBPLinks => NBPLinks )
@@ -286,9 +338,62 @@ begin
          -- Timing Interface (timingClk domain) 
          timingClk         => recTimingClk,
          timingRst         => recTimingRst,
-         timingin          => xData,
+         timingin          => yData,
          timingFbClk       => recTimingClk,
          timingFbRst       => recTimingRst,
          timingFb          => timingFb );
+
+   --regc : process ( regWrite, regWriteSlave ) is
+   --  variable v : RegWriteType;
+   --begin
+   --  v := regWrite;
+
+   --  if regWriteSlave.awready = '1' then
+   --    v.master.awvalid := '0';
+   --  end if;
+
+   --  if regWriteSlave.wready = '1' then
+   --    v.master.wvalid := '0';
+   --  end if;
+   --end process regc;
+
+   process is
+     --
+     --  This procedure results in multiple writes
+     --
+     procedure wreg(addr : integer; data : slv(31 downto 0)) is
+     begin
+       wait until regClk='0';
+       regWriteMaster.awaddr  <= toSlv(addr,32);
+       regWriteMaster.awvalid <= '1';
+       regWriteMaster.wdata   <= data;
+       regWriteMaster.wvalid  <= '1';
+       regWriteMaster.bready  <= '1';
+       wait until regClk='1';
+       wait until regWriteSlave.bvalid='1';
+       wait until regClk='0';
+       wait until regClk='1';
+       wait until regClk='0';
+       regWriteMaster.awvalid <= '0';
+       regWriteMaster.wvalid  <= '0';
+       regWriteMaster.bready  <= '0';
+       wait for 50 ns;
+     end procedure;
+  begin
+    axilDone <= '0';
+    wait until regRst='0';
+    wait for 1200 ns;
+    wreg(conv_integer(x"8004"),x"40010001"); -- Fixed Rate Sync
+    wreg(conv_integer(x"8008"),x"80000003"); -- Request
+    wreg(conv_integer(x"800c"),x"40000001"); -- Fixed Rate Sync
+    wreg(conv_integer(x"8010"),x"80000001"); -- Request
+    wreg(conv_integer(x"8014"),x"00000001"); -- Branch to 1
+    wreg(conv_integer(x"8018"),x"00000006"); -- Branch to 6 (runaway barrier)
+    wreg(conv_integer(x"403C"),x"00000001"); -- Jump to 1
+    wreg(conv_integer(x"0000"),x"00000001"); -- Restart seq 0
+    wait for 600 ns;
+    axilDone <= '1';
+    wait;
+  end process;
 
 end top_level_app;
