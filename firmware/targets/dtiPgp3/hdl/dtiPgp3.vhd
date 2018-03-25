@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-12-14
--- Last update: 2018-03-13
+-- Last update: 2018-03-20
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -620,8 +620,9 @@ begin
     U_App : entity work.DtiUsPgp3
       generic map ( ID_G             => x"0" & toSlv(i,4),
                     AXIL_BASE_ADDR_G => US_AXIL_BASE_ADDR_C(i),
-                    EN_AXIL_G        => ite(i<4, true, false),
-                    DEBUG_G          => ite(i>5, true, false) )
+--                    EN_AXIL_G        => ite(i<4, true, false),
+                    EN_AXIL_G        => false,
+                    DEBUG_G          => (i=0) )
 --                    INCLUDE_AXIL_G => ite(i<NPGPAXI_C, true, false) )
       port map ( amcClk   => iquad(i).coreClk,
                  amcRst   => '0',

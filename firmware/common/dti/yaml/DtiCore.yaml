@@ -194,10 +194,10 @@ DtiCore: &DtiCore
         stride: 0x100   
       description: Server RSSI Software
     ##################################################
-    AxiMemTester:
-      <<: *AxiMemTester
-      at:
-        offset: 0x0B000000  
+#    AxiMemTester:
+#      <<: *AxiMemTester
+#      at:
+#        offset: 0x0B000000  
  #   ##################################################   
  #   AmcCarrierMps:
  #     <<: *AmcCarrierMps

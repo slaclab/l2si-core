@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-07-10
--- Last update: 2018-02-22
+-- Last update: 2018-03-21
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -96,11 +96,16 @@ architecture top_level_app of DtiUsPgp3 is
     --  Event state
     opCodeEn   : sl;
     opCode     : slv(7 downto 0);
+    --  Ctl Statistics
+    obSent     : slv(31 downto 0);
+    obReceived : slv(31 downto 0);
   end record;
   
   constant REG_INIT_C : RegType := (
     opCodeEn   => '0',
-    opCode     => (others=>'0') );
+    opCode     => (others=>'0'),
+    obSent     => (others=>'0'),
+    obReceived => (others=>'0') );
 
   signal r    : RegType := REG_INIT_C;
   signal r_in : RegType;
@@ -124,6 +129,7 @@ architecture top_level_app of DtiUsPgp3 is
   signal itxfull        : sl;
 
   signal iibMaster      : AxiStreamMasterArray(NUM_DTI_VC_C-1 downto 0);
+  signal iobSlave       : AxiStreamSlaveType;
 
   component ila_0
     port ( clk : in sl;
@@ -132,14 +138,23 @@ architecture top_level_app of DtiUsPgp3 is
   
 begin
 
-  --GEN_DBUG : if DEBUG_G generate
-  --  U_ILA : ila_0
-  --    port map ( clk                  => ibClk,
-  --               probe0(0)            => ibSlave  (VC_EVT).tReady,
-  --               probe0(1)            => iibMaster(VC_EVT).tValid,
-  --               probe0(65 downto  2) => iibMaster(VC_EVT).tData(63 downto 0),
-  --               probe0(67 downto 66) => iibMaster(VC_EVT).tUser( 1 downto 0),
-  --               probe0(255 downto 68) => (others=>'0') );
+  GEN_DBUG : if DEBUG_G generate
+    U_ILA_IB : ila_0
+      port map ( clk                  => ibClk,
+                 probe0(0)            => ibSlave  (VC_CTL).tReady,
+                 probe0(1)            => iibMaster(VC_CTL).tValid,
+                 probe0(65 downto  2) => iibMaster(VC_CTL).tData(63 downto 0),
+                 probe0(67 downto 66) => iibMaster(VC_CTL).tUser( 1 downto 0),
+                 probe0(68)           => iibMaster(VC_CTL).tLast,
+                 probe0(255 downto 69) => (others=>'0') );
+    U_ILA_OB : ila_0
+      port map ( clk                  => obClk,
+                 probe0(0)            => iobSlave.tReady,
+                 probe0(1)            => obMaster.tValid,
+                 probe0(65 downto  2) => obMaster.tData(63 downto 0),
+                 probe0(67 downto 66) => obMaster.tUser( 1 downto 0),
+                 probe0(68)           => obMaster.tLast,
+                 probe0(255 downto 69) => (others=>'0') );
   --  U_ILA_P : ila_0
   --    port map ( clk                  => pgpClk,
   --               probe0(0)            => pgpRxCtrls(0).pause,
@@ -147,9 +162,10 @@ begin
   --               probe0(17 downto  2) => pgpRxMasters(0).tData(15 downto 0),
   --               probe0(19 downto 18) => pgpRxMasters(0).tUser( 1 downto 0),
   --               probe0(255 downto 20) => (others=>'0') );
-  --end generate;
+  end generate;
 
   ibMaster <= iibMaster;
+  obSlave  <= iobSlave;
   
   linkUp                   <= pgpRxOut.linkReady;
   pgpRxIn.loopback         <= '0' & loopback & '0';
@@ -166,7 +182,6 @@ begin
 --  locTxIn.locData          <= ID_G;
   pgpTxIn                  <= locTxIn;
   
-  status                   <= DTI_US_APP_STATUS_INIT_C;
   monClk                   <= pgpClk;
   
   U_PgpFb : entity work.DtiPgp3Fb
@@ -240,7 +255,7 @@ begin
     port map ( sAxisClk    => obClk,
                sAxisRst    => obRst,
                sAxisMaster => obMaster,
-               sAxisSlave  => obSlave,
+               sAxisSlave  => iobSlave,
                mAxisClk    => pgpClk,
                mAxisRst    => pgpRst,
                mAxisMaster => pgpTxMasters(VC_CTL),
@@ -276,7 +291,9 @@ begin
                valid   => pgpTrigValid,
                dout    => pgpTrig );
   
-  comb : process ( fifoRst, r, pgpTrig, pgpTrigValid ) is
+  comb : process ( fifoRst, r, pgpTrig, pgpTrigValid,
+                   pgpTxMasters, pgpTxSlaves,
+                   pgpRxMasters ) is
     variable v   : RegType;
   begin
     v := r;
@@ -291,10 +308,21 @@ begin
       v.opCode(2 downto 0) := pgpTrig;
     end if;
 
+    if pgpTxMasters(VC_CTL).tValid='1' and pgpTxSlaves(VC_CTL).tReady='1' then
+      v.obSent := r.obSent + 1;
+    end if;
+
+    if pgpRxMasters(VC_CTL).tValid='1' then
+      v.obReceived := r.obReceived + 1;
+    end if;
+    
     if fifoRst = '1' then
       v := REG_INIT_C;
     end if;
 
+    status.obSent     <= r.obSent;
+    status.obReceived <= r.obReceived;
+    
     r_in <= v;
   end process;
             
