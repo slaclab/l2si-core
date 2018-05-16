@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-12-14
--- Last update: 2018-03-20
+-- Last update: 2018-05-13
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -427,6 +427,7 @@ begin
       timingHdrP        => timingHdr,
       triggerBus        => triggerBus,
       fullOut           => fullOut,
+      msgDelay          => status.msgDelaySet,
       -- Reference Clocks and Resets
       recTimingClk      => recTimingClk,
       recTimingRst      => recTimingRst,
@@ -585,6 +586,7 @@ begin
                  status        => status.usLink(i),
                  remLinkID     => usRemLinkID  (i),
                  fullOut       => usFull       (i),
+                 msgDelay      => status.msgDelayGet(i),
                  --
                  --ctlClk        => regClk,
                  --ctlRst        => regRst,

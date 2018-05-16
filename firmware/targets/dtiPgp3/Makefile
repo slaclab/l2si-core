@@ -1,8 +1,12 @@
 export GIT_BYPASS = 1
 ##########################################################################################
 # Applications must define the 32-bitFirmware Version Number
+# PRJ_VERSION = 0x00000004  PGP3 fully working 
+# PRJ_VERSION = 0x00000005  Added UsLinkConfig AFDEPTH test
+# PRJ_VERSION = 0x00000006  Added count into transition header
+# PRJ_VERSION = 0x00000007  Track msg delay
 ##########################################################################################
-export PRJ_VERSION = 0x00000004
+export PRJ_VERSION = 0x00000007
 
 ##########################################################################################
 # Applications must define if using advance AMC carrier build
