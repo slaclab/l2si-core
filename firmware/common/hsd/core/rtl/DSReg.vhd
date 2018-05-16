@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2016-01-04
--- Last update: 2017-12-12
+-- Last update: 2018-05-15
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -82,7 +82,7 @@ architecture mapping of DSReg is
     dmaFullThr     => (others=>'1'),
     dmaHistEna     => '0',
     config         => QUAD_ADC_CONFIG_INIT_C,
-    adcSyncRst     => '0',
+    adcSyncRst     => '1',
     dmaRst         => '1',
     fbRst          => '1',
     fbPLLRst       => '1',
@@ -95,6 +95,10 @@ architecture mapping of DSReg is
   signal icache   : integer range 0 to 15;
   signal cacheS       : CacheType;
   signal cacheV, cacheSV : slv(CACHETYPE_LEN_C-1 downto 0);
+
+  signal msgDelaySetS, msgDelayGetS : slv(6 downto 0);
+  signal headerCntL0S : slv(19 downto 0);
+  signal headerCntOFS : slv( 7 downto 0);
   
 begin  -- mapping
 
@@ -110,6 +114,30 @@ begin  -- mapping
   fbRst          <= r.fbRst;
   fbPLLRst       <= r.fbPLLRst;
 
+  U_MsgDelaySetS : entity work.SynchronizerVector
+    generic map (WIDTH_G => 7)
+    port map ( clk     => axiClk,
+               dataIn  => status.msgDelaySet,
+               dataOut => msgDelaySetS );
+  
+  U_MsgDelayGetS : entity work.SynchronizerVector
+    generic map (WIDTH_G => 7)
+    port map ( clk     => axiClk,
+               dataIn  => status.msgDelayGet,
+               dataOut => msgDelayGetS );
+  
+  U_HeaderCntL0S : entity work.SynchronizerVector
+    generic map (WIDTH_G => 20)
+    port map ( clk     => axiClk,
+               dataIn  => status.headerCntL0,
+               dataOut => headerCntL0S );
+  
+  U_HeaderCntOFS : entity work.SynchronizerVector
+    generic map (WIDTH_G => 8)
+    port map ( clk     => axiClk,
+               dataIn  => status.headerCntOF,
+               dataOut => headerCntOFS );
+  
   process (axiClk)
   begin  -- process
     if rising_edge(axiClk) then
@@ -117,7 +145,8 @@ begin  -- mapping
     end if;
   end process;
 
-  process (r,axilReadMaster,axilWriteMaster,axiRst,status,irqReq,cacheS) is
+  process (r,axilReadMaster,axilWriteMaster,axiRst,status,irqReq,cacheS,
+           msgDelaySetS,msgDelayGetS,headerCntL0S,headerCntOFS) is
     variable v : RegType;
     variable sReg : slv(0 downto 0);
     variable axilStatus : AxiLiteStatusType;
@@ -160,6 +189,8 @@ begin  -- mapping
     end procedure;
   begin  -- process
     v  := r;
+    v.adcSyncRst := '0';
+    
     sReg(0) := irqReq;
     axiSlaveWaitTxn(axilWriteMaster, axilReadMaster, v.axilWriteSlave, v.axilReadSlave, axilStatus);
     v.axilReadSlave.rdata := (others=>'0');
@@ -190,8 +221,9 @@ begin  -- mapping
     axilSlaveRegisterR(toSlv(40,12), muxSlVectorArray(status.eventCount, 0));
     axilSlaveRegisterR(toSlv(44,12), muxSlVectorArray(status.eventCount, 1));
     axilSlaveRegisterR(toSlv(48,12), status.dmaCtrlCount);
-    axilSlaveRegisterR(toSlv(52,12), status.dmaFullQ);
-    axilSlaveRegisterR(toSlv(56,12), status.adcSyncReg);
+    axilSlaveRegisterR(toSlv(52,12), muxSlVectorArray(status.eventCount, 2));
+    axilSlaveRegisterR(toSlv(56,12), muxSlVectorArray(status.eventCount, 3));
+    axilSlaveRegisterR(toSlv(60,12), muxSlVectorArray(status.eventCount, 4));
 
     case cacheS.state is
       when EMPTY_S   => cacheS_state := x"0";
@@ -213,8 +245,14 @@ begin  -- mapping
     axilSlaveRegisterR(toSlv(68,12),  9, cacheS.ovflow );
     axilSlaveRegisterR(toSlv(72,12),  0, cacheS.baddr );
     axilSlaveRegisterR(toSlv(72,12), 16, cacheS.eaddr );
+
+    axilSlaveRegisterR(toSlv(76,12),  0, msgDelaySetS );
+    axilSlaveRegisterR(toSlv(76,12), 16, msgDelayGetS );
+
+    axilSlaveRegisterR(toSlv(80,12),  0, headerCntL0S );
+    axilSlaveRegisterR(toSlv(80,12), 24, headerCntOFS );
     
-    axilSlaveDefault(AXI_RESP_OK_C);
+    axilSlaveDefault(AXI_RESP_OK_C); 
     
     rin <= v;
   end process;

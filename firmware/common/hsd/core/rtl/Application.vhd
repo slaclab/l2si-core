@@ -68,8 +68,7 @@ end Application;
 -------------------------------------------------------------------------------
 architecture rtl of Application is
 
-  constant NUM_AXI_MASTERS_C : integer := 6;
---  constant NUM_AXI_MASTERS_C : integer := 5;
+  constant NUM_AXI_MASTERS_C : integer := 7;
   constant AXI_CROSSBAR_MASTERS_CONFIG_C : AxiLiteCrossbarMasterConfigArray(NUM_AXI_MASTERS_C-1 downto 0) := (
     0    => (
       baseAddr        => x"00080000",
@@ -89,9 +88,13 @@ architecture rtl of Application is
       connectivity    => x"FFFF"),
     4    => (
       baseAddr        => x"00082000",
-      addrBits        => 12,
+      addrBits        => 11,
       connectivity    => x"FFFF"),
     5    => (
+      baseAddr        => x"00082800",
+      addrBits        => 11,
+      connectivity    => x"FFFF"),
+    6    => (
       baseAddr        => x"00088000",
       addrBits        => 15,
       connectivity    => x"FFFF") );
@@ -100,10 +103,10 @@ architecture rtl of Application is
   signal mAxilReadMasters  : AxiLiteReadMasterArray (NUM_AXI_MASTERS_C-1 downto 0);
   signal mAxilReadSlaves   : AxiLiteReadSlaveArray  (NUM_AXI_MASTERS_C-1 downto 0);
 
-  signal cAxilWriteMasters : AxiLiteWriteMasterArray(1 downto 0);
-  signal cAxilWriteSlaves  : AxiLiteWriteSlaveArray (1 downto 0);
-  signal cAxilReadMasters  : AxiLiteReadMasterArray (1 downto 0);
-  signal cAxilReadSlaves   : AxiLiteReadSlaveArray  (1 downto 0);
+  signal cAxilWriteMasters : AxiLiteWriteMasterArray(2 downto 0);
+  signal cAxilWriteSlaves  : AxiLiteWriteSlaveArray (2 downto 0);
+  signal cAxilReadMasters  : AxiLiteReadMasterArray (2 downto 0);
+  signal cAxilReadSlaves   : AxiLiteReadSlaveArray  (2 downto 0);
   
   signal adcO              : AdcDataArray(4*NFMC_G-1 downto 0);
   signal adcClk            : sl;
@@ -117,6 +120,7 @@ architecture rtl of Application is
   signal ddrClk            : sl;
   signal ddrClkInv         : sl;
   signal gbClk             : sl;
+  signal pllRst            : sl;
   signal pllRefClk         : slv(1 downto 0);
   signal psClk             : slv(1 downto 0);
   signal psEn              : slv(1 downto 0);
@@ -140,6 +144,8 @@ architecture rtl of Application is
   signal adcSyncRst        : sl;
   signal adcSyncLocked     : sl;
 
+  constant DIVCLK_G : boolean := false;
+  
 begin  -- rtl
 
   dmaClk <= idmaClk;
@@ -270,59 +276,73 @@ begin  -- rtl
       axilReadSlave       => mAxilReadSlaves  (4),
       --
       evrClk              => evrClk,
-      trigSlot            => trigSlot,
-      trigSel             => trigSel,
---      trigOut             => trig,
-      trigOut             => open,
+      evrRst              => evrRst,
+      evrBus              => evrBus,
+      pllRstIn            => adcSyncRst,
+      pllRst              => pllRst,
       --
-      syncClk             => adcClk,
-      sync                => adcS,
       delayLd             => adcSdelayLd,
       delayOut            => adcSdelayIn,
       delayIn             => adcSdelayOut );              
 
-  U_MMCM_t : entity work.mmcm_fineps
-    -- LCLS   : Fvco = 119M * 10.5 = 1249.5M
-    --          Fout = 119M * 10.5/125 = 9.996M
-    -- LCLSII : Fvco = 1300M/7 * 6 = 1114.3M
-    --          Fout = 1300M/7 * 6/75 = 14-6/7M
-    generic map ( NUM_CLOCKS_G       => 2,
-                  CLKIN_PERIOD_G     => ite(LCLSII_G, 5.37, 8.40),
-                  CLKFBOUT_MULT_F_G  => ite(LCLSII_G, 6.0, 10.5),
-                  CLKOUT0_DIVIDE_F_G => ite(LCLSII_G, 75.0, 125.0),
-                  CLKOUT1_DIVIDE_G   => ite(LCLSII_G, 75  , 125  ) )
-    port map ( clkIn          => evrClk,
-               rstIn          => adcSyncRst,
-               clkOut(0)      => pllRefClk(0),
-               clkOut(1)      => pllRefClk(1),
-               rstOut         => open,
-               locked         => adcSyncLocked,
-               psClk          => psClk   (1),
-               psEn           => psEn    (1),
-               psIncDec       => psIncDec(1),
-               psDone         => psDone  (1),
-               axilClk        => axiClk,
-               axilRst        => axiRst,
-               axilReadMaster => mAxilReadMasters (1),
-               axilReadSlave  => mAxilReadSlaves  (1),
-               axilWriteMaster=> mAxilWriteMasters(1),
-               axilWriteSlave => mAxilWriteSlaves (1) );
+  GEN_DIVCLK : if DIVCLK_G generate
+    U_DIVCLK : entity work.HsdDivClk
+      generic map ( DIV_G => ite(LCLSII_G, 100, 7) )
+      port map ( ClkIn  => evrClk,
+                 RstIn  => evrRst,
+                 Sync   => evrBus.strobe,
+                 ClkOut => pllRefClk,
+                 Locked => adcSyncLocked );
+  end generate;
 
+  GEN_MMCM : if not DIVCLK_G generate
+    U_MMCM_t : entity work.mmcm_fineps
+      -- LCLS   : Fvco = 119M * 10.5 = 1249.5M
+      --          Fout = 119M * 10.5/125 = 9.996M
+      -- LCLSII : Fvco = 1300M/7 * 6 = 1114.3M
+      --          Fout = 1300M/7 * 6/75 = 14-6/7M
+      generic map ( NUM_CLOCKS_G       => 2,
+                    CLKIN_PERIOD_G     => ite(LCLSII_G, 5.37, 8.40),
+                    CLKFBOUT_MULT_F_G  => ite(LCLSII_G, 6.0, 10.5),
+                    CLKOUT0_DIVIDE_F_G => ite(LCLSII_G, 75.0, 125.0),
+                    CLKOUT1_DIVIDE_G   => ite(LCLSII_G, 75  , 125  ) )
+      port map ( clkIn          => evrClk,
+                 rstIn          => pllRst,
+                 clkOut(0)      => pllRefClk(0),
+                 clkOut(1)      => pllRefClk(1),
+                 rstOut         => open,
+                 locked         => adcSyncLocked,
+                 psClk          => psClk   (1),
+                 psEn           => psEn    (1),
+                 psIncDec       => psIncDec(1),
+                 psDone         => psDone  (1),
+                 axilClk        => axiClk,
+                 axilRst        => axiRst,
+                 axilReadMaster => mAxilReadMasters (1),
+                 axilReadSlave  => mAxilReadSlaves  (1),
+                 axilWriteMaster=> mAxilWriteMasters(1),
+                 axilWriteSlave => mAxilWriteSlaves (1) );
+  end generate;
+  
   cAxilWriteMasters(0) <= mAxilWriteMasters(0);
   cAxilReadMasters (0) <= mAxilReadMasters (0);
   mAxilWriteSlaves (0) <= cAxilWriteSlaves (0);
   mAxilReadSlaves  (0) <= cAxilReadSlaves  (0);
-  cAxilWriteMasters(1) <= mAxilWriteMasters(5);
-  cAxilReadMasters (1) <= mAxilReadMasters (5);
-  mAxilWriteSlaves (5) <= cAxilWriteSlaves (1);
-  mAxilReadSlaves  (5) <= cAxilReadSlaves  (1);
+  cAxilWriteMasters(1) <= mAxilWriteMasters(6);
+  cAxilReadMasters (1) <= mAxilReadMasters (6);
+  mAxilWriteSlaves (6) <= cAxilWriteSlaves (1);
+  mAxilReadSlaves  (6) <= cAxilReadSlaves  (1);
+  cAxilWriteMasters(2) <= mAxilWriteMasters(5);
+  cAxilReadMasters (2) <= mAxilReadMasters (5);
+  mAxilWriteSlaves (5) <= cAxilWriteSlaves (2);
+  mAxilReadSlaves  (5) <= cAxilReadSlaves  (2);
   --cAxilWriteMasters(1) <= AXI_LITE_WRITE_MASTER_INIT_C;
   --cAxilReadMasters (1) <= AXI_LITE_READ_MASTER_INIT_C;
   
   U_Core : entity work.QuadAdcCore
     generic map ( NFMC_G      => NFMC_G,
                   SYNC_BITS_G => SYNC_BITS,
-                  BASE_ADDR_C => AXI_CROSSBAR_MASTERS_CONFIG_C(5).baseAddr,
+                  BASE_ADDR_C => AXI_CROSSBAR_MASTERS_CONFIG_C(6).baseAddr,
                   DMA_SIZE_G  => DMA_SIZE_G,
                   DMA_STREAM_CONFIG_G => DMA_STREAM_CONFIG_G )
     port map (

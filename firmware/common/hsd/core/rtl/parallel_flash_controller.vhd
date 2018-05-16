@@ -204,6 +204,8 @@ signal data_byte_in                 : std_logic_vector(15 downto 0);
 signal out_reg_val_ack   : std_logic;
 signal wr_ack            : std_logic;
 
+signal flash_rst         : std_logic;
+signal rstn, flash_rstn  : std_logic;
 ----------------------------------------------------------------------------------------------------
 -- Component declarations
 ----------------------------------------------------------------------------------------------------
@@ -251,12 +253,45 @@ port (
 );
 end component;
 
-constant DEBUG_C : boolean := false;
+constant DEBUG_C : boolean := true;
+
+component ila_0
+  port ( clk   : in std_logic;
+         probe0 : in std_logic_vector(255 downto 0) );
+end component;
 
 signal mem_access_sm_slv : std_logic_vector(3 downto 0);
 
 begin
 
+  GEN_DEBUG : if DEBUG_C generate
+    mem_access_sm_slv <= x"0" when mem_access_sm = idleS else
+                         x"1" when mem_access_sm = start_eraseS else
+                         x"2" when mem_access_sm = poll_erase_statusS else
+                         x"3" when mem_access_sm = program_page_startS else
+                         x"4" when mem_access_sm = program_pageS  else
+                         x"5" when mem_access_sm = poll_program_statusS else
+                         x"6" when mem_access_sm = program_remainder_startS else
+                         x"7" when mem_access_sm = program_remainderS else
+                         x"8" when mem_access_sm = poll_rmdr_statusS else
+                         x"9" when mem_access_sm = update_addressS1 else
+                         x"A" when mem_access_sm = update_addressS2 else
+                         x"B";
+
+    U_ILA : ila_0
+      port map ( clk                    => flash_clk,
+                 probe0(  3 downto   0) => mem_access_sm_slv,
+                 probe0( 35 downto   4) => flash_cmd,
+                 probe0            (36) => flash_rst,
+                 probe0            (37) => flash_reg_val,
+                 probe0( 63 downto  38) => burst_size_words_flash_clk,
+                 probe0( 89 downto  64) => address_reg_in_flash_clk,
+                 probe0(116 downto  90) => mem_new_address,
+                 probe0(124 downto 117) => remainder_size_words,
+                 probe0           (125) => state_busy,
+                 probe0(255 downto 126) => (others=>'0') );
+  end generate;
+                 
 ----------------------------------------------------------------------------------------------------
 -- Stellar Command Interface
 ----------------------------------------------------------------------------------------------------
@@ -398,6 +433,11 @@ cmd_pls: for i in 0 to 31 generate
   );
 end generate;
 
+flash_rst_inst : entity work.RstSync
+  port map ( clk      => flash_clk,
+             asyncRst => rst,
+             syncRst  => flash_rst );
+         
 flash_reg_pulse_i <= out_reg_val or out_reg_val_ack;
 
 pulse2pulse_inst_cmdval : pulse2pulse
@@ -458,10 +498,10 @@ start_load_mem      <= flash_cmd(17);
 ----------------------------------------------------------------------------------------------------
 ----------------------------------------------------------------------------------------------------
 
-process (rst, flash_clk, flash_init)
+process (flash_rst, flash_clk, flash_init)
   -- variable mem_new_address : std_logic_vector(ADDRESS_RANGE downto 0);
 begin
-  if (rst = '1') or (flash_init = '1') then
+  if (flash_rst = '1') or (flash_init = '1') then
     mem_access_sm        <= idleS;
     mem_address          <= (others => '0');
     mem_new_address      <= (others => '0');
@@ -626,7 +666,7 @@ fifo_reset       <= flash_init;
 -- Map command pulses to flash phy and locally generated pulses 
 ----------------------------------------------------------------------------------------------------
               
-flash_init                <= flash_cmd(0) or rst;
+flash_init                <= flash_cmd(0) or flash_rst;
 flash_cmdi(3 downto 0)    <= flash_cmd(3 downto 0);
 flash_cmdi(4)             <= flash_cmd(4) or mem_getstatus_pulse;
 flash_cmdi(11 downto 5)   <= flash_cmd(11 downto 5);
@@ -646,7 +686,7 @@ mem_access_addr     <= mem_address(ADDRESS_RANGE-1 downto 0)   when mem_block_ac
 parallel_flash_phy_i : parallel_flash_phy
 port map
 (
-  rst                   => rst,
+  rst                   => flash_rst,
   init                  => flash_init,
   flash_clk             => flash_clk,
   flash_cmd             => flash_cmdi,

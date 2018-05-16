@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2016-01-04
--- Last update: 2017-08-23
+-- Last update: 2018-05-01
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -43,11 +43,14 @@ entity FexGate is
     rst             :  in sl;
     start           :  in sl;
     handle          :  in sl;
+    phase           :  in slv( 2 downto 0);
     fbegin          :  in slv(13 downto 0);
     flength         :  in slv(13 downto 0);
     lopen           : out sl;
+    lopen_phase     : out slv( 2 downto 0);
     lhandle         : out sl;
-    lclose          : out sl );
+    lclose          : out sl;
+    lclose_phase    : out slv( 2 downto 0));
 end FexGate;
 
 architecture rtl of FexGate is
@@ -55,11 +58,13 @@ architecture rtl of FexGate is
   type L0StateType is record
     state  : StateType;
     count  : slv(13 downto 0);
+    phase  : slv( 2 downto 0);
     handle : sl;
   end record;
   constant L0STATE_INIT_C : L0StateType := (
     state  => CLOSED_S,
     count  => (others=>'0'),
+    phase  => (others=>'0'),
     handle => '0' );
   type L0StateArray  is array(natural range<>) of L0StateType;
 
@@ -70,7 +75,9 @@ architecture rtl of FexGate is
     iwait      : slv(3 downto 0);
     iopen      : slv(3 downto 0);
     lopen      : sl;
+    lopen_ph   : slv(2 downto 0);
     lclose     : sl;
+    lclose_ph  : slv(2 downto 0);
     lhandle    : sl;
   end record;
 
@@ -81,7 +88,9 @@ architecture rtl of FexGate is
     iwait      => (others=>'0'),
     iopen      => (others=>'0'),
     lopen      => '0',
+    lopen_ph   => (others=>'0'),
     lclose     => '0',
+    lclose_ph  => (others=>'0'),
     lhandle    => '0' );
   
   signal r    : RegType := REG_INIT_C;
@@ -89,7 +98,7 @@ architecture rtl of FexGate is
 
 begin 
 
-  process (r, rst, start, handle, fbegin, flength) is
+  process (r, rst, start, handle, phase, fbegin, flength) is
     variable v  : RegType;
     variable i  : integer;
   begin
@@ -106,6 +115,7 @@ begin
       v.l0(i).state := WAIT_S;
       v.l0(i).count := r.count + fbegin + 1;
       v.l0(i).handle := handle;
+      v.l0(i).phase  := phase;
       v.iclosed := r.iclosed+1;
     end if;
 
@@ -113,6 +123,7 @@ begin
     if (r.l0(i).state = WAIT_S and
         r.l0(i).count = r.count) then
       v.lopen       := '1';
+      v.lopen_ph    := r.l0(i).phase;
       v.lhandle     := r.l0(i).handle;
       v.l0(i).state := OPEN_S;
       v.l0(i).count := r.count + flength;
@@ -123,6 +134,7 @@ begin
     if (r.l0(i).state = OPEN_S and
         r.l0(i).count = r.count) then
       v.lclose      := '1';
+      v.lclose_ph   := r.l0(i).phase;
       v.l0(i).state := CLOSED_S;
       v.iopen := r.iopen+1;
     end if;
@@ -133,9 +145,11 @@ begin
     
     r_in <= v;
 
-    lopen   <= r.lopen;
-    lclose  <= r.lclose;
-    lhandle <= r.lhandle;
+    lopen        <= r.lopen;
+    lopen_phase  <= r.lopen_ph;
+    lclose       <= r.lclose;
+    lclose_phase <= r.lopen_ph;
+    lhandle      <= r.lhandle;
   end process;
 
   process (clk)

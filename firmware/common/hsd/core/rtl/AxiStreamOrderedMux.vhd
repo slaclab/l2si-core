@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2016-01-04
--- Last update: 2018-03-12
+-- Last update: 2018-04-04
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -106,14 +106,16 @@ begin  -- mapping
       end if;
     end if;
 
+    enableAck   <= r.enableAck;
+    mAxisMaster <= r.axisMaster;
+    sAxisSlaves <= v.axisSlaves;
+    
     if rst='1' then
       v := REG_INIT_C;
     end if;
     
     rin <= v;
 
-    enableAck   <= r.enableAck;
-    mAxisMaster <= r.axisMaster;
   end process;
 
   process (clk)

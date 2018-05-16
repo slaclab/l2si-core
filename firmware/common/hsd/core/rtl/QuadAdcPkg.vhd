@@ -152,11 +152,15 @@ package QuadAdcPkg is
   
   type QuadAdcStatusType is record
     partitionAddr : slv(PADDR_LEN-1 downto 0);
-    eventCount    : SlVectorArray(1 downto 0, 31 downto 0);
+    eventCount    : SlVectorArray(4 downto 0, 31 downto 0);
     dmaCtrlCount  : slv(31 downto 0);
     dmaFullQ      : slv(31 downto 0);
     adcSyncReg    : slv(31 downto 0);
     eventCache    : CacheArray(MAX_OVL_C-1 downto 0);
+    msgDelaySet   : slv(6 downto 0);
+    msgDelayGet   : slv(6 downto 0);
+    headerCntL0   : slv(19 downto 0);
+    headerCntOF   : slv( 7 downto 0);
   end record;
   
   constant QADC_CONFIG_TYPE_LEN_C : integer := CHANNELS_C+101;
@@ -221,8 +225,6 @@ package QuadAdcPkg is
 
   type BRamReadSlaveArray is array(natural range<>) of BRamReadSlaveType;
 
-  constant ILV_AXIS_CONFIG_C : AxiStreamConfigType := ssiAxiStreamConfig(16);
-  
   constant QUAD_ADC_EVENT_TAG : slv(15 downto 0) := X"0000";
   constant QUAD_ADC_DIAG_TAG  : slv(15 downto 0) := X"0001";
 

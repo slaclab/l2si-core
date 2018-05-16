@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2016-01-04
--- Last update: 2017-03-13
+-- Last update: 2018-05-13
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -28,6 +28,7 @@ use ieee.NUMERIC_STD.all;
 
 use work.StdRtlPkg.all;
 use work.AxiLitePkg.all;
+use work.TimingPkg.all;
 
 entity AdcSyncCal is
   generic (
@@ -49,12 +50,10 @@ entity AdcSyncCal is
     delayIn             : in  Slv9Array(SYNC_BITS_G-1 downto 0 );
     --
     evrClk              : in  sl;
-    trigSlot            : in  sl;
-    trigSel             : in  sl;
-    trigOut             : out sl;
-    --
-    syncClk             : in  sl;
-    sync                : in  Slv8Array(SYNC_BITS_G-1 downto 0 ) );
+    evrRst              : in  sl;
+    evrBus              : in  TimingBusType;
+    pllRstIn            : in  sl;
+    pllRst              : out sl );
 end AdcSyncCal;
 
 architecture mapping of AdcSyncCal is
@@ -62,12 +61,10 @@ architecture mapping of AdcSyncCal is
   type HistoArray is array (natural range <>) of Slv16Array(7 downto 0);
 
   type EvrRegType is record
-    strobe: sl;
-    count : slv(3 downto 0);
+    pllRst : sl;
   end record;
   constant EVR_REG_INIT_C : EvrRegType := (
-    strobe => '0',
-    count  => (others=>'0') );
+    pllRst => '1' );
 
   signal re    : EvrRegType := EVR_REG_INIT_C;
   signal re_in : EvrRegType;
@@ -109,17 +106,15 @@ architecture mapping of AdcSyncCal is
   signal ra    : AxiRegType := AXI_REG_INIT_C;
   signal ra_in : AxiRegType;
   
-  signal stest     : sl;
-  signal etest     : sl;
   signal match     : slv(SYNC_BITS_G-1 downto 0);
   signal amatch    : slv(SYNC_BITS_G-1 downto 0);
   signal delayInS  : Slv9Array (SYNC_BITS_G-1 downto 0);
-
+  signal sreset    : sl;
+  
   signal r_state : slv(2 downto 0);
   
 begin 
 
-  trigOut        <= re.strobe;
   delayOut       <= ra.delay;
   delayLd        <= ra.delayLd;
   axilWriteSlave <= ra.axilWriteSlave;
@@ -133,6 +128,8 @@ begin
                  dataOut => delayInS(i) );
   end generate GEN_DelayIn;
 
+  pllRst         <= re.pllRst;
+  
   comba : process ( ra, axiRst, delayInS, match, axilWriteMaster, axilReadMaster ) is
     variable v  : AxiRegType;
     variable axilStatus : AxiLiteStatusType;
@@ -212,36 +209,21 @@ begin
     end if;
   end process seqa;
 
-  GEN_CAL : if ENABLE_CAL_G generate
-    GEN_CALBIT : for i in 0 to SYNC_BITS_G-1 generate
-      U_CALBIT : entity work.AdcSyncCalBit
-        generic map ( SYNC_PERIOD_G => SYNC_PERIOD_G,
-                      DEBUG_G       => false )
-        port map ( syncClk => syncClk,
-                   enable  => stest,
-                   sync    => sync(i),
-                   match   => match(i) );
-    end generate GEN_CALBIT;
-  end generate;
-    
-  combe: process (re, trigSlot, trigSel, etest   ) is
+  U_RstSync : entity work.RstSync
+    port map ( clk      => evrClk,
+               asyncRst => pllRstIn,
+               syncRst  => sreset );
+  
+  combe: process (re, sreset, evrBus) is
     variable v : EvrRegType;
   begin
     v := re;
 
-    v.strobe := '0';
-    
-    if etest='1' then
-      if trigSlot='1' or re.count=toSlv(EVR_PERIOD_G-1,re.count'length) then
-        v.strobe := '1';
-        v.count := (others=>'0');
-      else
-        v.count := re.count+1;
-      end if;
-    else
-      v.strobe := trigSlot and trigSel;
-      v.count  := (others=>'0');
-    end if;
+    if sreset = '1' then
+      v.pllRst := '1';
+    elsif evrBus.strobe = '1' then
+      v.pllRst := '0';
+    end if;   
     
     re_in <= v;
   end process combe;
@@ -252,21 +234,5 @@ begin
       re <= re_in;
     end if;
   end process seqe;
-  
-  U_SYNC_ECalibrate : entity work.Synchronizer
-    port map ( clk     => evrClk,
-               dataIn  => ra.test,
-               dataOut => etest );
-  
-  U_SYNC_SCalibrate : entity work.Synchronizer
-    port map ( clk     => syncClk,
-               dataIn  => ra.test,
-               dataOut => stest );
-  
-  U_SYNC_Match    : entity work.SynchronizerVector
-    generic map ( WIDTH_G => SYNC_BITS_G )
-    port map ( clk     => axiClk,
-               dataIn  => match   ,
-               dataOut => amatch    );
   
 end mapping;
