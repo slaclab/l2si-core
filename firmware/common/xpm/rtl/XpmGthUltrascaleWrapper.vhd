@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-12-14
--- Last update: 2018-03-09
+-- Last update: 2018-04-04
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -126,9 +126,6 @@ END COMPONENT;
   signal txUsrClk   : slv(NLINKS_G-1 downto 0);
   signal gtRefClk   : sl;
 
-  signal txReset, txResetDone : slv(NLINKS_G-1 downto 0);
-  signal rxReset, rxResetDone : slv(NLINKS_G-1 downto 0);
-  signal rxPmaResetDone, txPmaResetDone : slv(NLINKS_G-1 downto 0);
   signal rxErrL    : slv(NLINKS_G-1 downto 0);
   signal rxErrS    : slv(NLINKS_G-1 downto 0);
   signal rxErrCnts : Slv16Array(NLINKS_G-1 downto 0);
@@ -138,6 +135,8 @@ END COMPONENT;
   signal rxFifoRst : slv(NLINKS_G-1 downto 0);
   signal rxErrIn   : slv(NLINKS_G-1 downto 0);
 
+  signal rxResetDone  : slv(NLINKS_G-1 downto 0);
+ 
   signal rxbypassrst  : slv(NLINKS_G-1 downto 0);
   signal txbypassrst  : slv(NLINKS_G-1 downto 0);
 
@@ -180,15 +179,9 @@ begin
     rxErrIn   (i) <= '0' when (rxCtrl1Out(i)(1 downto 0)="00" and rxCtrl3Out(i)(1 downto 0)="00") else '1';
     rxFifoRst (i) <= not rxResetDone(i);
     loopback  (i) <= "0" & config(i).loopback & "0";
-    status    (i).txReady     <= txResetDone(i);
-    status    (i).txresetDone <= txPmaResetDone(i);
-    status    (i).rxReady     <= rxResetDone(i);
-    status    (i).rxresetDone <= rxPmaResetDone(i);
     status    (i).rxErr       <= rxErrS(i);
     status    (i).rxErrCnts   <= rxErrCnts(i);
-    txReset   (i)             <= '0';
---    rxReset   (i)             <= rxResetDone(i) and rxErrIn(i);
-    rxReset   (i)             <= '0';
+    status    (i).rxReady     <= rxResetDone(i);
     
     U_STATUS : entity work.SynchronizerOneShotCnt
       generic map ( CNT_WIDTH_G => 16 )
@@ -239,20 +232,20 @@ begin
         gtwiz_userclk_rx_active_in           => "1",
         gtwiz_buffbypass_tx_reset_in     (0) => txbypassrst(i),
         gtwiz_buffbypass_tx_start_user_in    => "0",
-        gtwiz_buffbypass_tx_done_out         => open,
+        gtwiz_buffbypass_tx_done_out     (0) => status(i).txResetDone,
         gtwiz_buffbypass_tx_error_out        => open,
         gtwiz_buffbypass_rx_reset_in     (0) => rxbypassrst(i),
         gtwiz_buffbypass_rx_start_user_in    => "0",
-        gtwiz_buffbypass_rx_done_out         => open,  -- Might need this
+        gtwiz_buffbypass_rx_done_out     (0) => status(i).rxResetDone,
         gtwiz_buffbypass_rx_error_out        => open,  -- Might need this
         gtwiz_reset_clk_freerun_in(0)        => stableClk,
         gtwiz_reset_all_in                   => "0",
-        gtwiz_reset_tx_pll_and_datapath_in(0)=> config(i).txReset,
-        gtwiz_reset_tx_datapath_in        (0)=> txReset(i),
-        gtwiz_reset_rx_pll_and_datapath_in(0)=> config(i).rxReset,
-        gtwiz_reset_rx_datapath_in        (0)=> rxReset(i),
+        gtwiz_reset_tx_pll_and_datapath_in(0)=> config(i).txPllReset,
+        gtwiz_reset_tx_datapath_in        (0)=> config(i).txReset,
+        gtwiz_reset_rx_pll_and_datapath_in(0)=> config(i).rxPllReset,
+        gtwiz_reset_rx_datapath_in        (0)=> config(i).rxReset,
         gtwiz_reset_rx_cdr_stable_out        => open,
-        gtwiz_reset_tx_done_out           (0)=> txResetDone(i),
+        gtwiz_reset_tx_done_out           (0)=> status(i).txReady,
         gtwiz_reset_rx_done_out           (0)=> rxResetDone(i),
         gtwiz_userdata_tx_in                 => txData(i),
         gtwiz_userdata_rx_out                => rxData(i),
@@ -286,9 +279,9 @@ begin
         rxctrl2_out                          => open,
         rxctrl3_out                          => rxCtrl3Out(i),
         rxoutclk_out                      (0)=> rxOutClk(i),
-        rxpmaresetdone_out                (0)=> rxPmaResetDone(i),
+        rxpmaresetdone_out                   => open,
         txoutclk_out                      (0)=> txOutClk(i),
-        txpmaresetdone_out                (0)=> txPmaResetDone(i)
+        txpmaresetdone_out                   => open
         );
   end generate GEN_CTRL;
     

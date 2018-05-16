@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-12-14
--- Last update: 2018-03-08
+-- Last update: 2018-05-13
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -32,6 +32,7 @@ use work.AxiStreamPkg.all;
 use work.SsiPkg.all;
 use work.AmcCarrierPkg.all;  -- ETH_AXIS_CONFIG_C
 use work.DtiPkg.all;
+use work.XpmPkg.all;
 
 entity DtiReg is
    generic ( AXIL_BASE_ADDR_G : slv(31 downto 0) := x"00000000" );
@@ -99,6 +100,9 @@ architecture rtl of DtiReg is
 
   signal pllStat     : slv(3 downto 0);
   signal pllCount    : SlVectorArray(3 downto 0, 2 downto 0);
+
+  signal msgDelaySetS : Slv7Array(NPartitions-1 downto 0);
+  signal msgDelayGetS : Slv7Array(MaxUsLinks-1 downto 0);
 
 begin
 
@@ -289,10 +293,26 @@ begin
                wrClk     => axilClk,
                rdClk     => axilClk );
 
+  GEN_MSGDELAYSET : for i in 0 to NPartitions-1 generate
+    U_MsgDelaySetS : entity work.SynchronizerVector
+      generic map ( WIDTH_G => 7 )
+      port map ( clk     => axilClk,
+                 dataIn  => status.msgDelaySet(i),
+                 dataOut => msgDelaySetS(i) );
+  end generate;
+
+  GEN_MSGDELAYGET : for i in 0 to MaxUsLinks-1 generate
+    U_MsgDelayGetS : entity work.SynchronizerVector
+      generic map ( WIDTH_G => 7 )
+      port map ( clk     => axilClk,
+                 dataIn  => status.msgDelayGet(i),
+                 dataOut => msgDelayGetS(i) );
+  end generate;
+
   comb : process (r, axilRst, axilReadMasters, axilWriteMasters, usApp,
                   usLinkUp, dsLinkUp, usStatus, dsStatus, bpStatus, qplllock,
                   monClkRate, monClkLock, monClkFast, monClkSlow,
-                  pllStat, pllCount) is
+                  pllStat, pllCount, msgDelaySetS, msgDelayGetS) is
     variable v          : RegType;
     variable ra         : integer;
     variable ep         : AxiLiteEndpointType;
@@ -331,6 +351,7 @@ begin
       axilRegRW (toSlv(  16*i+0,7),  2, v.config.usLink(i).l1Enable );
       axilRegRW (toSlv(  16*i+0,7),  3, v.config.usLink(i).hdrOnly );
       axilRegRW (toSlv(  16*i+0,7),  4, v.config.usLink(i).partition );
+      axilRegRW (toSlv(  16*i+0,7),  8, v.config.usLink(i).afdepth );
 --      axilRegRW (toSlv(  16*i+0,7),  8, v.config.usLink(i).trigDelay );
       axilRegRW (toSlv(  16*i+0,7), 16, v.config.usLink(i).fwdMask );
       axilRegRW (toSlv(  16*i+0,7), 31, v.config.usLink(i).fwdMode );
@@ -409,9 +430,19 @@ begin
     end loop;
 
     ra := 16*6;
-    axilRegRW(toSlv(ra,7), 0, v.config.loopback);
-    axilRegR (toSlv(ra+4,7), 0, AXIL_BASE_ADDR_G);
-    
+    for i in 0 to 3 loop
+      axilRegR (toSlv( ra+0,7), i*8, msgDelaySetS(i));
+      axilRegR (toSlv( ra+4,7), i*8, msgDelaySetS(i+4));
+    end loop;
+
+    axilRegR (toSlv( ra +8,7),  0, msgDelayGetS(0) );
+    axilRegR (toSlv( ra +8,7),  8, msgDelayGetS(1) );
+    axilRegR (toSlv( ra +8,7), 16, msgDelayGetS(2) );
+    axilRegR (toSlv( ra +8,7), 24, msgDelayGetS(3) );
+    axilRegR (toSlv( ra+12,7),  0, msgDelayGetS(4) );
+    axilRegR (toSlv( ra+12,7),  8, msgDelayGetS(5) );
+    axilRegR (toSlv( ra+12,7), 16, msgDelayGetS(6) );
+
     -- Set the status
     axiSlaveDefault(ep, v.axilWriteSlaves(1), v.axilReadSlaves(1),
                     AXI_RESP_OK_C);

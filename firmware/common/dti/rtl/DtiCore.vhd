@@ -5,7 +5,7 @@
 -- Author     : Larry Ruckman  <ruckman@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-07-08
--- Last update: 2017-12-19
+-- Last update: 2018-05-13
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -71,6 +71,7 @@ entity DtiCore is
       timingHdrP        : out   TimingHeaderType;  -- prompt
       triggerBus        : out   ExptBusType;       -- prompt
       fullOut           : in    slv(15 downto 0);
+      msgDelay          : out   Slv7Array(NPartitions-1 downto 0);
       -- BSI Interface (bsiClk domain) 
       bsiBus            : out   BsiBusType;
       -- Reference Clocks and Resets
@@ -513,6 +514,7 @@ begin
                 timingI        => intTimingHdr,
                 exptBusI       => intExptBus,
                 timingO        => timingHdr,
-                exptBusO       => exptBus );
+                exptBusO       => exptBus,
+                delay          => msgDelay );
   
 end mapping;

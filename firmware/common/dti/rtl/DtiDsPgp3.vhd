@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-07-10
--- Last update: 2018-02-22
+-- Last update: 2018-04-12
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -152,7 +152,7 @@ begin
 
   U_Pgp3 : entity work.Pgp3GthUs
     generic map ( NUM_VC_G     => NUM_DTI_VC_C,
-                  DEBUG_G      => DEBUG_G,
+--                  DEBUG_G      => DEBUG_G,
                   EN_DRP_G     => EN_AXIL_G,
                   EN_PGP_MON_G => EN_AXIL_G,
                   AXIL_CLK_FREQ_G  => 156.25e+6,

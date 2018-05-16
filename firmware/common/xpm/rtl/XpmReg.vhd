@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-12-14
--- Last update: 2017-10-25
+-- Last update: 2018-04-04
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -394,6 +394,8 @@ begin
 
     ra := 8;
     axilRegRW(toSlv(ra,12),    0, v.linkCfg.txDelay);
+    axilRegRW(toSlv(ra,12),   18, v.linkCfg.txPllReset);
+    axilRegRW(toSlv(ra,12),   19, v.linkCfg.rxPllReset);
     axilRegRW(toSlv(ra,12),   20, v.linkCfg.partition);
     axilRegRW(toSlv(ra,12),   24, v.linkCfg.trigsrc);
     axilRegRW(toSlv(ra,12),   28, v.linkCfg.loopback);

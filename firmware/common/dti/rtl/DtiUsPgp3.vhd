@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-07-10
--- Last update: 2018-03-21
+-- Last update: 2018-04-12
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -99,13 +99,16 @@ architecture top_level_app of DtiUsPgp3 is
     --  Ctl Statistics
     obSent     : slv(31 downto 0);
     obReceived : slv(31 downto 0);
+    --  SOF fixup
+    tlast      : sl;
   end record;
   
   constant REG_INIT_C : RegType := (
     opCodeEn   => '0',
     opCode     => (others=>'0'),
     obSent     => (others=>'0'),
-    obReceived => (others=>'0') );
+    obReceived => (others=>'0'),
+    tlast      => '1' );
 
   signal r    : RegType := REG_INIT_C;
   signal r_in : RegType;
@@ -164,7 +167,6 @@ begin
   --               probe0(255 downto 20) => (others=>'0') );
   end generate;
 
-  ibMaster <= iibMaster;
   obSlave  <= iobSlave;
   
   linkUp                   <= pgpRxOut.linkReady;
@@ -192,7 +194,7 @@ begin
 
   U_Pgp3 : entity work.Pgp3GthUs
     generic map ( NUM_VC_G     => NUM_DTI_VC_C,
-                  DEBUG_G      => DEBUG_G,
+--                  DEBUG_G      => DEBUG_G,
                   EN_DRP_G     => EN_AXIL_G,
                   EN_PGP_MON_G => EN_AXIL_G,
                   AXIL_CLK_FREQ_G  => 156.25e+6,
@@ -293,8 +295,10 @@ begin
   
   comb : process ( fifoRst, r, pgpTrig, pgpTrigValid,
                    pgpTxMasters, pgpTxSlaves,
-                   pgpRxMasters ) is
+                   pgpRxMasters,
+                   iibMaster ) is
     variable v   : RegType;
+    variable m   : AxiStreamMasterType;
   begin
     v := r;
 
@@ -322,6 +326,18 @@ begin
 
     status.obSent     <= r.obSent;
     status.obReceived <= r.obReceived;
+
+    --  SOF fixup
+    ibMaster <= iibMaster;
+    m := iibMaster(VC_CTL);
+    if m.tValid = '1' then
+      m.tKeep := genTKeep(8);
+      if r.tlast = '1' then
+        axiStreamSetUserBit(PGP3_AXIS_CONFIG_C, m, SSI_SOF_C, '1', 0);
+      end if;
+      v.tlast := m.tLast;
+    end if;
+    ibMaster(VC_CTL) <= m;
     
     r_in <= v;
   end process;

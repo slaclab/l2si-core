@@ -5,7 +5,7 @@
 -- Author     : Larry Ruckman  <ruckman@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2016-02-23
--- Last update: 2017-07-24
+-- Last update: 2018-03-28
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -47,14 +47,14 @@ entity DtiAppEthRssi is
       axilWriteMaster  : in  AxiLiteWriteMasterType;
       axilWriteSlave   : out AxiLiteWriteSlaveType;
       -- Application Interface
-      obAppMaster      : in  AxiStreamMasterType;
+      obAppMaster      : in  AxiStreamMasterType;  -- out to ethernet
       obAppSlave       : out AxiStreamSlaveType;
-      ibAppMaster      : out AxiStreamMasterType;
+      ibAppMaster      : out AxiStreamMasterType;  -- in from ethernet
       ibAppSlave       : in  AxiStreamSlaveType;
       -- Interface to UDP Server engines
-      obServerMaster   : in  AxiStreamMasterType;
+      obServerMaster   : in  AxiStreamMasterType;  -- in from ethernet
       obServerSlave    : out AxiStreamSlaveType;
-      ibServerMaster   : out AxiStreamMasterType;
+      ibServerMaster   : out AxiStreamMasterType;  -- out to ethernet
       ibServerSlave    : in  AxiStreamSlaveType);
 end DtiAppEthRssi;
 

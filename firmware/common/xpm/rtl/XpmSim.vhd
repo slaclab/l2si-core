@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-07-10
--- Last update: 2018-03-24
+-- Last update: 2018-04-13
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -228,7 +228,7 @@ begin
      wait for 10000 ns;
      for i in 0 to NPartitions-1 loop
        pconfig(i).message.hdr     <= MSG_DELAY_PWORD;
-       pconfig(i).message.payload <= toSlv(80+i,32);
+       pconfig(i).message.payload <= toSlv(80+i,8);
        pconfig(i).message.insert  <= '1';
      end loop;
    

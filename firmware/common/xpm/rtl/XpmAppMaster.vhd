@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-07-10
--- Last update: 2018-03-12
+-- Last update: 2018-04-12
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -253,6 +253,7 @@ begin
         msg.l0tag    := l0Tag(msg.l0tag'range);
         msg.hdr      := msgConfig.hdr;
         msg.payload  := msgConfig.payload;
+        msg.anatag   := l0Tag(msg.anatag'range);
         v.result     := toSlv(msg);
       else
         pword.l0a    := l0Accept;

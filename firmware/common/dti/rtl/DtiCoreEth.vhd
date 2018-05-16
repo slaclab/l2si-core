@@ -5,7 +5,7 @@
 -- Author     : Larry Ruckman  <ruckman@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-09-21
--- Last update: 2017-12-17
+-- Last update: 2018-03-26
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -160,9 +160,54 @@ architecture mapping of DtiCoreEth is
 
    
    signal phyReady : sl;
+
+   constant DEBUG_C : boolean := true;
+
+   component ila_0
+     port ( clk   : in sl;
+            probe0 : in slv(255 downto 0) );
+   end component;
    
 begin
 
+   GEN_DEBUG : if DEBUG_C generate
+     U_ILA : ila_0
+       port map ( clk       => axilClk,
+                  probe0(0) => obAppMasters(0).tValid,
+                  probe0(1) => obAppMasters(0).tLast,
+                  probe0(2) => obAppMasters(1).tValid,
+                  probe0(3) => obAppMasters(1).tLast,
+                  probe0(4) => obAppMasters(2).tValid,
+                  probe0(5) => obAppMasters(2).tLast,
+                  probe0(6) => obAppMasters(3).tValid,
+                  probe0(7) => obAppMasters(3).tLast,
+                  probe0(8) => obServerMasters(0).tValid,
+                  probe0(9) => obServerMasters(0).tLast,
+                  probe0(10) => obServerMasters(1).tValid,
+                  probe0(11) => obServerMasters(1).tLast,
+                  probe0(12) => obServerMasters(2).tValid,
+                  probe0(13) => obServerMasters(2).tLast,
+                  probe0(14) => obServerMasters(3).tValid,
+                  probe0(15) => obServerMasters(3).tLast,
+                  probe0(16) => ibServerMasters(0).tValid,
+                  probe0(17) => ibServerMasters(0).tLast,
+                  probe0(18) => ibServerMasters(1).tValid,
+                  probe0(19) => ibServerMasters(1).tLast,
+                  probe0(20) => ibServerMasters(2).tValid,
+                  probe0(21) => ibServerMasters(2).tLast,
+                  probe0(22) => ibServerMasters(3).tValid,
+                  probe0(23) => ibServerMasters(3).tLast,
+                  probe0(24) => obServerSlaves (0).tReady,
+                  probe0(25) => obServerSlaves (1).tReady,
+                  probe0(26) => obServerSlaves (2).tReady,
+                  probe0(27) => obServerSlaves (3).tReady,
+                  probe0(28) => ibServerSlaves (0).tReady,
+                  probe0(29) => ibServerSlaves (1).tReady,
+                  probe0(30) => ibServerSlaves (2).tReady,
+                  probe0(31) => ibServerSlaves (3).tReady,
+                  probe0(255 downto 32) => (others=>'0') );
+   end generate;
+                  
    --------------------------
    -- AXI-Lite: Crossbar Core
    --------------------------  

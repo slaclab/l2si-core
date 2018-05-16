@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-07-10
--- Last update: 2018-03-14
+-- Last update: 2018-05-13
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -50,6 +50,7 @@ entity DtiUsCore is
      remLinkID       : in  slv(7 downto 0) := x"FF";
      status          : out DtiUsLinkStatusType;
      fullOut         : out slv(15 downto 0);
+     msgDelay        : out slv( 6 downto 0);
      --  Ethernet control interface
      --ctlClk          : in  sl;
      --ctlRst          : in  sl;
@@ -172,6 +173,8 @@ architecture rtl of DtiUsCore is
   signal senable : sl;
   signal shdrOnly : sl;
   signal tfull   : slv(15 downto 0);
+  signal wrFifoD : slv( 3 downto 0);
+  signal rdFifoD : slv( 3 downto 0);
   signal rstFifo : sl;
   
   component ila_0
@@ -249,6 +252,8 @@ begin
   status.ibEvt      <= r.ibEvt;
   status.ibDump     <= r.ibDump;
   status.rxInh      <= t.ninh;
+  status.wrFifoD    <= wrFifoD;
+  status.rdFifoD    <= rdFifoD;
   
   eventTag        <= ibMaster.tId(eventTag'range);
 
@@ -284,8 +289,9 @@ begin
                cntL0     => status.obL0,
                cntL1A    => status.obL1A,
                cntL1R    => status.obL1R,
-               cntWrFifo => status.wrFifoD,
+               cntWrFifo => wrFifoD,
                rstFifo   => rstFifo,
+               msgDelay  => msgDelay,
                -- Cache Output
                rdclk     => eventClk,
                entag     => config.tagEnable,
@@ -293,7 +299,7 @@ begin
                advance   => r.hdrRd,
                pmsg      => pmsg,
                phdr      => phdr,
-               cntRdFifo => status.rdFifoD,
+               cntRdFifo => rdFifoD,
                hdrOut    => eventHeader,
                valid     => eventHeaderV );
 
@@ -348,7 +354,7 @@ begin
   --    Add event header
   --
   comb : process ( r, ibMaster, tSlave, configS, eventRst, sclear, supdate, eventHeaderVec, eventHeaderV,
-                   dsfull, ibFull,
+                   dsfull, ibFull, wrFifoD,
                    pmsg, phdr, rin, shdrOnly, rstFifo ) is
     variable v : RegType;
     variable selv : sl;
@@ -484,14 +490,17 @@ begin
     end if;
     
     v.full := (others=>'0');
-    if configS.fwdMode = '0' then    -- Round robin mode
+    isFull := not selv;                -- downstream full
+    if configS.fwdMode = '0' then      -- Round robin mode
       v.mask := configS.fwdMask;
-      isFull := dsFull(conv_integer(fwd)) or not selv;
-    else                             -- Next not full
+      isFull := isFull or dsFull(conv_integer(fwd));
+    else                               -- Next not full
       v.mask := configS.fwdMask and not dsFull;
-      isFull := not selv;
     end if;
-    isFull := isFull or ibFull;
+    isFull := isFull or ibFull;        -- detector full (direct)
+    if wrFifoD > configS.afdepth then  -- detector pipeline full 
+      isFull := '1';
+    end if;
     
     if isFull='1' and r.ena='1' then
       v.full(conv_integer(configS.partition)) := isFull;
