@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-07-10
--- Last update: 2017-12-24
+-- Last update: 2018-04-27
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -97,6 +97,9 @@ architecture top_level_app of Pgp3Hsd is
   signal full           : sl;
 begin
 
+  pgpTxIn.flowCntlDis <= '1';
+  pgpTxIn.skpInterval <= X"0000FFF0";
+  
   U_Fifo : entity work.AxiStreamFifoV2
     generic map (
       SLAVE_AXI_CONFIG_G  => AXIS_CONFIG_G,
@@ -119,13 +122,12 @@ begin
   rxErr                    <= pgpRxOut.frameRxErr;
   qpllRst                  <= iqpllRst;
   
-  process (pgpObMaster, full) is
+  process (pgpObMaster, pgpTxSlaves, full) is
   begin
     pgpTxMasters(0)          <= pgpObMaster;
     pgpTxMasters(0).tValid   <= pgpObMaster.tValid and not full;
+    pgpObSlave.tReady        <= pgpTxSlaves(0).tReady and not full;
   end process;
-
-  pgpObSlave               <= pgpTxSlaves(0);
 
   U_PgpFb : entity work.DtiPgp3Fb
     port map ( pgpClk       => pgpClk,
@@ -136,7 +138,7 @@ begin
   U_Pgp3 : entity work.Pgp3GthUs
     generic map ( NUM_VC_G     => NUM_DTI_VC_C,
                   EN_DRP_G     => false,
-                  EN_PGP_MON_G => false,
+                  EN_PGP_MON_G => true,
                   AXIL_BASE_ADDR_G => AXIL_BASE_ADDR_G )
     port map ( -- Stable Clock and Reset
                stableClk    => axilClk,

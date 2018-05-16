@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-07-10
--- Last update: 2017-10-16
+-- Last update: 2018-04-15
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -99,7 +99,9 @@ architecture rtl of PgpCore is
     opCodeEn    => '0',
     opCode      => (others=>'0'),
     locData     => PGP_ID,
-    flowCntlDis => '0' );
+    flowCntlDis => '0',
+    resetTx     => '0',
+    resetGt     => '0' );
 
   
 begin
@@ -123,16 +125,13 @@ begin
   linkUp                   <= pgpRxOut.linkReady;
   rxErr                    <= pgpRxOut.frameRxErr;
 
-  -- Assumes MpsPgpFrontEnd only asserts tReady when acknowledging tValid;
-  -- no tValid => no tReady.
-  process (pgpObMaster, full) is
+  process (pgpObMaster, pgpTxSlaves, full) is
   begin
     pgpTxMasters(0)        <= pgpObMaster;
     pgpTxMasters(0).tValid <= pgpObMaster.tValid and not full;
+    pgpObSlave.tReady      <= pgpTxSlaves(0).tReady and not full;
   end process;
   
-  pgpObSlave               <= pgpTxSlaves(0);
-
   U_PgpFb : entity work.DtiPgpFb
     port map ( pgpClk       => pgpClk,
                pgpRst       => coreRst,
