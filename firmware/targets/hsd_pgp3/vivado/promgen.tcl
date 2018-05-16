@@ -7,9 +7,9 @@
 ## may be copied, modified, propagated, or distributed except according to 
 ## the terms contained in the LICENSE.txt file.
 ##############################################################################
-set format     "hex"
+set format     "mcs"
 set inteface   "bpix16"
-set size       "1024"
+set size       "128"
 
-set outputFile    "$::env(IMPL_DIR)/$::env(PROJECT).hex"
-set imagesFile    "$::env(IMAGES_DIR)/$::env(IMAGENAME).hex"
+set outputFile    "$::env(IMPL_DIR)/$::env(PROJECT).mcs"
+set imagesFile    "$::env(IMAGES_DIR)/$::env(IMAGENAME).mcs"
