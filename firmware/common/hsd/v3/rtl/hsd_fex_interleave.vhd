@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2016-01-04
--- Last update: 2018-01-05
+-- Last update: 2018-04-27
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -44,8 +44,7 @@ use work.QuadAdcCompPkg.all;
 use work.QuadAdcPkg.all;
 
 entity hsd_fex_interleave is
-  generic ( AXIS_CONFIG_G : AxiStreamConfigType;
-            AXIS_SIZE_G   : integer := 1;
+  generic ( AXIS_SIZE_G   : integer := 1;
             ALG_ID_G      : integer := 0;
             ALGORITHM_G   : string  := "RAW";
             DEBUG_G       : boolean := false );
@@ -84,7 +83,7 @@ architecture mapping of hsd_fex_interleave is
   constant COUNT_BITS_C : integer := 14;
   constant SKIP_T       : slv(COUNT_BITS_C-1 downto 0) := toSlv(4096,COUNT_BITS_C);
   constant AXIS_SZ_BITS : integer := bitSize(AXIS_SIZE_G)-1;
-
+  
   type AxisRegType is record
     ireading   : slv(MAX_OVL_BITS_C-1 downto AXIS_SZ_BITS);
     rdaddr     : slv(RAM_ADDR_WIDTH_C-1 downto 0);
@@ -154,8 +153,9 @@ architecture mapping of hsd_fex_interleave is
   signal bWrite      : sl;
 
   signal maxisSlave  : AxiStreamSlaveArray(AXIS_SIZE_G-1 downto 0);
-  
-  constant SAXIS_CONFIG_C : AxiStreamConfigType := ssiAxiStreamConfig(64);
+
+  constant AXIS_CONFIG_C : AxiStreamConfigType := ssiAxiStreamConfig(64);
+  constant PAD_SAMP_C    : integer := (AXIS_CONFIG_C.TDATA_BYTES_C-16)/2;
   
 begin
 
@@ -353,24 +353,25 @@ begin
                 if skip = '1' then
                   q.axisMaster.tData(30 downto IDX_BITS+2) := (others=>'0');
                 else
-                  q.axisMaster.tData(30 downto IDX_BITS+2) :=
+                  q.axisMaster.tData(30 downto IDX_BITS+2) := 
                     resize(r.cache(i).eaddr(CACHE_ADDR_LEN_C-1 downto IDX_BITS) -
                            r.cache(i).baddr(CACHE_ADDR_LEN_C-1 downto IDX_BITS) + 1,
                            29-IDX_BITS);
+                  q.axisMaster.tData(IDX_BITS+1 downto 0) := toSlv(PAD_SAMP_C,IDX_BITS+2);
                 end if;
                 q.axisMaster.tData(31) := r.cache(i).ovflow;
-                q.axisMaster.tData( 39 downto  32) := resize(r.cache(i).baddr(IDX_BITS-1 downto 0),6) & "00";
+                k := 4*conv_integer(r.cache(i).baddr(IDX_BITS-1 downto 0)) +
+                     PAD_SAMP_C;
+                q.axisMaster.tData( 39 downto  32) := toSlv(k,8);
                 q.axisMaster.tData( 47 downto  40) := toSlv(8-conv_integer(r.cache(i).eaddr(IDX_BITS-1 downto 0)),6) & "00";
                 q.axisMaster.tData( 55 downto  48) := toSlv(i,8);
                 q.axisMaster.tData( 63 downto  56) := toSlv(ALG_ID_G,8);
                 q.axisMaster.tData( 95 downto  64) := resize(r.cache(i).toffs,32);
                 q.axisMaster.tData(111 downto  96) := resize(r.cache(i).baddr,16);
                 q.axisMaster.tData(127 downto 112) := resize(r.cache(i).eaddr,16);
-                q.axisMaster.tKeep := genTKeep(16);
-                ssiSetUserSof(AXIS_CONFIG_G, q.axisMaster, '1');
---                q.axisMaster.tKeep := genTKeep(64);  -- Drop the upper 48 bytes
-                                                     -- on the master side
---                ssiSetUserSof(SAXIS_CONFIG_C, q.axisMaster, '1');
+--                q.axisMaster.tKeep := genTKeep(16);  -- will skip the extra
+--                48 as padding
+                ssiSetUserSof(AXIS_CONFIG_C, q.axisMaster, '1');
                 v.cache(i).state := READING_S;
                 if skip = '1' then
                   q.axisMaster.tLast := '1';
@@ -384,23 +385,15 @@ begin
             --  Continue streaming data from RAM
             --
             q.axisMaster.tValid := '1';
---            q.axisMaster.tData(rddata'range) := rddata;
---            q.axisMaster.tKeep := genTKeep(64);
---            ssiSetUserSof(SAXIS_CONFIG_C, q.axisMaster, '0');
-            q.axisMaster.tData(127 downto 0) := rddata(q.irdsel*128+127 downto q.irdsel*128);
-            q.axisMaster.tKeep := genTKeep(16);
-            ssiSetUserSof(AXIS_CONFIG_G, q.axisMaster, '0');
-            if q.irdsel = 3 then
-              if q.rdaddr = r.cache(i).eaddr(q.rdaddr'left+IDX_BITS downto IDX_BITS) then
-                q.axisMaster.tLast := '1';
-                v.cache(i) := CACHE_INIT_C;
-                q.ireading := q.ireading+1;
-              end if;
-              q.rdaddr := q.rdaddr+1;
-              q.irdsel := 0;
-            else
-              q.irdsel := q.irdsel+1;
+            q.axisMaster.tData(rddata'range) := rddata;
+            q.axisMaster.tKeep := genTKeep(64);
+            ssiSetUserSof(AXIS_CONFIG_C, q.axisMaster, '0');
+            if q.rdaddr = r.cache(i).eaddr(q.rdaddr'left+IDX_BITS downto IDX_BITS) then
+              q.axisMaster.tLast := '1';
+              v.cache(i) := CACHE_INIT_C;
+              q.ireading := q.ireading+1;
             end if;
+            q.rdaddr := q.rdaddr+1;
           end if;
         end if;
 

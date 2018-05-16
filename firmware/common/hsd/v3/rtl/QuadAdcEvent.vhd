@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2016-01-04
--- Last update: 2018-01-05
+-- Last update: 2018-04-27
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -13,11 +13,6 @@
 -- Independent channel setup.  Simplified to make reasonable interface
 -- for feature extraction algorithms.
 -- BRAM interface factored out.
--- Many generics...
---   DMA_SIZE_G : 1 (PCIe DMA one FMC)
---                2 (PCIe DMA two FMC)
---                4 (PGP one FMC)
---                8 (PGP one FMC) (Only if ADC in secondary FMC)
 -------------------------------------------------------------------------------
 -- This file is part of 'LCLS2 Timing Core'.
 -- It is subject to the license terms in the LICENSE.txt file found in the 
@@ -48,7 +43,7 @@ entity QuadAdcEvent is
     FIFO_ADDR_WIDTH_C : integer := 10;
     NFMC_G            : integer := 2;
     SYNC_BITS_G       : integer := 4;
-    DMA_SIZE_G        : integer := 1;
+    DMA_STREAM_CONFIG_G : AxiStreamConfigType;
     BASE_ADDR_C       : slv(31 downto 0) := (others=>'0') );
   port (
     axilClk         :  in sl;
@@ -57,6 +52,8 @@ entity QuadAdcEvent is
     axilReadSlave   : out AxiLiteReadSlaveType;
     axilWriteMaster :  in AxiLiteWriteMasterType;
     axilWriteSlave  : out AxiLiteWriteSlaveType;
+    --
+    eventClk   :  in sl;
     trigArm    :  in sl;
     l1in       :  in sl;
     l1ina      :  in sl;
@@ -69,17 +66,17 @@ entity QuadAdcEvent is
     --
     dmaClk        :  in sl;
     dmaRst        :  in sl;
-    eventHeader   :  in slv(191 downto 0);
-    eventTrgV     :  in sl;
-    eventMsgV     :  in sl;
-    eventHeaderRd : out sl;
+    eventHeader   :  in Slv192Array(NFMC_G-1 downto 0);
+    eventHeaderV  :  in slv        (NFMC_G-1 downto 0);
+    noPayload     :  in slv        (NFMC_G-1 downto 0);
+    eventHeaderRd : out slv        (NFMC_G-1 downto 0);
     rstFifo       :  in sl;
     dmaFullThr    :  in slv(FIFO_ADDR_WIDTH_C-1 downto 0);
     dmaFullS      : out sl;
     dmaFullQ      : out slv(FIFO_ADDR_WIDTH_C-1 downto 0);
     status        : out CacheArray(MAX_OVL_C-1 downto 0);
-    dmaMaster     : out AxiStreamMasterArray(DMA_SIZE_G-1 downto 0);
-    dmaSlave      : in  AxiStreamSlaveArray (DMA_SIZE_G-1 downto 0) );
+    dmaMaster     : out AxiStreamMasterArray(NFMC_G-1 downto 0);
+    dmaSlave      : in  AxiStreamSlaveArray (NFMC_G-1 downto 0) );
 end QuadAdcEvent;
 
 architecture mapping of QuadAdcEvent is
@@ -119,11 +116,11 @@ architecture mapping of QuadAdcEvent is
     trig     : Slv8Array(SYNC_BITS_G-1 downto 0);
     trigCnt  : slv(1 downto 0);
     trigArm  : sl;
-    iaxis    : integer range 0 to DMA_SIZE_G-1;
+    --iaxis    : integer range 0 to DMA_SIZE_G-1;
     clear    : sl;
     start    : sl;
-    l1in     : slv(4 downto 0);
-    l1ina    : slv(3 downto 0);
+    l1inacc  : slv(3 downto 0);
+    l1inrej  : slv(3 downto 0);
     tmo      : integer range 0 to TMO_VAL_C;
   end record;
 
@@ -137,11 +134,11 @@ architecture mapping of QuadAdcEvent is
     trig      => (others=>(others=>'0')),
     trigCnt   => (others=>'0'),
     trigArm   => '0',
-    iaxis     => 0,
+    --iaxis     => 0,
     clear     => '1',
     start     => '0',
-    l1in      => (others=>'0'),
-    l1ina     => (others=>'0'),
+    l1inacc   => (others=>'0'),
+    l1inrej   => (others=>'0'),
     tmo       => TMO_VAL_C );
 
   signal r   : RegType := REG_INIT_C;
@@ -154,29 +151,27 @@ architecture mapping of QuadAdcEvent is
   signal  adcs : AdcShiftArray(NCHAN_C-1 downto 0);
   signal iadcs : AdcShiftArray(NCHAN_C-1 downto 0);
 
---  constant CHN_AXIS_CONFIG_C : AxiStreamConfigType := ssiAxiStreamConfig(16);
-  constant CHN_AXIS_CONFIG_C : AxiStreamConfigType := ILV_AXIS_CONFIG_C;
-  constant AXIS_SIZE_C : integer := ite(DMA_SIZE_G > NFMC_G, DMA_SIZE_G, 1);
+  constant CHN_AXIS_CONFIG_C : AxiStreamConfigType := ssiAxiStreamConfig(32);
   
   -- interleave payload
-  signal ilvmasters  : AxiStreamMasterArray(DMA_SIZE_G-1 downto 0) := (others=>AXI_STREAM_MASTER_INIT_C);
-  signal ilvslaves   : AxiStreamSlaveArray (DMA_SIZE_G-1 downto 0) := (others=>AXI_STREAM_SLAVE_INIT_C);
-
+  signal ilvmasters  : AxiStreamMasterArray(NFMC_G-1 downto 0) := (others=>AXI_STREAM_MASTER_INIT_C);
+  signal ilvslaves   : AxiStreamSlaveArray (NFMC_G-1 downto 0) := (others=>AXI_STREAM_SLAVE_INIT_C);
   signal ilvafull       : slv(NFMC_G-1 downto 0);
   signal ilvfull        : slv(NFMC_G-1 downto 0);
-  signal ilvCacheStatus : CacheStatusArray (NFMC_G-1 downto 0);
-  
-  signal pllSync   : Slv3Array  (NCHAN_C-1 downto 0);
-  signal pllSyncV  : slv        (NCHAN_C-1 downto 0);
 
+  signal hdrValid  : slv(NFMC_G-1 downto 0);
   signal hdrRd     : slv(NFMC_G-1 downto 0);
-  signal hdrValid  : sl;
   
-  signal sl1in, sl1ina : sl;
+  signal pllSync   : Slv3Array  (NFMC_G-1 downto 0);
+  signal pllSyncV  : slv        (NFMC_G-1 downto 0);
+  signal eventHdr  : Slv256Array(NFMC_G-1 downto 0);
+
+  signal l1inacc, sl1inacc : sl;
+  signal l1inrej, sl1inrej : sl;
+  signal l1q, l1aq : sl;
   signal trigArmS  : sl;
   
   constant APPLY_SHIFT_C : boolean := false;
-  constant NSTREAMS_C : integer := FEX_ALGORITHMS(0)'length;
   constant NAXIL_C    : integer := NFMC_G;
   
   signal mAxilReadMasters  : AxiLiteReadMasterArray (NAXIL_C-1 downto 0);
@@ -184,56 +179,65 @@ architecture mapping of QuadAdcEvent is
   signal mAxilWriteMasters : AxiLiteWriteMasterArray(NAXIL_C-1 downto 0);
   signal mAxilWriteSlaves  : AxiLiteWriteSlaveArray (NAXIL_C-1 downto 0);
 
-  function AxilCrossbarConfig  return AxiLiteCrossbarMasterConfigArray is
-    variable ret : AxiLiteCrossbarMasterConfigArray(NAXIL_C-1 downto 0);
-  begin
-    for i in 0 to NFMC_G-1 loop
-        ret(i) := (baseAddr => BASE_ADDR_C+toSlv(i*4096,32),
-                   addrBits => 12,
-                   connectivity => x"ffff");
-    end loop;
-    return ret;
-  end function AxilCrossbarConfig;
-  
-  constant AXIL_XBAR_CONFIG_C : AxiLiteCrossbarMasterConfigArray(NAXIL_C-1 downto 0) := AxilCrossbarConfig;
+  constant AXIL_XBAR_CONFIG_C : AxiLiteCrossbarMasterConfigArray(NAXIL_C-1 downto 0) := genAxiLiteConfig(NAXIL_C, BASE_ADDR_C, 15, 12);
 
-  signal bramWr    : BRamWriteMasterArray(4*NSTREAMS_C*NFMC_G-1 downto 0);
-  signal bramRd    : BRamReadMasterArray (4*NSTREAMS_C*NFMC_G-1 downto 0);
-  signal bRamSl    : BRamReadSlaveArray  (4*NSTREAMS_C*NFMC_G-1 downto 0);
+  constant NSTREAMS_C : integer := FEX_ALGORITHMS(0)'length;
+  constant NRAM_C     : integer := 4 * NFMC_G * NSTREAMS_C;
+  signal bramWr    : BRamWriteMasterArray(NRAM_C-1 downto 0);
+  signal bramRd    : BRamReadMasterArray (NRAM_C-1 downto 0);
+  signal bRamSl    : BRamReadSlaveArray  (NRAM_C-1 downto 0);
 
   signal cacheStatus : CacheStatusArray(NFMC_G-1 downto 0);
   signal ilvstreams  : Slv4Array       (NFMC_G-1 downto 0);
 
 begin  -- mapping
 
-  assert (DMA_SIZE_G=1 or NFMC_G=1) report "Multi channel DMA only allowed for one FMC";
-    
   status <= cacheStatus(0);
   
   dmaFullS  <= r.afull;
   dmaFullQ  <= (others=>'0');
 
-  U_L1IN : entity work.SynchronizerOneShot
+  l1q       <= r.l1inacc(0) or r.l1inrej(0);
+  l1aq      <= r.l1inacc(0);
+  
+  GEN_AXIL_XBAR : entity work.AxiLiteCrossbar
+    generic map ( NUM_SLAVE_SLOTS_G   => 1,
+                  NUM_MASTER_SLOTS_G  => AXIL_XBAR_CONFIG_C'length,
+                  MASTERS_CONFIG_G    => AXIL_XBAR_CONFIG_C )
+    port map ( axiClk              => axilClk,
+               axiClkRst           => axilRst,
+               sAxiReadMasters (0) => axilReadMaster,
+               sAxiReadSlaves  (0) => axilReadSlave,
+               sAxiWriteMasters(0) => axilWriteMaster,
+               sAxiWriteSlaves (0) => axilWriteSlave,
+               mAxiReadMasters     => mAxilReadMasters,
+               mAxiReadSlaves      => mAxilReadSlaves,
+               mAxiWriteMasters    => mAxilWriteMasters,
+               mAxiWriteSlaves     => mAxilWriteSlaves );
+               
+  process ( eventClk ) is
+  begin
+    if rising_edge(eventClk) then
+      l1inacc <= l1in and l1ina;
+      l1inrej <= l1in and not l1ina;
+    end if;
+  end process;
+
+  U_L1INACC : entity work.SynchronizerOneShot
     port map ( clk     => dmaClk,
-               dataIn  => l1in,
-               dataOut => sl1in );
-  
-  U_L1INA : entity work.RstSync
+               dataIn  => l1inacc,
+               dataOut => sl1inacc );
+
+  U_L1INREJ : entity work.SynchronizerOneShot
     port map ( clk      => dmaClk,
-               asyncRst => l1ina,
-               syncRst  => sl1ina );
-  
+               dataIn   => l1inrej,
+               dataOut  => sl1inrej );
+
   U_TRIGARM : entity work.SynchronizerOneShot
     port map ( clk     => dmaClk,
                dataIn  => trigArm,
                dataOut => trigArmS );
 
-  hdrValid      <= eventTrgV and pllSyncV(0);
-  eventHeaderRd <= hdrRd(0);
-
-  --
-  --  Reformat the ADC data structure
-  --
   GEN_CH : for i in 0 to NCHAN_C-1 generate
     GEN_BIT : for j in 0 to 10 generate
       U_Shift : entity work.AdcShift
@@ -254,18 +258,6 @@ begin  -- mapping
       end generate GEN_IADC;
     end generate GEN_BIT;
 
-
-    U_PllSyncF : entity work.FifoSync
-      generic map ( ADDR_WIDTH_G => 5,
-                    DATA_WIDTH_G => 3,
-                    FWFT_EN_G    => true )
-      port map ( rst    => rstFifo,
-                 clk    => dmaClk,
-                 wr_en  => r.start,
-                 din    => r.adcShift,
-                 rd_en  => hdrRd   (0),
-                 dout   => pllSync (i),
-                 valid  => pllSyncV(i) );
   end generate;
     
 --      This is the large buffer.
@@ -289,137 +281,98 @@ begin  -- mapping
     end generate;
   end generate;
 
-  --
-  --  One mezzanine card allows either one axi stream (PCIe DMA) or many axi
-  --  streams (PGP)
-  --
-  GEN_ONE_FMC : if NFMC_G = 1 generate
-    mAxilWriteMasters(0) <= axilWriteMaster;
-    axilWriteSlave       <= mAxilWriteSlaves(0);
-    mAxilReadMasters (0) <= axilReadMaster;
-    axilReadSlave        <= mAxilReadSlaves(0);
+  GEN_FMC : for i in 0 to NFMC_G-1 generate
+
+    U_PllSyncF : entity work.FifoSync
+      generic map ( ADDR_WIDTH_G => 5,
+                    DATA_WIDTH_G => 3,
+                    FWFT_EN_G    => true )
+      port map ( rst    => rstFifo,
+                 clk    => dmaClk,
+                 wr_en  => r.start,
+                 din    => r.adcShift,
+                 rd_en  => hdrRd   (0),
+                 dout   => pllSync (i),
+                 valid  => pllSyncV(i) );
+
+    eventHdr     (i) <= toSlv(0,29) & pllSync(i) &
+                        toSlv(0,7) & configA.enable(4*i) & toSlv(0,6) &
+                        configA.samples(17 downto 4) & x"0" &
+                        eventHeader(i);
     
+    hdrValid     (i) <= eventHeaderV(i) and (pllSyncV(i) or noPayload(i));
+    eventHeaderRd(i) <= hdrRd(i);
+
+  
     U_INTLV : entity work.QuadAdcInterleave
-      generic map ( BASE_ADDR_C     => AXIL_XBAR_CONFIG_C(0).baseAddr,
-                    AXIS_SIZE_G     => AXIS_SIZE_C,
-                    AXIS_CONFIG_G   => CHN_AXIS_CONFIG_C,
-                    IFMC_G          => 0,
-                    ALGORITHM_G     => FEX_ALGORITHMS(0) )
+      generic map ( BASE_ADDR_C    => AXIL_XBAR_CONFIG_C(i).baseAddr,
+                    AXIS_SIZE_G    => 1,
+                    AXIS_CONFIG_G  => CHN_AXIS_CONFIG_C,
+                    IFMC_G         => i,
+                    ALGORITHM_G    => FEX_ALGORITHMS(i) )
       port map ( clk             => dmaClk,
                  rst             => dmaRst,
                  clear           => r.clear,
                  start           => r.start,
                  shift           => r.adcShift,
-                 din0            => iadc(0),
-                 din1            => iadc(2),
-                 din2            => iadc(1),
-                 din3            => iadc(3),
-                 l1in            => r.l1in (0),
-                 l1ina           => r.l1ina(0),
+                 din0            => iadc(0+i*4),
+                 din1            => iadc(2+i*4),
+                 din2            => iadc(1+i*4),
+                 din3            => iadc(3+i*4),
+                 l1in            => l1q,
+                 l1ina           => l1aq,
                  l1a             => open,
                  l1v             => open,
-                 config          => configA,
-                 pllSync         => pllSync(0),
-                 hdr             => eventHeader,
-                 hdrV            => hdrValid,
-                 msgV            => eventMsgV,
-                 hdrRd           => hdrRd  (0),
-                 almost_full     => ilvafull      (0),
-                 full            => ilvfull       (0),
-                 status          => ilvCacheStatus(0),
-                 axisMaster      => dmaMaster,
-                 axisSlave       => dmaSlave,
+                 --  Unique to Interleave?
+                 --config          => configA,
+                 --pllSync         => pllSync(i*4),
+                 --hdr             => eventHeader,
+                 --hdrV            => hdrValid,
+                 --msgV            => eventMsgV,
+                 --hdrRd           => hdrRd(i),
+                 --
+                 almost_full     => ilvafull      (i),
+                 full            => ilvfull       (i),
+                 status          => cacheStatus   (i),
+                 axisMaster      => ilvmasters    (i),
+                 axisSlave       => ilvslaves     (i),
                  -- BRAM Interface (dmaClk domain)
-                 bramWriteMaster => bramWr,
-                 bramReadMaster  => bramRd,
-                 bramReadSlave   => bramSl,
+                 bramWriteMaster => bramWr((i+1)*4*NSTREAMS_C-1 downto i*4*NSTREAMS_C),
+                 bramReadMaster  => bramRd((i+1)*4*NSTREAMS_C-1 downto i*4*NSTREAMS_C),
+                 bramReadSlave   => bramSl((i+1)*4*NSTREAMS_C-1 downto i*4*NSTREAMS_C),
                  -- AXI-Lite Interface
                  axilClk         => axilClk,
                  axilRst         => axilRst,
-                 axilReadMaster  => mAxilReadMasters (0),
-                 axilReadSlave   => mAxilReadSlaves  (0),
-                 axilWriteMaster => mAxilWriteMasters(0),
-                 axilWriteSlave  => mAxilWriteSlaves (0),
-                 streams         => ilvstreams       (0) );
-  end generate GEN_ONE_FMC;
+                 axilReadMaster  => mAxilReadMasters (i),
+                 axilReadSlave   => mAxilReadSlaves  (i),
+                 axilWriteMaster => mAxilWriteMasters(i),
+                 axilWriteSlave  => mAxilWriteSlaves (i),
+                 streams         => ilvstreams       (i) );
 
-  --
-  --  Two mezzanine cards allow only one axi stream (PCIe DMA)
-  --
-  GEN_TWO_FMC : if NFMC_G = 2 generate
+    U_DATA : entity work.QuadAdcChannelData
+      generic map ( SAXIS_CONFIG_G => CHN_AXIS_CONFIG_C,
+                    MAXIS_CONFIG_G => DMA_STREAM_CONFIG_G )
+      port map ( dmaClk      => dmaClk,
+                 dmaRst      => dmaRst,
+                 --
+                 eventHdrV   => hdrValid (i),
+                 eventHdr    => eventHdr (i),
+                 noPayload   => noPayload(i),
+                 eventHdrRd  => hdrRd    (i),
+                 --
+                 eventTrig(31 downto 24) => r.trig(3),
+                 eventTrig(23 downto 16) => r.trig(2),
+                 eventTrig(15 downto  8) => r.trig(1),
+                 eventTrig( 7 downto  0) => r.trig(0),
+                 chnMaster   => ilvmasters(i),
+                 chnSlave    => ilvslaves (i),
+                 dmaMaster   => dmaMaster(i),
+                 dmaSlave    => dmaSlave (i) );
 
-    GEN_AXIL_XBAR : entity work.AxiLiteCrossbar
-      generic map ( NUM_SLAVE_SLOTS_G   => 1,
-                    NUM_MASTER_SLOTS_G  => AXIL_XBAR_CONFIG_C'length,
-                    MASTERS_CONFIG_G    => AXIL_XBAR_CONFIG_C )
-      port map ( axiClk              => axilClk,
-                 axiClkRst           => axilRst,
-                 sAxiReadMasters (0) => axilReadMaster,
-                 sAxiReadSlaves  (0) => axilReadSlave,
-                 sAxiWriteMasters(0) => axilWriteMaster,
-                 sAxiWriteSlaves (0) => axilWriteSlave,
-                 mAxiReadMasters     => mAxilReadMasters,
-                 mAxiReadSlaves      => mAxilReadSlaves,
-                 mAxiWriteMasters    => mAxilWriteMasters,
-                 mAxiWriteSlaves     => mAxilWriteSlaves );
-               
-    GEN_FMC : for i in 0 to NFMC_G-1 generate
-      U_INTLV : entity work.QuadAdcInterleave
-        generic map ( BASE_ADDR_C    => AXIL_XBAR_CONFIG_C(0).baseAddr,
-                      AXIS_SIZE_G    => AXIS_SIZE_C,
-                      AXIS_CONFIG_G  => CHN_AXIS_CONFIG_C,
-                      IFMC_G         => i,
-                      ALGORITHM_G    => FEX_ALGORITHMS(i) )
-        port map ( clk             => dmaClk,
-                   rst             => dmaRst,
-                   clear           => r.clear,
-                   start           => r.start,
-                   shift           => r.adcShift,
-                   din0            => iadc(0+i*4),
-                   din1            => iadc(2+i*4),
-                   din2            => iadc(1+i*4),
-                   din3            => iadc(3+i*4),
-                   l1in            => r.l1in (0),
-                   l1ina           => r.l1ina(0),
-                   l1a             => open,
-                   l1v             => open,
-                   config          => configA,
-                   pllSync         => pllSync(i*4),
-                   hdr             => eventHeader,
-                   hdrV            => hdrValid,
-                   msgV            => eventMsgV,
-                   hdrRd           => hdrRd(i),
-                   almost_full     => ilvafull      (i),
-                   full            => ilvfull       (i),
-                   status          => ilvCacheStatus(i),
-                   axisMaster      => ilvmasters    (i downto i),
-                   axisSlave       => ilvslaves     (i downto i),
-                   -- BRAM Interface (dmaClk domain)
-                   bramWriteMaster => bramWr((i+1)*4*NSTREAMS_C-1 downto i*4*NSTREAMS_C),
-                   bramReadMaster  => bramRd((i+1)*4*NSTREAMS_C-1 downto i*4*NSTREAMS_C),
-                   bramReadSlave   => bramSl((i+1)*4*NSTREAMS_C-1 downto i*4*NSTREAMS_C),
-                   -- AXI-Lite Interface
-                   axilClk         => axilClk,
-                   axilRst         => axilRst,
-                   axilReadMaster  => mAxilReadMasters (i),
-                   axilReadSlave   => mAxilReadSlaves  (i),
-                   axilWriteMaster => mAxilWriteMasters(i),
-                   axilWriteSlave  => mAxilWriteSlaves (i),
-                   streams         => ilvstreams       (i) );
-    end generate;
-
-    U_ILV_MUX : entity work.AxiStreamMux
-      generic map ( NUM_SLAVES_G => NFMC_G )
-      port map ( axisClk      => dmaClk,
-                 axisRst      => dmaRst,
-                 sAxisMasters => ilvmasters,
-                 sAxisSlaves  => ilvslaves,
-                 mAxisMaster  => dmaMaster(0),
-                 mAxisSlave   => dmaSlave (0) );
   end generate;
-  
+
   process (r, dmaRst, dmaFullThr, trigArmS, trigIn, ilvfull, ilvafull, configA,
-           sl1in, sl1ina) is
+           sl1inacc, sl1inrej) is
     variable v   : RegType;
   begin  -- process
     v := r;
@@ -431,8 +384,8 @@ begin  -- mapping
     v.full         := uOr(ilvfull);
     v.afull        := uOr(ilvafull);
 
-    v.l1in    := sl1in  & r.l1in (r.l1in 'left downto 1);
-    v.l1ina   := sl1ina & r.l1ina(r.l1ina'left downto 1);
+    v.l1inacc := sl1inacc & r.l1inacc(r.l1inacc'left downto 1);
+    v.l1inrej := sl1inrej & r.l1inrej(r.l1inrej'left downto 1);
     
     if r.trigCnt/="11" then
       v.trig    := r.trigd2 & r.trig(r.trig'left downto 1);

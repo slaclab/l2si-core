@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2016-01-04
--- Last update: 2018-01-04
+-- Last update: 2018-04-28
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -43,24 +43,24 @@ entity QuadAdcCore is
   generic (
     TPD_G       : time    := 1 ns;
     LCLSII_G    : boolean := TRUE; -- obsolete
+    DMA_SIZE_G  : integer := 1;
     NFMC_G      : integer := 1;
     SYNC_BITS_G : integer := 4;
-    DMA_SIZE_G  : integer := 4;
     DMA_STREAM_CONFIG_G : AxiStreamConfigType;
     BASE_ADDR_C : slv(31 downto 0) := (others=>'0') );
   port (
     -- AXI-Lite and IRQ Interface
     axiClk              : in  sl;
     axiRst              : in  sl;
-    axilWriteMasters    : in  AxiLiteWriteMasterArray(1 downto 0);
-    axilWriteSlaves     : out AxiLiteWriteSlaveArray (1 downto 0);
-    axilReadMasters     : in  AxiLiteReadMasterArray (1 downto 0);
-    axilReadSlaves      : out AxiLiteReadSlaveArray  (1 downto 0);
+    axilWriteMasters    : in  AxiLiteWriteMasterArray(2 downto 0);
+    axilWriteSlaves     : out AxiLiteWriteSlaveArray (2 downto 0);
+    axilReadMasters     : in  AxiLiteReadMasterArray (2 downto 0);
+    axilReadSlaves      : out AxiLiteReadSlaveArray  (2 downto 0);
     -- DMA
     dmaClk              : in  sl;
     dmaRst              : out sl;
-    dmaRxIbMaster       : out AxiStreamMasterArray(DMA_SIZE_G-1 downto 0);
-    dmaRxIbSlave        : in  AxiStreamSlaveArray (DMA_SIZE_G-1 downto 0);
+    dmaRxIbMaster       : out AxiStreamMasterArray(NFMC_G-1 downto 0);
+    dmaRxIbSlave        : in  AxiStreamSlaveArray (NFMC_G-1 downto 0);
     -- EVR Ports
     evrClk              : in  sl;
     evrRst              : in  sl;
@@ -84,6 +84,18 @@ entity QuadAdcCore is
 end QuadAdcCore;
 
 architecture mapping of QuadAdcCore is
+
+  type RegType is record
+    axilWriteSlave : AxiLiteWriteSlaveType;
+    axilReadSlave  : AxiLiteReadSlaveType;
+  end record;
+
+  constant REG_INIT_C : RegType := (
+    axilWriteSlave => AXI_LITE_WRITE_SLAVE_INIT_C,
+    axilReadSlave  => AXI_LITE_READ_SLAVE_INIT_C );
+
+  signal r    : RegType := REG_INIT_C;
+  signal r_in : RegType;
 
   constant FIFO_ADDR_WIDTH_C : integer := 14;
   constant NCHAN_C           : integer := 4*NFMC_G;
@@ -119,7 +131,6 @@ architecture mapping of QuadAdcCore is
   signal dmaFullV            : slv(NPartitions-1 downto 0);
   signal iready              : sl;
   
-  signal adcQ, adc_test      : AdcDataArray(NCHAN_C-1 downto 0);
   signal idmaRst             : sl;
   signal dmaRstI             : slv(2 downto 0);
   signal dmaRstS             : sl;
@@ -141,23 +152,25 @@ architecture mapping of QuadAdcCore is
   signal timingHeader_prompt  : TimingHeaderType;
   signal timingHeader_aligned : TimingHeaderType;
   signal exptBus_aligned      : ExptBusType;
-  signal trigData             : XpmPartitionDataType;
-  signal trigDataV            : sl;
-  signal eventHdr             : EventHeaderType;
-  signal eventHdrD            : slv(191 downto 0);
-  signal eventTrgV            : sl;
-  signal eventMsgV            : sl;
-  signal eventHdrRd           : sl;
-  signal eventHdrV            : sl;
-  signal phdr                 : sl;
-  signal pmsg                 : sl;
-  signal rstFifo              : sl;
+
+
+  signal trigData             : XpmPartitionDataArray(NFMC_G-1 downto 0);
+  signal trigDataV            : slv             (NFMC_G-1 downto 0);
+  signal eventHdr             : EventHeaderArray(NFMC_G-1 downto 0);
+  signal eventHdrD            : Slv192Array     (NFMC_G-1 downto 0);
+  signal eventHdrV            : slv             (NFMC_G-1 downto 0);
+  signal eventHdrRd           : slv             (NFMC_G-1 downto 0);
+  signal phdr                 : slv             (NFMC_G-1 downto 0);
+  signal pmsg                 : slv             (NFMC_G-1 downto 0);
+  signal rstFifo              : slv             (NFMC_G-1 downto 0);
+  signal wrFifoCnt            : Slv4Array       (NFMC_G-1 downto 0);
+  signal rdFifoCnt            : Slv4Array       (NFMC_G-1 downto 0);
   signal fbPllRst             : sl;
   signal fbPhyRst             : sl;
   
   signal status : QuadAdcStatusType;
-  signal axisMaster : AxiStreamMasterArray(DMA_SIZE_G-1 downto 0);
-  signal axisSlave  : AxiStreamSlaveArray (DMA_SIZE_G-1 downto 0);
+  signal axisMaster : AxiStreamMasterArray(NFMC_G-1 downto 0);
+  signal axisSlave  : AxiStreamSlaveArray (NFMC_G-1 downto 0);
 
 begin  
 
@@ -165,19 +178,8 @@ begin
   iready  <= not dmaFullS;
   dmaRst  <= idmaRst;
 
-  GEN_AXIS : for i in 0 to DMA_SIZE_G-1 generate
-    U_FIFO : entity work.AxiStreamFifoV2
-      generic map ( SLAVE_AXI_CONFIG_G  => ILV_AXIS_CONFIG_C,
-                    MASTER_AXI_CONFIG_G => DMA_STREAM_CONFIG_G )
-      port map ( sAxisClk    => dmaClk,
-                 sAxisRst    => idmaRst,
-                 sAxisMaster => axisMaster(i),
-                 sAxisSlave  => axisSlave (i),
-                 mAxisClk    => dmaClk,
-                 mAxisRst    => idmaRst,
-                 mAxisMaster => dmaRxIbMaster(i),
-                 mAxisSlave  => dmaRxIbSlave (i) );
-  end generate;
+  dmaRxIbMaster <= axisMaster;
+  axisSlave     <= dmaRxIbSlave;
   
   U_TimingFb : entity work.XpmTimingFb
     generic map ( DEBUG_G => true )
@@ -209,51 +211,44 @@ begin
                dataIn  => dmaHistDump,
                dataOut => dmaHistDumpS );
 
-  adcQ <= adc_test when configA.dmaTest='1' else
-          adc;
-  
-  GEN_TP : for i in 0 to NCHAN_C-1 generate
-    U_DATA : entity work.QuadAdcChannelTestPattern
-      generic map ( CHANNEL_C => i )
-      port map ( clk   => adcClk,
-                 rst   => eventSelQ,
-                 data  => adc_test(i).data );
+  GEN_FMC : for i in 0 to NFMC_G-1 generate
+    U_EventSel : entity work.EventHeaderCache
+      port map ( rst            => evrRst,
+                 wrclk          => evrClk,
+                 enable         => configE.acqEnable,
+                 partition      => configE.partition(2 downto 0),
+                 timing_prompt  => timingHeader_prompt,
+                 expt_prompt    => exptBus,
+                 timing_aligned => timingHeader_aligned,
+                 expt_aligned   => exptBus_aligned,
+                 pdata          => trigData (i),
+                 pdataV         => trigDataV(i),
+                 cntWrFifo      => wrFifoCnt(i),
+                 rstFifo        => rstFifo  (i),
+                 --
+                 rdclk          => dmaClk,
+                 advance        => eventHdrRd(i),
+                 valid          => eventHdrV (i),
+                 pmsg           => pmsg      (i),
+                 phdr           => phdr      (i),
+                 cntRdFifo      => rdFifoCnt (i),
+                 hdrOut         => eventHdr  (i));
+
+    eventHdrD(i)    <= toSlv(eventHdr(i));
   end generate;
-
-  U_EventSel : entity work.EventHeaderCache
-    port map ( rst            => evrRst,
-               wrclk          => evrClk,
-               enable         => configE.acqEnable,
-               partition      => configE.partition(2 downto 0),
-               timing_prompt  => timingHeader_prompt,
-               expt_prompt    => exptBus,
-               timing_aligned => timingHeader_aligned,
-               expt_aligned   => exptBus_aligned,
-               pdata          => trigData ,
-               pdataV         => trigDataV,
-               rstFifo        => rstFifo  ,
-               --
-               rdclk          => dmaClk,
-               advance        => eventHdrRd,
-               valid          => eventHdrV,
-               pmsg           => pmsg,
-               phdr           => phdr      ,
-               hdrOut         => eventHdr  );
-
-  eventHdrD    <= toSlv(eventHdr);
-  eventTrgV    <= eventHdrV and phdr;
-  eventMsgV    <= eventHdrV and pmsg;
-  trigSlot     <= trigDataV;
-  eventSel     <= trigData .l0a and trigDataV;
-  l1in         <= trigData .l1e and trigDataV;
-  l1ina        <= trigData .l1a;
+  
+  trigSlot     <= trigDataV(0);
+  eventSel     <= trigData (0).l0a and trigDataV(0);
+  l1in         <= trigData (0).l1e and trigDataV(0);
+--  l1ina        <= trigData (0).l1a;
+  l1ina        <= '1';
   
   U_EventDma : entity work.QuadAdcEvent
     generic map ( TPD_G               => TPD_G,
                   FIFO_ADDR_WIDTH_C   => FIFO_ADDR_WIDTH_C,
                   NFMC_G              => NFMC_G,
                   SYNC_BITS_G         => SYNC_BITS_G,
-                  DMA_SIZE_G          => DMA_SIZE_G,
+                  DMA_STREAM_CONFIG_G => DMA_STREAM_CONFIG_G,
                   BASE_ADDR_C         => BASE_ADDR_C )
     port map (    axilClk         => axiClk,
                   axilRst         => axiRst,
@@ -262,11 +257,7 @@ begin
                   axilWriteMaster => axilWriteMasters(1),
                   axilWriteSlave  => axilWriteSlaves (1),
                   --
-                  --eventClk   => evrClk,
-                  --eventRst   => evrRst,
-                  --configE    => configE,
-                  --strobe     => eventSelQ,
-                  --eventId    => eventId,
+                  eventClk   => evrClk,
                   trigArm    => eventSelQ,
                   l1in       => l1in,
                   l1ina      => l1ina,
@@ -274,15 +265,16 @@ begin
                   adcClk     => adcClk,
                   adcRst     => adcRst,
                   configA    => configA,
-                  adc        => adcQ,
+                  adc        => adc,
                   trigIn     => trigIn,
+                  --
                   dmaClk     => dmaClk,
                   dmaRst     => dmaRstS,
                   eventHeader   => eventHdrD,
-                  eventTrgV     => eventTrgV,
-                  eventMsgV     => eventMsgV,
+                  eventHeaderV  => eventHdrV,
+                  noPayload     => pmsg,
                   eventHeaderRd => eventHdrRd,
-                  rstFifo    => rstFifo,
+                  rstFifo    => rstFifo(0),
                   dmaFullThr => dmaFullThrS(FIFO_ADDR_WIDTH_C-1 downto 0),
                   dmaFullS   => dmaFullS,
                   dmaFullQ   => dmaFullQ,
@@ -425,4 +417,39 @@ begin
                dataIn  => adcSyncReg,
                dataOut => status.adcSyncReg );
 
+  comb : process ( axiRst, r, wrFifoCnt, rdFifoCnt,
+                   axilWriteMasters(2), axilReadMasters(2) ) is
+    variable v  : RegType;
+    variable ep : AxiLiteEndPointType;
+  begin
+    v := r;
+
+    axiSlaveWaitTxn( ep,
+                     axilWriteMasters(2), axilReadMasters(2),
+                     v.axilWriteSlave, v.axilReadSlave );
+
+    for i in 0 to NFMC_G-1 loop
+      axiSlaveRegisterR ( ep, toSlv(i*8+0,8), 0, wrFifoCnt(i) );
+      axiSlaveRegisterR ( ep, toSlv(i*8+4,8), 0, rdFifoCnt(i) );
+    end loop;
+
+    axiSlaveDefault( ep, v.axilWriteSlave, v.axilReadSlave );
+
+    axilWriteSlaves(2) <= r.axilWriteSlave;
+    axilReadSlaves (2) <= r.axilReadSlave;
+    
+    if axiRst = '1' then
+      v := REG_INIT_C;
+    end if;
+
+    r_in <= v;
+  end process comb;
+
+  aseq : process ( axiClk ) is
+  begin
+    if rising_edge(axiClk) then
+      r <= r_in;
+    end if;
+  end process aseq;
+  
 end mapping;
