@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2016-03-25
--- Last update: 2018-02-17
+-- Last update: 2018-05-13
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -87,7 +87,8 @@ package DtiPkg is
    
    type DtiUsLinkConfigType is record
      enable     : sl;
-     partition  : slv(3 downto 0);
+     partition  : slv( 3 downto 0);
+     afdepth    : slv( 3 downto 0);
      hdrOnly    : sl;
 --     trigDelay  : slv(7 downto 0);
      fwdMask    : slv(MaxDsLinks-1 downto 0);
@@ -101,6 +102,7 @@ package DtiPkg is
    constant DTI_US_LINK_CONFIG_INIT_C : DtiUsLinkConfigType := (
      enable     => '0',
      partition  => (others=>'0'),
+     afdepth    => (others=>'1'),
      hdrOnly    => '0',
 --     trigDelay  => (others=>'0'),
      fwdMask    => (others=>'0'),
@@ -216,6 +218,8 @@ package DtiPkg is
      usApp      : DtiUsAppStatusArray    (MaxUsLinks-1 downto 0);
      qplllock   : slv                    (3 downto 0);
      amcPll     : XpmPllStatusArray      (1 downto 0);
+     msgDelaySet: Slv7Array              (NPartitions-1 downto 0);
+     msgDelayGet: Slv7Array              (MaxUsLinks-1 downto 0);
    end record;
 
    constant DTI_STATUS_INIT_C : DtiStatusType := (
@@ -224,7 +228,9 @@ package DtiPkg is
      bpLink     => DTI_BP_LINK_STATUS_INIT_C,
      usApp      => (others=>DTI_US_APP_STATUS_INIT_C),
      qplllock   => "0000",
-     amcPll     => (others=>XPM_PLL_STATUS_INIT_C) );
+     amcPll     => (others=>XPM_PLL_STATUS_INIT_C),
+     msgDelaySet=> (others=>(others=>'1')),
+     msgDelayGet=> (others=>(others=>'1')) );
 
    type DtiEventHeaderType is record
      timeStamp  : slv(63 downto 0);

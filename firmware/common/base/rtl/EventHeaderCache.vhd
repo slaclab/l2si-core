@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-07-10
--- Last update: 2018-01-05
+-- Last update: 2018-05-15
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -35,13 +35,16 @@ use unisim.vcomponents.all;
 
 entity EventHeaderCache is
    generic (
-      TPD_G               : time                := 1 ns );
+      TPD_G               : time                := 1 ns;
+      ADDR_WIDTH_G        : integer             := 4;
+      DEBUG_G             : boolean             := false );
    port (
      rst             : in  sl;
      --  Cache Input
      wrclk           : in  sl;
      -- configuration
-     enable          : in  sl;
+     enable          : in  sl;            -- passes trigger info --
+     cacheenable     : in  sl := '1';     -- caches headers --
      partition       : in  slv(2 downto 0);
      -- event input
      timing_prompt   : in  TimingHeaderType;
@@ -55,8 +58,10 @@ entity EventHeaderCache is
      cntL0           : out slv(19 downto 0);
      cntL1A          : out slv(19 downto 0);
      cntL1R          : out slv(19 downto 0);
-     cntWrFifo       : out slv( 3 downto 0);
+     cntWrFifo       : out slv(ADDR_WIDTH_G-1 downto 0);
      rstFifo         : out sl;
+     msgDelay        : out slv( 6 downto 0);
+     cntOflow        : out slv( 7 downto 0);
      --  Cache Output
      rdclk           : in  sl;
      entag           : in  sl := '0';
@@ -65,7 +70,7 @@ entity EventHeaderCache is
      valid           : out sl;
      pmsg            : out sl;  -- partition message
      phdr            : out sl;  -- event header
-     cntRdFifo       : out slv(3 downto 0);
+     cntRdFifo       : out slv(ADDR_WIDTH_G-1 downto 0);
      hdrOut          : out EventHeaderType );
 end EventHeaderCache;
 
@@ -84,8 +89,10 @@ architecture rtl of EventHeaderCache is
     cntL0  : slv(19 downto 0);
     cntL1A : slv(19 downto 0);
     cntL1R : slv(19 downto 0);
-    cntWrF : slv( 3 downto 0);
+    cntWrF : slv(ADDR_WIDTH_G-1 downto 0);
     rstF   : sl;
+    msgD   : Slv7Array(1 downto 0);
+    ofcnt  : slv( 7 downto 0);
   end record;
 
   constant WR_REG_INIT_C : WrRegType := (
@@ -102,14 +109,16 @@ architecture rtl of EventHeaderCache is
     cntL1A => (others=>'0'),
     cntL1R => (others=>'0'),
     cntWrF => (others=>'0'),
-    rstF   => '1' );
+    rstF   => '1',
+    msgD   => (others=>(others=>'1')),
+    ofcnt  => (others=>'0') );
 
   signal wr    : WrRegType := WR_REG_INIT_C;
   signal wr_in : WrRegType;
 
   type RdRegType is record
     valid  : sl;
-    cntRdF : slv( 3 downto 0);
+    cntRdF : slv(ADDR_WIDTH_G-1 downto 0);
   end record;
 
   constant RD_REG_INIT_C : RdRegType := (
@@ -125,8 +134,8 @@ architecture rtl of EventHeaderCache is
   signal doutf        : slv(  6 downto 0);
   signal doutb        : slv(191 downto 0);
   signal spartition   : slv(partition'range);
-  signal wr_data_count: slv( 3 downto 0);
-  signal rd_data_count: slv( 3 downto 0);
+  signal wr_data_count: slv(ADDR_WIDTH_G-1 downto 0);
+  signal rd_data_count: slv(ADDR_WIDTH_G-1 downto 0);
 
   signal pword        : slv(47 downto 0);
   signal gword        : slv(15 downto 0);
@@ -134,7 +143,35 @@ architecture rtl of EventHeaderCache is
   signal ptag         : slv(4 downto 0);
   signal hdrWe        : sl;
   signal ivalid       : sl;
+
+  signal wr_ack       : sl;
+  signal wr_overflow  : sl;
+  signal wr_full      : sl;
+
+  component ila_0
+    port ( clk    : in sl;
+           probe0 : in slv(255 downto 0) );
+  end component;
+  
 begin
+
+  GEN_DEBUG : if DEBUG_G generate
+    U_ILA : ila_0
+      port map ( clk       => wrclk,
+                 probe0(0) => hdrWe,
+                 probe0( 5 downto 1) => ptag,
+                 probe0(10 downto 6) => resize(wr_data_count,5),
+                 probe0(11)          => wr.twordV,
+                 probe0(12)          => wr.tword.l0a,
+                 probe0(13)          => wr.rden,
+                 probe0(14)          => wr.pwordV,
+                 probe0(15)          => wr.pword.l0a,
+                 probe0(16)          => wr.wren,
+                 probe0(17)          => wr_ack,
+                 probe0(18)          => wr_overflow,
+                 probe0(19)          => wr_full,
+                 probe0(255 downto 20) => (others=>'0') );
+  end generate;
 
   --  trigger bus
   pdata            <= wr.tword;
@@ -145,13 +182,15 @@ begin
   cntWrFifo        <= wr.cntWrF;
   cntRdFifo        <= rd.cntRdF;
   rstFifo          <= wr.rstF;
-
+  msgDelay         <= wr.msgD(1);
+  cntOflow         <= wr.ofcnt;
+  
   hdrOut.pulseId    <= doutb( 63 downto   0);
   hdrOut.timeStamp  <= doutb(127 downto  64);
   hdrOut.count      <= doutb(183 downto 160);
   hdrOut.version    <= EVENT_HEADER_INIT_C.version;
   hdrOut.partitions <= doutb(143 downto 128);
---  hdrOut.l1t        <= EVENT_HEADER_INIT_C.l1t;
+  hdrOut.payload    <= doutb(191 downto 184);
   hdrOut.l1t        <= doutb(159 downto 144);
   pmsg             <= doutf(5);
   phdr             <= doutf(6);
@@ -203,13 +242,16 @@ begin
                doutb                => doutb );
 
   U_TagFifo : entity work.FifoAsync
-    generic map ( ADDR_WIDTH_G => 4,
+    generic map ( ADDR_WIDTH_G => ADDR_WIDTH_G,
                   DATA_WIDTH_G => 7,
                   FWFT_EN_G    => true )
     port map ( rst             => wr.rstF,
                wr_clk          => wrclk,
                wr_en           => hdrWe,
                wr_data_count   => wr_data_count,
+               wr_ack          => wr_ack,
+               overflow        => wr_overflow,
+               full            => wr_full,
                din(4 downto 0) => ptag,
                din(5)          => wr_in.pmsg(0),
                din(6)          => wr_in.phdr(0),
@@ -225,7 +267,8 @@ begin
                dataIn  => partition,
                dataOut => spartition );
   
-  comb : process( wr, wrrst, timing_prompt, timing_aligned, expt_prompt, expt_aligned, spartition, enable, wr_data_count ) is
+  comb : process( wr, wrrst, timing_prompt, timing_aligned, expt_prompt, expt_aligned, spartition,
+                  enable, cacheenable, wr_data_count, wr_overflow ) is
     variable v  : WrRegType;
     variable ip : integer;
   begin
@@ -246,6 +289,10 @@ begin
       if expt_prompt.valid='1' then
         v.tword  := toPartitionWord(expt_prompt.message.partitionWord(ip));
         v.twordV := enable and expt_prompt.message.partitionWord(ip)(15);
+        v.msgD(0) := wr.msgD(0)+1;
+        if expt_prompt.message.partitionWord(ip)(15)='0' then
+          v.msgD(0) := (others=>'0');
+        end if;
       end if;
     end if;
     
@@ -254,11 +301,14 @@ begin
       v.rden   := '1';
       if expt_aligned.valid='1' then
         v.pword  := toPartitionWord(expt_aligned.message.partitionWord(ip));
-        v.pwordV := enable and expt_aligned.message.partitionWord(ip)(15);
+        v.pwordV := enable and cacheenable and expt_aligned.message.partitionWord(ip)(15);
         v.pvec   := expt_aligned.message.partitionWord(ip);
-        v.pmsg(0) := not expt_aligned.message.partitionWord(ip)(15);
-        v.phdr(0) := enable and     expt_aligned.message.partitionWord(ip)(15) and
+        v.pmsg(0) := enable and cacheenable and not expt_aligned.message.partitionWord(ip)(15);
+        v.phdr(0) := enable and cacheenable and     expt_aligned.message.partitionWord(ip)(15) and
                      toPartitionWord(expt_aligned.message.partitionWord(ip)).l0a;
+        if expt_aligned.message.partitionWord(ip)(15) = '0' then
+          v.msgD(1) := v.msgD(0);
+        end if;
       end if;
     end if;
 
@@ -268,6 +318,10 @@ begin
       
     if wr.rden = '1' then
       v.wren  := wr.pword.l0a or not wr.pvec(15);
+    end if;
+
+    if wr_overflow = '1' then
+      v.ofcnt := wr.ofcnt+1;
     end if;
     
     if wrrst = '1' then

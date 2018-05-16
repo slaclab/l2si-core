@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-07-10
--- Last update: 2018-01-03
+-- Last update: 2018-05-11
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -42,7 +42,8 @@ entity EventRealign is
      timingI         : in  TimingHeaderType; -- prompt
      exptBusI        : in  ExptBusType;      -- prompt
      timingO         : out TimingHeaderType; -- delayed
-     exptBusO        : out ExptBusType );    -- delayed
+     exptBusO        : out ExptBusType;      -- delayed
+     delay           : out Slv7Array(NPartitions-1 downto 0));
 end EventRealign;
 
 architecture rtl of EventRealign is
@@ -69,6 +70,8 @@ architecture rtl of EventRealign is
 
 begin
 
+  delay <= r.pdelay;
+  
   U_Ram : entity work.SimpleDualPortRam
     generic map ( DATA_WIDTH_G => 129,
                   ADDR_WIDTH_G => 7 )

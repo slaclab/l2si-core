@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2016-03-25
--- Last update: 2017-12-22
+-- Last update: 2018-04-12
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -49,9 +49,10 @@ package EventPkg is
      timeStamp  : slv(63 downto 0);
      count      : slv(23 downto 0);
      version    : slv( 7 downto 0);
-     partitions : slv(15 downto 0);
+     partitions : slv(15 downto 0);   -- readout groups
      l1t        : slv(15 downto 0);   -- L1 trigger lines
-     --detenv     : slv(63 downto 0);  -- detector specific words
+     payload    : slv( 7 downto 0);   -- transition payload
+--     env        : slv(63 downto 0);  -- detector specific words
    end record;
 
    constant EVENT_HEADER_INIT_C : EventHeaderType := (
@@ -60,7 +61,8 @@ package EventPkg is
      count      => (others=>'0'),
      version    => toSlv(EVENT_HEADER_VERSION_C,8),
      partitions => (others=>'0'),
-     l1t        => (others=>'0') );
+     l1t        => (others=>'0'),
+     payload    => (others=>'0') );
 
    type EventHeaderArray is array(natural range<>) of EventHeaderType;
    
@@ -93,7 +95,12 @@ package body EventPkg is
      assignSlv(i, vector, v.timeStamp );
      assignSlv(i, vector, v.count     );
      assignSlv(i, vector, v.version   );
-     assignSlv(i, vector, v.partitions);
+     if v.l1t(15) = '1' then
+       assignSlv(i, vector, v.partitions);
+     else
+       assignSlv(i, vector, v.payload);
+       assignSlv(i, vector, x"00");
+     end if;
      assignSlv(i, vector, v.l1t       );
      return vector;
    end function;

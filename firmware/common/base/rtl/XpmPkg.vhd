@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2016-03-25
--- Last update: 2017-10-25
+-- Last update: 2018-04-12
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -193,8 +193,10 @@ package XpmPkg is
      loopback   : sl;
      txReset    : sl;
      rxReset    : sl;
+     txPllReset : sl;
+     rxPllReset : sl;
      txDelayRst : sl;
-     txDelay    : slv(19 downto 0);
+     txDelay    : slv(17 downto 0);
      partition  : slv( 3 downto 0);
      trigsrc    : slv( 3 downto 0);
    end record;
@@ -204,6 +206,8 @@ package XpmPkg is
      loopback   => '0',
      txReset    => '0',
      rxReset    => '0',
+     txPllReset => '0',
+     rxPllReset => '0',
      txDelayRst => '0',
      txDelay    => (others=>'0'),
      partition  => (others=>'0'),
@@ -266,8 +270,8 @@ package XpmPkg is
 
    type XpmPartMsgConfigType is record
      insert  : sl;
-     hdr     : slv( 8 downto 0);
-     payload : slv(31 downto 0);
+     hdr     : slv( 7 downto 0);
+     payload : slv( 7 downto 0);
    end record;
    constant XPM_PART_MSG_CONFIG_INIT_C : XpmPartMsgConfigType := (
      insert  => '0',
@@ -275,9 +279,9 @@ package XpmPkg is
      payload => (others=>'0') );
 
    --  Clear event header -> event data match fifos
-   constant MSG_CLEAR_FIFO  : slv(8 downto 0) := toSlv(0,9);
+   constant MSG_CLEAR_FIFO  : slv(7 downto 0) := toSlv(0,8);
    --  Communicate delay of pword
-   constant MSG_DELAY_PWORD : slv(8 downto 0) := toSlv(1,9);
+   constant MSG_DELAY_PWORD : slv(7 downto 0) := toSlv(1,8);
    
    type XpmAnalysisConfigType is record
       rst        : slv(  NTagBytes-1 downto 0);
@@ -361,14 +365,16 @@ package XpmPkg is
 
    type XpmPartitionMsgType is record
       l0tag   : slv(4 downto 0);
-      hdr     : slv(8 downto 0);
-      payload : slv(31 downto 0);
+      hdr     : slv(7 downto 0);
+      payload : slv(7 downto 0);
+      anatag  : slv(23 downto 0);
    end record;
 
    constant XPM_PARTITION_MSG_INIT_C : XpmPartitionMsgType := (
      l0tag    => (others=>'0'),
      hdr      => (others=>'0'),
-     payload  => (others=>'0') );
+     payload  => (others=>'0'),
+     anatag   => (others=>'0') );
 
    type XpmPartitionDataType is record
       l0a     : sl;
@@ -377,7 +383,7 @@ package XpmPkg is
       l1e     : sl;
       l1a     : sl;
       l1tag   : slv(4 downto 0);
-      anatag  : slv(31 downto 0);
+      anatag  : slv(23 downto 0);
    end record;
 
    constant XPM_PARTITION_DATA_INIT_C : XpmPartitionDataType := (
@@ -438,7 +444,9 @@ package body XpmPkg is
      assignSlv(i, vector, "0");
      assignSlv(i, vector, pword.l0tag);
      assignSlv(i, vector, pword.hdr);
+     assignSlv(i, vector, "0");
      assignSlv(i, vector, "0");  -- message indicator
+     assignSlv(i, vector, pword.anatag);
      assignSlv(i, vector, pword.payload);
      return vector;
    end function;
@@ -451,6 +459,8 @@ package body XpmPkg is
      assignRecord(i, vector, pword.l0tag);
      assignRecord(i, vector, pword.hdr);
      i := i+1;
+     i := i+1;
+     assignRecord(i, vector, pword.anatag);
      assignRecord(i, vector, pword.payload);
      return pword;
    end function;
@@ -468,6 +478,7 @@ package body XpmPkg is
      assignSlv(i, vector, pword.l1tag);
      assignSlv(i, vector, "1");  -- valid trigger word
      assignSlv(i, vector, pword.anatag);
+     assignSlv(i, vector, x"00");
      return vector;
    end function;
    
@@ -484,6 +495,7 @@ package body XpmPkg is
      assignRecord(i, vector, pword.l1tag);
      i := i+1;
      assignRecord(i, vector, pword.anatag);
+     i := i+8;
      return pword;
    end function;
    
