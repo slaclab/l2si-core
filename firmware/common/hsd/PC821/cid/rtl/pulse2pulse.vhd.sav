@@ -37,21 +37,6 @@ signal in_reset      :std_logic;
 signal in_reset_prev :std_logic;
 signal in_reset_prev2:std_logic;
 
-constant STAGES_G : integer := 3;
-signal crossDomainSyncReg : std_logic_vector(STAGES_G-1 downto 0) := (others=>'0');
-
-   attribute ASYNC_REG                       : string;
-   attribute ASYNC_REG of crossDomainSyncReg : signal is "TRUE";
-   attribute syn_srlstyle                       : string;
-   attribute syn_srlstyle of crossDomainSyncReg : signal is "registers";
-   attribute MSGON                       : string;
-   attribute MSGON of crossDomainSyncReg : signal is "FALSE";
-   attribute shreg_extract                       : string;
-   attribute shreg_extract of crossDomainSyncReg : signal is "no";
-   attribute register_balancing                       : string;
-   attribute register_balancing of crossDomainSyncReg : signal is "no";
-   attribute altera_attribute                       : string;
-   attribute altera_attribute of crossDomainSyncReg : signal is "-name AUTO_SHIFT_REGISTER_RECOGNITION OFF";
 
 -----------------------------------------------------------------------------------
 --component declarations
@@ -101,7 +86,9 @@ end process in_proc;
 out_proc:process(out_clk,rst)
 begin
    if(rst = '1') then
-      crossDomainSyncReg <= (others=>'0');
+      out_set       <= '0';
+      out_set_prev  <= '0';
+      out_set_prev2 <= '0';
       outreset      <= '0';
       pulseout      <= '0';
    elsif(out_clk'event and out_clk = '1') then
@@ -123,15 +110,13 @@ begin
       --register the reset signal from the other clock domain
       --three times. double stage synchronising circuit
       --reduces the MTB
-      crossDomainSyncReg <= crossDomainSyncReg(STAGES_G-2 downto 0) & in_set;
+      out_set        <= in_set;
+      out_set_prev   <= out_set;
+      out_set_prev2  <= out_set_prev;
+
 
    end if;
 end process out_proc;
-
-out_set       <= crossDomainSyncReg(0);
-out_set_prev  <= crossDomainSyncReg(1);
-out_set_prev2 <= crossDomainSyncReg(2);
-
 -----------------------------------------------------------------------------------
 --asynchronous processes
 -----------------------------------------------------------------------------------

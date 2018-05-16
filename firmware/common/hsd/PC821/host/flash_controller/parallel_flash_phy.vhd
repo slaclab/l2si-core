@@ -214,7 +214,12 @@ signal page_read_bus_cycle          : std_logic;
 
 signal remainder_page               : std_logic;
 
-constant DEBUG_C : boolean := false;
+constant DEBUG_C : boolean := true;
+
+component ila_0
+  port ( clk     : in std_logic;
+         probe0  : in std_logic_vector(255 downto 0) );
+end component;
 
 signal flash_sm_slv : std_logic_vector(3 downto 0);
 signal bus_cycle_cnt_slv : std_logic_vector(3 downto 0);
@@ -222,8 +227,44 @@ signal bus_cycle_sm_slv : std_logic_vector(3 downto 0);
 signal async_state_cnt_slv : std_logic_vector(3 downto 0);
 begin
 
-     async_state_cnt_slv <= std_logic_vector(to_unsigned(async_state_cnt,4));
-
+  GEN_DEBUG : if DEBUG_C generate
+    flash_sm_slv <= x"0" when flash_sm = idle else
+                    x"1" when flash_sm = cmd_enter_cfi else
+                    x"2" when flash_sm = cmd_get_devid else
+                    x"3" when flash_sm = cmd_exit_cfi else
+                    x"4" when flash_sm = cmd_sector_erase else
+                    x"5" when flash_sm = cmd_read_status_cmd else
+                    x"6" when flash_sm = cmd_receive_status else
+                    x"7" when flash_sm = cmd_read_status_cmd_wait else
+                    x"8" when flash_sm = cmd_program_buffer else
+                    x"9" when flash_sm = cmd_program_buffer_remainder else
+                    x"A" when flash_sm = cmd_program_buf_to_flash else
+                    x"B" when flash_sm = cmd_read_data else
+                    x"C" when flash_sm = cmd_pageread_data else
+                    x"D";
+    bus_cycle_cnt_slv <= std_logic_vector(to_unsigned(bus_cycle_cnt,4));
+    bus_cycle_sm_slv <= x"0" when bus_cycle_sm = idle else
+                        x"1" when bus_cycle_sm = wr_bus_ce_low else
+                        x"2" when bus_cycle_sm = wr_bus_we_low else
+                        x"3" when bus_cycle_sm = wr_bus_we_high else
+                        x"4" when bus_cycle_sm = rd_bus_ce_low else
+                        x"5" when bus_cycle_sm = rd_bus_oe_low else
+                        x"6" when bus_cycle_sm = rd_bus_oe_high else
+                        x"7" when bus_cycle_sm = pagerd_bus_ce_low else
+                        x"8" when bus_cycle_sm = pagerd_bus_oe_low else
+                        x"9" when bus_cycle_sm = rd_bus_oe_low_nextword else
+                        x"A" when bus_cycle_sm = rd_bus_oe_low_nextpage else
+                        x"B";
+    async_state_cnt_slv <= std_logic_vector(to_unsigned(async_state_cnt,4));
+    U_ILA : ila_0
+      port map ( clk                  => flash_clk,
+                 probe0( 3 downto  0) => flash_sm_slv,
+                 probe0( 7 downto  4) => bus_cycle_cnt_slv,
+                 probe0(11 downto  8) => bus_cycle_sm_slv,
+                 probe0(15 downto 12) => async_state_cnt_slv,
+                 probe0(255 downto 16) => (others=>'0') );
+  end generate;
+  
 flash_init    <= flash_cmd(0);
 read_id_start <= flash_cmd(1);
 ramp_reset    <= flash_cmd(2);
