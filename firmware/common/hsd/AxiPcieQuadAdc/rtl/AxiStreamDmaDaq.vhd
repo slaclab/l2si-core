@@ -5,7 +5,7 @@
 -- File       : AxiStreamDma.vhd
 -- Author     : Ryan Herbst, rherbst@slac.stanford1.edu
 -- Created    : 2014-04-25
--- Last update: 2018-03-13
+-- Last update: 2018-04-04
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -570,11 +570,6 @@ begin
          v.intPending := '0';
       end if;
 
-      -- Reset
-      if axiRst = '1' or r.rxEnable = '0' then
-         v := IB_INIT_C;
-      end if;
-
       -- Next register assignment
       ibin <= v;
 
@@ -587,6 +582,11 @@ begin
       ---
       ibsMaster               <= v.master;
       sAxisSlave              <= v.slave;
+
+      -- Reset
+      if axiRst = '1' or r.rxEnable = '0' then
+         v := IB_INIT_C;
+      end if;
 
    end process;
 

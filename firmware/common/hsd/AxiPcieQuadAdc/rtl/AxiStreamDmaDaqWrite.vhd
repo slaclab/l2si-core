@@ -5,7 +5,7 @@
 -- File       : AxiStreamDmaWrite.vhd
 -- Author     : Ryan Herbst, rherbst@slac.stanford.edu
 -- Created    : 2014-04-25
--- Last update: 2017-03-13
+-- Last update: 2018-04-04
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -391,16 +391,16 @@ begin
             v.state := S_IDLE_C;
       end case;
 
+      dmaAck         <= r.dmaAck;
+      intAxisSlave   <= v.slave;
+      axiWriteMaster <= r.wMaster;
+
       if (axiRst = '1') then
          v := REG_INIT_C;
       end if;
 
 
       rin <= v;
-
-      dmaAck         <= r.dmaAck;
-      intAxisSlave   <= v.slave;
-      axiWriteMaster <= r.wMaster;
 
    end process comb;
 

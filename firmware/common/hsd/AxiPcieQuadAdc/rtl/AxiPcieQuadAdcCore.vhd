@@ -5,7 +5,7 @@
 -- Author     : Larry Ruckman  <ruckman@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2016-02-12
--- Last update: 2018-03-12
+-- Last update: 2018-05-04
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -164,6 +164,7 @@ architecture mapping of AxiPcieQuadAdcCore is
    
    signal axiClk  : sl;
    signal axiRst  : sl;
+   signal axiRst0 : sl;
    signal axilClk : sl;
    signal axilRst : sl;
    signal dmaIrq  : sl;
@@ -183,9 +184,9 @@ architecture mapping of AxiPcieQuadAdcCore is
      -- ADT7411 Voltage/Temp Mon 3
      5 => MakeI2cAxiLiteDevType( "1001011", 8, 8, '0' ),
      --  TPS2481 Current Mon 1
-     6 => MakeI2cAxiLiteDevType( "1000000", 8, 8, '0' ),
+     6 => MakeI2cAxiLiteDevType( "1000000", 16, 8, '1' ),
      --  TPS2481 Current Mon 2
-     7 => MakeI2cAxiLiteDevType( "1000001", 8, 8, '0' ),
+     7 => MakeI2cAxiLiteDevType( "1000001", 16, 8, '1' ),
      --  FMC SPI Bridge [1B addressing, 1B payload]
 --     7 => MakeI2cAxiLiteDevType( "0101001", 8, 8, '0' ),
      --  FMC SPI Bridge [1B addressing, 1B payload]
@@ -295,6 +296,10 @@ begin
                    
    axilClk <= axiClk;
    axilRst <= axiRst;
+
+   U_BUFG_Rst : BUFG
+     port map ( I => axiRst0,
+                O => axiRst );
    
    ---------------
    -- AXI PCIe PHY
@@ -305,7 +310,7 @@ begin
       port map (
          -- AXI4 Interfaces
          axiClk         => axiClk,
-         axiRst         => axiRst,
+         axiRst         => axiRst0,
          dmaReadMaster  => dmaReadMaster,
          dmaReadSlave   => dmaReadSlave,
          dmaWriteMaster => dmaWriteMaster,

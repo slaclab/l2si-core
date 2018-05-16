@@ -5,7 +5,7 @@
 -- Author     : Larry Ruckman  <ruckman@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2016-02-12
--- Last update: 2017-08-17
+-- Last update: 2018-05-07
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -155,9 +155,35 @@ architecture mapping of AxiPcieReg is
 
    signal userValues   : Slv32Array(63 downto 0) := (others => x"00000000");
    signal flashAddress : slv(30 downto 0);
-   
+
+   constant DEBUG_C : boolean := true;
+
+   component ila_0
+     port ( clk    : in sl;
+            probe0 : in slv(255 downto 0) );
+   end component;
 begin
 
+   GEN_DEBUG : if DEBUG_C generate
+     U_ILA : ila_0
+       port map ( clk       => axiClk,
+                  probe0(0) => axilReadMaster.arvalid,
+                  probe0(1) => axilReadMaster.rready,
+                  probe0(2) => axilReadSlave .arready,
+                  probe0(3) => axilReadSlave .rvalid,
+                  probe0(4) => axilWriteMaster.awvalid,
+                  probe0(5) => axilWriteMaster.wvalid,
+                  probe0(6) => axilWriteMaster.bready,
+                  probe0(7) => axilWriteSlave.awready,
+                  probe0(8) => axilWriteSlave.wready,
+                  probe0(9) => axilWriteSlave.bvalid,
+                  probe0(41 downto 10) => axilReadMaster.araddr,
+                  probe0(73 downto 42) => axilWriteMaster.awaddr,
+                  probe0(75 downto 74) => axilReadSlave.rresp,
+                  probe0(77 downto 76) => axilWriteSlave.bresp,
+                  probe0(255 downto 78) => (others=>'0') );
+   end generate;
+   
    ---------------------------------------------------------------------------------------------
    -- Driver Polls the userValues to determine the firmware's configurations and interrupt state
    ---------------------------------------------------------------------------------------------
