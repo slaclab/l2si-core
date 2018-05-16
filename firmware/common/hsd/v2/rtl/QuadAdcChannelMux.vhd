@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2016-01-04
--- Last update: 2017-10-11
+-- Last update: 2018-05-08
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -47,8 +47,8 @@ entity QuadAdcChannelMux is
     dmaRst       :  in sl;
     eventHdr     :  in slv(255 downto 0);
     eventHdrV    :  in sl;
+    noPayload    :  in sl;
     eventHdrRd   : out sl;
-    eventTrig    :  in slv(31 downto 0);
     chenable     :  in slv                 (NCHAN_C-1 downto 0);
     chmasters    :  in AxiStreamMasterArray(NCHAN_C-1 downto 0);
     chslaves     : out AxiStreamSlaveArray (NCHAN_C-1 downto 0);
@@ -58,7 +58,7 @@ end QuadAdcChannelMux;
 
 architecture mapping of QuadAdcChannelMux is
 
-  type RdStateType is (S_IDLE, S_READHDR, S_WAITHDR, S_WRITEHDR,
+  type RdStateType is (S_WAIT, S_IDLE, S_READHDR, S_WAITHDR, S_WRITEHDR,
                        S_WAITCHAN, S_READCHAN, S_DUMP);
 
   constant SAXIS_CONFIG_C : AxiStreamConfigType := ssiAxiStreamConfig(16);
@@ -121,7 +121,7 @@ begin  -- mapping
                mAxisSlave   => chslave );
   
   
-  process (r, dmaRst, eventHdr, eventHdrV, eventTrig, tSlave,
+  process (r, dmaRst, eventHdr, eventHdrV, noPayload, tSlave,
            chenable, chmaster, chEnableAck) is
     variable v   : RegType;
   begin  -- process
@@ -142,6 +142,8 @@ begin  -- mapping
     end if;
     
     case r.state is
+      when S_WAIT =>
+        v.state := S_IDLE;
       when S_IDLE =>
         v.enable  := chenable;
         if eventHdrV='1' then
@@ -159,12 +161,16 @@ begin  -- mapping
       when S_WRITEHDR =>
         if v.master.tValid='0' then
           ssiSetUserSof(SAXIS_CONFIG_C, v.master, '0');
-          v.master.tData(127 downto  96) := eventTrig;
-          v.master.tData( 95 downto   0) := eventHdr(223 downto 128);
+          v.master.tData(127 downto   0) := eventHdr(255 downto 128);
           v.master.tValid                := '1';
-          v.hdrRd       := '1';
-          v.enableValid := '1';
-          v.state := S_WAITCHAN;
+          v.hdrRd                        := '1';
+          if noPayload = '1' then
+            v.master.tLast := '1';
+            v.state        := S_WAIT;
+          else
+            v.enableValid  := '1';
+            v.state        := S_WAITCHAN;
+          end if;
         end if;
       when S_WAITCHAN =>
         if v.master.tValid='0' and chmaster.tValid='1' then
@@ -198,16 +204,16 @@ begin  -- mapping
       v.master.tLast  := '1';
     end if;
     
+    chEnableV  <= r.enableValid;
+    chEnableM  <= r.enable;
+    chslave    <= v.slave;
+    eventHdrRd <= r.hdrRd;
+
     if dmaRst='1' then
       v := REG_INIT_C;
     end if;
 
     rin <= v;
-
-    chEnableV  <= r.enableValid;
-    chEnableM  <= r.enable;
-    chslave    <= v.slave;
-    eventHdrRd <= r.hdrRd;
 
   end process;
 

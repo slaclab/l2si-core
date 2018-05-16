@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2016-01-04
--- Last update: 2018-01-05
+-- Last update: 2018-05-10
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -45,22 +45,25 @@ use work.QuadAdcPkg.all;
 entity hsd_fex_wrapper is
   generic ( AXIS_CONFIG_G : AxiStreamConfigType;
             ALGORITHM_G   : string := "RAW";
+            STREAM_ID_G   : integer := 0;
             DEBUG_G       : boolean := false );
   port (
     clk             :  in sl;
     rst             :  in sl;
     clear           :  in sl;
     din             :  in Slv11Array(7 downto 0);  -- row of data
-    lopen           :  in sl;                      -- begin sampling
     lskip           :  in sl;                      -- skip sampling (cache
                                                    -- header for readout)
-    lphase          :  in slv(2 downto 0);         -- lopen location within the row
+    lopen           :  in sl;                      -- begin sampling
+    lopen_phase     :  in slv(2 downto 0);         -- lopen location within the row
     lclose          :  in sl;                      -- end sampling
+    lclose_phase    :  in slv(2 downto 0);         -- lclose location within the row
     l1in            :  in sl;                      -- once per lopen
     l1ina           :  in sl;                      -- accept/reject
     free            : out slv(15 downto 0);        -- unused rows in RAM
     nfree           : out slv( 4 downto 0);        -- unused gates
     status          : out CacheArray(MAX_OVL_C-1 downto 0);
+    debug           : out slv(31 downto 0);
     -- readout interface
     axisMaster      : out AxiStreamMasterType;
     axisSlave       :  in AxiStreamSlaveType;
@@ -101,6 +104,7 @@ architecture mapping of hsd_fex_wrapper is
     free       : slv     (15 downto 0);
     nfree      : slv     ( 4 downto 0);
     axisMaster : AxiStreamMasterType;
+    debug      : slv     (31 downto 0);
   end record;
   constant REG_INIT_C : RegType := (
     tout       => (others=>(others=>'0')),
@@ -121,7 +125,8 @@ architecture mapping of hsd_fex_wrapper is
     wraddr     => (others=>'0'),
     free       => (others=>'0'),
     nfree      => (others=>'0'),
-    axisMaster => AXI_STREAM_MASTER_INIT_C );
+    axisMaster => AXI_STREAM_MASTER_INIT_C,
+    debug      => (others=>'0') );
 
   signal r    : RegType := REG_INIT_C;
   signal r_in : RegType;
@@ -147,6 +152,7 @@ architecture mapping of hsd_fex_wrapper is
            probe0 : in slv(255 downto 0) );
   end component;
 
+  signal test : slv(6 downto 0);
 begin
 
   status <= r.cache;
@@ -159,15 +165,26 @@ begin
   bramReadMaster.addr  <= rdaddr;
 
   rddata <= bramReadSlave.data;
+
+  debug  <= r.debug;
   
   GEN_DEBUG : if DEBUG_C generate
-    process (r, tout) is
+    process (r, tout, din) is
     begin
       for i in 0 to ROW_SIZE-1 loop
         tin_dbg(2*i+1 downto 2*i) <= r.tin(i);
       end loop;
       for i in 0 to ROW_SIZE loop
         tout_dbg(2*i+1 downto 2*i) <= tout(i);
+      end loop;
+      for i in 0 to 6 loop
+        if ((r.wrdata(i+1)(3 downto 0)=r.wrdata(i)(3 downto 0)+x"1") or
+            r.wrdata(i+1)(15)='1' or
+            r.wrdata(i)(15)='1') then
+          test(i) <= '0';
+        else
+          test(i) <= '1';
+        end if;
       end loop;
     end process;
     
@@ -190,7 +207,17 @@ begin
                  probe0(102 downto 99) => r.itrigger,
                  probe0(118 downto 103) => tin_dbg,
                  probe0(136 downto 119) => tout_dbg,
-                 probe0(255 downto 137) => (others=>'0') );
+                 probe0(143 downto 137) => test,
+                 probe0(147 downto 144) => din(0)(3 downto 0),
+                 probe0(151 downto 148) => din(1)(3 downto 0),
+                 probe0(155 downto 152) => din(2)(3 downto 0),
+                 probe0(159 downto 156) => din(3)(3 downto 0),
+                 probe0(163 downto 160) => din(4)(3 downto 0),
+                 probe0(167 downto 164) => din(5)(3 downto 0),
+                 probe0(171 downto 168) => din(6)(3 downto 0),
+                 probe0(175 downto 172) => din(7)(3 downto 0),
+                 probe0(179 downto 176) => douten,
+                 probe0(255 downto 180) => (others=>'0') );
   end generate;
   
   rstn <= not rst;
@@ -218,15 +245,15 @@ begin
   --             addrb  => rdaddr,
   --             doutb  => rddata );
   
-  comb : process( r, clear, lopen, lskip, lclose, lphase, l1in, l1ina,
+  comb : process( r, clear, lopen, lskip, lclose, lopen_phase, lclose_phase,
+                  l1in, l1ina,
                   tout, dout, douten, rddata, maxisSlave ) is
     variable v : RegType;
-    variable n : integer range 0 to 2*ROW_SIZE-1;
+    variable n : integer;
     variable i,j,k : integer;
     variable imatch : integer;
     variable flush  : sl;
     variable skip   : sl;
-    variable sdout  : Slv16Array(ROW_SIZE-1 downto 0) := (others=>(others=>'0'));
   begin
     v := r;
     
@@ -235,7 +262,8 @@ begin
     v.tout    := tout;
     v.douten  := douten;
     v.tin     := (others=>"00");
-    v.tin(conv_integer(lphase)) := lclose & lopen;
+    v.tin(conv_integer(lopen_phase ))(0) := lopen;
+    v.tin(conv_integer(lclose_phase))(1) := lclose;
 
     if lopen='1' then
       v.lskip   := lskip;
@@ -279,7 +307,7 @@ begin
       i := conv_integer(r.iopened);
       v.iopened := r.iopened+1;
       v.cache(i).state  := CLOSED_S;
-      v.cache(i).eaddr  := (v.wraddr & toSlv(k,IDX_BITS)) + toSlv(imatch,CACHE_ADDR_LEN_C);
+      v.cache(i).eaddr  := (v.wraddr & toSlv(0,IDX_BITS)) + toSlv(k+imatch,CACHE_ADDR_LEN_C);
     end if;
 
     --
@@ -298,7 +326,12 @@ begin
 --      v.cache(i).trigd  := WAIT_T;  -- l1t can precede open
         v.cache(i).skip   := r.lskip;
 --        v.cache(i).mapd   := END_M; -- look for close
-        v.cache(i).baddr  := (v.wraddr & toSlv(k,IDX_BITS)) + toSlv(imatch,CACHE_ADDR_LEN_C);
+        v.cache(i).baddr  := (v.wraddr & toSlv(0,IDX_BITS)) + toSlv(k+imatch,CACHE_ADDR_LEN_C);
+        if r.cache(i).state /= EMPTY_S then
+          v.cache(i).ovflow := '1';
+        else
+          v.cache(i).ovflow := '0';
+        end if;
     end if;
         
     --
@@ -322,6 +355,7 @@ begin
     end if;
 
     if v.axisMaster.tValid='0' then
+      v.debug(0) := '0';
       i := conv_integer(r.ireading);
       v.axisMaster.tLast := '0';
       if (r.cache(i).state = CLOSED_S) then
@@ -332,6 +366,7 @@ begin
             v.cache(i) := CACHE_INIT_C;
             v.ireading := r.ireading+1;
           when ACCEPT_T =>
+            v.debug(0) := '1';
             --
             --  Prepare reading from recorded data RAM
             --
@@ -354,7 +389,7 @@ begin
             v.axisMaster.tData(31) := r.cache(i).ovflow;
             v.axisMaster.tData( 39 downto  32) := resize(r.cache(i).baddr(IDX_BITS-1 downto 0),8);
             v.axisMaster.tData( 47 downto  40) := toSlv(8-conv_integer(r.cache(i).eaddr(IDX_BITS-1 downto 0)),8);
-            v.axisMaster.tData( 63 downto  48) := toSlv(i,16);
+            v.axisMaster.tData( 63 downto  48) := toSlv(STREAM_ID_G,8) & toSlv(i,8);
             v.axisMaster.tData( 95 downto  64) := resize(r.cache(i).toffs,32);
             v.axisMaster.tData(111 downto  96) := resize(r.cache(i).baddr,16);
             v.axisMaster.tData(127 downto 112) := resize(r.cache(i).eaddr,16);
@@ -392,23 +427,6 @@ begin
       end if;
     end if;
 
-    -- skipped buffers are causing this to fire
-    if conv_integer(r.free) < 4 and false then
-      --  Deadtime failed
-      --  Close all open caches/gates and flag them
-      v.wrfull := '0';
-      v.wrword := (others=>'0');
-      for i in 0 to 15 loop
-        if r.cache(i).state = OPEN_S then
-          v.cache(i).state := CLOSED_S;
---          v.cache(i).mapd  := DONE_M;
-          v.cache(i).baddr := r.wraddr & toSlv(0,IDX_BITS);
-          v.cache(i).eaddr := r.wraddr & toSlv(0,IDX_BITS);
-          v.cache(i).ovflow := '1';
-        end if;
-      end loop;
-    end if;
-    
     v.free := resize(r.rdtail - r.wraddr,r.free'length);
       
     i := conv_integer(r.ireading);
@@ -569,5 +587,22 @@ begin
                  s_axi_BUS_A_BREADY  => axilWriteMaster.bready,
                  s_axi_BUS_A_BRESP   => axilWriteSlave .bresp );
     end generate;
+
+  GEN_NATIVE : if ALGORITHM_G = "NAT" generate
+    U_FEX : entity work.hsd_raw_native
+      port map ( ap_clk              => clk,
+                 ap_rst_n            => rstn,
+                 sync                => configSync,
+                 x                   => din,
+                 tin                 => r.tin,
+                 y                   => dout,
+                 tout                => tout,
+                 yv                  => douten,
+                 axilReadMaster      => axilReadMaster,
+                 axilReadSlave       => axilReadSlave,
+                 axilWriteMaster     => axilWriteMaster,
+                 axilWriteSlave      => axilWriteSlave );
+    end generate;
     
+  
 end mapping;

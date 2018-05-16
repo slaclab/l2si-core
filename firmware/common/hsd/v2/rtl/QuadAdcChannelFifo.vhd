@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2016-01-04
--- Last update: 2018-01-05
+-- Last update: 2018-05-09
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -57,6 +57,7 @@ entity QuadAdcChannelFifo is
     almost_full     : out sl;
     full            : out sl;
     status          : out CacheArray(MAX_OVL_C-1 downto 0);
+    debug           : out slv       (31 downto 0);
     -- readout interface
     axisMaster      : out AxiStreamMasterType;
     axisSlave       :  in AxiStreamSlaveType;
@@ -111,6 +112,10 @@ architecture mapping of QuadAdcChannelFifo is
     fexn       : integer range 0 to NSTREAMS_C-1;
     axisMaster : AxiStreamMasterType;
     axisSlaves : AxiStreamSlaveArray(NSTREAMS_C-1 downto 0);
+    bramWr         : BramWriteMasterType;
+    bramRdM        : BramReadMasterType;
+    bramRdS        : BramReadSlaveType;
+    bramRdEn       : sl;
     axilReadSlave  : AxiLiteReadSlaveType;
     axilWriteSlave : AxiLiteWriteSlaveType;
   end record;
@@ -136,6 +141,10 @@ architecture mapping of QuadAdcChannelFifo is
     fexn       => 0,
     axisMaster => AXI_STREAM_MASTER_INIT_C,
     axisSlaves => (others=>AXI_STREAM_SLAVE_INIT_C),
+    bramWr         => BRAM_WRITE_MASTER_INIT_C,
+    bramRdM        => BRAM_READ_MASTER_INIT_C,
+    bramRdS        => BRAM_READ_SLAVE_INIT_C,
+    bramRdEn       => '0',
     axilReadSlave  => AXI_LITE_READ_SLAVE_INIT_C,
     axilWriteSlave => AXI_LITE_WRITE_SLAVE_INIT_C );
 
@@ -143,6 +152,7 @@ architecture mapping of QuadAdcChannelFifo is
   signal rin : RegType;
 
   signal lopen, lclose, lskip : slv(NSTREAMS_C-1 downto 0);
+  signal lopen_phase, lclose_phase : Slv3Array(NSTREAMS_C-1 downto 0);
   signal free              : Slv16Array(NSTREAMS_C-1 downto 0);
   signal nfree             : Slv5Array (NSTREAMS_C-1 downto 0);
 
@@ -156,24 +166,14 @@ architecture mapping of QuadAdcChannelFifo is
   signal maxilWriteSlaves  : AxiLiteWriteSlaveArray (NSTREAMS_C downto 0);
 
   signal axisMasters       : AxiStreamMasterArray   (NSTREAMS_C-1 downto 0);
+  signal axisSlaves        : AxiStreamSlaveArray    (NSTREAMS_C-1 downto 0);
   signal maxisSlave        : AxiStreamSlaveType;
   
   constant SAXIS_CONFIG_C : AxiStreamConfigType := ssiAxiStreamConfig(16);
 --  constant MAXIS_CONFIG_C : AxiStreamConfigType := ssiAxiStreamConfig(32);
   constant MAXIS_CONFIG_C : AxiStreamConfigType := AXIS_CONFIG_G;
 
-  function AxilCrossbarConfig  return AxiLiteCrossbarMasterConfigArray is
-    variable ret : AxiLiteCrossbarMasterConfigArray(NSTREAMS_C downto 0);
-  begin
-    for i in 0 to NSTREAMS_C loop
-      ret(i) := (baseAddr => BASE_ADDR_C+toSlv(i*256,32),
-                 addrBits => 8,
-                 connectivity => x"ffff");
-    end loop;
-    return ret;
-  end function AxilCrossbarConfig;
-  
-  constant AXIL_XBAR_CONFIG_C : AxiLiteCrossbarMasterConfigArray(NSTREAMS_C downto 0) := AxilCrossbarConfig;
+  constant AXIL_XBAR_CONFIG_C : AxiLiteCrossbarMasterConfigArray(NSTREAMS_C downto 0) := genAxiLiteConfig(NSTREAMS_C+1, BASE_ADDR_C, 12, 8);
 
   -- signals for debugging
   signal rData : slv(127 downto 0);
@@ -181,15 +181,18 @@ architecture mapping of QuadAdcChannelFifo is
 
   signal dmaData : Slv128Array(NSTREAMS_C-1 downto 0);
 
-  constant DEBUG_C : boolean := DEBUG_G;
+--  constant DEBUG_C : boolean := DEBUG_G;
+  constant DEBUG_C : boolean := false;
   
   component ila_0
     port ( clk : in sl;
            probe0 : in slv(255 downto 0) );
   end component;
 
-  signal cacheStatus : CacheStatusArray(NSTREAMS_C-1 downto 0);
-  
+  signal cacheStatus      : CacheStatusArray    (NSTREAMS_C-1 downto 0);
+  signal ibramWriteMaster : BRamWriteMasterArray(NSTREAMS_C-1 downto 0);
+  signal ibramReadMaster  : BRamReadMasterArray (NSTREAMS_C-1 downto 0);
+  signal debugArray       : Slv32Array          (NSTREAMS_C-1 downto 0);
 begin  -- mapping
 
   rData <= r.axisMaster.tData(127 downto 0);
@@ -197,6 +200,8 @@ begin  -- mapping
 
   status <= cacheStatus(0);
   streams <= resize(r.fexEnable,4);
+
+  debug   <= debugArray(0);
   
   GEN_DMADATA : for i in 0 to NSTREAMS_C-1 generate
     dmaData(i) <= axisMasters(i).tData(127 downto 0);
@@ -243,16 +248,6 @@ begin  -- mapping
                mAxiReadSlave   => maxilReadSlave,
                mAxiWriteMaster => maxilWriteMaster,
                mAxiWriteSlave  => maxilWriteSlave );
-  --  Disable access to these registers to test if this is the cause for hang
-  --U_EMPTY : entity work.AxiLiteEmpty
-  --  port map ( axiClk     => axilClk,
-  --             axiClkRst  => axilRst,
-  --             axiReadMaster  => axilReadMaster,
-  --             axiReadSlave   => axilReadSlave,
-  --             axiWriteMaster => axilWriteMaster,
-  --             axiWriteSlave  => axilWriteSlave );
-  --maxilReadMaster  <= AXI_LITE_READ_MASTER_INIT_C;
-  --maxilWriteMaster <= AXI_LITE_WRITE_MASTER_INIT_C;
   
   GEN_AXIL_XBAR : entity work.AxiLiteCrossbar
     generic map ( NUM_SLAVE_SLOTS_G   => 1,
@@ -289,46 +284,55 @@ begin  -- mapping
     l1a   (i) <= '0';
 
     U_GATE : entity work.FexGate
-      port map ( clk     => clk,
-                 rst     => rst,
-                 start   => r.start    (i),
-                 handle  => r.skip     (i),
-                 fbegin  => r.fexBegin (i),
-                 flength => r.fexLength(i),
-                 lopen   => lopen      (i),
-                 lhandle => lskip      (i),
-                 lclose  => lclose     (i) );
+      port map ( clk          => clk,
+                 rst          => rst,
+                 start        => r.start     (i),
+                 handle       => r.skip      (i),
+                 phase        => shift          ,
+                 fbegin       => r.fexBegin  (i),
+                 flength      => r.fexLength (i),
+                 lopen        => lopen       (i),
+                 lopen_phase  => lopen_phase (i),
+                 lhandle      => lskip       (i),
+                 lclose       => lclose      (i),
+                 lclose_phase => lclose_phase(i) );
 
     U_FEX : entity work.hsd_fex_wrapper
       generic map ( AXIS_CONFIG_G => SAXIS_CONFIG_C,
                     ALGORITHM_G   => ALGORITHM_G(i),
-                    DEBUG_G       => ite(i>1,false,true) )
+                    STREAM_ID_G   => i,
+                    DEBUG_G       => ite(i>1,false,DEBUG_G) )
 --                    DEBUG_G       => false )
 --                    DEBUG_G       => DEBUG_G )
       port map ( clk               => clk,
                  rst               => rst,
                  clear             => clear,
                  din               => din,
-                 lopen             => lopen(i),
-                 lskip             => lskip(i),
-                 lphase            => shift,
-                 lclose            => lclose(i),
-                 l1in              => r.l1in  (i),
-                 l1ina             => r.l1ina (i),
+                 lskip             => lskip           (i),
+                 lopen             => lopen           (i),
+                 lopen_phase       => lopen_phase     (i),
+                 lclose            => lclose          (i),
+                 lclose_phase      => lclose_phase    (i),
+                 l1in              => r.l1in          (i),
+                 l1ina             => r.l1ina         (i),
                  free              => free            (i),
                  nfree             => nfree           (i),
                  status            => cacheStatus     (i),
+                 debug             => debugArray      (i),
                  axisMaster        => axisMasters     (i),
-                 axisSlave         => rin.axisSlaves  (i),
+                 axisSlave         => axisSlaves      (i),
                  -- BRAM interface
-                 bramWriteMaster   => bramWriteMaster (i),
-                 bramReadMaster    => bramReadMaster  (i),
+                 bramWriteMaster   => ibramWriteMaster(i),
+                 bramReadMaster    => ibramReadMaster (i),
                  bramReadSlave     => bramReadSlave   (i),
                  --
                  axilReadMaster    => maxilReadMasters (i+1),
                  axilReadSlave     => maxilReadSlaves  (i+1),
                  axilWriteMaster   => maxilWriteMasters(i+1),
                  axilWriteSlave    => maxilWriteSlaves (i+1) );
+
+    bramWriteMaster(i) <= ibramWriteMaster(i);
+    bramReadMaster (i) <= ibramReadMaster (i);
   end generate;
 
   GEN_REM : for i in NSTREAMS_C to 3 generate
@@ -336,7 +340,8 @@ begin  -- mapping
     l1a   (i) <= '0';
   end generate;
   
-  process (r, rst, clear, start, free, nfree, l1in, l1ina,
+  process (r, rst, clear, start, free, nfree, l1in, l1ina, din,
+           ibramWriteMaster, ibramReadMaster, bramReadSlave,
            axisMasters, maxisSlave,
            maxilWriteMasters, maxilReadMasters) is
     variable v     : RegType;
@@ -456,17 +461,19 @@ begin  -- mapping
     if clear='1' then
       v.fexPreCount := (others=>(others=>'0'));
     end if;
-    
+
+    axisSlaves          <= v.axisSlaves;
+    maxilReadSlaves (0) <= r.axilReadSlave;
+    maxilWriteSlaves(0) <= r.axilWriteSlave;
+    full                <= '0';
+    almost_full         <= uOr(r.almost_full);
+
     if rst='1' then
       v := REG_INIT_C;
     end if;
     
     rin <= v;
 
-    maxilReadSlaves (0) <= r.axilReadSlave;
-    maxilWriteSlaves(0) <= r.axilWriteSlave;
-    full                <= '0';
-    almost_full         <= uOr(r.almost_full);
   end process;
 
   process (clk)

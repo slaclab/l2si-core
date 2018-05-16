@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2016-01-04
--- Last update: 2017-10-11
+-- Last update: 2018-05-15
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -42,9 +42,9 @@ entity QuadAdcChannelData is
     --
     eventHdr     :  in slv(255 downto 0);
     eventHdrV    :  in sl;
+    noPayload    :  in sl;
     eventHdrRd   : out sl;
     --
-    eventTrig    :  in slv(31 downto 0);
     chnMaster    :  in AxiStreamMasterType;
     chnSlave     : out AxiStreamSlaveType;
     dmaMaster    : out AxiStreamMasterType;
@@ -53,7 +53,7 @@ end QuadAdcChannelData;
 
 architecture mapping of QuadAdcChannelData is
 
-  type RdStateType is (S_IDLE, S_READHDR, S_WAITHDR, S_WRITEHDR,
+  type RdStateType is (S_WAIT, S_IDLE, S_READHDR, S_WAITHDR, S_WRITEHDR,
                        S_WAITCHAN, S_READCHAN, S_DUMP);
 
   constant SAXIS_CONFIG_C : AxiStreamConfigType := ssiAxiStreamConfig(16);
@@ -95,7 +95,8 @@ begin  -- mapping
                mAxisSlave  => dmaSlave );
 
   
-  process (r, dmaRst, eventHdr, eventHdrV, eventTrig, tSlave, chnMaster) is
+  process (r, dmaRst, eventHdr, eventHdrV, noPayload,
+           tSlave, chnMaster) is
     variable v   : RegType;
   begin  -- process
     v := r;
@@ -107,13 +108,15 @@ begin  -- mapping
       v.master.tValid := '0';
     end if;
 
-    if r.state = S_READCHAN and r.master.tValid='0' then
-      v.tmo := r.tmo-1;
-    else
-      v.tmo := TMO_VAL_C;
-    end if;
+    --if r.state = S_READCHAN and r.master.tValid='0' then
+    --  v.tmo := r.tmo-1;
+    --else
+    --  v.tmo := TMO_VAL_C;
+    --end if;
     
     case r.state is
+      when S_WAIT =>
+        v.state := S_IDLE;
       when S_IDLE =>
         if eventHdrV='1' then
           v.state := S_READHDR;
@@ -130,11 +133,15 @@ begin  -- mapping
       when S_WRITEHDR =>
         if v.master.tValid='0' then
           ssiSetUserSof(SAXIS_CONFIG_C, v.master, '0');
-          v.master.tData(127 downto  96) := eventTrig;
-          v.master.tData( 95 downto   0) := eventHdr(223 downto 128);
+          v.master.tData(127 downto   0) := eventHdr(255 downto 128);
           v.master.tValid                := '1';
           v.hdrRd := '1';
-          v.state := S_WAITCHAN;
+          if noPayload = '1' then
+            v.master.tLast := '1';
+            v.state := S_WAIT;
+          else
+            v.state := S_WAITCHAN;
+          end if;
         end if;
       when S_WAITCHAN =>
         if v.master.tValid='0' and chnMaster.tValid='1' then
@@ -159,21 +166,22 @@ begin  -- mapping
       when others => NULL;
     end case;
 
-    if r.tmo = 0 then
-      v.state := S_DUMP;
-      ssiSetUserEofe(SAXIS_CONFIG_C,v.master,'1');
-      v.master.tValid := '1';
-      v.master.tLast  := '1';
-    end if;
+    --if r.tmo = 0 then
+    --  v.state := S_DUMP;
+    --  ssiSetUserEofe(SAXIS_CONFIG_C,v.master,'1');
+    --  v.master.tValid := '1';
+    --  v.master.tLast  := '1';
+    --end if;
     
+    chnSlave   <= v.slave;
+    eventHdrRd <= r.hdrRd;
+
     if dmaRst='1' then
       v := REG_INIT_C;
     end if;
 
     rin <= v;
 
-    chnSlave   <= v.slave;
-    eventHdrRd <= r.hdrRd;
   end process;
 
   process (dmaClk)
