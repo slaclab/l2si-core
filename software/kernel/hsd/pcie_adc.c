@@ -141,7 +141,7 @@ int PcieAdc_Release(struct inode *inode, struct file *filp) {
       const volatile unsigned* p = (volatile unsigned*)adcDevice->rxBuffer[idx]->buffer;
       if (adcDevice->rxPend == adcDevice->rxBuffer[idx])
         printk("%s: Release -- rxPend --\n",MOD_NAME);
-      printk("%s: Release [%u]: %x:%x:%x\n",MOD_NAME,idx,p[0],p[3],p[4]);
+      //      printk("%s: Release [%u]: %x:%x:%x\n",MOD_NAME,idx,p[0],p[3],p[4]);
     }
   }
   else {
@@ -393,10 +393,12 @@ static int PcieAdc_Probe(struct pci_dev *pcidev, const struct pci_device_id *dev
               MOD_NAME,idx,NUMBER_OF_RX_BUFFERS,adcDevice->major);
        break;
      }
+     /*
      printk(KERN_WARNING "%s: Probe: Alloc buffer[%i] %p/%x\n", MOD_NAME, 
 	    idx,
 	    adcDevice->rxBuffer[idx]->buffer, 
 	    (unsigned)adcDevice->rxBuffer[idx]->dma);
+     */
    }
 
    // Request IRQ from OS.
@@ -430,10 +432,12 @@ static void PcieAdc_Remove(struct pci_dev *pcidev) {
    else {
      //  Free all rx buffers awaiting read (TBD)
      for ( idx=0; idx < NUMBER_OF_RX_BUFFERS; idx++ ) {
+       /*
        printk(KERN_WARNING "%s: Remove: Free buffer[%i] %p/%x\n", MOD_NAME, 
 	      idx,
 	      adcDevice->rxBuffer[idx]->buffer, 
 	      (unsigned)adcDevice->rxBuffer[idx]->dma);
+       */
        if (adcDevice->rxBuffer[idx]->dma != 0) {
          pci_free_consistent( pcidev, BUF_SIZE, adcDevice->rxBuffer[idx]->buffer, adcDevice->rxBuffer[idx]->dma);
          if (adcDevice->rxBuffer[idx]) {
