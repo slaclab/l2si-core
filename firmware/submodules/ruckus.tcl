@@ -13,3 +13,5 @@ loadRuckusTcl "$::DIR_PATH/../common/$::env(COMMON_FILE)"
 loadSource -dir  "$::DIR_PATH/amc-carrier-core/AmcCarrierCore/core"
 loadSource -dir  "$::DIR_PATH/amc-carrier-core/AmcCarrierCore/dcp/hdl"
 loadSource -dir  "$::DIR_PATH/amc-carrier-core/AmcCarrierCore/ip"
+# Keep a history of all the load paths
+set ::DIR_LIST "$::DIR_LIST $::DIR_PATH/amc-carrier-core/AmcCarrierCore"
