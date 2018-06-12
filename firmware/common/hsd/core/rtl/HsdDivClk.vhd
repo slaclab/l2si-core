@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2016-01-04
--- Last update: 2018-05-15
+-- Last update: 2018-06-03
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -29,7 +29,8 @@ use ieee.NUMERIC_STD.all;
 use work.StdRtlPkg.all;
 
 entity HsdDivClk is
-  generic ( DIV_G : integer := 100 );
+  generic ( DIV_G  : integer := 100;
+            HALF_G : boolean := false );
   port ( ClkIn   :  in sl;
          RstIn   :  in sl;
          Sync    :  in sl;
@@ -39,13 +40,17 @@ end HsdDivClk;
 
 architecture mapping of HsdDivClk is
 
+  constant CWIDTH_C : integer := bitSize(DIV_G-1);
+    
   type RegType is record
+    sync      : slv(1 downto 0);
     state     : sl;
     locked    : sl;
-    count     : slv(7 downto 0);
+    count     : slv(CWIDTH_C-1 downto 0);
   end record;
 
   constant REG_INIT_C : RegType := (
+    sync      => (others=>'1'),
     state     => '1',
     locked    => '0',
     count     => (others=>'0') );
@@ -53,12 +58,53 @@ architecture mapping of HsdDivClk is
   signal r   : RegType := REG_INIT_C;
   signal rin : RegType;
 
+  signal Clk, Rst, bLocked : sl;
+  
+  component ila_0
+    port ( clk   : in sl;
+           probe0 : in slv(255 downto 0) );
+  end component;
+
+  constant DEBUG_C : boolean := false;
+  
 begin
 
+  GEN_DEBUG : if DEBUG_C generate
+    U_ILA : ila_0
+      port map ( clk       => Clk,
+                 probe0(0) => Rst,
+                 probe0(1) => Sync,
+                 probe0(2) => r.state,
+                 probe0(3) => r.locked,
+                 probe0(4) => bLocked,
+                 probe0(12 downto 5) => resize(r.count,8),
+                 probe0(255 downto 13) => (others=>'0') );
+  end generate;
+
+  GEN_CLKx2 : if HALF_G generate
+    U_MMCM : entity work.ClockManagerUltrascale
+      generic map ( INPUT_BUFG_G     => false,
+                    NUM_CLOCKS_G     => 1,
+                    CLKIN_PERIOD_G   => 5.4,
+                    CLKFBOUT_MULT_G  => 6,
+                    CLKOUT0_DIVIDE_G => 3 )
+      port map ( clkIn     => ClkIn,
+                 rstIn     => RstIn,
+                 clkOut(0) => Clk,
+                 rstOut(0) => Rst,
+                 locked    => bLocked );
+  end generate;
+
+  NOGEN_CLK : if not HALF_G generate
+    Clk     <= ClkIn;
+    Rst     <= RstIn;
+    bLocked <= '1';
+  end generate;
+  
   ClkOut <= r.state & r.state;
   Locked <= r.locked;
   
-  process (r, RstIn, Sync)
+  process (r, Rst, Sync, bLocked)
     variable v     : RegType;
   begin  -- process
     v := r;
@@ -69,21 +115,20 @@ begin
     else
       v.count  := r.count+1;
     end if;
-   
-    if RstIn='1' or Sync='1' then
+
+    if r.sync="01" then
       v := REG_INIT_C;
+      v.locked := bLocked;
     end if;
 
-    if Sync='1' then
-      v.locked := '1';
-    end if;
+    v.sync := r.sync(0) & Sync;
     
     rin <= v;
   end process;
 
-  process (ClkIn)
+  process (Clk)
   begin  -- process
-    if rising_edge(ClkIn) then
+    if rising_edge(Clk) then
       r <= rin;
     end if;
   end process;

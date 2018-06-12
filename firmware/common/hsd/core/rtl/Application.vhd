@@ -136,15 +136,16 @@ architecture rtl of Application is
   signal trig              : sl;
   signal adcSin            : slv      (SYNC_BITS-1 downto 0);
   signal adcS              : Slv8Array(SYNC_BITS-1 downto 0);
-  signal adcSdelayLd       : slv      (SYNC_BITS-1 downto 0);
-  signal adcSdelayLdS      : slv      (SYNC_BITS-1 downto 0);
-  signal adcSdelayIn       : Slv9Array(SYNC_BITS-1 downto 0);
-  signal adcSdelayInS      : Slv9Array(SYNC_BITS-1 downto 0);
-  signal adcSdelayOut      : Slv9Array(SYNC_BITS-1 downto 0);
+  --signal adcSdelayLd       : slv      (SYNC_BITS-1 downto 0);
+  --signal adcSdelayLdS      : slv      (SYNC_BITS-1 downto 0);
+  --signal adcSdelayIn       : Slv9Array(SYNC_BITS-1 downto 0);
+  --signal adcSdelayInS      : Slv9Array(SYNC_BITS-1 downto 0);
+  --signal adcSdelayOut      : Slv9Array(SYNC_BITS-1 downto 0);
   signal adcSyncRst        : sl;
   signal adcSyncLocked     : sl;
-
-  constant DIVCLK_G : boolean := false;
+  signal clk_to_fpga       : slv(NFMC_G-1 downto 0);
+  
+  constant DIVCLK_G : boolean := LCLSII_G;
   
 begin  -- rtl
 
@@ -225,9 +226,12 @@ begin  -- rtl
                  CE                     => '0',
                  CLK                    => adcClk,
                  INC                    => '0',
-                 LOAD                   => adcSdelayLdS(i),
-                 CNTVALUEIN             => adcSdelayIn (i),
-                 CNTVALUEOUT            => adcSdelayOut(i),
+                 --LOAD                   => adcSdelayLdS(i),
+                 --CNTVALUEIN             => adcSdelayIn (i),
+                 --CNTVALUEOUT            => adcSdelayOut(i),
+                 LOAD                   => '0',
+                 CNTVALUEIN             => (others=>'0'),
+                 CNTVALUEOUT            => open,
                  DATAIN                 => trig,         -- Data from FPGA logic
                  IDATAIN                => '0',          -- Driven by IOB
                  DATAOUT                => adcSin(i),
@@ -250,23 +254,24 @@ begin  -- rtl
                  FIFO_EMPTY        => open,
                  INTERNAL_DIVCLK   => open );
 
-    U_Sync_DelayIn : entity work.SynchronizerVector
-      generic map ( WIDTH_G => 9 )
-      port map ( clk     => adcClk,
-                 dataIn  => adcSdelayIn (i),
-                 dataOut => adcSdelayInS(i) );
+    --U_Sync_DelayIn : entity work.SynchronizerVector
+    --  generic map ( WIDTH_G => 9 )
+    --  port map ( clk     => adcClk,
+    --             dataIn  => adcSdelayIn (i),
+    --             dataOut => adcSdelayInS(i) );
     
-    U_Sync_DelayLd : entity work.SynchronizerOneShot
-      port map ( clk     => adcClk,
-                 dataIn  => adcSdelayLd (i),
-                 dataOut => adcSdelayLdS(i) );
+    --U_Sync_DelayLd : entity work.SynchronizerOneShot
+    --  port map ( clk     => adcClk,
+    --             dataIn  => adcSdelayLd (i),
+    --             dataOut => adcSdelayLdS(i) );
     
   end generate GEN_ADCSYNC;
 
   trig <= trigSel;
   
   U_SyncCal : entity work.AdcSyncCal
-    generic map ( SYNC_BITS_G => SYNC_BITS )
+    generic map ( SYNC_BITS_G => SYNC_BITS,
+                  NFMC_G      => NFMC_G )
     port map (
       axiClk              => axiClk,
       axiRst              => axiRst,
@@ -280,14 +285,17 @@ begin  -- rtl
       evrBus              => evrBus,
       pllRstIn            => adcSyncRst,
       pllRst              => pllRst,
+      adcClk              => clk_to_fpga,
+      sync_p              => sync_from_fpga_p,
+      sync_n              => sync_from_fpga_n );
       --
-      delayLd             => adcSdelayLd,
-      delayOut            => adcSdelayIn,
-      delayIn             => adcSdelayOut );              
+      --delayLd             => adcSdelayLd,
+      --delayOut            => adcSdelayIn,
+      --delayIn             => adcSdelayOut );              
 
   GEN_DIVCLK : if DIVCLK_G generate
     U_DIVCLK : entity work.HsdDivClk
-      generic map ( DIV_G => ite(LCLSII_G, 100, 7) )
+      generic map ( DIV_G => ite(LCLSII_G, 25, 7) ) -- 929kHz*4
       port map ( ClkIn  => evrClk,
                  RstIn  => evrRst,
                  Sync   => evrBus.strobe,
@@ -300,7 +308,7 @@ begin  -- rtl
       -- LCLS   : Fvco = 119M * 10.5 = 1249.5M
       --          Fout = 119M * 10.5/125 = 9.996M
       -- LCLSII : Fvco = 1300M/7 * 6 = 1114.3M
-      --          Fout = 1300M/7 * 6/75 = 14-6/7M
+      --          Fout = 1300M/7 * 6/75 = 14-6/7M = 929kHz*16
       generic map ( NUM_CLOCKS_G       => 2,
                     CLKIN_PERIOD_G     => ite(LCLSII_G, 5.37, 8.40),
                     CLKFBOUT_MULT_F_G  => ite(LCLSII_G, 6.0, 10.5),
@@ -371,6 +379,7 @@ begin  -- rtl
       adcClk              => adcClk,
       adcRst              => adcRst,
       adc                 => adcO,
+      fmcClk              => clk_to_fpga,
       --
       trigSlot            => trigSlot,
       trigOut             => trigSel,
@@ -413,10 +422,11 @@ begin  -- rtl
 
         clk_to_fpga_p    => clk_to_fpga_p(i),
         clk_to_fpga_n    => clk_to_fpga_n(i),
+        clk_to_fpga      => clk_to_fpga  (i),
         ext_trigger_p    => ext_trigger_p(i),
         ext_trigger_n    => ext_trigger_n(i),
-        sync_from_fpga_p => sync_from_fpga_p(i),
-        sync_from_fpga_n => sync_from_fpga_n(i),
+        sync_from_fpga_p => open,
+        sync_from_fpga_n => open,
 
         adc_in           => adcInput(4*i+3 downto 4*i),
 

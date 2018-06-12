@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2016-01-04
--- Last update: 2018-05-15
+-- Last update: 2018-06-08
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -75,6 +75,7 @@ entity QuadAdcCore is
     adcClk              : in  sl;
     adcRst              : in  sl;
     adc                 : in  AdcDataArray(4*NFMC_G-1 downto 0);
+    fmcClk              : in  slv(NFMC_G-1 downto 0);
     --
     trigSlot            : out sl;
     trigOut             : out sl;
@@ -128,6 +129,7 @@ architecture mapping of QuadAdcCore is
   signal dmaFullThr, dmaFullThrS : slv(23 downto 0) := (others=>'0');
   signal dmaFullQ            : slv(FIFO_ADDR_WIDTH_C-1 downto 0);
   signal dmaFullS            : sl;
+  signal dmaFullSS           : sl;
   signal dmaFullV            : slv(NPartitions-1 downto 0);
   signal iready              : sl;
   
@@ -172,6 +174,9 @@ architecture mapping of QuadAdcCore is
 
   signal status : QuadAdcStatusType;
   signal eventDebug : slv(31 downto 0);
+
+  signal phaseValue : Slv16Array(3 downto 0);
+  signal phaseCount : Slv16Array(3 downto 0);
   
 begin  
 
@@ -180,7 +185,7 @@ begin
   dmaRst  <= idmaRst;
 
   U_TimingFb : entity work.XpmTimingFb
-    generic map ( DEBUG_G => true )
+    generic map ( DEBUG_G => false )
     port map ( clk        => timingFbClk,
                rst        => timingFbRst,
                pllReset   => fbPllRst,
@@ -231,6 +236,7 @@ begin
     U_EventSel : entity work.EventHeaderCache
       generic map ( ADDR_WIDTH_G => ADDR_WIDTH_C,
                     DEBUG_G      => ite(i>0,false,true) )
+--                    DEBUG_G      => false )
       port map ( rst            => evrRst,
                  wrclk          => evrClk,
                  enable         => configE.acqEnable,
@@ -405,8 +411,19 @@ begin
       if dmaFullS='1' then
         dmaCtrlC <= dmaCtrlC+1;
       end if;
+    end if;
+  end process;
+
+  Sync_dmaFullS : entity work.Synchronizer
+    port map ( clk     => timingFbClk,
+               dataIn  => dmaFullS,
+               dataOut => dmaFullSS );
+  
+  process (timingFbClk) is
+  begin
+    if rising_edge(timingFbClk) then
       dmaFullV <= (others=>'0');
-      dmaFullV(conv_integer(configE.partition)) <= dmaFullS;
+      dmaFullV(conv_integer(configE.partition)) <= dmaFullSS;
     end if;
   end process;
 
@@ -442,7 +459,59 @@ begin
     port map ( O => dmaRstS,
                I => dmaRstI(2) );
 
+  U_ADC_PHASE : entity work.PhaseDetector
+    generic map ( WIDTH_G => 16 )
+    port map ( stableClk  => axiClk,
+               latch      => '0',
+               refClk     => adcClk,
+               refClkRst  => adcRst,
+               testClk    => evrClk,
+               testClkRst => evrRst,
+               testSync   => evrBus.strobe,
+               testId     => evrBus.message.pulseId(0),
+               ready      => open,
+               phase0     => phaseValue(0),
+               phase1     => phaseValue(1),
+               count0     => phaseCount(0),
+               count1     => phaseCount(1),
+               valid      => open );
+
+  U_TREE_PHASE : entity work.PhaseDetector
+    generic map ( WIDTH_G => 16 )
+    port map ( stableClk  => axiClk,
+               latch      => '0',
+               refClk     => fmcClk(0),
+               refClkRst  => adcRst,
+               testClk    => evrClk,
+               testClkRst => evrRst,
+               testSync   => evrBus.strobe,
+               testId     => evrBus.message.pulseId(0),
+               ready      => open,
+               phase0     => phaseValue(2),
+               phase1     => phaseValue(3),
+               count0     => phaseCount(2),
+               count1     => phaseCount(3),
+               valid      => open );
+
+  --U_TRIG_PHASE : entity work.PhaseDetector
+  --  generic map ( WIDTH_G => 16 )
+  --  port map ( stableClk  => axiClk,
+  --             latch      => '0',
+  --             refClk     => adcClk,
+  --             refClkRst  => adcRst,
+  --             testClk    => evrClk,
+  --             testClkRst => evrRst,
+  --             testSync   => eventSelQ,
+  --             testId     => evrBus.message.pulseId(0),
+  --             ready      => open,
+  --             phase0     => phaseValue(2),
+  --             phase1     => phaseValue(3),
+  --             count0     => phaseCount(2),
+  --             count1     => phaseCount(3),
+  --             valid      => open );
+
   comb : process ( axiRst, r, wrFifoCnt, rdFifoCnt,
+                   phaseValue, phaseCount,
                    axilWriteMasters(2), axilReadMasters(2) ) is
     variable v  : RegType;
     variable ep : AxiLiteEndPointType;
@@ -458,6 +527,11 @@ begin
       axiSlaveRegisterR ( ep, toSlv(i*8+4,8), 0, rdFifoCnt(i) );
     end loop;
 
+    for i in 0 to 3 loop
+      axiSlaveRegisterR( ep, toSlv(32+4*i,8), 0, phaseValue(i) );
+      axiSlaveRegisterR( ep, toSlv(48+4*i,8), 0, phaseCount(i) );
+    end loop;
+    
     axiSlaveDefault( ep, v.axilWriteSlave, v.axilReadSlave );
 
     axilWriteSlaves(2) <= r.axilWriteSlave;

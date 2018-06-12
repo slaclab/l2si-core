@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2016-01-04
--- Last update: 2018-05-09
+-- Last update: 2018-06-08
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -301,7 +301,7 @@ begin  -- mapping
       generic map ( AXIS_CONFIG_G => SAXIS_CONFIG_C,
                     ALGORITHM_G   => ALGORITHM_G(i),
                     STREAM_ID_G   => i,
-                    DEBUG_G       => ite(i>1,false,DEBUG_G) )
+                    DEBUG_G       => ite(i<2,false,DEBUG_G) )
 --                    DEBUG_G       => false )
 --                    DEBUG_G       => DEBUG_G )
       port map ( clk               => clk,

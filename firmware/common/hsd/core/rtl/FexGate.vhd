@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2016-01-04
--- Last update: 2018-05-01
+-- Last update: 2018-05-17
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -148,7 +148,7 @@ begin
     lopen        <= r.lopen;
     lopen_phase  <= r.lopen_ph;
     lclose       <= r.lclose;
-    lclose_phase <= r.lopen_ph;
+    lclose_phase <= r.lclose_ph;
     lhandle      <= r.lhandle;
   end process;
 

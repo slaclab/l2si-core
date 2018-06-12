@@ -97,6 +97,7 @@ port (
 
   clk_to_fpga_p    : in    std_logic;
   clk_to_fpga_n    : in    std_logic;
+  clk_to_fpga      : out   std_logic;
   ext_trigger_p    : in    std_logic;
   ext_trigger_n    : in    std_logic;
   sync_from_fpga_p : out   std_logic;
@@ -433,6 +434,9 @@ trigger_out <= trigger;
 ----------------------------------------------------------------------------------------------------
 -- Clock input
 ----------------------------------------------------------------------------------------------------
+
+clk_to_fpga <= clk_to_fpga_buf;
+
 ibufgds_ref_clk : ibufgds
 generic map (
   IOSTANDARD => "LVDS_25",

@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2016-01-04
--- Last update: 2018-05-13
+-- Last update: 2018-06-08
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -30,13 +30,14 @@ use work.StdRtlPkg.all;
 use work.AxiLitePkg.all;
 use work.TimingPkg.all;
 
+library unisim;            
+use unisim.vcomponents.all;  
+
 entity AdcSyncCal is
   generic (
     TPD_G         : time    := 1 ns;
     SYNC_BITS_G   : integer := 4;
-    ENABLE_CAL_G  : boolean := false;
-    EVR_PERIOD_G  : integer := 14;
-    SYNC_PERIOD_G : integer := 147 );
+    NFMC_G        : integer := 1 );
   port (
     -- AXI-Lite Interface
     axiClk              : in  sl;
@@ -45,59 +46,46 @@ entity AdcSyncCal is
     axilWriteSlave      : out AxiLiteWriteSlaveType;
     axilReadMaster      : in  AxiLiteReadMasterType;
     axilReadSlave       : out AxiLiteReadSlaveType;
-    delayLd             : out slv      (SYNC_BITS_G-1 downto 0 );
-    delayOut            : out Slv9Array(SYNC_BITS_G-1 downto 0 );
-    delayIn             : in  Slv9Array(SYNC_BITS_G-1 downto 0 );
+    --delayLd             : out slv      (SYNC_BITS_G-1 downto 0 );
+    --delayOut            : out Slv9Array(SYNC_BITS_G-1 downto 0 );
+    --delayIn             : in  Slv9Array(SYNC_BITS_G-1 downto 0 );
     --
     evrClk              : in  sl;
     evrRst              : in  sl;
     evrBus              : in  TimingBusType;
     pllRstIn            : in  sl;
-    pllRst              : out sl );
+    pllRst              : out sl;
+    adcClk              : in  slv(NFMC_G-1 downto 0);
+    sync_p              : out slv(NFMC_G-1 downto 0);
+    sync_n              : out slv(NFMC_G-1 downto 0) );
 end AdcSyncCal;
 
 architecture mapping of AdcSyncCal is
 
-  type HistoArray is array (natural range <>) of Slv16Array(7 downto 0);
+  type SyncStateType is ( IDLE_S, WAIT_S, END_S );
 
   type EvrRegType is record
     pllRst : sl;
+    state  : SyncStateType;
+    sync   : sl;
   end record;
   constant EVR_REG_INIT_C : EvrRegType := (
-    pllRst => '1' );
+    pllRst => '1',
+    state  => IDLE_S,
+    sync   => '0' );
 
   signal re    : EvrRegType := EVR_REG_INIT_C;
   signal re_in : EvrRegType;
 
-  type StateType is (S_IDLE, S_SET_DELAY, S_TEST_DELAY);
-  constant DELAY_STIME : slv(14 downto 0) := toSlv(8,15);
-  type Slv512Array is array (natural range <>) of slv(511 downto 0);
-
   type AxiRegType is record
-    state          : StateType;
-    count          : slv(14 downto 0);
-    matchTime      : slv(14 downto 0);
-    calibrate      : sl;
-    test           : sl;
-    channel        : slv(1 downto 0);
-    word           : slv(3 downto 0);
-    match          : Slv512Array(SYNC_BITS_G-1 downto 0);
-    matchw         : slv(511 downto 0);
-    delayLd        : slv(SYNC_BITS_G-1 downto 0);
-    delay          : Slv9Array(SYNC_BITS_G-1 downto 0);
+    sync           : sl;
+    delayLd        : slv      (NFMC_G-1 downto 0);
+    delay          : Slv9Array(NFMC_G-1 downto 0);
     axilWriteSlave : AxiLiteWriteSlaveType;
     axilReadSlave  : AxiLiteReadSlaveType;
   end record;
   constant AXI_REG_INIT_C : AxiRegType := (
-    state          => S_IDLE,
-    count          => (others=>'0'),
-    matchTime      => toSlv(2048,15),
-    calibrate      => '0',
-    test           => '0',
-    channel        => "00",
-    word           => x"0",
-    match          => (others=>(others=>'0')),
-    matchw         => (others=>'0'),
+    sync           => '0',
     delayLd        => (others=>'0'),
     delay          => (others=>(others=>'0')),
     axilWriteSlave => AXI_LITE_WRITE_SLAVE_INIT_C,
@@ -106,95 +94,41 @@ architecture mapping of AdcSyncCal is
   signal ra    : AxiRegType := AXI_REG_INIT_C;
   signal ra_in : AxiRegType;
   
-  signal match     : slv(SYNC_BITS_G-1 downto 0);
-  signal amatch    : slv(SYNC_BITS_G-1 downto 0);
-  signal delayInS  : Slv9Array (SYNC_BITS_G-1 downto 0);
   signal sreset    : sl;
-  
-  signal r_state : slv(2 downto 0);
-  
+  signal ssync     : sl;
+  signal qsync     : slv(NFMC_G-1 downto 0);
+  signal osync     : slv(NFMC_G-1 downto 0);
+  signal delayOut  : Slv9Array(NFMC_G-1 downto 0);
+
 begin 
 
-  delayOut       <= ra.delay;
-  delayLd        <= ra.delayLd;
   axilWriteSlave <= ra.axilWriteSlave;
   axilReadSlave  <= ra.axilReadSlave;
 
-  GEN_DelayIn : for i in 0 to SYNC_BITS_G-1 generate
-    U_SyncDelayIn : entity work.SynchronizerVector
-      generic map ( WIDTH_G => 9 )
-      port map ( clk     => axiClk,
-                 dataIn  => delayIn(i),
-                 dataOut => delayInS(i) );
-  end generate GEN_DelayIn;
-
   pllRst         <= re.pllRst;
   
-  comba : process ( ra, axiRst, delayInS, match, axilWriteMaster, axilReadMaster ) is
+  comba : process ( ra, axiRst, delayOut, axilWriteMaster, axilReadMaster ) is
     variable v  : AxiRegType;
-    variable axilStatus : AxiLiteStatusType;
+    variable ep : AxiLiteEndpointType;
     variable iw : integer;
   begin
     v         := ra;
     v.delayLd := (others=>'0');
-    v.count   := ra.count+1;
-    v.matchw  := ra.match(conv_integer(ra.channel));
+
     v.axilReadSlave.rdata := (others=>'0');
 
-    iw := 32*conv_integer(ra.word);
-    
-    axiSlaveWaitTxn(axilWriteMaster, axilReadMaster, v.axilWriteSlave, v.axilReadSlave, axilStatus);
+    axiSlaveWaitTxn(ep, axilWriteMaster, axilReadMaster, v.axilWriteSlave, v.axilReadSlave);
 
-    axiSlaveRegister(axilWriteMaster, axilReadMaster, v.axilWriteSlave, v.axilReadSlave, axilStatus, x"00", 0, v.calibrate);
-    axiSlaveRegister(axilWriteMaster, axilReadMaster, v.axilWriteSlave, v.axilReadSlave, axilStatus, x"00", 1, v.matchTime);
-    axiSlaveRegister(axilWriteMaster, axilReadMaster, v.axilWriteSlave, v.axilReadSlave, axilStatus, x"00",16, v.delayLd);
-    axiSlaveRegister(axilWriteMaster, axilReadMaster, v.axilWriteSlave, v.axilReadSlave, axilStatus, x"04", 0, v.channel);
-    axiSlaveRegister(axilWriteMaster, axilReadMaster, v.axilWriteSlave, v.axilReadSlave, axilStatus, x"04", 4, v.word);
-    axiSlaveRegister(axilReadMaster, v.axilReadSlave, axilStatus, x"08", 0, v.matchw(iw+31 downto iw));
+    axiSlaveRegister(ep, x"00", 0, v.sync);
+    axiSlaveRegister(ep, x"00",16, v.delayLd);
 
-    for i in 0 to SYNC_BITS_G-1 loop
-      axiSlaveRegister(axilWriteMaster, axilReadMaster, v.axilWriteSlave, v.axilReadSlave, axilStatus, toSlv(16+8*i,8), 0, v.delay(i));
-      axiSlaveRegister(axilReadMaster, v.axilReadSlave, axilStatus, toSlv(20+8*i,8), 0, delayInS(i));
+    for i in 0 to NFMC_G-1 loop
+      axiSlaveRegister (ep, toSlv(16+8*i,8), 0, v.delay(i));
+      axiSlaveRegisterR(ep, toSlv(20+8*i,8), 0, delayOut(i));
     end loop;
 
-    axiSlaveDefault(axilWriteMaster, axilReadMaster, v.axilWriteSlave, v.axilReadSlave, axilStatus, AXI_RESP_OK_C);
+    axiSlaveDefault(ep, v.axilWriteSlave, v.axilReadSlave, AXI_RESP_OK_C);
 
-    if ENABLE_CAL_G then
-      case ra.state is
-        when S_IDLE =>
-          if v.calibrate='1' and ra.calibrate='0' then
-            v.match   := (others=>(others=>'0'));
-            v.delay   := (others=>(others=>'0'));
-            v.delayLd := (others=>'1');
-            v.state   := S_SET_DELAY;
-          end if;
-        when S_SET_DELAY =>
-          if ra.count=DELAY_STIME then
-            v.count    := (others=>'0');
-            v.test     := '1';
-            v.state    := S_TEST_DELAY;
-          end if;
-        when S_TEST_DELAY =>
-          if ra.count=ra.matchTime then
-            v.count    := (others=>'0');
-            v.test     := '0';
-            for i in 0 to SYNC_BITS_G-1 loop
-              v.match(i)(conv_integer(ra.delay(i))) := match(i);
-            end loop;
-            if ra.delay(0)=toSlv(511,9) then
-              v.state := S_IDLE;
-            else
-              for i in 0 to SYNC_BITS_G-1 loop
-                v.delay(i) := ra.delay(0)+1;
-              end loop;
-              v.delayLd := (others=>'1');
-              v.state := S_SET_DELAY;
-            end if;
-          end if;
-        when others => null;
-      end case;
-    end if;
-    
     if axiRst='1' then
       v := AXI_REG_INIT_C;
     end if;
@@ -209,23 +143,83 @@ begin
     end if;
   end process seqa;
 
-  U_RstSync : entity work.RstSync
+  U_SyncPllRst : entity work.RstSync
     port map ( clk      => evrClk,
                asyncRst => pllRstIn,
                syncRst  => sreset );
+
+  U_SyncSync : entity work.Synchronizer
+    port map ( clk      => evrClk,
+               dataIn   => ra.sync,
+               dataOut  => ssync );
+
+  GEN_ADCSYNC : for i in 0 to NFMC_G-1 generate
+    U_SyncSyncQ : entity work.Synchronizer
+      port map ( clk      => adcClk(i),
+                 dataIn   => re.sync,
+                 dataOut  => qsync(i) );
+
+    U_BeamSync_Delay : ODELAYE3
+      generic map ( DELAY_TYPE             => "VAR_LOAD",
+                    DELAY_VALUE            => 0, -- 0 to 31
+                    REFCLK_FREQUENCY       => 312.5,
+                    DELAY_FORMAT           => "COUNT",
+                    UPDATE_MODE            => "ASYNC" )
+      port map ( CASC_RETURN            => '0',
+                 CASC_IN                => '0',
+                 CASC_OUT               => open,
+                 CE                     => '1',
+                 CLK                    => axiClk,
+                 INC                    => '0',
+                 LOAD                   => ra.delayLd(i),
+                 CNTVALUEIN             => ra.delay  (i),
+                 CNTVALUEOUT            => delayOut  (i),
+                 
+                 ODATAIN                => qsync(i),      -- Data from FPGA logic
+                 DATAOUT                => osync(i),
+                 RST                    => '0',
+                 EN_VTC                 => '0'
+                 );
+
+    U_OBUF : OBUFDS
+      port map ( I   => osync(i),
+                 O   => sync_p(i),
+                 OB  => sync_n(i) );
+  end generate;
   
-  combe: process (re, sreset, evrBus) is
+  combe: process (re, sreset, ssync, evrBus) is
     variable v : EvrRegType;
+    variable sync : sl;
   begin
     v := re;
+    v.sync := '0';
 
+    sync := evrBus.strobe and not evrBus.message.pulseId(0);
+    
     if sreset = '1' then
       v.pllRst := '1';
-    elsif evrBus.strobe = '1' then
+    elsif sync='1' then
       v.pllRst := '0';
     end if;   
+
+    case re.state is
+      when IDLE_S =>
+        if ssync = '1' then
+          v.state := WAIT_S;
+        end if;
+      when WAIT_S =>
+        if sync='1' then
+          v.sync  := '1';
+          v.state := END_S;
+        end if;
+      when END_S =>
+        if ssync = '0' then
+          v.state := IDLE_S;
+        end if;
+    end case;
     
     re_in <= v;
+    
   end process combe;
 
   seqe: process ( evrClk ) is
