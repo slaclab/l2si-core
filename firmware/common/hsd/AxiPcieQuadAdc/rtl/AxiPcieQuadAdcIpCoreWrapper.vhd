@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver  <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2016-02-12
--- Last update: 2016-10-06
+-- Last update: 2018-06-08
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -322,4 +322,13 @@ begin
          int_qpll1outrefclk_out => open,
          int_qpll1outclk_out    => open);
 
+   regReadMaster.arid     <= (others=>'0');
+   regReadMaster.arqos    <= (others=>'0');
+   regReadMaster.arregion <= (others=>'0');
+   
+   regWriteMaster.awid     <= (others=>'0');
+   regWriteMaster.awqos    <= (others=>'0');
+   regWriteMaster.awregion <= (others=>'0');
+   regWriteMaster.wid      <= (others=>'0');
+   
 end mapping;
