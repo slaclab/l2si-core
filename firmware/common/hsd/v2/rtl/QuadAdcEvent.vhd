@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2016-01-04
--- Last update: 2018-05-10
+-- Last update: 2018-06-20
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -106,42 +106,14 @@ architecture mapping of QuadAdcEvent is
   signal re    : EventRegType := EVENT_REG_INIT_C;
   signal re_in : EventRegType;
 
-  type SyncStateType is (S_SHIFT_S, S_WAIT_S);
-
-  constant TMO_VAL_C : integer := 4095;
+  signal afull  : sl;
+  signal ql1in  : sl;
+  signal ql1ina : sl;
+  signal shift  : slv(2 downto 0);
+  signal clear  : sl;
+  signal start  : sl;
+  signal trig   : Slv8Array(1 downto 0);
   
-  type RegType is record
-    full     : sl;
-    afull    : sl;
-    clear    : sl;
-    start    : sl;
-    syncState: SyncStateType;
-    adcShift : slv(2 downto 0);
-    trigd1   : slv(7 downto 0);
-    trigd2   : slv(7 downto 0);
-    trig     : slv(7 downto 0);
-    l1in     : slv(4 downto 0);
-    l1ina    : slv(4 downto 0);
-    tmo      : integer range 0 to TMO_VAL_C;
-  end record;
-
-  constant REG_INIT_C : RegType := (
-    full      => '0',
-    afull     => '0',
-    clear     => '1',
-    start     => '0',
-    syncState => S_SHIFT_S,
-    adcShift  => (others=>'0'),
-    trigd1    => (others=>'0'),
-    trigd2    => (others=>'0'),
-    trig      => (others=>'0'),
-    l1in      => (others=>'0'),
-    l1ina     => (others=>'0'),
-    tmo       => TMO_VAL_C );
-
-  signal r   : RegType := REG_INIT_C;
-  signal rin : RegType;
-
   type DmaDataArray is array (natural range <>) of Slv11Array(7 downto 0);
   signal iadc        : DmaDataArray(NCHAN_C-1 downto 0);
 
@@ -200,7 +172,7 @@ begin  -- mapping
 
   status <= cacheStatus(0);
 
-  debug(0) <= r.start;
+  debug(0) <= start;
   debug(1) <= debugArray(0)(0);
   debug(31 downto 2) <= (others=>'0');
   
@@ -208,7 +180,7 @@ begin  -- mapping
     U_ILA : ila_0
       port map ( clk     => dmaClk,
                  probe0 ( 0 ) => dmaRst, 
-                 probe0 ( 1 ) => r.start,
+                 probe0 ( 1 ) => start,
                  probe0 ( 2 ) => sl1in,
                  probe0 ( 3 ) => sl1ina,
                  probe0 ( 4 ) => chafull(0),                 
@@ -221,7 +193,7 @@ begin  -- mapping
                  probe0 ( 255 downto 43 ) => (others=>'0') );
   end generate;
 
-  dmaFullS  <= r.afull;
+  dmaFullS  <= afull;
   dmaFullQ  <= (others=>'0');
 
   GEN_AXIL_XBAR : entity work.AxiLiteCrossbar
@@ -298,11 +270,11 @@ begin  -- mapping
                     FWFT_EN_G    => true )
       port map ( rst    => rstFifo,
                  clk    => dmaClk,
-                 wr_en  => r.start,
-                 din(31 downto 24) => r.trigd2,
-                 din(23 downto 16) => r.trig,
+                 wr_en  => start,
+                 din(31 downto 24) => trig(1),
+                 din(23 downto 16) => trig(0),
                  din(15 downto  3) => (others=>'0'),
-                 din( 2 downto  0) => r.adcShift,
+                 din( 2 downto  0) => shift,
                  rd_en  => hdrRd   (i),
                  dout   => pllSync (i),
                  valid  => pllSyncV(i) );
@@ -332,12 +304,12 @@ begin  -- mapping
 --                    DEBUG_G     => false )
       port map ( clk      => dmaClk,
                  rst      => dmaRst,
-                 clear    => r.clear,
-                 start    => r.start,
-                 shift    => r.adcShift,
+                 clear    => clear,
+                 start    => start,
+                 shift    => shift,
                  din      => iadc(i),
-                 l1in     => r.l1in (0),
-                 l1ina    => r.l1ina(0),
+                 l1in     => ql1in ,
+                 l1ina    => ql1ina,
                  l1a      => open,
                  l1v      => open,
                  almost_full     => chafull  (i),
@@ -398,64 +370,22 @@ begin  -- mapping
     dmaMaster(dmaMaster'left downto 1) <= (others=>AXI_STREAM_MASTER_INIT_C);
   end generate;
 
-  process (r, dmaRst, dmaFullThr, trigIn, chfull, chafull, configA,
-           sl1in, sl1ina) is
-    variable v   : RegType;
-    variable tshift : integer;
-  begin  -- process
-    v := r;
-
-    v.trigd1  := trigIn(0);
-    case configA.trigShift(1 downto 0) is
-      when "00" => v.trigd2 := r.trigd1;
-      when "01" => v.trigd2 := trigIn(0)(0 downto 0) & r.trigd1(7 downto 1);
-      when "10" => v.trigd2 := trigIn(0)(1 downto 0) & r.trigd1(7 downto 2);
-      when "11" => v.trigd2 := trigIn(0)(2 downto 0) & r.trigd1(7 downto 3);
-      when others => null;
-    end case;
-    v.trig   := r.trigd2;
-    
-    v.full         := uOr(chfull);
-    v.afull        := uOr(chafull);
-
-    v.l1in    := sl1in  & r.l1in (r.l1in 'left downto 1);
-    v.l1ina   := sl1ina & r.l1ina(r.l1ina'left downto 1);
-    
-
-    v.clear := not configA.acqEnable;
-    
-    v.start := '0';
-    case (r.syncState) is
-      when S_SHIFT_S =>
-        if r.trigd2/=toSlv(0,8) then
-          v.start := configA.acqEnable;
-          if r.trigd2(3 downto 0)/=0 then
-            v.adcShift := toSlv(0,3);
-          else
-            v.adcShift := toSlv(4,3);
-          end if;
-         
-          v.syncState := S_WAIT_S;
-        end if;
-      when S_WAIT_S =>
-        if r.trigd2=toSlv(0,8) then
-          v.syncState := S_SHIFT_S;
-        end if;
-      when others => NULL;
-    end case;
-
-    if dmaRst='1' then
-      v := REG_INIT_C;
-    end if;
-
-    rin <= v;
-  end process;
-
-  process (dmaClk)
-  begin  -- process
-    if rising_edge(dmaClk) then
-      r <= rin;
-    end if;
-  end process;
+  U_Trigger : entity work.QuadAdcTrigger
+    generic map ( NCHAN_C => NCHAN_C )
+    port map ( clk       => dmaClk,
+               rst       => dmaRst,
+               trigIn    => trigIn(0),  
+               afullIn   => chafull,
+               config    => configA,
+               l1in      => sl1in,
+               l1ina     => sl1ina,
+               --
+               afullOut  => afull,
+               ql1in     => ql1in,
+               ql1ina    => ql1ina,
+               shift     => shift,
+               clear     => clear,
+               start     => start,
+               trig      => trig );
 
 end mapping;

@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2016-01-04
--- Last update: 2018-06-08
+-- Last update: 2018-06-12
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -195,20 +195,6 @@ begin
                phy        => timingFb );
 
   eventSelQ <= eventSel and (iready or not configE.inhibit);
-
-  --U_EventSel : entity work.QuadAdcEventV2Select
-  --  port map ( evrClk     => evrClk,
-  --             evrRst     => evrRst,
-  --             config     => configE,
-  --             evrBus     => evrBus,
-  --             exptBus    => exptBus,
-  --             strobe     => trigSlot,
-  --             oneHz      => oneHz,
-  --             eventSel   => eventSel,
-  --             eventId    => eventId,
-  --             l1v        => l1in,
-  --             l1a        => l1ina,
-  --             l1tag      => open );
 
   timingHeader_prompt.strobe    <= evrBus.strobe;
   timingHeader_prompt.pulseId   <= evrBus.message.pulseId;
@@ -443,7 +429,7 @@ begin
                dataIn  => evrBus.strobe,
                dataOut => dmaStrobe );
 
-  Sync_dmaRst : process (dmaClk, adcSyncLocked) is
+  Sync_dmaRst : process (dmaClk) is
   begin
     if rising_edge(dmaClk) then
       dmaRstI <= dmaRstI(dmaRstI'left-1 downto 0) & dmaRstI(0);
