@@ -5,7 +5,7 @@
 -- Author     : Larry Ruckman  <ruckman@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2016-02-12
--- Last update: 2018-05-07
+-- Last update: 2018-06-28
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -90,7 +90,7 @@ end AxiPcieReg;
 
 architecture mapping of AxiPcieReg is
 
-   constant NUM_AXI_MASTERS_C : natural := 8;
+   constant NUM_AXI_MASTERS_C : natural := 9;
 
    constant VERSION_INDEX_C : natural := 0;
    constant FLASH_INDEX_C   : natural := 1;
@@ -98,8 +98,9 @@ architecture mapping of AxiPcieReg is
    constant DMA_INDEX_C     : natural := 3;
    constant PHY_INDEX_C     : natural := 4;
    constant GTH_INDEX_C     : natural := 5;
-   constant TIM_INDEX_C     : natural := 6;
-   constant APP_INDEX_C     : natural := 7;
+   constant XVC_INDEX_C     : natural := 6;
+   constant TIM_INDEX_C     : natural := 7;
+   constant APP_INDEX_C     : natural := 8;
 
    constant AXI_CROSSBAR_MASTERS_CONFIG_C : AxiLiteCrossbarMasterConfigArray(NUM_AXI_MASTERS_C-1 downto 0) := (
       VERSION_INDEX_C => (
@@ -120,11 +121,15 @@ architecture mapping of AxiPcieReg is
          connectivity => x"FFFF"),
       PHY_INDEX_C     => (
          baseAddr     => PHY_ADDR_C,
-         addrBits     => 16,
+         addrBits     => 12,
          connectivity => x"FFFF"),
       GTH_INDEX_C     => (
          baseAddr     => GTH_ADDR_C,
-         addrBits     => 16,
+         addrBits     => 12,
+         connectivity => x"FFFF"),
+      XVC_INDEX_C     => (
+         baseAddr     => XVC_ADDR_C,
+         addrBits     => 12,
          connectivity => x"FFFF"),
       TIM_INDEX_C     => (
          baseAddr     => TIM_ADDR_C,
@@ -277,6 +282,18 @@ begin
          -- Optional: user values
          userValues     => userValues);
 
+   --------------------------
+   -- Xilinx Virtual Cable Module
+   --------------------------   
+   U_XVC : entity work.DebugBridgeWrapper
+     port map (
+       axilClk         => mclk,
+       axilRst         => mrst,
+       axilReadMaster  => axilReadMasters (XVC_INDEX_C),
+       axilReadSlave   => axilReadSlaves  (XVC_INDEX_C),
+       axilWriteMaster => axilWriteMasters(XVC_INDEX_C),
+       axilWriteSlave  => axilWriteSlaves (XVC_INDEX_C) );
+   
    ---------------------------------
    -- Map the AXI-Lite to FLASH Engine
    ---------------------------------

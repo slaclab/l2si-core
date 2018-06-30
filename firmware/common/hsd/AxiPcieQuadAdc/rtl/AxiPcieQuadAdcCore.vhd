@@ -5,7 +5,7 @@
 -- Author     : Larry Ruckman  <ruckman@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2016-02-12
--- Last update: 2018-05-04
+-- Last update: 2018-06-19
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -306,7 +306,7 @@ begin
    ---------------   
    U_AxiPciePhy : entity work.AxiPcieQuadAdcIpCoreWrapper
       generic map (
-         TPD_G => TPD_G)   
+         TPD_G  => TPD_G )
       port map (
          -- AXI4 Interfaces
          axiClk         => axiClk,
@@ -490,8 +490,8 @@ begin
      GEN_NO_DMA : if not ENABLE_DMA_G generate
        dmaReadMaster     <= AXI_READ_MASTER_INIT_C;
        dmaWriteMaster    <= AXI_WRITE_MASTER_INIT_C;
-       dmaCtrlReadSlave  <= AXI_LITE_READ_SLAVE_INIT_C;
-       dmaCtrlWriteSlave <= AXI_LITE_WRITE_SLAVE_INIT_C;
+       dmaCtrlReadSlave  <= AXI_LITE_READ_SLAVE_EMPTY_OK_C;
+       dmaCtrlWriteSlave <= AXI_LITE_WRITE_SLAVE_EMPTY_OK_C;
        interrupt         <= (others=>'0');
        dmaObMasters      <= (others=>AXI_STREAM_MASTER_INIT_C);
        dmaIbSlaves       <= (others=>AXI_STREAM_SLAVE_FORCE_C);

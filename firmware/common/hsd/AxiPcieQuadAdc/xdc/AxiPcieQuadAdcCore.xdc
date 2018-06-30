@@ -157,10 +157,12 @@ create_clock -period 10.000 -name pciRefClkP [get_ports pciRefClkP]
 create_generated_clock -name dnaClk [get_pins U_Core/U_REG/U_Version/GEN_DEVICE_DNA.DeviceDna_1/GEN_ULTRA_SCALE.DeviceDnaUltraScale_Inst/BUFGCE_DIV_Inst/O]
 create_generated_clock -name pciClk [get_pins U_Core/U_AxiPciePhy/U_AxiPcie/inst/pcie3_ip_i/U0/gt_top_i/phy_clk_i/bufg_gt_userclk/O]
 create_generated_clock -name flashClk [get_pins {U_Core/U_Clk/MmcmGen.U_Mmcm/CLKOUT0}]
-#create_generated_clock -name rxUsrClk [get_pins {U_Core/U_TimingGth/GEN_EXTREF.TIMING_RECCLK_BUFG_GT/O}]
+create_generated_clock -name evrClk [get_pins {U_Core/U_TimingGth/GEN_EXTREF.TIMING_RECCLK_BUFG_GT/O}]
+create_generated_clock -name timingFbClk [get_pins {U_Core/U_TimingGth/GEN_EXTREF.TIMING_TXCLK_BUFG_GT/O}]
 
 set_clock_groups -asynchronous -group [get_clocks dnaClk] -group [get_clocks pciClk]
 set_clock_groups -asynchronous -group [get_clocks flashClk] -group [get_clocks pciClk]
+set_clock_groups -asynchronous -group [get_clocks evrClk] -group [get_clocks timingFbClk]
 
 set_property LOC PCIE_3_1_X0Y0 [get_cells U_Core/U_AxiPciePhy/U_AxiPcie/inst/pcie3_ip_i/U0/pcie3_uscale_top_inst/pcie3_uscale_wrapper_inst/PCIE_3_1_inst]
 set_property PACKAGE_PIN AP28 [get_ports pciRstL]
