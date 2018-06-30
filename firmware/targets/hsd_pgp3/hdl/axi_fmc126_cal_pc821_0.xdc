@@ -6,7 +6,7 @@ create_clock -period 1.600 -name bdr_p_0 [get_ports {bdr_p[0]}]
 create_clock -period 1.600 -name cdr_p_0 [get_ports {cdr_p[0]}]
 create_clock -period 1.600 -name ddr_p_0 [get_ports {ddr_p[0]}]
 
-create_clock -period 2.000 -name clk_to_fpga_p_0 [get_ports clk_to_fpga_p[0]]
+create_clock -period 6.400 -name clk_to_fpga_p_0 [get_ports clk_to_fpga_p[0]]
 create_clock -period 100.000 -name ext_trigger_p_0 [get_ports ext_trigger_p[0]]
 
 set_clock_groups -name adr_phy_clocks_0 -asynchronous -group [get_clocks -include_generated_clocks adr_p]
@@ -94,10 +94,10 @@ set_output_delay -clock [get_clocks VIRTUAL_axi_fmc126_clk125] -clock_fall -min 
 set_output_delay -clock [get_clocks VIRTUAL_axi_fmc126_clk125] -clock_fall -max -add_delay 4.500 [get_ports {fmc_to_cpld[0][*]}]
 #set_output_delay -clock [get_clocks VIRTUAL_axi_fmc126_clk125] -clock_fall -min -add_delay 3.000 [get_ports front_io_fmc[0][*]]
 #set_output_delay -clock [get_clocks VIRTUAL_axi_fmc126_clk125] -clock_fall -max -add_delay 4.500 [get_ports front_io_fmc[0][*]]
-set_output_delay -clock [get_clocks adr_p] -clock_fall -min -add_delay 3.000 [get_ports sync_from_fpga_n[0]]
-set_output_delay -clock [get_clocks adr_p] -clock_fall -max -add_delay 4.500 [get_ports sync_from_fpga_n[0]]
-set_output_delay -clock [get_clocks adr_p] -clock_fall -min -add_delay 3.000 [get_ports sync_from_fpga_p[0]]
-set_output_delay -clock [get_clocks adr_p] -clock_fall -max -add_delay 4.500 [get_ports sync_from_fpga_p[0]]
+set_output_delay -clock [get_clocks clk_to_fpga_p_0] -clock_fall -min -add_delay 3.000 [get_ports sync_from_fpga_n[0]]
+set_output_delay -clock [get_clocks clk_to_fpga_p_0] -max -add_delay 4.500 [get_ports sync_from_fpga_n[0]]
+set_output_delay -clock [get_clocks clk_to_fpga_p_0] -min -add_delay 3.000 [get_ports sync_from_fpga_p[0]]
+set_output_delay -clock [get_clocks clk_to_fpga_p_0] -max -add_delay 4.500 [get_ports sync_from_fpga_p[0]]
 
 ################################################################################
 # FMC signals (FMC126 on PC821 primary side)

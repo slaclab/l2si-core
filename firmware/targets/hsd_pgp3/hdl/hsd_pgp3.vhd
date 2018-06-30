@@ -8,7 +8,7 @@
 -- Last update : 2009/05/07
 -- Plateform :  
 -------------------------------------------------------------------------------
--- Description : link all project blocks
+-- Description : link all project blocks2
 -------------------------------------------------------------------------------
 -------------------------------------------------------------------------------
  
@@ -271,6 +271,7 @@ begin  -- rtl
   U_Core : entity work.AxiPcieQuadAdcCore
     generic map ( AXI_APP_BUS_EN_G => true,
                   AXIS_CONFIG_G    => DMA_AXIS_CONFIG_C,
+                  ENABLE_DMA_G     => false,
                   LCLSII_G         => LCLSII_C,
                   BUILD_INFO_G     => BUILD_INFO_G )
     port map ( sysClk         => sysClk,
