@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-07-10
--- Last update: 2018-04-27
+-- Last update: 2018-06-22
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -44,12 +44,14 @@ architecture top_level_app of AxiStreamInterleave is
 
   type RegType is record
     masters : AxiStreamMasterArray(LANES_G-1 downto 0);
+    tDest   : slv                 (7 downto 0);
     nready  : slv                 (LANES_G-1 downto 0);
     slave   : AxiStreamSlaveType;
   end record;
 
   constant REG_INIT_C : RegType := (
     masters => (others=>axiStreamMasterInit(MAXIS_CONFIG_G)),
+    tDest   => (others=>'0'),
     nready  => (others=>'0'),
     slave   => AXI_STREAM_SLAVE_INIT_C );
   
@@ -74,7 +76,7 @@ begin
         end if;
       end loop;
     end if;
-    
+
     if v.nready = 0 then
       if sAxisMaster.tValid = '1' then
         v.slave.tReady := '1';
@@ -84,8 +86,13 @@ begin
           v.masters(i).tLast  := sAxisMaster.tLast;
 
           -- set user bits
-          axiStreamSetUserBit(MAXIS_CONFIG_G, v.masters(i), SSI_SOF_C,
-                              axiStreamGetUserBit(SAXIS_CONFIG_G, sAxisMaster, SSI_SOF_C, 0), 0);
+          if axiStreamGetUserBit(SAXIS_CONFIG_G, sAxisMaster, SSI_SOF_C, 0) = '1' then
+            axiStreamSetUserBit(MAXIS_CONFIG_G, v.masters(i), SSI_SOF_C, '1', 0);
+            v.masters(i).tDest := r.tDest;
+            v.tDest := r.tDest + 1;
+          else
+            axiStreamSetUserBit(MAXIS_CONFIG_G, v.masters(i), SSI_SOF_C, '0', 0);
+          end if;
           -- distribute data
           for j in 0 to MAXIS_CONFIG_G.TDATA_BYTES_C-1 loop
             m := 8*j;
