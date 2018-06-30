@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2016-01-04
--- Last update: 2018-04-27
+-- Last update: 2018-06-20
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -46,7 +46,6 @@ entity QuadAdcChannelData is
     noPayload    :  in sl;
     eventHdrRd   : out sl;
     --
-    eventTrig    :  in slv(31 downto 0);
     chnMaster    :  in AxiStreamMasterType;
     chnSlave     : out AxiStreamSlaveType;
     dmaMaster    : out AxiStreamMasterType;
@@ -100,7 +99,7 @@ begin  -- mapping
                mAxisSlave  => dmaSlave );
 
   
-  process (r, dmaRst, eventHdr, eventHdrV, eventTrig, noPayload,
+  process (r, dmaRst, eventHdr, eventHdrV, noPayload,
            tSlave, chnMaster) is
     variable v   : RegType;
   begin  -- process
@@ -138,8 +137,7 @@ begin  -- mapping
             v.state        := S_WRITEHDR;
           else
             v.master.tKeep := genTKeep(32);
-            v.master.tData(255 downto 224) := eventTrig;
-            v.master.tData(223 downto 128) := eventHdr(223 downto 128);
+            v.master.tData(255 downto 128) := eventHdr(255 downto 128);
             v.hdrRd := '1';
             if noPayload = '1' then
               v.master.tLast := '1';
@@ -151,8 +149,7 @@ begin  -- mapping
         end if;
       when S_WRITEHDR =>
         if v.master.tValid='0' then
-          v.master.tData(127 downto  96) := eventTrig;
-          v.master.tData( 95 downto   0) := eventHdr(223 downto 128);
+          v.master.tData(127 downto   0) := eventHdr(255 downto 128);
           v.master.tValid                := '1';
           v.hdrRd := '1';
           if noPayload = '1' then

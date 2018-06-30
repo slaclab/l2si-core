@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2016-01-04
--- Last update: 2018-04-29
+-- Last update: 2018-06-27
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -42,7 +42,6 @@ entity QuadAdcInterleave is
   generic ( BASE_ADDR_C   : slv(31 downto 0) := x"00000000";
             AXIS_CONFIG_G : AxiStreamConfigType;
             ALGORITHM_G   : StringArray;
-            AXIS_SIZE_G   : integer := 1;
             IFMC_G        : integer := 0;
             DEBUG_G       : boolean := false );
   port (
@@ -70,6 +69,7 @@ entity QuadAdcInterleave is
     almost_full     : out sl;
     full            : out sl;
     status          : out CacheArray(MAX_OVL_C-1 downto 0);
+    debug           : out slv(7 downto 0);
     -- readout interface
     axisMaster      : out AxiStreamMasterType;
     axisSlave       :  in AxiStreamSlaveType;
@@ -164,6 +164,7 @@ architecture mapping of QuadAdcInterleave is
   signal rin : RegType;
 
   signal lopen, lclose, lskip : slv(NSTREAMS_C-1 downto 0);
+  signal lopen_phase, lclose_phase : Slv3Array(NSTREAMS_C-1 downto 0);
   signal free              : Slv16Array(NSTREAMS_C-1 downto 0);
   signal nfree             : Slv5Array (NSTREAMS_C-1 downto 0);
 
@@ -176,8 +177,8 @@ architecture mapping of QuadAdcInterleave is
   signal maxilWriteMasters : AxiLiteWriteMasterArray(NSTREAMS_C downto 0);
   signal maxilWriteSlaves  : AxiLiteWriteSlaveArray (NSTREAMS_C downto 0);
 
-  signal axisMasters       : AxiStreamMasterArray   (AXIS_SIZE_G*NSTREAMS_C-1 downto 0);
-  signal axisSlaves        : AxiStreamSlaveArray    (AXIS_SIZE_G*NSTREAMS_C-1 downto 0);
+  signal axisMasters       : AxiStreamMasterArray   (NSTREAMS_C-1 downto 0);
+  signal axisSlaves        : AxiStreamSlaveArray    (NSTREAMS_C-1 downto 0);
    signal maxisSlave        : AxiStreamSlaveType;
 
   constant SAXIS_CONFIG_C : AxiStreamConfigType := ssiAxiStreamConfig(64);
@@ -205,6 +206,7 @@ begin  -- mapping
 
   status  <= cacheStatus(0);
   streams <= resize(r.fexEnable,4);
+  debug   <= resize(nfree(0),8);
   
   GEN_DIN : for i in 0 to 7 generate
     din(i) <= din3(i) & din2(i) & din1(i) & din0(i);
@@ -270,20 +272,22 @@ begin  -- mapping
     l1a   (i) <= '0';
 
     U_GATE : entity work.FexGate
-      port map ( clk     => clk,
-                 rst     => rst,
-                 start   => r.start    (i),
-                 handle  => r.skip     (i),
-                 fbegin  => r.fexBegin (i),
-                 flength => r.fexLength(i),
-                 lopen   => lopen      (i),
-                 lhandle => lskip      (i),
-                 lclose  => lclose     (i) );
+      port map ( clk          => clk,
+                 rst          => rst,
+                 start        => r.start     (i),
+                 handle       => r.skip      (i),
+                 phase        => shift          ,
+                 fbegin       => r.fexBegin  (i),
+                 flength      => r.fexLength (i),
+                 lopen        => lopen       (i),
+                 lopen_phase  => lopen_phase (i),
+                 lhandle      => lskip       (i),
+                 lclose       => lclose      (i),
+                 lclose_phase => lclose_phase(i) );
 
     U_FEX : entity work.hsd_fex_interleave
       generic map ( ALG_ID_G      => i,
                     ALGORITHM_G   => ALGORITHM_G(i),
-                    AXIS_SIZE_G   => AXIS_SIZE_G,
                     DEBUG_G       => ite(i>1,false,true) )
 --                    DEBUG_G       => false )
 --                    DEBUG_G       => DEBUG_G )
@@ -291,17 +295,18 @@ begin  -- mapping
                  rst               => rst,
                  clear             => clear,
                  din               => din,
-                 lopen             => lopen(i),
-                 lskip             => lskip(i),
-                 lphase            => shift,
-                 lclose            => lclose(i),
-                 l1in              => r.l1in  (i),
-                 l1ina             => r.l1ina (i),
+                 lskip             => lskip       (i),
+                 lopen             => lopen       (i),
+                 lopen_phase       => lopen_phase (i),
+                 lclose            => lclose      (i),
+                 lclose_phase      => lclose_phase(i),
+                 l1in              => r.l1in      (i),
+                 l1ina             => r.l1ina     (i),
                  free              => free            (i),
                  nfree             => nfree           (i),
                  status            => cacheStatus     (i),
-                 axisMaster        => axisMasters     ((i+1)*AXIS_SIZE_G-1 downto i*AXIS_SIZE_G),
-                 axisSlave         => axisSlaves      ((i+1)*AXIS_SIZE_G-1 downto i*AXIS_SIZE_G),
+                 axisMaster        => axisMasters     (i),
+                 axisSlave         => axisSlaves      (i),
                  -- BRAM interface
                  bramWriteMaster   => bramWriteMaster (4*i+3 downto 4*i),
                  bramReadMaster    => bramReadMaster  (4*i+3 downto 4*i),

@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2016-01-04
--- Last update: 2018-04-27
+-- Last update: 2018-06-27
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -44,8 +44,7 @@ use work.QuadAdcCompPkg.all;
 use work.QuadAdcPkg.all;
 
 entity hsd_fex_interleave is
-  generic ( AXIS_SIZE_G   : integer := 1;
-            ALG_ID_G      : integer := 0;
+  generic ( ALG_ID_G      : integer := 0;
             ALGORITHM_G   : string  := "RAW";
             DEBUG_G       : boolean := false );
   port (
@@ -53,19 +52,20 @@ entity hsd_fex_interleave is
     rst             :  in sl;
     clear           :  in sl;
     din             :  in Slv44Array(7 downto 0);  -- row of data
-    lopen           :  in sl;                      -- begin sampling
     lskip           :  in sl;                      -- skip sampling (cache
                                                    -- header for readout)
-    lphase          :  in slv(2 downto 0);         -- lopen location within the row
+    lopen           :  in sl;                      -- begin sampling
+    lopen_phase     :  in slv(2 downto 0);         -- lopen location within the row
     lclose          :  in sl;                      -- end sampling
+    lclose_phase    :  in slv(2 downto 0);         -- lopen location within the row
     l1in            :  in sl;                      -- once per lopen
     l1ina           :  in sl;                      -- accept/reject
     free            : out slv(15 downto 0);        -- unused rows in RAM
     nfree           : out slv( 4 downto 0);        -- unused gates
     status          : out CacheArray(MAX_OVL_C-1 downto 0);
     -- readout interface
-    axisMaster      : out AxiStreamMasterArray(AXIS_SIZE_G-1 downto 0);
-    axisSlave       :  in AxiStreamSlaveArray (AXIS_SIZE_G-1 downto 0);
+    axisMaster      : out AxiStreamMasterType;
+    axisSlave       :  in AxiStreamSlaveType;
     -- BRAM interface (clk domain)
     bramWriteMaster : out BRamWriteMasterArray(3 downto 0);
     bramReadMaster  : out BRamReadMasterArray (3 downto 0);
@@ -82,10 +82,9 @@ architecture mapping of hsd_fex_interleave is
   constant LATENCY_C    : integer := 0;
   constant COUNT_BITS_C : integer := 14;
   constant SKIP_T       : slv(COUNT_BITS_C-1 downto 0) := toSlv(4096,COUNT_BITS_C);
-  constant AXIS_SZ_BITS : integer := bitSize(AXIS_SIZE_G)-1;
   
   type AxisRegType is record
-    ireading   : slv(MAX_OVL_BITS_C-1 downto AXIS_SZ_BITS);
+    ireading   : slv(MAX_OVL_BITS_C-1 downto 0);
     rdaddr     : slv(RAM_ADDR_WIDTH_C-1 downto 0);
     irdsel     : integer;
     axisMaster : AxiStreamMasterType;
@@ -97,8 +96,6 @@ architecture mapping of hsd_fex_interleave is
     irdsel     => 0,
     axisMaster => AXI_STREAM_MASTER_INIT_C );
 
-  type AxisRegArray is array(natural range<>) of AxisRegType;
-  
   type RegType is record
     tout       : Slv2Array (ROW_SIZE downto 0);
     dout       : Slv64Array(ROW_SIZE downto 0);    -- cached data from FEX
@@ -116,8 +113,7 @@ architecture mapping of hsd_fex_interleave is
     wraddr     : slv(RAM_ADDR_WIDTH_C-1 downto 0);
     free       : slv     (15 downto 0);
     nfree      : slv     ( 4 downto 0);
-    axisSel    : integer range 0 to AXIS_SIZE_G;
-    axisReg    : AxisRegArray(AXIS_SIZE_G-1 downto 0);
+    axisReg    : AxisRegType;
   end record;
   constant REG_INIT_C : RegType := (
     tout       => (others=>(others=>'0')),
@@ -136,8 +132,7 @@ architecture mapping of hsd_fex_interleave is
     wraddr     => (others=>'0'),
     free       => (others=>'0'),
     nfree      => (others=>'0'),
-    axisSel    => 0,
-    axisReg    => (others=>AXIS_REG_INIT_C) );
+    axisReg    => AXIS_REG_INIT_C );
 
   signal r    : RegType := REG_INIT_C;
   signal r_in : RegType;
@@ -152,7 +147,7 @@ architecture mapping of hsd_fex_interleave is
   signal configSync  : sl;
   signal bWrite      : sl;
 
-  signal maxisSlave  : AxiStreamSlaveArray(AXIS_SIZE_G-1 downto 0);
+  signal maxisSlave  : AxiStreamSlaveType;
 
   constant AXIS_CONFIG_C : AxiStreamConfigType := ssiAxiStreamConfig(64);
   constant PAD_SAMP_C    : integer := (AXIS_CONFIG_C.TDATA_BYTES_C-16)/2;
@@ -161,23 +156,21 @@ begin
 
   status <= r.cache;
 
-  GEN_FIFO : for i in 0 to AXIS_SIZE_G-1 generate
-    --U_FIFO : entity work.AxiStreamFifoV2
-    --  generic map ( SLAVE_AXI_CONFIG_G  => SAXIS_CONFIG_C,
-    --                MASTER_AXI_CONFIG_G => AXIS_CONFIG_G )
-    --  port map ( -- Slave Port
-    --    sAxisClk    => clk,
-    --    sAxisRst    => rst,
-    --    sAxisMaster => r.axisReg   (i).axisMaster,
-    --    sAxisSlave  => maxisSlave  (i),
-    --    -- Master Port
-    --    mAxisClk    => clk,
-    --    mAxisRst    => rst,
-    --    mAxisMaster => axisMaster  (i),
-    --    mAxisSlave  => axisSlave   (i) );
-    axisMaster(i) <= r.axisReg(i).axisMaster;
-    maxisSlave(i) <= axisSlave(i);
-  end generate;
+  --U_FIFO : entity work.AxiStreamFifoV2
+  --  generic map ( SLAVE_AXI_CONFIG_G  => SAXIS_CONFIG_C,
+  --                MASTER_AXI_CONFIG_G => AXIS_CONFIG_G )
+  --  port map ( -- Slave Port
+  --    sAxisClk    => clk,
+  --    sAxisRst    => rst,
+  --    sAxisMaster => r.axisReg   (i).axisMaster,
+  --    sAxisSlave  => maxisSlave  (i),
+  --    -- Master Port
+  --    mAxisClk    => clk,
+  --    mAxisRst    => rst,
+  --    mAxisMaster => axisMaster  (i),
+  --    mAxisSlave  => axisSlave   (i) );
+  axisMaster <= r.axisReg.axisMaster;
+  maxisSlave <= axisSlave;
   
   GEN_CHAN : for j in 0 to 3 generate
     bramWriteMaster(j).en   <= '1';
@@ -199,7 +192,8 @@ begin
                asyncRst => configSynct,
                syncRst  => configSync );
   
-  comb : process( r, clear, lopen, lskip, lclose, lphase, l1in, l1ina,
+  comb : process( r, clear, lopen, lskip, lclose, lopen_phase, lclose_phase,
+                  l1in, l1ina,
                   tout, dout, douten, rddata, maxisSlave ) is
     variable v : RegType;
     variable n : integer range 0 to 2*ROW_SIZE-1;
@@ -216,7 +210,8 @@ begin
     v.tout    := tout;
     v.douten  := douten;
     v.tin     := (others=>"00");
-    v.tin(conv_integer(lphase)) := lclose & lopen;
+    v.tin(conv_integer(lopen_phase ))(0) := lopen;
+    v.tin(conv_integer(lclose_phase))(1) := lclose;
 
     if lopen='1' then
       v.lskip   := lskip;
@@ -297,115 +292,99 @@ begin
     --
     --  Stream out data for pending event buffers
     --
-    for j in 0 to AXIS_SIZE_G-1 loop
+    q := v.axisReg;
+    i := conv_integer(q.ireading);
 
-      q := v.axisReg(j);
+    v.free := resize(r.rdtail - r.wraddr,r.free'length);
+      
+    if r.cache(i).state = EMPTY_S then
+      v.nfree := toSlv(r.cache'length,r.nfree'length);
+    else
+      v.nfree := resize(q.ireading-r.iempty,r.nfree'length);
+    end if;
+      
+    if maxisSlave.tReady='1' then
+      q.axisMaster.tValid := '0';
+    end if;
 
-      if maxisSlave(j).tReady='1' then
-        q.axisMaster.tValid := '0';
+    if q.axisMaster.tValid='0' then
+      q.axisMaster.tLast := '0';
+
+      if (r.cache(i).state = EMPTY_S or
+          r.cache(i).skip = '1' ) then
+        v.rdtail := r.wraddr-1;
+      else
+        v.rdtail := r.cache(i).baddr(q.rdaddr'left+IDX_BITS downto IDX_BITS);
       end if;
 
-      if q.axisMaster.tValid='0' then
-        q.axisMaster.tLast := '0';
-
-        if AXIS_SIZE_G > 1 then
-          i := conv_integer(q.ireading & toSlv(j,AXIS_SZ_BITS));
-        else
-          i := conv_integer(q.ireading);
-        end if;
-        
-        if r.axisSel = j then
-
-          v.free := resize(r.rdtail - r.wraddr,r.free'length);
-          
-          if r.cache(i).state = EMPTY_S then
-            v.nfree := toSlv(r.cache'length,r.nfree'length);
-          else
-            v.nfree := resize(q.ireading-r.iempty,r.nfree'length);
-          end if;
-          
-          if (r.cache(i).state = EMPTY_S or
-              r.cache(i).skip = '1' ) then
-            v.rdtail := r.wraddr-1;
-          else
-            v.rdtail := r.cache(i).baddr(q.rdaddr'left+IDX_BITS downto IDX_BITS);
-          end if;
-
-          if (r.cache(i).state = CLOSED_S) then
+      if (r.cache(i).state = CLOSED_S) then
 --          and r.cache(i).mapd = DONE_M) then
-            case r.cache(i).trigd is
-              when WAIT_T   => null;
-              when REJECT_T =>
-                v.cache(i) := CACHE_INIT_C;
-                q.ireading := q.ireading+1;
-              when ACCEPT_T =>
-                --
-                --  Prepare reading from recorded data RAM
-                --
-                q.rdaddr := r.cache(i).baddr(q.rdaddr'left+IDX_BITS downto IDX_BITS);
-                --
-                --  Form header word
-                --
-                q.axisMaster.tValid := '1';
-                q.axisMaster.tData(ROW_SIZE*16-1 downto 0) := (others=>'0');
-
-                skip := r.cache(i).skip;
-                if skip = '1' then
-                  q.axisMaster.tData(30 downto IDX_BITS+2) := (others=>'0');
-                else
-                  q.axisMaster.tData(30 downto IDX_BITS+2) := 
-                    resize(r.cache(i).eaddr(CACHE_ADDR_LEN_C-1 downto IDX_BITS) -
-                           r.cache(i).baddr(CACHE_ADDR_LEN_C-1 downto IDX_BITS) + 1,
-                           29-IDX_BITS);
-                  q.axisMaster.tData(IDX_BITS+1 downto 0) := toSlv(PAD_SAMP_C,IDX_BITS+2);
-                end if;
-                q.axisMaster.tData(31) := r.cache(i).ovflow;
-                k := 4*conv_integer(r.cache(i).baddr(IDX_BITS-1 downto 0)) +
-                     PAD_SAMP_C;
-                q.axisMaster.tData( 39 downto  32) := toSlv(k,8);
-                q.axisMaster.tData( 47 downto  40) := toSlv(8-conv_integer(r.cache(i).eaddr(IDX_BITS-1 downto 0)),6) & "00";
-                q.axisMaster.tData( 55 downto  48) := toSlv(i,8);
-                q.axisMaster.tData( 63 downto  56) := toSlv(ALG_ID_G,8);
-                q.axisMaster.tData( 95 downto  64) := resize(r.cache(i).toffs,32);
-                q.axisMaster.tData(111 downto  96) := resize(r.cache(i).baddr,16);
-                q.axisMaster.tData(127 downto 112) := resize(r.cache(i).eaddr,16);
---                q.axisMaster.tKeep := genTKeep(16);  -- will skip the extra
---                48 as padding
-                ssiSetUserSof(AXIS_CONFIG_C, q.axisMaster, '1');
-                v.cache(i).state := READING_S;
-                if skip = '1' then
-                  q.axisMaster.tLast := '1';
-                  v.cache(i) := CACHE_INIT_C;
-                  q.ireading := q.ireading+1;
-                end if;
-              when others => null;
-            end case;
-          elsif r.cache(i).state = READING_S then
+        case r.cache(i).trigd is
+          when WAIT_T   => null;
+          when REJECT_T =>
+            v.cache(i) := CACHE_INIT_C;
+            q.ireading := q.ireading+1;
+          when ACCEPT_T =>
             --
-            --  Continue streaming data from RAM
+            --  Prepare reading from recorded data RAM
+            --
+            q.rdaddr := r.cache(i).baddr(q.rdaddr'left+IDX_BITS downto IDX_BITS);
+            --
+            --  Form header word
             --
             q.axisMaster.tValid := '1';
-            q.axisMaster.tData(rddata'range) := rddata;
-            q.axisMaster.tKeep := genTKeep(64);
-            ssiSetUserSof(AXIS_CONFIG_C, q.axisMaster, '0');
-            if q.rdaddr = r.cache(i).eaddr(q.rdaddr'left+IDX_BITS downto IDX_BITS) then
+            q.axisMaster.tData(ROW_SIZE*16-1 downto 0) := (others=>'0');
+
+            skip := r.cache(i).skip;
+            if skip = '1' then
+              q.axisMaster.tData(30 downto IDX_BITS+2) := (others=>'0');
+            else
+              q.axisMaster.tData(30 downto IDX_BITS+2) := 
+                resize(r.cache(i).eaddr(CACHE_ADDR_LEN_C-1 downto IDX_BITS) -
+                       r.cache(i).baddr(CACHE_ADDR_LEN_C-1 downto IDX_BITS) + 1,
+                       29-IDX_BITS);
+              q.axisMaster.tData(IDX_BITS+1 downto 0) := toSlv(PAD_SAMP_C,IDX_BITS+2);
+            end if;
+            q.axisMaster.tData(31) := r.cache(i).ovflow;
+            k := 4*conv_integer(r.cache(i).baddr(IDX_BITS-1 downto 0)) +
+                 PAD_SAMP_C;
+            q.axisMaster.tData( 39 downto  32) := toSlv(k,8);
+            q.axisMaster.tData( 47 downto  40) := toSlv(8-conv_integer(r.cache(i).eaddr(IDX_BITS-1 downto 0)),6) & "00";
+            q.axisMaster.tData( 55 downto  48) := toSlv(i,8);
+            q.axisMaster.tData( 63 downto  56) := toSlv(ALG_ID_G,8);
+            q.axisMaster.tData( 95 downto  64) := resize(r.cache(i).toffs,32);
+            q.axisMaster.tData(111 downto  96) := resize(r.cache(i).baddr,16);
+            q.axisMaster.tData(127 downto 112) := resize(r.cache(i).eaddr,16);
+--                q.axisMaster.tKeep := genTKeep(16);  -- will skip the extra
+--                48 as padding
+            ssiSetUserSof(AXIS_CONFIG_C, q.axisMaster, '1');
+            v.cache(i).state := READING_S;
+            if skip = '1' then
               q.axisMaster.tLast := '1';
               v.cache(i) := CACHE_INIT_C;
               q.ireading := q.ireading+1;
             end if;
-            q.rdaddr := q.rdaddr+1;
-          end if;
+          when others => null;
+        end case;
+      elsif r.cache(i).state = READING_S then
+        --
+        --  Continue streaming data from RAM
+        --
+        q.axisMaster.tValid := '1';
+        q.axisMaster.tData(rddata'range) := rddata;
+        q.axisMaster.tKeep := genTKeep(64);
+        ssiSetUserSof(AXIS_CONFIG_C, q.axisMaster, '0');
+        if q.rdaddr = r.cache(i).eaddr(q.rdaddr'left+IDX_BITS downto IDX_BITS) then
+          q.axisMaster.tLast := '1';
+          v.cache(i) := CACHE_INIT_C;
+          q.ireading := q.ireading+1;
         end if;
-
-        v.axisReg(j) := q;
+        q.rdaddr := q.rdaddr+1;
       end if;
-    end loop;
 
-    v.axisSel := r.axisSel+1;
-    if v.axisSel = AXIS_SIZE_G then
-      v.axisSel := 0;
+      v.axisReg := q;
     end if;
-    
+
     -- skipped buffers are causing this to fire
     if conv_integer(r.free) < 4 and false then
       --  Deadtime failed
@@ -430,12 +409,7 @@ begin
     r_in   <= v;
     free   <= r.free;
     nfree  <= r.nfree;
-
-    if AXIS_SIZE_G > 1 then
-      rdaddr <= r.axisReg(v.axisSel).rdaddr;
-    else
-      rdaddr <= v.axisReg(v.axisSel).rdaddr;
-    end if;
+    rdaddr <= v.axisReg.rdaddr;
   end process;
 
   seq : process(clk) is
