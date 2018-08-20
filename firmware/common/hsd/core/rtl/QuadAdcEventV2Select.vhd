@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2016-01-04
--- Last update: 2017-08-23
+-- Last update: 2018-07-26
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -27,6 +27,7 @@ use ieee.std_logic_arith.all;
 use ieee.NUMERIC_STD.all;
 
 use work.StdRtlPkg.all;
+use work.TimingExtnPkg.all;
 use work.TimingPkg.all;
 use work.QuadAdcPkg.all;
 use work.EvrV2Pkg.all;

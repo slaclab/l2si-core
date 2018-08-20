@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-12-14
--- Last update: 2018-05-13
+-- Last update: 2018-08-19
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -32,6 +32,7 @@ use work.StdRtlPkg.all;
 use work.AxiStreamPkg.all;
 use work.SsiPkg.all;
 use work.AxiLitePkg.all;
+use work.TimingExtnPkg.all;
 use work.TimingPkg.all;
 use work.XpmPkg.all;
 use work.EventPkg.all;
@@ -183,7 +184,7 @@ architecture top_level of dtiPgp3 is
 
   signal usConfig     : DtiUsLinkConfigArray(MaxUsLinks-1 downto 0) := (others=>DTI_US_LINK_CONFIG_INIT_C);
   signal usStatus     : DtiUsLinkStatusArray(MaxUsLinks-1 downto 0);
-  signal usRemLinkID  : Slv8Array           (MaxUsLinks-1 downto 0);
+  signal usRemLinkID  : Slv32Array          (MaxUsLinks-1 downto 0);
   signal usIbMaster   : AxiStreamMasterArray(MaxUsLinks-1 downto 0);
   signal usIbSlave    : AxiStreamSlaveArray (MaxUsLinks-1 downto 0);
   signal usIbClk      : slv                 (MaxUsLinks-1 downto 0);
@@ -201,7 +202,7 @@ architecture top_level of dtiPgp3 is
   signal fullOut      : slv(15 downto 0);
   
   signal dsStatus     : DtiDsLinkStatusArray(MaxDsLinks-1 downto 0);
-  signal dsRemLinkID  : Slv8Array           (MaxDsLinks-1 downto 0);
+  signal dsRemLinkID  : Slv32Array          (MaxDsLinks-1 downto 0);
   signal dsMonClk     : slv                 (MaxDsLinks-1 downto 0);
   
   signal ctlRxM, ctlTxM : AxiStreamMasterArray(MaxUsLinks-1 downto 0) := (others=>AXI_STREAM_MASTER_INIT_C);
@@ -291,6 +292,7 @@ architecture top_level of dtiPgp3 is
   signal bpMonClk : slv( 1 downto 0);
 
   signal ringData : slv(19 downto 0);
+  signal ipAddr   : slv(31 downto 0);
 
   signal drpRdy   : slv(MaxUsLinks-1 downto 0);
   signal drpEn    : slv(MaxUsLinks-1 downto 0);
@@ -451,6 +453,7 @@ begin
       ethTxN           => ethTxN,
       ethClkP          => ethClkP,
       ethClkN          => ethClkN,
+      ipAddr           => ipAddr,
       -- LCLS Timing Ports
       timingRxP         => timingRxP,
       timingRxN         => timingRxN,
@@ -655,6 +658,7 @@ begin
                  ibSlave (VC_CTL) => ctlTxS     (i),
                  loopback         => config.loopback(i),
                  linkUp           => usLinkUp   (i),
+                 locLinkID        => dtiUsLinkId(ipAddr,i),
                  remLinkID        => usRemLinkID(i),
                  rxErrs           => usRxErrs   (i),
                  txFull           => usFullIn   (i),

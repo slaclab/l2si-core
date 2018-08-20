@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-07-10
--- Last update: 2018-05-13
+-- Last update: 2018-07-26
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -28,6 +28,7 @@ use ieee.std_logic_1164.all;
 use ieee.std_logic_unsigned.all;
 
 use work.StdRtlPkg.all;
+use work.TimingExtnPkg.all;
 use work.TimingPkg.all;
 use work.EventPkg.all;
 use work.XpmPkg.all;
@@ -47,7 +48,7 @@ entity DtiUsCore is
      clear           : in  sl := '0';
      update          : in  sl := '1';
      config          : in  DtiUsLinkConfigType;
-     remLinkID       : in  slv(7 downto 0) := x"FF";
+     remLinkID       : in  slv(31 downto 0);
      status          : out DtiUsLinkStatusType;
      fullOut         : out slv(15 downto 0);
      msgDelay        : out slv( 6 downto 0);

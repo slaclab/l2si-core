@@ -5,7 +5,7 @@
 -- Author     : Benjamin Reese  <bareese@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-09-25
--- Last update: 2017-08-22
+-- Last update: 2018-07-26
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -26,6 +26,7 @@ use ieee.std_logic_arith.all;
 
 use work.StdRtlPkg.all;
 use work.AxiLitePkg.all;
+use work.TimingExtnPkg.all;
 use work.TimingPkg.all;
 
 entity TimingBase is

@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-07-10
--- Last update: 2018-04-13
+-- Last update: 2018-08-03
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -31,6 +31,7 @@ use STD.textio.all;
 use ieee.std_logic_textio.all;
 
 use work.StdRtlPkg.all;
+use work.TimingExtnPkg.all;
 use work.TimingPkg.all;
 use work.TPGPkg.all;
 use work.XpmPkg.all;
@@ -309,7 +310,6 @@ begin
      file_close(trigs);
    end process;
 
-   timingBus.valid  <= '1';
    timingBus.stream <= TIMING_STREAM_INIT_C;
    timingBus.v1     <= LCLS_V1_TIMING_DATA_INIT_C;
    timingBus.v2     <= LCLS_V2_TIMING_DATA_INIT_C;
@@ -322,9 +322,10 @@ begin
                 messageDelayRst     => '0',
                 timingMessage       => timingBus.message,
                 timingMessageStrobe => timingBus.strobe,
-                exptMessage         => exptBus.message,
-                exptMessageValid    => exptBus.valid );
-                
+                timingMessageValid  => timingBus.valid,
+                timingExtn          => exptBus.message,
+                timingExtnValid     => exptBus.valid );
+
    U_Application : entity work.XpmApp
       generic map ( NDsLinks => linkStatus'length,
                     NBpLinks => bpRxLinkUp'length )
@@ -359,6 +360,7 @@ begin
          timingin          => xData,
          timingFbClk       => '0',
          timingFbRst       => '1',
+         timingFbId        => (others=>'0'),
          timingFb          => open );
 --         timingBus         => timingBus,
 --         exptBus           => exptBus );

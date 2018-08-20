@@ -5,8 +5,9 @@ export GIT_BYPASS = 1
 # PRJ_VERSION = 0x00000005  Added UsLinkConfig AFDEPTH test
 # PRJ_VERSION = 0x00000006  Added count into transition header
 # PRJ_VERSION = 0x00000007  Track msg delay
+# PRJ_VERSION = 0x00000008  Upgrade remote link ID discovery
 ##########################################################################################
-export PRJ_VERSION = 0x00000007
+export PRJ_VERSION = 0x00000008
 
 ##########################################################################################
 # Applications must define if using advance AMC carrier build

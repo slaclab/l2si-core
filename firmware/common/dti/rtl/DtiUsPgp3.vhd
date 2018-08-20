@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-07-10
--- Last update: 2018-04-12
+-- Last update: 2018-08-19
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -74,7 +74,8 @@ entity DtiUsPgp3 is
      ibSlave         : in  AxiStreamSlaveArray (NUM_DTI_VC_C-1 downto 0);
      loopback        : in  sl;
      linkUp          : out sl;
-     remLinkID       : out slv( 7 downto 0);
+     locLinkID       : in  slv(31 downto 0);
+     remLinkID       : out slv(31 downto 0);
      rxErrs          : out slv(31 downto 0);
      txFull          : out sl;
      monClk          : out sl;
@@ -95,7 +96,7 @@ architecture top_level_app of DtiUsPgp3 is
   type RegType is record
     --  Event state
     opCodeEn   : sl;
-    opCode     : slv(7 downto 0);
+    opCode     : slv( 7 downto 0);
     --  Ctl Statistics
     obSent     : slv(31 downto 0);
     obReceived : slv(31 downto 0);
@@ -130,7 +131,8 @@ architecture top_level_app of DtiUsPgp3 is
   signal pgpRst         : sl;
 
   signal itxfull        : sl;
-
+  signal slocLinkID     : slv(31 downto 0);
+  
   signal iibMaster      : AxiStreamMasterArray(NUM_DTI_VC_C-1 downto 0);
   signal iobSlave       : AxiStreamSlaveType;
 
@@ -172,15 +174,15 @@ begin
   linkUp                   <= pgpRxOut.linkReady;
   pgpRxIn.loopback         <= '0' & loopback & '0';
 --  remLinkID                <= pgpRxOut.remLinkData;
-  remLinkID                <= (others=>'0');
   
   locTxIn.disable          <= '0';
   locTxIn.flowCntlDis      <= '1';
 --  locTxIn.skpInterval      <= (others=>'0');
   locTxIn.skpInterval      <= X"0000FFF0";  -- override bad default
   locTxIn.opCodeEn         <= r.opCodeEn;
-  locTxIn.opCodeNumber     <= toSlv(1,3);
-  locTxIn.opCodeData       <= resize(r.opCode,48);
+  locTxIn.opCodeNumber     <= toSlv(6,3);
+  locTxIn.opCodeData(15 downto  0) <= resize(r.opCode,16);
+  locTxIn.opCodeData(47 downto 16) <= slocLinkId;
 --  locTxIn.locData          <= ID_G;
   pgpTxIn                  <= locTxIn;
   
@@ -190,6 +192,7 @@ begin
     port map ( pgpClk       => pgpClk,
                pgpRst       => pgpRst,
                pgpRxOut     => pgpRxOut,
+               rxLinkId     => remLinkID,
                txAlmostFull => itxFull );
 
   U_Pgp3 : entity work.Pgp3GthUs
@@ -292,6 +295,12 @@ begin
                rd_clk  => pgpClk,
                valid   => pgpTrigValid,
                dout    => pgpTrig );
+
+  U_SyncLocLinkID : entity work.SynchronizerVector
+    generic map ( DATA_WIDTH_G => 32 )
+    port map ( clk     => pgpClk,
+               dataIn  => locLinkID,
+               dataOut => slocLinkID );
   
   comb : process ( fifoRst, r, pgpTrig, pgpTrigValid,
                    pgpTxMasters, pgpTxSlaves,

@@ -5,7 +5,7 @@
 -- Author     : Larry Ruckman  <ruckman@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-07-08
--- Last update: 2018-05-13
+-- Last update: 2018-08-19
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -28,8 +28,10 @@ use work.AxiStreamPkg.all;
 use work.SsiPkg.all;
 use work.AxiLitePkg.all;
 use work.AxiPkg.all;
+use work.TimingExtnPkg.all;
 use work.TimingPkg.all;
 use work.XpmPkg.all;
+use work.DtiPkg.all;
 use work.EventPkg.all;
 use work.AmcCarrierSysRegPkg.all;
 use work.AmcCarrierPkg.all;
@@ -97,6 +99,7 @@ entity DtiCore is
       ethTxN           : out   slv(3 downto 0);
       ethClkP          : in    sl;
       ethClkN          : in    sl;
+      ipAddr           : out   slv(31 downto 0);
       -- LCLS Timing Ports
       timingRxP         : in    sl;
       timingRxN         : in    sl;
@@ -224,6 +227,11 @@ begin
   recTimingClk <= intTimingClk;
   recTimingRst <= intTimingRst;
   triggerBus   <= intExptBus;
+
+  intExptBus.message <= ExptMessageType(intTimingBus.extn);
+  intExptBus.valid   <= intTimingBus.extnValid;
+
+  ipAddr       <= localIp;
   
   GEN_BSI_OVERRIDE: if OVERRIDE_BSI_G=true generate
     localIp    <= IP_ADDR_G;
@@ -391,6 +399,7 @@ begin
   U_TimingFb : entity work.XpmTimingFb
     port map ( clk        => timingFbClk,
                rst        => timingFbRst,
+               id         => dtiTimingFbId(localIp),
                l1input    => (others=>XPM_L1_INPUT_INIT_C),
                full       => fullOut(7 downto 0),
                phy        => timingFb );
@@ -418,7 +427,6 @@ begin
          recTimingClk     => intTimingClk,
          recTimingRst     => intTimingRst,
          recTimingBus     => intTimingBus,
-         recExptBus       => intExptBus,
          recData          => timingData,
 
          appTimingPhy     => timingFb,

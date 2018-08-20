@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-12-14
--- Last update: 2018-04-04
+-- Last update: 2018-08-02
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -370,8 +370,9 @@ begin
     -- Read/write to the configuration registers
     -- Read only from status registers
 
-    axilRegR  (toSlv(  0,12),  0, status.paddr);
-    ra := 4;
+    ra := 0;
+    axilRegR  (toSlv( ra,12),  0, status.paddr);
+    ra := ra+4;
     axilRegRW (toSlv( ra,12),  0, v.partition);
     axilRegRW (toSlv( ra,12),  4, v.link);
     axilRegRW (toSlv( ra,12), 10, v.linkDebug);
@@ -392,7 +393,7 @@ begin
       end if;
     end if;
 
-    ra := 8;
+    ra := ra+4;
     axilRegRW(toSlv(ra,12),    0, v.linkCfg.txDelay);
     axilRegRW(toSlv(ra,12),   18, v.linkCfg.txPllReset);
     axilRegRW(toSlv(ra,12),   19, v.linkCfg.rxPllReset);
@@ -403,16 +404,18 @@ begin
     axilRegRW(toSlv(ra,12),   30, v.linkCfg.rxReset);
     axilRegRW(toSlv(ra,12),   31, v.linkCfg.enable);
 
-    ra := 12;
+    ra := ra+4;
     axilRegR (toSlv(ra,12),   0, r.linkStat.rxErrCnts);
     axilRegR (toSlv(ra,12),  16, r.linkStat.txResetDone);
     axilRegR (toSlv(ra,12),  17, r.linkStat.txReady);
     axilRegR (toSlv(ra,12),  18, r.linkStat.rxResetDone);
     axilRegR (toSlv(ra,12),  19, r.linkStat.rxReady);
     axilRegR (toSlv(ra,12),  20, r.linkStat.rxIsXpm);
-    axilRegR (toSlv(ra+4,12), 0, r.linkStat.rxRcvCnts);
 
-    ra := 20;
+    ra := ra+4;
+    axilRegR (toSlv(ra,12),  0, r.linkStat.rxRcvCnts);
+
+    ra := ra+4;
     axilRegRW(toSlv(ra,12),  0, v.pllCfg.bwSel);
     axilRegRW(toSlv(ra,12),  4, v.pllCfg.frqTbl);
     axilRegRW(toSlv(ra,12),  8, v.pllCfg.frqSel);
@@ -426,11 +429,12 @@ begin
     axilRegR (toSlv(ra,12), 28, muxSlVectorArray( pllCount, 2*ia+1));
     axilRegR (toSlv(ra,12), 31, pllStat(2*ia+1));
 
-    ra := 24;
+    ra := ra+4;
     axilRegRW (toSlv(ra,12), 0, v.partitionCfg.l0Select.reset);
     axilRegRW (toSlv(ra,12),16, v.partitionCfg.l0Select.enabled);
     axilRegRW (toSlv(ra,12),31, v.axilRdEn(ip));
-    ra := 28;
+
+    ra := ra+4;
     axilRegRW (toSlv(ra,12), 0, v.partitionCfg.l0Select.rateSel);
     axilRegRW (toSlv(ra,12),16, v.partitionCfg.l0Select.destSel);
 
@@ -443,7 +447,8 @@ begin
 
     axilRegRW (toSlv(ra+52,12),  0, v.partitionCfg.l1Select.clear);
     axilRegRW (toSlv(ra+52,12), 16, v.partitionCfg.l1Select.enable);
-    ra := 84;
+
+    ra := ra+56;
     axilRegRW (toSlv(ra,12),  0, v.partitionCfg.l1Select.trigsrc);
     axilRegRW (toSlv(ra,12),  4, v.partitionCfg.l1Select.trigword);
     axilRegRW (toSlv(ra,12), 16, v.partitionCfg.l1Select.trigwr);
@@ -460,6 +465,9 @@ begin
     axilRegRW (toSlv(ra+28,12), 0, v.partitionCfg.message.hdr);
     axilRegRW (toSlv(ra+32,12), 0, v.partitionCfg.message.payload);
 
+    ra := ra+36;
+    axilRegR (toSlv(ra,12),  0, r.linkStat.rxId);
+    
     for j in r.partitionCfg.inhibit.setup'range loop
       axilRegRW (toSlv(128+j*4,12),  0, v.partitionCfg.inhibit.setup(j).interval);
       axilRegRW (toSlv(128+j*4,12), 12, v.partitionCfg.inhibit.setup(j).limit);

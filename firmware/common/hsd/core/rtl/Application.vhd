@@ -8,6 +8,7 @@ library work;
 use work.StdRtlPkg.all;
 use work.AxiLitePkg.all;
 use work.AxiStreamPkg.all;
+use work.TimingExtnPkg.all;
 use work.TimingPkg.all;
 use work.QuadAdcPkg.all;
  

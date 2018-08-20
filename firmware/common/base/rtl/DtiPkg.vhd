@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2016-03-25
--- Last update: 2018-05-13
+-- Last update: 2018-08-19
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -117,7 +117,7 @@ package DtiPkg is
    
    type DtiUsLinkStatusType is record
      linkUp     : sl;
-     remLinkID  : slv( 7 downto 0);
+     remLinkID  : slv(31 downto 0);
      rxErrs     : slv(31 downto 0);
      rxFull     : slv(31 downto 0);
      rxInh      : slv(31 downto 0);
@@ -162,7 +162,7 @@ package DtiPkg is
 
    type DtiDsLinkStatusType is record
      linkUp     : sl;
-     remLinkID  : slv( 7 downto 0);
+     remLinkID  : slv(31 downto 0);
      rxErrs     : slv(31 downto 0);
      rxFull     : slv(31 downto 0);
      obSent     : slv(47 downto 0);
@@ -245,6 +245,8 @@ package DtiPkg is
 
    function toSlv         (cfg : DtiUsLinkConfigType) return slv;
    function toUsLinkConfig(v : slv) return DtiUsLinkConfigType;
+   function dtiTimingFbId(ip : slv) return slv;
+   function dtiUsLinkId  (ip : slv; constant link : integer) return slv;
 
 end package DtiPkg;
 
@@ -282,4 +284,18 @@ package body DtiPkg is
     return cfg;
   end function;
     
+   function dtiTimingFbId(ip : slv) return slv is
+     variable id  : slv(31 downto 0);
+   begin
+     id := x"FE" & ip(15 downto 0) & x"FF";
+     return id;
+   end function;
+
+   function dtiUsLinkId(ip : slv; constant link : integer) return slv is
+     variable id  : slv(31 downto 0);
+   begin
+     id := x"FE" & ip(15 downto 0) & x"F" & toSlv(integer,4);
+     return id;
+   end function;
+
 end package body DtiPkg;

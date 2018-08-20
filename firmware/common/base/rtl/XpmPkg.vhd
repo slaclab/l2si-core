@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2016-03-25
--- Last update: 2018-04-12
+-- Last update: 2018-08-02
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -24,7 +24,7 @@ library ieee;
 use ieee.std_logic_1164.all;
 
 use work.StdRtlPkg.all;
-use work.TimingPkg.all;
+use work.TimingExtnPkg.all;
 
 package XpmPkg is
 
@@ -38,16 +38,6 @@ package XpmPkg is
    constant NTagBytes   : integer := 4;
    constant NL1Triggers : integer := 1;
    
-   --type XpmRxSerialType is record
-   --   stream    : TimingSerialType;
-   --   advance   : sl;
-   --   fiducial  : sl;
-   --end record;
-   --constant XPM_RX_SERIAL_INIT_C : XpmRxSerialType := (
-   --   stream    => TIMING_SERIAL_INIT_C,
-   --   advance   => '0',
-   --   fiducial  => '0' );
-
    type XpmTxSerialType is record
       data      : slv(15 downto 0);
       dataK     : slv( 1 downto 0);
@@ -82,6 +72,7 @@ package XpmPkg is
       rxErrCnts   : slv(15 downto 0);
       rxRcvCnts   : slv(31 downto 0);
       rxIsXpm     : sl;
+      rxId        : slv(31 downto 0);
    end record;
    type XpmLinkStatusArray is array (natural range<>) of XpmLinkStatusType;
    constant XPM_LINK_STATUS_INIT_C : XpmLinkStatusType := (
@@ -92,7 +83,8 @@ package XpmPkg is
       rxErr       => '0',
       rxErrCnts   => (others=>'0'),
       rxRcvCnts   => (others=>'0'),
-      rxIsXpm     => '0' );
+      rxIsXpm     => '0',
+      rxId        => (others=>'0'));
 
    type XpmBpLinkStatusType is record
      linkUp   : sl;
@@ -404,6 +396,8 @@ package XpmPkg is
    function toPartitionMsg (vector : slv) return XpmPartitionMsgType;
    function toSlv  (pword : XpmPartitionDataType) return slv;
    function toPartitionWord(vector : slv) return XpmPartitionDataType;
+
+   function xpmTimingFbId(ip : slv) return slv;
    
 end package XpmPkg;
 
@@ -498,5 +492,12 @@ package body XpmPkg is
      i := i+8;
      return pword;
    end function;
-   
+
+   function xpmTimingFbId(ip : slv) return slv is
+     variable id  : slv(31 downto 0);
+   begin
+     id := x"FF" & ip(15 downto 0) & x"00";
+     return id;
+   end function;
+     
 end package body XpmPkg;

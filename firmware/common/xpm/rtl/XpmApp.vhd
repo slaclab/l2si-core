@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-07-10
--- Last update: 2017-12-21
+-- Last update: 2018-08-02
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -28,6 +28,7 @@ use ieee.std_logic_1164.all;
 use ieee.std_logic_unsigned.all;
 
 use work.StdRtlPkg.all;
+use work.TimingExtnPkg.all;
 use work.TimingPkg.all;
 --use work.AmcCarrierPkg.all;
 use work.XpmPkg.all;
@@ -68,6 +69,7 @@ entity XpmApp is
       timingIn          : in  TimingRxType;
       timingFbClk       : in  sl;
       timingFbRst       : in  sl;
+      timingFbId        : in  slv(31 downto 0);
       timingFb          : out TimingPhyType );
 end XpmApp;
 
@@ -114,8 +116,10 @@ architecture top_level_app of XpmApp is
   type FullArray    is array (natural range<>) of slv            (NPartitions-1 downto 0);
 
   signal l1Input        : L1InputArray(NDsLinks-1 downto 0);
+  signal isXpm          : slv         (NDsLinks-1 downto 0);
   signal dsFull         : FullArray   (NDsLinks-1 downto 0);
   signal dsRxRcvs       : Slv32Array  (NDsLinks-1 downto 0);
+  signal dsId           : Slv32Array  (NDsLinks-1 downto 0);
   signal bpRxLinkFullS  : Slv16Array        (NBpLinks-1 downto 0);
   
   --  Serialized data to sensor links
@@ -128,19 +132,19 @@ architecture top_level_app of XpmApp is
   signal advance   : slv              (STREAMS_C-1 downto 0);
   signal fiducial  : sl;
   signal sof, eof, crcErr : sl;
-  signal isXpm       : slv(NDsLinks-1 downto 0);
   signal pmaster     : slv(NPartitions-1 downto 0);
   signal expWord     : Slv48Array(NPartitions-1 downto 0);
 
 begin
 
-  linkstatp: process (bpStatus, dsLinkStatus, dsRxRcvs, isXpm) is
+  linkstatp: process (bpStatus, dsLinkStatus, dsRxRcvs, isXpm, dsId) is
     variable linkStat : XpmLinkStatusType;
   begin
     for i in 0 to NDsLinks-1 loop
       linkStat           := dsLinkStatus(i);
       linkStat.rxRcvCnts := dsRxRcvs(i);
-      linkStat.rxIsXpm   := isXpm(i);
+      linkStat.rxIsXpm   := isXpm   (i);
+      linkStat.rxId      := dsId    (i);
       status.dsLink(i)   <= linkStat;
     end loop;
     status.bpLink <= bpStatus;
@@ -163,6 +167,7 @@ begin
   U_TimingFb : entity work.XpmTimingFb
     port map ( clk        => timingFbClk,
                rst        => timingFbRst,
+               id         => timingFbId,
                l1input    => (others=>XPM_L1_INPUT_INIT_C),
                full       => (others=>'0'),
                phy        => timingFb );
@@ -194,6 +199,7 @@ begin
                  rxClk           => dsRxClk  (i),
                  rxRst           => dsRxRst  (i),
                  isXpm           => isXpm    (i),
+                 id              => dsId     (i),
                  rxRcvs          => dsRxRcvs (i),
                  full            => dsFull   (i),
                  l1Input         => l1Input  (i) );

@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-07-10
--- Last update: 2017-07-25
+-- Last update: 2018-07-26
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -43,7 +43,7 @@ entity DtiDsCore is
      clear           : in  sl := '0';
      update          : in  sl := '1';
 --     config          : in  DtiUsLinkConfigType,
-     remLinkID       : in  slv(7 downto 0);
+     remLinkID       : in  slv(31 downto 0);
      status          : out DtiDsLinkStatusType;
      --
      eventClk        : in  sl;

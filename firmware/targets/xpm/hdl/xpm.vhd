@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-12-14
--- Last update: 2018-03-24
+-- Last update: 2018-08-01
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -232,6 +232,7 @@ architecture top_level of xpm is
    signal dsClkBuf         : slv(1 downto 0);
 
    signal bpMonClk         : sl;
+   signal ipAddr           : slv(31 downto 0);
    
 begin
 
@@ -389,6 +390,7 @@ begin
          timingIn        => recTimingData,
          timingFbClk     => timingPhyClk,
          timingFbRst     => '0',
+         timingFbId      => xpmTimingFbId(ipAddr),
          timingFb        => timingPhy );
 
    U_Backplane : entity work.XpmBp
@@ -443,7 +445,6 @@ begin
          -- Timing Interface (timingClk domain)
          timingData        => recTimingDataI,
          timingBus         => recTimingBus,
-         exptBus           => open,
          timingPhy         => timingPhy,
          -- Reference Clocks and Resets
          timingPhyClk      => timingPhyClk,
@@ -471,6 +472,7 @@ begin
          ethTxN           => ethTxN,
          ethClkP          => ethClkP,
          ethClkN          => ethClkN,
+         ipAddr           => ipAddr,
          -- LCLS Timing Ports
          usRxP             => usRxP,
          usRxN             => usRxN,

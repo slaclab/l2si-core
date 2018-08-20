@@ -5,7 +5,7 @@
 -- Author     : Larry Ruckman  <ruckman@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-07-08
--- Last update: 2018-03-23
+-- Last update: 2018-08-01
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -69,7 +69,6 @@ entity XpmCore is
       -- Timing Interface (timingClk domain)
       timingData        : out   TimingRxType;
       timingBus         : out   TimingBusType;
-      exptBus           : out   ExptBusType;
       timingPhy         : in    TimingPhyType                    := TIMING_PHY_INIT_C;  -- Input for timing generator only
       timingPhyClk      : out   sl;
       timingPhyRst      : out   sl;
@@ -102,6 +101,7 @@ entity XpmCore is
       ethTxN           : out   slv(3 downto 0);
       ethClkP          : in    sl;
       ethClkN          : in    sl;
+      ipAddr           : out   slv(31 downto 0);
       -- Upstream Timing Ports
       usRxP             : in    sl;
       usRxN             : in    sl;
@@ -213,6 +213,8 @@ architecture mapping of XpmCore is
    signal timingRefClkN : sl;
 begin
 
+  ipAddr <= localIp;
+  
   GEN_BSI_OVERRIDE: if OVERRIDE_BSI_G=true generate
     localIp    <= IP_ADDR_G;
     localMac   <= MAC_ADDR_G;
@@ -423,7 +425,6 @@ begin
          recTimingClk     => recTimingClk,
          recTimingRst     => recTimingRst,
          recTimingBus     => timingBus,
-         recExptBus       => exptBus,
          recData          => timingData,
          
          appTimingPhy     => timingPhy,

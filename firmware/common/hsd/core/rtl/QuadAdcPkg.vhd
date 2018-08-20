@@ -27,6 +27,7 @@ library work;
 use work.StdRtlPkg.all;
 use work.AxiStreamPkg.all;
 use work.SsiPkg.all;
+use work.TimingExtnPkg.all;
 use work.TimingPkg.all;
 
 package QuadAdcPkg is
@@ -36,7 +37,7 @@ package QuadAdcPkg is
 -------------------------------------------------------------------------------
   constant PATTERN_WIDTH          : natural := 11; --number of bits by channel 
   constant CHANNELS_C         : natural := 8;  -- number of channel FIXE DONT CHANGE
-                                                   -- Wite in nb_channel register with SPI register to configure channel number 
+                                               -- Wite in nb_channel register with SPI register to configure channel number 
   constant SERDES_FACTOR    : natural := 8;  --deserialization factor in SERDES
 
   type serdes_tap_value_type is array (CHANNELS_C-1 downto 0) of NaturalArray(PATTERN_WIDTH - 1 downto 0);
@@ -109,7 +110,7 @@ package QuadAdcPkg is
   constant CACHE_ADDR_LEN_C : integer := RAM_ADDR_WIDTH_C+IDX_BITS;
   constant SKIP_CHAR : slv(1 downto 0) := "10";
   constant CACHETYPE_LEN_C : integer := 26 + 2*IDX_BITS+2*CACHE_ADDR_LEN_C;
-                                       
+  
   type CacheStateType is ( EMPTY_S,  -- buffer empty
                            OPEN_S,   -- buffer filling
                            CLOSED_S, -- buffer filled
@@ -150,6 +151,7 @@ package QuadAdcPkg is
   function cacheToSlv  (status : CacheType) return slv;
   function toCacheType (vector : slv)      return CacheType;
   
+  constant QADC_STATUS_TYPE_LEN_C : integer := PADDR_LEN+32*5+32*3+MAX_OVL_C*CACHETYPE_LEN_C+7+7+20+8+32+32*4;
   type QuadAdcStatusType is record
     partitionAddr : slv(PADDR_LEN-1 downto 0);
     eventCount    : SlVectorArray(4 downto 0, 31 downto 0);
@@ -161,6 +163,8 @@ package QuadAdcPkg is
     msgDelayGet   : slv(6 downto 0);
     headerCntL0   : slv(19 downto 0);
     headerCntOF   : slv( 7 downto 0);
+    upstreamId    : Slv32Array(0 downto 0);
+    dnstreamId    : Slv32Array(3 downto 0);
   end record;
   
   constant QADC_CONFIG_TYPE_LEN_C : integer := CHANNELS_C+101;
@@ -177,6 +181,7 @@ package QuadAdcPkg is
     inhibit   : sl;
     dmaTest   : sl;
     trigShift : slv( 7 downto 0);
+    localId   : slv(31 downto 0);
   end record;
   constant QUAD_ADC_CONFIG_INIT_C : QuadAdcConfigType := (
     enable    => (others=>'0'),
@@ -190,7 +195,8 @@ package QuadAdcPkg is
     destSel   => (others=>'0'),
     inhibit   => '1',
     dmaTest   => '0',
-    trigShift => (others=>'0') );
+    trigShift => (others=>'0'),
+    localId   => (others=>'0') );
 
   type BRamWriteMasterType is record
     en    : sl;
@@ -228,113 +234,217 @@ package QuadAdcPkg is
   constant QUAD_ADC_EVENT_TAG : slv(15 downto 0) := X"0000";
   constant QUAD_ADC_DIAG_TAG  : slv(15 downto 0) := X"0001";
 
+  procedure assignSlv   (i : inout integer; vector: inout slv; value : in    CacheArray);
+  procedure assignRecord(i : inout integer; vector: in    slv; value : inout CacheArray);
+  
   function toSlv       (config : QuadAdcConfigType) return slv;
   function toQadcConfig(vector : slv)               return QuadAdcConfigType;
-
+  function toSlv       (status : QuadAdcStatusType) return slv;
+  function toQadcStatus(vector : slv)               return QuadAdcStatusType;
+  function hsdTimingFbId(localId : slv) return slv;
+  
 end QuadAdcPkg;
 
 package body QuadAdcPkg is
 
-   function toSlv (config : QuadAdcConfigType) return slv
-   is
-      variable vector : slv(QADC_CONFIG_TYPE_LEN_C-1 downto 0) := (others => '0');
-      variable i      : integer                               := 0;
-   begin
-      assignSlv(i, vector, config.enable);
-      assignSlv(i, vector, config.partition);
-      assignSlv(i, vector, config.intlv);
-      assignSlv(i, vector, config.samples);
-      assignSlv(i, vector, config.prescale);
-      assignSlv(i, vector, config.offset);
-      assignSlv(i, vector, config.acqEnable);
-      assignSlv(i, vector, config.rateSel);
-      assignSlv(i, vector, config.destSel);
-      assignSlv(i, vector, config.inhibit);
-      assignSlv(i, vector, config.dmaTest);
-      assignSlv(i, vector, config.trigShift);
-      return vector;
-   end function;
-   
-   function toQadcConfig (vector : slv) return QuadAdcConfigType
-   is
-      variable config : QuadAdcConfigType;
-      variable i       : integer := 0;
-   begin
-      assignRecord(i, vector, config.enable);
-      assignRecord(i, vector, config.partition);
-      assignRecord(i, vector, config.intlv);
-      assignRecord(i, vector, config.samples);
-      assignRecord(i, vector, config.prescale);
-      assignRecord(i, vector, config.offset);
-      assignRecord(i, vector, config.acqEnable);
-      assignRecord(i, vector, config.rateSel);
-      assignRecord(i, vector, config.destSel);
-      assignRecord(i, vector, config.inhibit);
-      assignRecord(i, vector, config.dmaTest);
-      assignRecord(i, vector, config.trigShift);
-      return config;
-   end function;
-   
-   function cacheToSlv (status : CacheType) return slv
-   is
-      variable vector : slv(CACHETYPE_LEN_C-1 downto 0) := (others => '0');
-      variable i      : integer                          := 0;
-      variable vstate : slv(3 downto 0) := (others=>'0');
-      variable vtrigd : slv(3 downto 0) := (others=>'0');
-   begin
-      case status.state is
-        when EMPTY_S   => vstate := x"0";
-        when OPEN_S    => vstate := x"1";
-        when CLOSED_S  => vstate := x"2";
-        when READING_S => vstate := x"3";
-        when others    => vstate := x"4";
-      end case;
-      assignSlv(i, vector, vstate);
-      case status.trigd is
-        when WAIT_T    => vtrigd := x"0";
-        when ACCEPT_T  => vtrigd := x"1";
-        when others    => vtrigd := x"2";
-      end case;
-      assignSlv(i, vector, vtrigd);
-      assignSlv(i, vector, status.toffs);
-      assignSlv(i, vector, status.boffs);
-      assignSlv(i, vector, status.eoffs);
-      assignSlv(i, vector, status.baddr);
-      assignSlv(i, vector, status.eaddr);
-      assignSlv(i, vector, status.skip);
-      assignSlv(i, vector, status.ovflow);
-      return vector;
-   end function;
-   
-   function toCacheType (vector : slv) return CacheType
-   is
-      variable status : CacheType;
-      variable i       : integer := 0;
-      variable vstate : slv(3 downto 0) := (others=>'0');
-      variable vtrigd : slv(3 downto 0) := (others=>'0');
-   begin
-      assignRecord(i, vector, vstate);
-      case vstate is
-        when x"0"   => status.state := EMPTY_S;
-        when x"1"   => status.state := OPEN_S;
-        when x"2"   => status.state := CLOSED_S;
-        when x"3"   => status.state := READING_S;
-        when others => status.state := LAST_S;
-      end case;
-      assignRecord(i, vector, vtrigd);
-      case vtrigd is
-        when x"0"   => status.trigd := WAIT_T;
-        when x"1"   => status.trigd := ACCEPT_T;
-        when others => status.trigd := REJECT_T;
-      end case;
-      assignRecord(i, vector, status.toffs);
-      assignRecord(i, vector, status.boffs);
-      assignRecord(i, vector, status.eoffs);
-      assignRecord(i, vector, status.baddr);
-      assignRecord(i, vector, status.eaddr);
-      assignRecord(i, vector, status.skip);
-      assignRecord(i, vector, status.ovflow);
-      return status;
-   end function;
-   
+  procedure assignSlv(
+    i      : inout integer;
+    vector : inout slv;
+    value  : in    CacheArray)
+  is
+    variable low : integer;
+  begin
+    for j in 0 to MAX_OVL_C-1 loop
+      low := i;
+      i   := i+CACHETYPE_LEN_C;
+      vector(i-1 downto low) := cacheToSlv(value(j));
+    end loop;
+  end procedure assignSlv;
+
+  procedure assignRecord(
+    i      : inout integer;
+    vector : in    slv;
+    value  : inout CacheArray)
+  is
+    variable low : integer;
+  begin
+    for j in 0 to MAX_OVL_C-1 loop
+      low := i;
+      i   := i+CACHETYPE_LEN_C;
+      value(j) := toCacheType(vector(i-1 downto low));
+    end loop;
+  end procedure assignRecord;
+  
+  function toSlv (config : QuadAdcConfigType) return slv
+  is
+    variable vector : slv(QADC_CONFIG_TYPE_LEN_C-1 downto 0) := (others => '0');
+    variable i      : integer                               := 0;
+  begin
+    assignSlv(i, vector, config.enable);
+    assignSlv(i, vector, config.partition);
+    assignSlv(i, vector, config.intlv);
+    assignSlv(i, vector, config.samples);
+    assignSlv(i, vector, config.prescale);
+    assignSlv(i, vector, config.offset);
+    assignSlv(i, vector, config.acqEnable);
+    assignSlv(i, vector, config.rateSel);
+    assignSlv(i, vector, config.destSel);
+    assignSlv(i, vector, config.inhibit);
+    assignSlv(i, vector, config.dmaTest);
+    assignSlv(i, vector, config.trigShift);
+    return vector;
+  end function;
+  
+  function toQadcConfig (vector : slv) return QuadAdcConfigType
+  is
+    variable config : QuadAdcConfigType;
+    variable i       : integer := 0;
+  begin
+    assignRecord(i, vector, config.enable);
+    assignRecord(i, vector, config.partition);
+    assignRecord(i, vector, config.intlv);
+    assignRecord(i, vector, config.samples);
+    assignRecord(i, vector, config.prescale);
+    assignRecord(i, vector, config.offset);
+    assignRecord(i, vector, config.acqEnable);
+    assignRecord(i, vector, config.rateSel);
+    assignRecord(i, vector, config.destSel);
+    assignRecord(i, vector, config.inhibit);
+    assignRecord(i, vector, config.dmaTest);
+    assignRecord(i, vector, config.trigShift);
+    return config;
+  end function;
+  
+  function toSlv (status : QuadAdcStatusType) return slv
+  is
+    variable vector : slv(QADC_STATUS_TYPE_LEN_C-1 downto 0) := (others => '0');
+    variable i,j,low    : integer                               := 0;
+  begin
+    assignSlv(i, vector, status.partitionAddr);
+    for j in 4 downto 0 loop
+      for k in 31 downto 0 loop
+        assignSlv(i, vector, status.eventCount(j,k));
+      end loop;
+    end loop;
+    assignSlv(i, vector, status.dmaCtrlCount);
+    assignSlv(i, vector, status.dmaFullQ);
+    assignSlv(i, vector, status.adcSyncReg);
+    assignSlv(i, vector, status.eventCache);
+    --for j in 0 to MAX_OVL_C-1 loop
+    --  low := i;
+    --  i   := i+CACHETYPE_LEN_C;
+    --  vector(i-1 downto low) := cacheToSlv(status.eventCache(j));
+    --end loop;
+    assignSlv(i, vector, status.msgDelaySet);
+    assignSlv(i, vector, status.msgDelayGet);
+    assignSlv(i, vector, status.headerCntL0);
+    assignSlv(i, vector, status.headerCntOF);
+    assignSlv(i, vector, status.upstreamId(0));
+    for j in 0 to 3 loop
+      assignSlv(i, vector, status.dnstreamId(j));
+    end loop;
+    return vector;
+  end function;
+  
+  function toQadcStatus (vector : slv) return QuadAdcStatusType
+  is
+    variable status  : QuadAdcStatusType;
+    variable i,j,low : integer := vector'low;
+  begin
+    assignRecord(i, vector, status.partitionAddr);
+    for j in 4 downto 0 loop
+      for k in 31 downto 0 loop
+        assignRecord(i, vector, status.eventCount(j,k));
+      end loop;
+    end loop;
+    assignRecord(i, vector, status.dmaCtrlCount);
+    assignRecord(i, vector, status.dmaFullQ);
+    assignRecord(i, vector, status.adcSyncReg);
+    assignRecord(i, vector, status.eventCache);
+    --for j in 0 to MAX_OVL_C-1 loop
+    --  low := i;
+    --  i   := i+CACHETYPE_LEN_C;
+    --  status.eventCache(j) := toCacheType(vector(i-1 downto low));
+    --end loop;
+    assignRecord(i, vector, status.msgDelaySet);
+    assignRecord(i, vector, status.msgDelayGet);
+    assignRecord(i, vector, status.headerCntL0);
+    assignRecord(i, vector, status.headerCntOF);
+    assignRecord(i, vector, status.upstreamId(0));
+    for j in 0 to 3 loop
+      assignRecord(i, vector, status.dnstreamId(j));
+    end loop;
+    return status;
+  end function;
+  
+  function cacheToSlv (status : CacheType) return slv
+  is
+    variable vector : slv(CACHETYPE_LEN_C-1 downto 0) := (others => '0');
+    variable i      : integer                          := 0;
+    variable vstate : slv(3 downto 0) := (others=>'0');
+    variable vtrigd : slv(3 downto 0) := (others=>'0');
+  begin
+    case status.state is
+      when EMPTY_S   => vstate := x"0";
+      when OPEN_S    => vstate := x"1";
+      when CLOSED_S  => vstate := x"2";
+      when READING_S => vstate := x"3";
+      when others    => vstate := x"4";
+    end case;
+    assignSlv(i, vector, vstate);
+    case status.trigd is
+      when WAIT_T    => vtrigd := x"0";
+      when ACCEPT_T  => vtrigd := x"1";
+      when others    => vtrigd := x"2";
+    end case;
+    assignSlv(i, vector, vtrigd);
+    assignSlv(i, vector, status.toffs);
+    assignSlv(i, vector, status.boffs);
+    assignSlv(i, vector, status.eoffs);
+    assignSlv(i, vector, status.baddr);
+    assignSlv(i, vector, status.eaddr);
+    assignSlv(i, vector, status.skip);
+    assignSlv(i, vector, status.ovflow);
+    return vector;
+  end function;
+  
+  function toCacheType (vector : slv) return CacheType
+  is
+    variable status : CacheType;
+    variable i       : integer := vector'low;
+    variable vstate : slv(3 downto 0) := (others=>'0');
+    variable vtrigd : slv(3 downto 0) := (others=>'0');
+  begin
+    assignRecord(i, vector, vstate);
+    case vstate is
+      when x"0"   => status.state := EMPTY_S;
+      when x"1"   => status.state := OPEN_S;
+      when x"2"   => status.state := CLOSED_S;
+      when x"3"   => status.state := READING_S;
+      when others => status.state := LAST_S;
+    end case;
+    assignRecord(i, vector, vtrigd);
+    case vtrigd is
+      when x"0"   => status.trigd := WAIT_T;
+      when x"1"   => status.trigd := ACCEPT_T;
+      when others => status.trigd := REJECT_T;
+    end case;
+    assignRecord(i, vector, status.toffs);
+    assignRecord(i, vector, status.boffs);
+    assignRecord(i, vector, status.eoffs);
+    assignRecord(i, vector, status.baddr);
+    assignRecord(i, vector, status.eaddr);
+    assignRecord(i, vector, status.skip);
+    assignRecord(i, vector, status.ovflow);
+    return status;
+  end function;
+
+  function hsdTimingFbId(localId : slv) return slv is
+    variable vec : slv(31 downto 0);
+  begin
+    vec := toSlv(252,8) & localId(23 downto 0);
+    return vec;
+  end function;
+
 end package body QuadAdcPkg;
+

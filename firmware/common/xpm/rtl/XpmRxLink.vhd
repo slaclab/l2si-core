@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-12-14
--- Last update: 2017-10-25
+-- Last update: 2018-08-01
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -47,18 +47,20 @@ entity XpmRxLink is
     rxRst            : in  sl;
     rxErr            : in  sl;
     isXpm            : out sl;
+    id               : out slv(31 downto 0);
     rxRcvs           : out slv(31 downto 0);
     full             : out slv            (NPartitions-1 downto 0);
     l1Input          : out XpmL1InputArray(NPartitions-1 downto 0) );
 end XpmRxLink;
 
 architecture rtl of XpmRxLink is
-  type RxStateType is (IDLE_S, PFULL_S, PDATA1_S, PDATA2_S, DDATA_S);
+  type RxStateType is (IDLE_S, PFULL_S, ID1_S, ID2_S, PDATA1_S, PDATA2_S, DDATA_S);
   
   type RegType is record
     state     : RxStateType;
     partition : integer range 0 to NPartitions-1;
     isXpm     : sl;
+    id        : slv(31 downto 0);
     rxRcvs    : slv(31 downto 0);
     pfull     : slv(NPartitions-1 downto 0);
     l1input   : XpmL1InputType;
@@ -68,6 +70,7 @@ architecture rtl of XpmRxLink is
     state     => IDLE_S,
     partition => 0,
     isXpm     => '0',
+    id        => (others=>'0'),
     rxRcvs    => (others=>'0'),
     pfull     => (others=>'1'),
     l1input   => XPM_L1_INPUT_INIT_C,
@@ -81,6 +84,7 @@ architecture rtl of XpmRxLink is
 begin
 
   isXpm  <= r.isXpm;
+  id     <= r.id;
   rxRcvs <= r.rxRcvs;
   
   U_FIFO : for i in 0 to NPartitions-1 generate
@@ -152,6 +156,16 @@ begin
         end if;
       when PFULL_S =>
         v.pfull := rxData(r.pfull'range);
+        v.state := ID1_S;
+      when ID1_S =>
+        if (rxDataK="01" and rxData=(D_215_C & K_EOF_C)) then
+          v.state := IDLE_S;
+        else
+          v.id(15 downto 0) := rxData;
+          v.state := ID2_S;
+        end if;
+      when ID2_S =>
+        v.id(31 downto 16) := rxData;
         v.state := PDATA1_S;
       when PDATA1_S =>
         if (rxDataK="01" and rxData=(D_215_C & K_EOF_C)) then

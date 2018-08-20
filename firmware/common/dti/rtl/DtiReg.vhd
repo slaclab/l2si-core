@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-12-14
--- Last update: 2018-05-13
+-- Last update: 2018-07-26
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -165,7 +165,7 @@ begin
                dataOut => usStatus.rxInh );
   
   U_UsRemLinkID : entity work.SynchronizerVector
-    generic map ( WIDTH_G => 8 )
+    generic map ( WIDTH_G => 32 )
     port map ( clk     => axilClk,
                dataIn  => iusStatus.remLinkID,
                dataOut => usStatus.remLinkID );
@@ -227,7 +227,7 @@ begin
   dsStatus.rxErrs <= idsStatus.rxErrs;
   
   U_DsRemLinkID : entity work.SynchronizerVector
-    generic map ( WIDTH_G => 8 )
+    generic map ( WIDTH_G => 32 )
     port map ( clk     => axilClk,
                dataIn  => idsStatus.remLinkID,
                dataOut => dsStatus.remLinkID );
@@ -384,8 +384,7 @@ begin
                     v.axilWriteSlaves(1),  v.axilReadSlaves(1));
     v.axilReadSlaves(1).rdata := (others=>'0');
     
-    axilRegR (toSlv( 16*0+0 ,7),  0, usStatus.rxErrs(23 downto 0) );
-    axilRegR (toSlv( 16*0+0 ,7), 24, usStatus.remLinkID);
+    axilRegR (toSlv( 16*0+0 ,7),  0, usStatus.remLinkID );
     axilRegR (toSlv( 16*0+4 ,7),  0, usStatus.rxFull );
 --    axilRegR (toSlv( 16*0+8 ,7),  0, usStatus.ibRecv (31 downto 0));
     axilRegR (toSlv( 16*0+8 ,7),  0, usStatus.rxInh(23 downto 0) );
@@ -393,8 +392,7 @@ begin
     axilRegR (toSlv( 16*0+8 ,7), 28, usStatus.rdFifoD );
     axilRegR (toSlv( 16*0+12,7),  0, usStatus.ibEvt );
 
-    axilRegR (toSlv( 16*1+0 ,7),  0, dsStatus.rxErrs(23 downto 0));
-    axilRegR (toSlv( 16*1+0 ,7), 24, dsStatus.remLinkID);
+    axilRegR (toSlv( 16*1+0 ,7),  0, dsStatus.remLinkID);
     axilRegR (toSlv( 16*1+4 ,7),  0, dsStatus.rxFull);
     axilRegR (toSlv( 16*1+8 ,7),  0, dsStatus.obSent(31 downto 0));
     axilRegR (toSlv( 16*1+12,7),  0, dsStatus.obSent(47 downto 32));

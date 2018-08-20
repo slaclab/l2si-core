@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-07-08
--- Last update: 2017-07-23
+-- Last update: 2018-07-26
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -35,6 +35,7 @@ use work.AxiStreamPkg.all;
 use work.SsiPkg.all;
 use work.AxiPkg.all;
 use work.AxiLitePkg.all;
+use work.TimingExtnPkg.all;
 use work.TimingPkg.all;
 use work.AmcCarrierPkg.all;
 use work.AmcCarrierSysRegPkg.all;

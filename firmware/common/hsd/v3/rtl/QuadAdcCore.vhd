@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2016-01-04
--- Last update: 2018-06-27
+-- Last update: 2018-08-02
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -32,6 +32,7 @@ use unisim.vcomponents.all;
 use work.StdRtlPkg.all;
 use work.AxiLitePkg.all;
 use work.AxiStreamPkg.all;
+use work.TimingExtnPkg.all;
 use work.TimingPkg.all;
 use work.XpmPkg.all;
 use work.EventPkg.all;
@@ -193,6 +194,7 @@ begin
                rst        => timingFbRst,
                pllReset   => fbPllRst,
                phyReset   => fbPhyRst,
+               id         => hsdTimingFbId(config.localId),
                l1input    => (others=>XPM_L1_INPUT_INIT_C),
                full       => dmaFullV,
                phy        => timingFb );

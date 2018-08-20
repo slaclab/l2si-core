@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-07-10
--- Last update: 2017-12-11
+-- Last update: 2018-07-26
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -41,6 +41,7 @@ entity DtiPgp3Fb is
      pgpClk          : in  sl;
      pgpRst          : in  sl;
      pgpRxOut        : in  Pgp3RxOutType;
+     rxLinkId        : out slv(31 downto 0);
      rxAlmostFull    : out sl;
      txAlmostFull    : out sl );
 end DtiPgp3Fb;
@@ -59,6 +60,7 @@ architecture rtl of DtiPgp3Fb is
     tx_almost_full : sl;
     tmo            : slv(11 downto 0);
     opCodeFound    : sl;
+    rxLinkId       : slv(31 downto 0);
   end record;
 
   constant REG_INIT_C : RegType := (
@@ -66,7 +68,8 @@ architecture rtl of DtiPgp3Fb is
     rx_almost_full => '1',
     tx_almost_full => '1',
     tmo            => (others=>'0'),
-    opCodeFound    => '0' );
+    opCodeFound    => '0',
+    rxLinkId       => (others=>'0'));
 
   signal r    : RegType := REG_INIT_C;
   signal r_in : RegType;
@@ -82,6 +85,7 @@ begin
     
     if pgpRxOut.opCodeEn = '1' then
       v.opCodeFound := '1';
+      v.rxLinkId    := pgpRxOut.opCodeData(47 downto 16);
       case (pgpRxOut.opCodeData(7 downto 0)) is
         when NONE_AF_OPCODE =>
           v.rx_almost_full := '0';
@@ -116,6 +120,7 @@ begin
     
     r_in <= v;
 
+    rxLinkId     <= r.rxLinkId;
     rxAlmostFull <= r.rx_almost_full or r.rx_full;
     txAlmostFull <= r.tx_almost_full;
   end process;

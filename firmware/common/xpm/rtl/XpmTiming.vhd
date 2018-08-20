@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-07-08
--- Last update: 2018-03-09
+-- Last update: 2018-07-20
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -64,7 +64,6 @@ entity XpmTiming is
       recTimingClk     : out sl;
       recTimingRst     : out sl;
       recTimingBus     : out TimingBusType;
-      recExptBus       : out ExptBusType;
       recData          : out TimingRxType;
       appTimingPhy     : in  TimingPhyType;             -- Input for timing generator only
       appTimingPhyClk  : out sl;
@@ -330,7 +329,6 @@ begin
          appTimingClk    => rxOutClk,
          appTimingRst    => rxRst,
          appTimingBus    => recTimingBus,
-         exptBus         => recExptBus,
          timingPhy       => genTimingPhy,
          axilClk         => axilClk,
          axilRst         => axilRst,

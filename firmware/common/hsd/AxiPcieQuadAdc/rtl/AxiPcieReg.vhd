@@ -5,7 +5,7 @@
 -- Author     : Larry Ruckman  <ruckman@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2016-02-12
--- Last update: 2018-06-28
+-- Last update: 2018-08-03
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -90,6 +90,8 @@ end AxiPcieReg;
 
 architecture mapping of AxiPcieReg is
 
+   constant HSD_PGP_DEVICE_ID_C : slv(31 downto 0) := x"FC000000";
+   
    constant NUM_AXI_MASTERS_C : natural := 9;
 
    constant VERSION_INDEX_C : natural := 0;
@@ -270,6 +272,7 @@ begin
          AXI_ERROR_RESP_G => AXI_ERROR_RESP_G,
          EN_DEVICE_DNA_G  => true,
          XIL_DEVICE_G     => XIL_DEVICE_G,
+         DEVICE_ID_G      => HSD_PGP_DEVICE_ID_C,
          BUILD_INFO_G     => BUILD_INFO_G )
       port map (
          -- AXI-Lite Interface
@@ -285,7 +288,7 @@ begin
    --------------------------
    -- Xilinx Virtual Cable Module
    --------------------------   
-   U_XVC : entity work.DebugBridgeWrapper
+   U_XVC : entity work.JtagBridgeWrapper
      port map (
        axilClk         => mclk,
        axilRst         => mrst,

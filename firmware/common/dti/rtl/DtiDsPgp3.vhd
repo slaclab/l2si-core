@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-07-10
--- Last update: 2018-04-12
+-- Last update: 2018-07-26
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -70,7 +70,7 @@ entity DtiDsPgp3 is
      ibRst           : in  sl;
      loopback        : in  sl;
      linkUp          : out sl;
-     remLinkID       : out slv(7 downto 0);
+     remLinkID       : out slv(31 downto 0);
      rxErrs          : out slv(31 downto 0);
      full            : out sl;
      monClk          : out sl;
@@ -110,7 +110,6 @@ begin
   pgpRxIn.loopback         <= '0' & loopback & '0';
   linkUp                   <= pgpRxOut.linkReady;
 --  remLinkID                <= pgpRxOut.remLinkData;
-  remLinkID                <= (others=>'0');
   monClk                   <= pgpClk;
   
   U_Fifo : entity work.AxiStreamFifo
@@ -131,16 +130,18 @@ begin
       mAxisMaster => amcObMaster,
       mAxisSlave  => amcObSlave );
 
-  U_RXERR : entity work.SynchronizerOneShotCnt
-    generic map ( CNT_WIDTH_G => 32 )
-    port map ( wrClk   => pgpClk,
-               rdClk   => axilClk,
-               cntRst  => fifoRst,
-               rollOverEn => '1',
-               dataIn  => pgpRxOut.linkError,
-               dataOut => open,
-               cntOut  => rxErrs );
-
+  --U_RXERR : entity work.SynchronizerOneShotCnt
+  --  generic map ( CNT_WIDTH_G => 32 )
+  --  port map ( wrClk   => pgpClk,
+  --             rdClk   => axilClk,
+  --             cntRst  => fifoRst,
+  --             rollOverEn => '1',
+  --             dataIn  => pgpRxOut.linkError,
+  --             dataOut => open,
+  --             cntOut  => rxErrs );
+  -- 64b/66b encoding doesn't trap many errors
+  rxErrs                   <= (others=>'0');
+  
   pgpTxMasters(0)          <= amcObMaster;
   amcObSlave               <= pgpTxSlaves(0);
 
@@ -148,7 +149,8 @@ begin
     port map ( pgpClk       => pgpClk,
                pgpRst       => pgpRst,
                pgpRxOut     => pgpRxOut,
-               rxAlmostFull => full );
+               rxAlmostFull => full,
+               rxLinkId     => remLinkID );
 
   U_Pgp3 : entity work.Pgp3GthUs
     generic map ( NUM_VC_G     => NUM_DTI_VC_C,

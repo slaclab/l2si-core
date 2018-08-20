@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-07-08
--- Last update: 2017-11-16
+-- Last update: 2018-08-02
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -37,6 +37,7 @@ entity XpmTimingFb is
       rst            : in  sl;
       pllReset       : in  sl := '0';
       phyReset       : in  sl := '0';
+      id             : in  slv(31 downto 0) := (others=>'1');
       l1input        : in  XpmL1InputArray(NPartitions-1 downto 0);
       full           : in  slv            (NPartitions-1 downto 0);
       l1ack          : out slv            (NPartitions-1 downto 0);
@@ -45,7 +46,7 @@ end XpmTimingFb;
 
 architecture rtl of XpmTimingFb is
 
-  type StateType is (IDLE_S, PFULL_S, PDATA1_S, PDATA2_S, EOF_S);
+  type StateType is (IDLE_S, PFULL_S, ID1_S, ID2_S, PDATA1_S, PDATA2_S, EOF_S);
   
   constant MAX_IDLE_C : slv(7 downto 0) := x"0F";
 
@@ -114,7 +115,7 @@ begin
   phy.control.polarity <= '0';
   phy.control.bufferByRst <= '0';
   
-  comb: process (r, full, l1input, rst) is
+  comb: process (r, full, l1input, rst, id) is
     variable v : RegType;
   begin
     v := r;
@@ -150,6 +151,14 @@ begin
         v.txData  := (others=>'0');
         v.txData(full'range) := full;
         v.full := full;
+        v.state   := ID1_S;
+      when ID1_S =>
+        v.txDataK := "00";
+        v.txData  := id(15 downto 0);
+        v.state   := ID2_S;
+      when ID2_S =>
+        v.txDataK := "00";
+        v.txData  := id(31 downto 16);
         v.state   := EOF_S;
         v.partition := 0;
         for i in 0 to NPartitions-1 loop

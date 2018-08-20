@@ -5,7 +5,7 @@
 -- Author     : Larry Ruckman  <ruckman@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2016-02-12
--- Last update: 2018-06-19
+-- Last update: 2018-08-03
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -31,6 +31,7 @@ use work.AxiLitePkg.all;
 use work.AxiStreamPkg.all;
 use work.AxiPciePkg.all;
 use work.AxiPcieRegPkg.all;
+use work.TimingExtnPkg.all;
 use work.TimingPkg.all;
 use work.I2cPkg.all;
 
@@ -147,6 +148,7 @@ architecture mapping of AxiPcieQuadAdcCore is
    signal timingRefClk   : sl;
    signal timingClk      : sl;
    signal timingClkRst   : sl;
+   signal intTimingBus   : TimingBusType;
    signal rxStatus       : TimingPhyStatusType;
    signal rxControl      : TimingPhyControlType;
    signal rxUsrClk       : sl;
@@ -170,7 +172,7 @@ architecture mapping of AxiPcieQuadAdcCore is
    signal dmaIrq  : sl;
    signal dmaIrqAck : sl;
    
-   constant DEVICE_MAP_C : I2cAxiLiteDevArray(11 downto 0) := (
+   constant DEVICE_MAP_C : I2cAxiLiteDevArray(12 downto 0) := (
      -- PCA9548A I2C Mux
      0 => MakeI2cAxiLiteDevType( "1110100", 8, 0, '0' ),
      -- SI5338 Local clock synthesizer
@@ -200,7 +202,9 @@ architecture mapping of AxiPcieQuadAdcCore is
      --  FMC SPI Bridge [1B addressing, 1B payload]
      10 => MakeI2cAxiLiteDevType( "0101000",16, 8, '0' ),
      --  FMC SPI Bridge [2B addressing, 1B payload]
-     11 => MakeI2cAxiLiteDevType( "0101000",24, 8, '0' )
+     11 => MakeI2cAxiLiteDevType( "0101000",24, 8, '0' ),
+     --  FMC EEPROM
+     12 => MakeI2cAxiLiteDevType( "1010000",8, 8, '0' )
    );                                                        
 
    signal flash_clk      : sl;
@@ -583,8 +587,7 @@ begin
          gtLoopback      => loopback,
          appTimingClk    => timingClk,
          appTimingRst    => timingClkRst,
-         appTimingBus    => timingBus,
-         exptBus         => exptBus,
+         appTimingBus    => intTimingBus,
          timingPhy       => open,
          timingClkSel    => open,
          axilClk         => axilClk,
@@ -594,6 +597,10 @@ begin
          axilWriteMaster => timWriteMaster,
          axilWriteSlave  => timWriteSlave);
 
+   timingBus         <= intTimingBus;
+   exptBus.message   <= ExptMessageType(intTimingBus.extn);
+   exptBus.valid     <= intTimingBus.extnValid;
+     
    timingFbClk <= txUsrClk;
    timingFbRst <= txUsrRst;
    
