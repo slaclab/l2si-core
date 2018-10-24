@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2016-03-25
--- Last update: 2018-08-19
+-- Last update: 2018-08-23
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -294,7 +294,7 @@ package body DtiPkg is
    function dtiUsLinkId(ip : slv; constant link : integer) return slv is
      variable id  : slv(31 downto 0);
    begin
-     id := x"FE" & ip(15 downto 0) & x"F" & toSlv(integer,4);
+     id := x"FE" & ip(15 downto 0) & x"F" & toSlv(link,4);
      return id;
    end function;
 

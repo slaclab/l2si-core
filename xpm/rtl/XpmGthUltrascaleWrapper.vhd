@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-12-14
--- Last update: 2018-04-04
+-- Last update: 2018-09-06
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -22,6 +22,7 @@
 
 library ieee;
 use ieee.std_logic_1164.all;
+use ieee.std_logic_unsigned.all;
 
 use work.StdRtlPkg.all;
 use work.XpmPkg.all;
@@ -117,6 +118,22 @@ COMPONENT gt_dslink_ss_nophase_amc0
   );
 END COMPONENT;
 
+  type RegType is record
+    clkcnt  : slv(5 downto 0);
+    errdet  : sl;
+    reset   : sl;
+  end record;
+  constant REG_INIT_C : RegType := (
+    clkcnt  => (others=>'0'),
+    errdet  => '0',
+    reset   => '0' );
+  type RegTypeArray is array(natural range<>) of RegType;
+
+  constant ERR_INTVL : slv(5 downto 0) := (others=>'1');
+  
+  signal r    : RegTypeArray(NLINKS_G-1 downto 0) := (others=>REG_INIT_C);
+  signal rin  : RegTypeArray(NLINKS_G-1 downto 0);
+  
   signal txCtrl2In  : Slv8Array (NLINKS_G-1 downto 0);
   signal rxCtrl0Out : Slv16Array(NLINKS_G-1 downto 0);
   signal rxCtrl1Out : Slv16Array(NLINKS_G-1 downto 0);
@@ -135,6 +152,7 @@ END COMPONENT;
   signal rxFifoRst : slv(NLINKS_G-1 downto 0);
   signal rxErrIn   : slv(NLINKS_G-1 downto 0);
 
+  signal rxReset      : slv(NLINKS_G-1 downto 0);
   signal rxResetDone  : slv(NLINKS_G-1 downto 0);
  
   signal rxbypassrst  : slv(NLINKS_G-1 downto 0);
@@ -182,6 +200,7 @@ begin
     status    (i).rxErr       <= rxErrS(i);
     status    (i).rxErrCnts   <= rxErrCnts(i);
     status    (i).rxReady     <= rxResetDone(i);
+    rxReset   (i) <= config(i).rxReset or r(i).reset;
     
     U_STATUS : entity work.SynchronizerOneShotCnt
       generic map ( CNT_WIDTH_G => 16 )
@@ -223,7 +242,7 @@ begin
 
     U_RstSyncRx : entity work.RstSync
       port map ( clk      => rxUsrClk(i),
-                 asyncRst => config(i).rxReset,
+                 asyncRst => rxReset(i),
                  syncRst  => rxbypassrst(i) );
 
     U_GthCore : gt_dslink_ss_nophase_amc0 -- 1 RTM link
@@ -243,7 +262,7 @@ begin
         gtwiz_reset_tx_pll_and_datapath_in(0)=> config(i).txPllReset,
         gtwiz_reset_tx_datapath_in        (0)=> config(i).txReset,
         gtwiz_reset_rx_pll_and_datapath_in(0)=> config(i).rxPllReset,
-        gtwiz_reset_rx_datapath_in        (0)=> config(i).rxReset,
+        gtwiz_reset_rx_datapath_in        (0)=> rxReset(i),
         gtwiz_reset_rx_cdr_stable_out        => open,
         gtwiz_reset_tx_done_out           (0)=> status(i).txReady,
         gtwiz_reset_rx_done_out           (0)=> rxResetDone(i),
@@ -283,6 +302,42 @@ begin
         txoutclk_out                      (0)=> txOutClk(i),
         txpmaresetdone_out                   => open
         );
-  end generate GEN_CTRL;
+
+    comb : process ( r, rxResetDone, rxErrIn ) is
+      variable v : RegType;
+    begin
+      v := r(i);
+
+      if rxErrIn(i)='1' then
+        if r(i).errdet='1' then
+          v.reset := '1';
+        else
+          v.errdet := '1';
+        end if;
+      end if;
+
+      if r(i).reset='0' then
+        v.clkcnt := r(i).clkcnt+1;
+        if r(i).clkcnt=ERR_INTVL then
+          v.errdet := '0';
+          v.clkcnt := (others=>'0');
+        end if;
+      end if;
+
+      if rxResetDone(i)='0' then
+        v := REG_INIT_C;
+      end if;
+      
+      rin(i) <= v;
+    end process comb;
+
+    seq : process ( rxUsrClk ) is
+    begin
+      if rising_edge(rxUsrClk(i)) then
+        r(i) <= rin(i);
+      end if;
+    end process seq;
     
+  end generate GEN_CTRL;
+
 end rtl;

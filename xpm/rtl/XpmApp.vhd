@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-07-10
--- Last update: 2018-08-02
+-- Last update: 2018-09-06
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -277,9 +277,6 @@ begin
     --  test if we are the top of the hierarchy
     if streams(1).ready='1' then
       v.source        := '0';
-    else
-      v.paddr         := (others=>'1');
-      v.source        := '1';
     end if;
 
     if (advance(0)='0' and r.advance(0)='1') then

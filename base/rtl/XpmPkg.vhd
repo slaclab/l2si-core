@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2016-03-25
--- Last update: 2018-08-02
+-- Last update: 2018-09-12
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -496,7 +496,7 @@ package body XpmPkg is
    function xpmTimingFbId(ip : slv) return slv is
      variable id  : slv(31 downto 0);
    begin
-     id := x"FF" & ip(15 downto 0) & x"00";
+     id := x"FF" & ip(23 downto 16) & ip(31 downto 8) & x"00";
      return id;
    end function;
      

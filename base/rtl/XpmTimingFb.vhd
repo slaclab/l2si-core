@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-07-08
--- Last update: 2018-08-02
+-- Last update: 2018-09-05
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -37,6 +37,7 @@ entity XpmTimingFb is
       rst            : in  sl;
       pllReset       : in  sl := '0';
       phyReset       : in  sl := '0';
+      status         : in  TimingPhyStatusType := TIMING_PHY_STATUS_INIT_C;
       id             : in  slv(31 downto 0) := (others=>'1');
       l1input        : in  XpmL1InputArray(NPartitions-1 downto 0);
       full           : in  slv            (NPartitions-1 downto 0);
@@ -103,7 +104,11 @@ begin
                  probe0(38 downto 31) => r.full(7 downto 0),
                  probe0(46 downto 39) => r.strobe(7 downto 0),
                  probe0(54 downto 47) => full(7 downto 0),
-                 probe0(255 downto 55) => (others=>'0') );
+                 probe0(55)           => status.locked,
+                 probe0(56)           => status.resetDone,
+                 probe0(57)           => status.bufferByDone,
+                 probe0(58)           => status.bufferByErr,
+                 probe0(255 downto 59) => (others=>'0') );
   end generate;
   
   l1ack       <= r.strobe;
