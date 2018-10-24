@@ -1,3 +1,0 @@
-../../modules/AmcCarrierCore/head/xdc/AmcCarrierCore.xdc
-../../modules/AmcCarrierCore/head/xdc/AmcGenericAdcDacBay1Pinout.xdc
-hdl/AmcCarrierTimingGenerator.xdc

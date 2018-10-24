@@ -1,1 +1,0 @@
-cmd_/reg/neh/home5/weaver/l2si/software/kernel/pgpcardG3/pgpcardG3.ko := ld -r -m elf_x86_64 -T ./scripts/module-common.lds --build-id  -o /reg/neh/home5/weaver/l2si/software/kernel/pgpcardG3/pgpcardG3.ko /reg/neh/home5/weaver/l2si/software/kernel/pgpcardG3/pgpcardG3.o /reg/neh/home5/weaver/l2si/software/kernel/pgpcardG3/pgpcardG3.mod.o
