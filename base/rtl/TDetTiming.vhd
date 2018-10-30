@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-07-08
--- Last update: 2018-10-16
+-- Last update: 2018-10-28
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -67,12 +67,14 @@ entity TDetTiming is
       timingTxP        : out sl;
       timingTxN        : out sl;
       timingRefClkInP  : in  sl;
-      timingRefClkInN  : in  sl);
+      timingRefClkInN  : in  sl;
+      timingRefClkOut  : out sl);
 end TDetTiming;
 
 architecture mapping of TDetTiming is
 
    signal timingRefClk   : sl;
+   signal timingRefClkDiv: sl;
    signal rxControl      : TimingPhyControlType;
    signal rxStatus       : TimingPhyStatusType;
    signal rxCdrStable    : sl;
@@ -105,14 +107,24 @@ begin
    TIMING_REFCLK_IBUFDS_GTE3 : IBUFDS_GTE3
       generic map (
          REFCLK_EN_TX_PATH  => '0',
-         REFCLK_HROW_CK_SEL => "01",    -- 2'b01: ODIV2 = Divide-by-2 version of O
+         REFCLK_HROW_CK_SEL => "00",    -- 2'b01: ODIV2 = Divide-by-2 version of O
          REFCLK_ICNTL_RX    => "00")
       port map (
          I     => timingRefClkInP,
          IB    => timingRefClkInN,
          CEB   => '0',
-         ODIV2 => open,
+         ODIV2 => timingRefClkDiv,
          O     => timingRefClk);
+
+   U_BUFG_GT : BUFG_GT
+    port map (
+      I       => timingRefClkDiv,
+      CE      => '1',
+      CLR     => '0',
+      CEMASK  => '1',
+      CLRMASK => '1',
+      DIV     => "000",              -- Divide by 1
+      O       => timingRefClkOut );
 
    -------------------------------------------------------------------------------------------------
    -- GTH Timing Receiver
