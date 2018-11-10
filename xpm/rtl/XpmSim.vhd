@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-07-10
--- Last update: 2018-08-03
+-- Last update: 2018-11-02
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -45,6 +45,7 @@ entity XpmSim is
             ENABLE_BP_LINKS_G : slv(NBPLinks-1 downto 0) := (others=>'0');
             RATE_DIV_G        : integer := 4;
             RATE_SELECT_G     : integer := 1;
+            TRIG_DELAY_G      : integer := 80;
             PIPELINE_DEPTH_G  : integer := 200 );
   port ( txRefClk     : in  sl := '0';
          dsRxClk      : in  slv       (NDSLinks-1 downto 0);
@@ -172,6 +173,7 @@ begin
                configI  => tpgConfig );
 
   tpgConfig.FixedRateDivisors(RATE_SELECT_G) <= toSlv(RATE_DIV_G,20);
+  tpgConfig.pulseIdWrEn                      <= '0';
   
   xpmConfig.partition <= pconfig;
   xpmConfig.dsLink(0).txDelay <= toSlv(200,20);
@@ -194,7 +196,7 @@ begin
   process is
   begin
      for i in 0 to NPartitions-1 loop
-       pconfig(i).pipeline.depth <= toSlv((80+i)*200,20);
+       pconfig(i).pipeline.depth <= toSlv((TRIG_DELAY_G+i)*200,20);
      end loop;
        
      pconfig(0).analysis.rst  <= x"f";
@@ -229,7 +231,7 @@ begin
      wait for 10000 ns;
      for i in 0 to NPartitions-1 loop
        pconfig(i).message.hdr     <= MSG_DELAY_PWORD;
-       pconfig(i).message.payload <= toSlv(80+i,8);
+       pconfig(i).message.payload <= toSlv(TRIG_DELAY_G+i,8);
        pconfig(i).message.insert  <= '1';
      end loop;
    
@@ -240,7 +242,9 @@ begin
        pconfig(i).message.insert  <= '0';
      end loop;
 
-     wait for 120 us;
+     for i in 0 to TRIG_DELAY_G loop
+       wait for 1 us;
+     end loop;
      
      pconfig(0).l0Select.enabled <= '1';
      pconfig(0).l0Select.rateSel <= toSlv(RATE_SELECT_G,16);

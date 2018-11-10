@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-12-14
--- Last update: 2017-12-21
+-- Last update: 2018-10-31
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -74,25 +74,8 @@ architecture rtl of XpmL0Select is
 
    signal uconfig : XpmL0SelectConfigType;
 
-   component ila_3
-     port ( clk    : in sl;
-            probe0 : in slv(7 downto 0) );
-   end component;
 begin
 
-  GEN_DEBUG : if DEBUG_G generate
-    U_ILA : ila_3
-      port map ( clk      => clk,
-                 probe0(0) => timingBus.strobe,
-                 probe0(1) => uconfig.enabled,
-                 probe0(2) => strobe,
-                 probe0(3) => inhibit,
-                 probe0(4) => r.status.enabled  (0),
-                 probe0(5) => r.status.inhibited(0),
-                 probe0(6) => r.status.num      (0),
-                 probe0(7) => r.status.numInh   (0) );
-  end generate;
-  
    accept <= r.accept;
    rejecc <= r.rejecc;
    status <= r.status;

@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-07-08
--- Last update: 2018-10-30
+-- Last update: 2018-11-02
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -34,10 +34,7 @@ use work.EventPkg.all;
 use work.TDetPkg.all;
 use work.XpmPkg.all;
 
-library unisim;
-use unisim.vcomponents.all;
-
-entity TDetTiming is
+entity TDetTimingSim is
    generic (
       TPD_G               : time             := 1 ns;
       NDET_G              : natural          := 1;
@@ -65,31 +62,22 @@ entity TDetTiming is
       ----------------
       -- Core Ports --
       ----------------   
-      -- AXI-Lite Interface (axilClk domain)
-      axilClk          : in  sl;
-      axilRst          : in  sl;
-      axilReadMaster   : in  AxiLiteReadMasterType;
-      axilReadSlave    : out AxiLiteReadSlaveType;
-      axilWriteMaster  : in  AxiLiteWriteMasterType;
-      axilWriteSlave   : out AxiLiteWriteSlaveType;
       -- LCLS Timing Ports
-      timingRxP        : in  sl;
-      timingRxN        : in  sl;
-      timingTxP        : out sl;
-      timingTxN        : out sl;
-      timingRefClkInP  : in  sl;
-      timingRefClkInN  : in  sl;
       timingRefClkOut  : out sl;
       timingRecClkOut  : out sl;
       timingBusOut     : out TimingBusType );
-end TDetTiming;
+end TDetTimingSim;
 
-architecture mapping of TDetTiming is
+architecture mapping of TDetTimingSim is
 
    signal timingRefClk   : sl;
    signal timingRefClkDiv: sl;
    signal rxControl      : TimingPhyControlType;
-   signal rxStatus       : TimingPhyStatusType;
+   signal rxStatus       : TimingPhyStatusType := (
+     locked       => '1',
+     resetDone    => '1',
+     bufferByDone => '1',
+     bufferByErr  => '0' );
    signal rxCdrStable    : sl;
    signal rxUsrClk       : sl;
    signal rxData         : slv(15 downto 0);
@@ -98,13 +86,17 @@ architecture mapping of TDetTiming is
    signal rxDecErr       : slv(1 downto 0);
    signal rxOutClk       : sl;
    signal rxRst          : sl;
-   signal txStatus       : TimingPhyStatusType := TIMING_PHY_STATUS_INIT_C;
+   signal txStatus       : TimingPhyStatusType := (
+     locked       => '1',
+     resetDone    => '1',
+     bufferByDone => '1',
+     bufferByErr  => '0' );
    signal txUsrClk       : sl;
    signal txUsrRst       : sl;
    signal txOutClk       : sl;
    signal loopback       : slv(2 downto 0);
    signal timingPhy      : TimingPhyType;
-   signal timingBus      : TimingBusType;
+   signal timingBus      : TimingBusType := TIMING_BUS_INIT_C;
 
    signal appTimingHdr   : TimingHeaderType; -- aligned
    signal appExptBus     : ExptBusType;      -- aligned
@@ -117,116 +109,93 @@ architecture mapping of TDetTiming is
    signal tdetMaster     : AxiStreamMasterArray (NDET_G-1 downto 0);
    signal tdetSlave      : AxiStreamSlaveArray  (NDET_G-1 downto 0);
    signal hdrOut         : EventHeaderArray     (NDET_G-1 downto 0);
+
+   signal xpmClk       : slv       (NDSLinks-1 downto 0);
+   signal xpmDsRxData  : Slv16Array(NDSLinks-1 downto 0) := (others=>x"0000");
+   signal xpmDsRxDataK : Slv2Array (NDSLinks-1 downto 0) := (others=>"00");
+   signal xpmDsTxData  : Slv16Array(NDSLinks-1 downto 0);
+   signal xpmDsTxDataK : Slv2Array (NDSLinks-1 downto 0);
+   
 begin
 
    trigClk         <= rxOutClk;
    timingRecClkOut <= rxOutClk;
    timingBusOut    <= timingBus;
-
-   -------------------------------------------------------------------------------------------------
-   -- Clock Buffers
-   -------------------------------------------------------------------------------------------------
-   TIMING_REFCLK_IBUFDS_GTE3 : IBUFDS_GTE3
-      generic map (
-         REFCLK_EN_TX_PATH  => '0',
-         REFCLK_HROW_CK_SEL => "00",    -- 2'b01: ODIV2 = Divide-by-2 version of O
-         REFCLK_ICNTL_RX    => "00")
-      port map (
-         I     => timingRefClkInP,
-         IB    => timingRefClkInN,
-         CEB   => '0',
-         ODIV2 => timingRefClkDiv,
-         O     => timingRefClk);
-
-   U_BUFG_GT : BUFG_GT
-    port map (
-      I       => timingRefClkDiv,
-      CE      => '1',
-      CLR     => '0',
-      CEMASK  => '1',
-      CLRMASK => '1',
-      DIV     => "000",              -- Divide by 1
-      O       => timingRefClkOut );
-
-   -------------------------------------------------------------------------------------------------
-   -- GTH Timing Receiver
-   -------------------------------------------------------------------------------------------------
-     TimingGthCoreWrapper_1 : entity work.TimingGtCoreWrapper
-       generic map ( TPD_G            => TPD_G,
-                     EXTREF_G         => true,
-                     AXIL_BASE_ADDR_G => (others=>'0') )
-       port map (
-         axilClk        => axilClk,
-         axilRst        => axilRst,
-         axilReadMaster => AXI_LITE_READ_MASTER_INIT_C,
-         axilReadSlave  => open,
-         axilWriteMaster=> AXI_LITE_WRITE_MASTER_INIT_C,
-         axilWriteSlave => open,
-         stableClk      => axilClk,
-         stableRst      => axilRst,
-         gtRefClk       => timingRefClk,
-         gtRefClkDiv2   => '0',
-         gtRxP          => timingRxP,
-         gtRxN          => timingRxN,
-         gtTxP          => timingTxP,
-         gtTxN          => timingTxN,
-         rxControl      => rxControl,
-         rxStatus       => rxStatus,
-         rxUsrClkActive => '1',
-         rxCdrStable    => rxCdrStable,
-         rxUsrClk       => rxUsrClk,
-         rxData         => rxData,
-         rxDataK        => rxDataK,
-         rxDispErr      => rxDispErr,
-         rxDecErr       => rxDecErr,
-         rxOutClk       => rxOutClk,
-         txControl      => timingPhy.control,
-         txStatus       => txStatus,
-         txUsrClk       => txUsrClk,
-         txUsrClkActive => '1',
-         txData         => timingPhy.data,
-         txDataK        => timingPhy.dataK,
-         txOutClk       => txUsrClk,
-         loopback       => loopback);
-
-   txUsrRst         <= not (txStatus.resetDone);
-   rxRst            <= not (rxStatus.resetDone);
-   rxUsrClk         <= rxOutClk;
+   rxRst           <= tdetRst;
    
-   TimingCore_1 : entity work.TimingCore
-     generic map ( TPD_G             => TPD_G,
-                   CLKSEL_MODE_G     => "LCLSII",
-                   USE_TPGMINI_G     => false,
-                   ASYNC_G           => false,
-                   AXIL_BASE_ADDR_G  => AXIL_BASEADDR_G )
-     port map (
-         gtTxUsrClk      => txUsrClk,
-         gtTxUsrRst      => txUsrRst,
-         gtRxRecClk      => rxOutClk,
-         gtRxData        => rxData,
-         gtRxDataK       => rxDataK,
-         gtRxDispErr     => rxDispErr,
-         gtRxDecErr      => rxDecErr,
-         gtRxControl     => rxControl,
-         gtRxStatus      => rxStatus,
-         gtLoopback      => loopback,
-         appTimingClk    => rxOutClk,
-         appTimingRst    => rxRst,
-         appTimingBus    => timingBus,
-         timingPhy       => open, -- TPGMINI
-         axilClk         => axilClk,
-         axilRst         => axilRst,
-         axilReadMaster  => axilReadMaster,
-         axilReadSlave   => axilReadSlave,
-         axilWriteMaster => axilWriteMaster,
-         axilWriteSlave  => axilWriteSlave );
+   process is
+   begin
+     rxOutClk <= '1';
+     wait for 2.69 ns;
+     rxOutClk <= '0';
+     wait for 2.69 ns;
+   end process;
 
+   --  Need timingBus with extn
+   process is
+     variable pulseId : slv(63 downto 0) := (others=>'0');
+     variable anatag  : slv(23 downto 0) := (others=>'0');
+     variable pmsg    : XpmPartitionMsgType  := XPM_PARTITION_MSG_INIT_C;
+     variable pdat    : XpmPartitionDataType := XPM_PARTITION_DATA_INIT_C;
+     variable frame   : slv( 3 downto 0) := (others=>'0');
+   begin
+     timingBus <= TIMING_BUS_INIT_C;
+     timingBus.valid     <= '1';
+     timingBus.modesel   <= '1';
+     timingBus.message.version    <= toSlv(1,16);
+
+     wait for 1 us;
+     wait until rxOutClk = '0';
+
+     for j in 0 to 99 loop
+       timingBus.message.pulseId    <= pulseId;
+       timingBus.message.timeStamp  <= pulseId;
+       timingBus.strobe    <= '1';
+
+       timingBus.extn.partitionWord(0)(0)  <= '0'; -- No L0
+       timingBus.extn.partitionWord(0)(15) <= '1'; -- No Msg
+       if frame = x"0" then
+         pmsg.hdr     := MSG_DELAY_PWORD;
+         pmsg.payload := toSlv(3,8);
+         pmsg.anatag  := anatag;
+         anatag       := anatag+1;
+         timingBus.extn.partitionWord(0) <= toSlv(pmsg);
+         timingBus.extnValid             <= '1';
+       elsif frame = x"8" then
+         pmsg.l0tag   := anatag(4 downto 0);
+         pmsg.hdr     := toSlv(2,8);
+         pmsg.payload := x"FE";
+         pmsg.anatag  := anatag;
+         anatag       := anatag+1;
+         timingBus.extn.partitionWord(0) <= toSlv(pmsg);
+       elsif frame = x"F" then
+         pdat.l0a    := '1';
+         pdat.l0tag  := anatag(4 downto 0);
+         pdat.anatag := anatag;
+         anatag      := anatag+1;
+         timingBus.extn.partitionWord(0) <= toSlv(pdat);
+       end if;
+       if frame /= x"F" then
+         frame := frame+1;
+       end if;
+
+       pulseId := pulseId+1;
+       for i in 0 to 199 loop
+         wait until rxOutClk = '1';
+         wait until rxOutClk = '0';
+         timingBus.strobe <= '0';
+       end loop;
+     end loop;
+     wait;
+   end process;
+   
    timingHdr          <= toTimingHeader (timingBus);
    triggerBus.message <= ExptMessageType(timingBus.extn);
    triggerBus.valid   <= timingBus.extnValid;
 
    
    U_Realign : entity work.EventRealign
+     generic map ( TF_DELAY_G => toSlv(5,7) )
      port map ( clk            => rxOutClk,
                 rst            => rxRst,
                 timingI        => timingHdr,
@@ -278,7 +247,8 @@ begin
      tdetMaster(i).tKeep  <= genTKeep(TDET_AXIS_CONFIG_C);
 
      U_DeMux : entity work.AxiStreamDeMux
-       generic map ( NUM_MASTERS_G => 2 )
+       generic map ( NUM_MASTERS_G => 2,
+                     TDEST_HIGH_G  => TDET_AXIS_CONFIG_C.TDEST_BITS_C-1 )
        port map ( axisClk         => tdetClk,
                   axisRst         => tdetRst,
                   sAxisMaster     => tdetMaster     (i),

@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-07-10
--- Last update: 2018-07-26
+-- Last update: 2018-11-02
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -271,18 +271,6 @@ begin
                  probe0(255 downto 28) => (others=>'0') );
   end generate;
 
-  --  trigger bus
-  pdata            <= wr.tword;
-  pdataV           <= wr.twordV;
-  cntL0            <= wr.cntL0;
-  cntL1A           <= wr.cntL1A;
-  cntL1R           <= wr.cntL1R;
-  cntWrFifo        <= wr.cntWrF;
-  cntRdFifo        <= rd.cntRdF;
-  rstFifo          <= wr.rstF;
-  msgDelay         <= wr.msgD(1);
-  cntOflow         <= wr.ofcnt;
-  
   hdrOut.pulseId    <= doutb( 63 downto   0);
   hdrOut.timeStamp  <= doutb(127 downto  64);
   hdrOut.count      <= doutb(183 downto 160);
@@ -335,6 +323,7 @@ begin
                dina(159 downto 144) => pword(15 downto 0),
                dina(191 downto 160) => pword(47 downto 16),
                clkb                 => rdclk,
+               rstb                 => rdrst,
                enb                  => '1',
                addrb                => daddr,
                doutb                => doutb );
@@ -422,10 +411,6 @@ begin
       v.ofcnt := wr.ofcnt+1;
     end if;
     
-    if wrrst = '1' then
-      v := WR_REG_INIT_C;
-    end if;
-
     if wr.pwordV = '1' then
       if wr.pword.l0a = '1' then
         v.cntL0 := wr.cntL0 + 1;
@@ -441,6 +426,21 @@ begin
       end if;
     end if;
     
+    if wrrst = '1' then
+      v := WR_REG_INIT_C;
+    end if;
+
+    --  trigger bus
+    pdata            <= wr.tword;
+    pdataV           <= wr.twordV;
+    cntL0            <= wr.cntL0;
+    cntL1A           <= wr.cntL1A;
+    cntL1R           <= wr.cntL1R;
+    cntWrFifo        <= wr.cntWrF;
+    rstFifo          <= wr.rstF;
+    msgDelay         <= wr.msgD(1);
+    cntOflow         <= wr.ofcnt;
+  
     wr_in <= v;
   end process;
   
@@ -461,6 +461,12 @@ begin
     if advance = '1' then
       v.cntRdF := rd_data_count;
     end if;
+
+    if rdrst = '1' then
+      v := RD_REG_INIT_C;
+    end if;
+    
+    cntRdFifo <= rd.cntRdF;
 
     rd_in <= v;
   end process;

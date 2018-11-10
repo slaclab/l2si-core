@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver  <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2018-07-20
--- Last update: 2018-09-01
+-- Last update: 2018-10-30
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -23,6 +23,7 @@ library ieee;
 use ieee.std_logic_1164.all;
 
 use work.StdRtlPkg.all;
+use work.AxiStreamPkg.all;
 use work.EventPkg.all;
 
 package TDetPkg is
@@ -32,7 +33,6 @@ package TDetPkg is
       partition    :  slv( 2 downto 0);
       enable       :  sl;
       aFull        :  sl;
-      ack          :  sl;
    end record TDetTimingType;
    type TDetTimingArray is array(natural range<>) of TDetTimingType;
    
@@ -40,9 +40,19 @@ package TDetPkg is
       id           => (others=>'0'),
       partition    => (others=>'0'),
       enable       => '0',
-      aFull        => '0',
-      ack          => '0' );
-     
+      aFull        => '0' );
+
+   type TDetTrigType is record
+     l0a     : sl;
+     l0tag   : slv( 4 downto 0);
+     valid   : sl;
+   end record;
+   type TDetTrigArray is array(natural range<>) of TDetTrigType;
+   constant TDETTRIG_INIT_C : TDetTrigType := (
+     l0a     => '0',
+     l0tag   => (others=>'0'),
+     valid   => '0' );
+   
    type TDetEventType is record
      header  : EventHeaderType;
      isEvent : sl;
@@ -67,6 +77,15 @@ package TDetPkg is
    type TDetStatusArray is array(natural range<>) of TDetStatusType;
 
    constant TDETSTATUS_BITS_C : natural := 117;
+
+   constant TDET_AXIS_CONFIG_C : AxiStreamConfigType := (
+     TSTRB_EN_C    => false,
+     TDATA_BYTES_C => 24,
+     TDEST_BITS_C  => 1,
+     TID_BITS_C    => 0,
+     TKEEP_MODE_C  => TKEEP_NORMAL_C,
+     TUSER_BITS_C  => 2,
+     TUSER_MODE_C  => TUSER_NORMAL_C );
    
    function toSlv       (status : TDetStatusType) return slv;
    function toTDetStatus(vector : slv           ) return TDetStatusType;

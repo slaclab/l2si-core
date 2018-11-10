@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-07-10
--- Last update: 2018-07-26
+-- Last update: 2018-11-02
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -84,6 +84,7 @@ begin
                dina(127 downto 64)  => timingI.timeStamp,
                dina(128)            => exptBusI.valid,
                clkb                 => clk,
+               rstb                 => rst,
                enb                  => r.rden,
                addrb                => r.rdaddr(NPartitions),
                doutb( 63 downto  0) => timingO.pulseId,
