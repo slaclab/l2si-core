@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-07-10
--- Last update: 2018-11-02
+-- Last update: 2018-12-07
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -195,82 +195,6 @@ architecture rtl of EventHeaderCache is
   
 begin
 
-  GEN_DEBUG : if DEBUG_G generate
-    U_CLKDIV0 : BUFGCE_DIV
-      generic map ( BUFGCE_DIVIDE => 5 )
-      port map ( I   => wrclk,
-                 CLR => rst,
-                 CE  => '1',
-                 O   => drClk );
-    U_CLKDIV1 : BUFGCE_DIV
-      generic map ( BUFGCE_DIVIDE => 8 )
-      port map ( I   => drclk,
-                 CLR => rst,
-                 CE  => '1',
-                 O   => drrClk );
-    
-    comb : process ( dr, drr, wr, timing_aligned.strobe,
-                     hdrWe, ptag, wr_ack, wr_overflow, wr_full, wr_data_count, debug, debugv ) is
-      variable v : DbgRegType;
-      variable w : DbgRegType;
-    begin
-      v := dr;
-      w := drr;
-      v.count := dr.count+1;
-
-      if timing_aligned.strobe = '1' then
-        v       := DBG_REG_INIT_C;
-      elsif dr.count = toSlv(99,7) then
-        w       := dr;
-        v.count := (others=>'0');
-      end if;
-
-      v.hdrWe       := v.hdrWe       or hdrWe;
-      v.ptag        := ptag;
-      v.pwordV      := v.pwordV      or wr.pwordV;
-      v.pword_l0a   := v.pword_l0a   or wr.pword.l0a;
-      v.twordV      := v.twordV      or wr.twordV;
-      v.tword_l0a   := v.tword_l0a   or wr.tword.l0a;
-      v.rden        := v.rden        or wr.rden;
-      v.wren        := v.wren        or wr.wren;
-      v.wr_ack      := v.wr_ack      or wr_ack;
-      v.wr_overflow := v.wr_overflow or wr_overflow;
-      v.wr_full     := v.wr_full     or wr_full;
-      v.wr_data_count := resize(wr_data_count,5);
-      if debugv = '1' then
-        v.debug     := debug;
-      end if;
-      
-      dr_in  <= v;
-      drr_in <= w;
-    end process comb;
-
-    seq : process ( wrclk ) is
-    begin
-      if rising_edge(wrclk) then
-        dr  <= dr_in;
-        drr <= drr_in;
-      end if;
-    end process seq;
-    
-    U_ILA : ila_0
-      port map ( clk                   => drrClk,
-                 probe0(0          )   => drr.hdrWe,
-                 probe0( 5 downto 1)   => drr.ptag,
-                 probe0(10 downto 6)   => drr.wr_data_count,
-                 probe0(11)            => drr.rden,
-                 probe0(12)            => drr.pwordV,
-                 probe0(13)            => drr.pword_l0a,
-                 probe0(14)            => drr.twordV,
-                 probe0(15)            => drr.tword_l0a,
-                 probe0(16)            => drr.wren,
-                 probe0(17)            => drr.wr_ack,
-                 probe0(18)            => drr.wr_overflow,
-                 probe0(19)            => drr.wr_full,
-                 probe0(27  downto 20) => drr.debug,
-                 probe0(255 downto 28) => (others=>'0') );
-  end generate;
-
   hdrOut.pulseId    <= doutb( 63 downto   0);
   hdrOut.timeStamp  <= doutb(127 downto  64);
   hdrOut.count      <= doutb(183 downto 160);
@@ -278,9 +202,9 @@ begin
   hdrOut.partitions <= doutb(143 downto 128);
   hdrOut.payload    <= doutb(191 downto 184);
   hdrOut.l1t        <= doutb(159 downto 144);
-  pmsg             <= doutf(5);
-  phdr             <= doutf(6);
-  valid            <= rd.valid and ivalid;
+  pmsg              <= doutf(5);
+  phdr              <= doutf(6);
+  valid             <= rd.valid and ivalid;
 
   GEN_GROUPS : for i in 0 to NPartitions-1 generate
     gword(i) <= '1' when (toPartitionWord(expt_aligned.message.partitionWord(i)).l0a='1') else
