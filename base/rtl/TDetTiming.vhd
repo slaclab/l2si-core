@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-07-08
--- Last update: 2018-10-30
+-- Last update: 2018-12-19
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -117,12 +117,35 @@ architecture mapping of TDetTiming is
    signal tdetMaster     : AxiStreamMasterArray (NDET_G-1 downto 0);
    signal tdetSlave      : AxiStreamSlaveArray  (NDET_G-1 downto 0);
    signal hdrOut         : EventHeaderArray     (NDET_G-1 downto 0);
+
+   subtype AXIL_RANGE_C is natural range 1 downto 0;
+   constant AXIL_MASTERS_CONFIG_C : AxiLiteCrossbarMasterConfigArray(AXIL_RANGE_C) := genAxiLiteConfig(2,AXIL_BASEADDR_G,21,18);
+   signal axilReadMasters  : AxiLiteReadMasterArray (AXIL_RANGE_C);
+   signal axilReadSlaves   : AxiLiteReadSlaveArray  (AXIL_RANGE_C);
+   signal axilWriteMasters : AxiLiteWriteMasterArray(AXIL_RANGE_C);
+   signal axilWriteSlaves  : AxiLiteWriteSlaveArray (AXIL_RANGE_C);
+
 begin
 
    trigClk         <= rxOutClk;
    timingRecClkOut <= rxOutClk;
    timingBusOut    <= timingBus;
 
+   U_AxilXbar0 : entity work.AxiLiteCrossbar
+    generic map ( NUM_SLAVE_SLOTS_G  => 1,
+                  NUM_MASTER_SLOTS_G => AXIL_MASTERS_CONFIG_C'length,
+                  MASTERS_CONFIG_G   => AXIL_MASTERS_CONFIG_C )
+    port map    ( axiClk              => axilClk,
+                  axiClkRst           => axilRst,
+                  sAxiWriteMasters(0) => axilWriteMaster,
+                  sAxiWriteSlaves (0) => axilWriteSlave ,
+                  sAxiReadMasters (0) => axilReadMaster ,
+                  sAxiReadSlaves  (0) => axilReadSlave  ,
+                  mAxiWriteMasters    => axilWriteMasters,
+                  mAxiWriteSlaves     => axilWriteSlaves ,
+                  mAxiReadMasters     => axilReadMasters ,
+                  mAxiReadSlaves      => axilReadSlaves  );
+  
    -------------------------------------------------------------------------------------------------
    -- Clock Buffers
    -------------------------------------------------------------------------------------------------
@@ -154,14 +177,14 @@ begin
      TimingGthCoreWrapper_1 : entity work.TimingGtCoreWrapper
        generic map ( TPD_G            => TPD_G,
                      EXTREF_G         => true,
-                     AXIL_BASE_ADDR_G => (others=>'0') )
+                     AXIL_BASE_ADDR_G => AXIL_MASTERS_CONFIG_C(1).baseAddr )
        port map (
          axilClk        => axilClk,
          axilRst        => axilRst,
-         axilReadMaster => AXI_LITE_READ_MASTER_INIT_C,
-         axilReadSlave  => open,
-         axilWriteMaster=> AXI_LITE_WRITE_MASTER_INIT_C,
-         axilWriteSlave => open,
+         axilReadMaster => axilReadMasters (1),
+         axilReadSlave  => axilReadSlaves  (1),
+         axilWriteMaster=> axilWriteMasters(1),
+         axilWriteSlave => axilWriteSlaves (1),
          stableClk      => axilClk,
          stableRst      => axilRst,
          gtRefClk       => timingRefClk,
@@ -198,7 +221,7 @@ begin
                    CLKSEL_MODE_G     => "LCLSII",
                    USE_TPGMINI_G     => false,
                    ASYNC_G           => false,
-                   AXIL_BASE_ADDR_G  => AXIL_BASEADDR_G )
+                   AXIL_BASE_ADDR_G  => AXIL_MASTERS_CONFIG_C(0).baseAddr )
      port map (
          gtTxUsrClk      => txUsrClk,
          gtTxUsrRst      => txUsrRst,
@@ -216,10 +239,10 @@ begin
          timingPhy       => open, -- TPGMINI
          axilClk         => axilClk,
          axilRst         => axilRst,
-         axilReadMaster  => axilReadMaster,
-         axilReadSlave   => axilReadSlave,
-         axilWriteMaster => axilWriteMaster,
-         axilWriteSlave  => axilWriteSlave );
+         axilReadMaster  => axilReadMasters (0),
+         axilReadSlave   => axilReadSlaves  (0),
+         axilWriteMaster => axilWriteMasters(0),
+         axilWriteSlave  => axilWriteSlaves (0) );
 
    timingHdr          <= toTimingHeader (timingBus);
    triggerBus.message <= ExptMessageType(timingBus.extn);
@@ -319,7 +342,9 @@ begin
      if rising_edge(rxOutClk) then
        if (triggerBus.valid = '1' and timingBus.strobe = '1') then
          for i in 0 to NDET_G-1 loop
-           tdetStatus(i).partitionAddr <= triggerBus.message.partitionAddr;
+           if toXpmBroadcastType(triggerBus.message.partitionAddr) = XADDR then
+             tdetStatus(i).partitionAddr <= triggerBus.message.partitionAddr;
+           end if;
          end loop;
        end if;
      end if;

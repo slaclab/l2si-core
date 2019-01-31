@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2016-03-25
--- Last update: 2018-09-12
+-- Last update: 2018-12-17
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -22,6 +22,8 @@
 
 library ieee;
 use ieee.std_logic_1164.all;
+use ieee.std_logic_unsigned.all;
+use ieee.std_logic_arith.all;
 
 use work.StdRtlPkg.all;
 use work.TimingExtnPkg.all;
@@ -209,10 +211,11 @@ package XpmPkg is
       enabled          : sl;
       -- EventSelection
       rateSel          : slv(15 downto 0);
-      -- Bits(15:14)=(fixed,AC,seq,reserved)
+      -- Bits(15:14)=(fixed,AC,seq,Cu)
       -- fixed:  marker = 3:0
       -- AC   :  marker = 2:0;  TS = 8:3 (mask)
       -- seq  :  bit    = 4:0;  seq = 12:8
+      -- cu   :  event  = 7:0
       destSel          : slv(15 downto 0);
       -- 15:15 = DONT_CARE
       --  3:0  = Destination
@@ -286,10 +289,12 @@ package XpmPkg is
       push       => (others=>'0') );
    
    type XpmPipelineConfigType is record
-      depth      : slv(19 downto 0);
+      depth_clks : slv(15 downto 0);
+      depth_fids : slv( 7 downto 0);
    end record;
    constant XPM_PIPELINE_CONFIG_INIT_C : XpmPipelineConfigType := (
-      depth => toSlv(100*200,20) );
+      depth_clks => toSlv(200*100,16),
+      depth_fids => toSlv(200,8) );
 
    type XpmBsaConfigType is record
       enabled    : sl;
@@ -304,6 +309,7 @@ package XpmPkg is
       activeWidth   => (others=>'0') );
   
    type XpmPartitionConfigType is record
+      master     : sl;
       l0Select   : XpmL0SelectConfigType;
       l1Select   : XpmL1SelectConfigType;
       analysis   : XpmAnalysisConfigType;
@@ -313,6 +319,7 @@ package XpmPkg is
       message    : XpmPartMsgConfigType;
    end record;
    constant XPM_PARTITION_CONFIG_INIT_C : XpmPartitionConfigType := (
+      master     => '0',
       l0Select   => XPM_L0_SELECT_CONFIG_INIT_C,
       l1Select   => XPM_L1_SELECT_CONFIG_INIT_C,
       analysis   => XPM_ANALYSIS_CONFIG_INIT_C,
@@ -323,6 +330,8 @@ package XpmPkg is
    type XpmPartitionConfigArray is array (natural range<>) of XpmPartitionConfigType;
    
    type XpmConfigType is record
+      usRxEnable : sl;
+      cuRxEnable : sl;
       dsLink     : XpmLinkConfigArray(NDSLinks-1 downto 0);
       bpLink     : XpmLinkConfigArray(NBPLinks   downto 0);
       pll        : XpmPllConfigArray(NAmcs-1 downto 0);
@@ -330,11 +339,13 @@ package XpmPkg is
       tagstream  : sl;
    end record;
    constant XPM_CONFIG_INIT_C : XpmConfigType := (
-      dsLink    => (others => XPM_LINK_CONFIG_INIT_C),
-      bpLink    => (others => XPM_LINK_CONFIG_INIT_C),
-      pll       => (others => XPM_PLL_CONFIG_INIT_C),
-      partition => (others => XPM_PARTITION_CONFIG_INIT_C),
-      tagstream => '0' );
+      usRxEnable => '1',
+      cuRxEnable => '0',
+      dsLink     => (others => XPM_LINK_CONFIG_INIT_C),
+      bpLink     => (others => XPM_LINK_CONFIG_INIT_C),
+      pll        => (others => XPM_PLL_CONFIG_INIT_C),
+      partition  => (others => XPM_PARTITION_CONFIG_INIT_C),
+      tagstream  => '0' );
 
    type XpmAcceptFrameType is record
       strobe     : sl;
@@ -388,6 +399,11 @@ package XpmPkg is
      anatag   => (others=>'0') );
 
    type XpmPartitionDataArray is array(natural range<>) of XpmPartitionDataType;
+
+   type XpmBroadcastType is ( RSVD0, RSVD1, RSVD2, RSVD3,
+                              RSVD4, RSVD5, RSVD6, RSVD7,
+                              RSVD8, RSVD9, RSVDA, RSVDB,
+                              RSVDC, RSVDD, PDELAY, XADDR );
    
    function toSlv(s : XpmLinkStatusType) return slv;
    function toLinkStatus(vector : slv) return XpmLinkStatusType;
@@ -398,7 +414,14 @@ package XpmPkg is
    function toPartitionWord(vector : slv) return XpmPartitionDataType;
 
    function xpmTimingFbId(ip : slv) return slv;
-   
+
+   function toXpmBroadcastType(vector : slv) return XpmBroadcastType;
+   function toIndex           (vector : slv) return integer;
+   function toValue           (vector : slv) return slv;
+   -- vivado cant resolve toSlv(enum)
+   function toPaddr           (btype  : XpmBroadcastType;
+                               ipart  : integer;
+                               value  : slv) return slv;
 end package XpmPkg;
 
 package body XpmPkg is
@@ -496,8 +519,47 @@ package body XpmPkg is
    function xpmTimingFbId(ip : slv) return slv is
      variable id  : slv(31 downto 0);
    begin
-     id := x"FF" & ip(23 downto 16) & ip(31 downto 8) & x"00";
+     id := x"FF" & ip(23 downto 0);
      return id;
+   end function;
+ 
+  function toXpmBroadcastType(vector : slv) return XpmBroadcastType is
+     variable result : XpmBroadcastType := XADDR;
+   begin
+     if vector(PADDR_LEN-1 downto PADDR_LEN-4)=x"E" then
+       result := PDELAY;
+     end if;
+     return result;
+   end function;
+
+   function toIndex           (vector : slv) return integer is
+     variable result : integer;
+   begin
+     result := conv_integer(vector(26 downto 24));
+     return result;
+   end function;
+   
+   function toValue           (vector : slv) return slv is
+     variable result : slv(23 downto 0);
+   begin
+     result := vector(23 downto 0);
+     return result;
+   end function;
+
+   function toPaddr            (btype : XpmBroadcastType;
+                               ipart : integer;
+                               value : slv) return slv is
+     variable vector : slv(PADDR_LEN-1 downto 0) := (others=>'0');
+     variable i : integer := 0;
+   begin
+     case (btype) is
+       when PDELAY =>
+         assignSlv(i, vector, resize(value,24));
+         assignSlv(i, vector, toSlv(ipart,4));
+         assignSlv(i, vector, x"E");
+       when others => null;
+     end case;
+     return vector;
    end function;
      
 end package body XpmPkg;

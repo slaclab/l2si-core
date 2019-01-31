@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2016-03-25
--- Last update: 2018-04-12
+-- Last update: 2018-12-14
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -42,7 +42,7 @@ package EventPkg is
 
    
    constant EVENT_HEADER_VERSION_C : integer := 0;
-   constant L1A_INFO_C : slv(7 downto 0) := X"00";
+   constant L1A_INFO_C : slv(6 downto 0) := toSlv(12,7);
    
    type EventHeaderType is record
      pulseId    : slv(63 downto 0);
@@ -52,7 +52,7 @@ package EventPkg is
      partitions : slv(15 downto 0);   -- readout groups
      l1t        : slv(15 downto 0);   -- L1 trigger lines
      payload    : slv( 7 downto 0);   -- transition payload
---     env        : slv(63 downto 0);  -- detector specific words
+     damaged    : sl;
    end record;
 
    constant EVENT_HEADER_INIT_C : EventHeaderType := (
@@ -62,7 +62,8 @@ package EventPkg is
      version    => toSlv(EVENT_HEADER_VERSION_C,8),
      partitions => (others=>'0'),
      l1t        => (others=>'0'),
-     payload    => (others=>'0') );
+     payload    => (others=>'0'),
+     damaged    => '0' );
 
    type EventHeaderArray is array(natural range<>) of EventHeaderType;
    
@@ -89,9 +90,9 @@ package body EventPkg is
      if v.l1t(15) = '1' then
        assignSlv(i, vector, L1A_INFO_C);
      else
-       -- XpmPartitionMsgType.hdr(7 downto 0)
-       assignSlv(i, vector, v.l1t(13 downto 6)); 
+       assignSlv(i, vector, v.l1t(12 downto 6)); 
      end if;
+     assignSlv(i, vector, v.damaged   );
      assignSlv(i, vector, v.timeStamp );
      assignSlv(i, vector, v.count     );
      assignSlv(i, vector, v.version   );
