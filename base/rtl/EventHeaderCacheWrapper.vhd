@@ -24,11 +24,15 @@ use work.TimingExtnPkg.all;
 use work.EventPkg.all;
 use work.TDetPkg.all;
 use work.XpmPkg.all;
+use work.SsiPkg.all;
 
 entity EventHeaderCacheWrapper is
    generic (
-      TPD_G  : time    := 1 ns;
-      NDET_G : natural := 1);
+      TPD_G              : time                := 1 ns;
+      -- USER_AXIS_CONFIG_G : AxiStreamConfigType := TDET_AXIS_CONFIG_C;
+      USER_AXIS_CONFIG_G : AxiStreamConfigType := ssiAxiStreamConfig(4);
+      PIPE_STAGES_G      : natural             := 0;
+      NDET_G             : natural             := 1);
    port (
       -- Trigger Interface (rxClk domain)
       trigBus         : out TDetTrigArray (NDET_G-1 downto 0);
@@ -70,6 +74,9 @@ architecture mapping of EventHeaderCacheWrapper is
 
    signal tdetMaster : AxiStreamMasterArray (NDET_G-1 downto 0);
    signal tdetSlave  : AxiStreamSlaveArray (NDET_G-1 downto 0);
+
+   signal tdetMasterResize : AxiStreamMasterArray (NDET_G-1 downto 0);
+   signal tdetSlaveResize  : AxiStreamSlaveArray (NDET_G-1 downto 0);
 
    signal hdrOut : EventHeaderArray (NDET_G-1 downto 0);
 
@@ -136,15 +143,32 @@ begin
       tdetMaster(i).tLast                                                <= '1';
       tdetMaster(i).tKeep                                                <= genTKeep(TDET_AXIS_CONFIG_C);
 
+      U_Resizer : entity work.AxiStreamResize
+         generic map (
+            TPD_G               => TPD_G,
+            SLAVE_AXI_CONFIG_G  => TDET_AXIS_CONFIG_C,
+            MASTER_AXI_CONFIG_G => USER_AXIS_CONFIG_G)
+         port map (
+            -- Clock and reset
+            axisClk     => tdetClk,
+            axisRst     => tdetRst,
+            -- Slave Port
+            sAxisMaster => tdetMaster(i),
+            sAxisSlave  => tdetSlave (i),
+            -- Master Port
+            mAxisMaster => tdetMasterResize(i),
+            mAxisSlave  => tdetSlaveResize (i));
+
       U_DeMux : entity work.AxiStreamDeMux
          generic map (
             TPD_G         => TPD_G,
+            PIPE_STAGES_G => PIPE_STAGES_G,
             NUM_MASTERS_G => 2)
          port map (
             axisClk         => tdetClk,
             axisRst         => tdetRst,
-            sAxisMaster     => tdetMaster(i),
-            sAxisSlave      => tdetSlave (i),
+            sAxisMaster     => tdetMasterResize(i),
+            sAxisSlave      => tdetSlaveResize (i),
             mAxisMasters(0) => tdetEventMaster(i),
             mAxisMasters(1) => tdetTransMaster(i),
             mAxisSlaves (0) => tdetEventSlave (i),
