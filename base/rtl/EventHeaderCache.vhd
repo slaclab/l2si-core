@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-07-10
--- Last update: 2018-12-14
+-- Last update: 2018-12-17
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -197,6 +197,94 @@ architecture rtl of EventHeaderCache is
   
 begin
 
+  GEN_DEBUG : if DEBUG_G generate
+    U_CLKDIV0 : BUFGCE_DIV
+      generic map ( BUFGCE_DIVIDE => 5 )
+      port map ( I   => wrclk,
+                 CLR => rst,
+                 CE  => '1',
+                 O   => drClk );
+    U_CLKDIV1 : BUFGCE_DIV
+      generic map ( BUFGCE_DIVIDE => 8 )
+      port map ( I   => drclk,
+                 CLR => rst,
+                 CE  => '1',
+                 O   => drrClk );
+    
+    comb : process ( dr, drr, wr, timing_aligned.strobe,
+                     hdrWe, ptag, wr_ack, wr_overflow, wr_full, wr_data_count, debug, debugv ) is
+      variable v : DbgRegType;
+      variable w : DbgRegType;
+    begin
+      v := dr;
+      w := drr;
+      v.count := dr.count+1;
+
+      if timing_aligned.strobe = '1' then
+        v       := DBG_REG_INIT_C;
+      elsif dr.count = toSlv(99,7) then
+        w       := dr;
+        v.count := (others=>'0');
+      end if;
+
+      v.hdrWe       := v.hdrWe       or hdrWe;
+      v.ptag        := ptag;
+      v.pwordV      := v.pwordV      or wr.pwordV;
+      v.pword_l0a   := v.pword_l0a   or wr.pword.l0a;
+      v.twordV      := v.twordV      or wr.twordV;
+      v.tword_l0a   := v.tword_l0a   or wr.tword.l0a;
+      v.rden        := v.rden        or wr.rden;
+      v.wren        := v.wren        or wr.wren;
+      v.wr_ack      := v.wr_ack      or wr_ack;
+      v.wr_overflow := v.wr_overflow or wr_overflow;
+      v.wr_full     := v.wr_full     or wr_full;
+      v.wr_data_count := resize(wr_data_count,5);
+      if debugv = '1' then
+        v.debug     := debug;
+      end if;
+      
+      dr_in  <= v;
+      drr_in <= w;
+    end process comb;
+
+    seq : process ( wrclk ) is
+    begin
+      if rising_edge(wrclk) then
+        dr  <= dr_in;
+        drr <= drr_in;
+      end if;
+    end process seq;
+    
+    U_ILA : ila_0
+      port map ( clk                   => drrClk,
+                 probe0(0          )   => drr.hdrWe,
+                 probe0( 5 downto 1)   => drr.ptag,
+                 probe0(10 downto 6)   => drr.wr_data_count,
+                 probe0(11)            => drr.rden,
+                 probe0(12)            => drr.pwordV,
+                 probe0(13)            => drr.pword_l0a,
+                 probe0(14)            => drr.twordV,
+                 probe0(15)            => drr.tword_l0a,
+                 probe0(16)            => drr.wren,
+                 probe0(17)            => drr.wr_ack,
+                 probe0(18)            => drr.wr_overflow,
+                 probe0(19)            => drr.wr_full,
+                 probe0(27  downto 20) => drr.debug,
+                 probe0(255 downto 28) => (others=>'0') );
+  end generate;
+
+  --  trigger bus
+  pdata            <= wr.tword;
+  pdataV           <= wr.twordV;
+  cntL0            <= wr.cntL0;
+  cntL1A           <= wr.cntL1A;
+  cntL1R           <= wr.cntL1R;
+  cntWrFifo        <= wr.cntWrF;
+  cntRdFifo        <= rd.cntRdF;
+  rstFifo          <= wr.rstF(0);
+  msgDelay         <= wr.msgD(1);
+  cntOflow         <= wr.ofcnt;
+  
   hdrOut.pulseId    <= doutb( 63 downto   0);
   hdrOut.timeStamp  <= doutb(127 downto  64);
   hdrOut.count      <= doutb(183 downto 160);
@@ -250,7 +338,6 @@ begin
                dina(159 downto 144) => pword(15 downto 0),
                dina(191 downto 160) => pword(47 downto 16),
                clkb                 => rdclk,
-               rstb                 => rdrst,
                enb                  => '1',
                addrb                => daddr,
                doutb                => doutb );
@@ -269,7 +356,7 @@ begin
                din(4 downto 0) => ptag,
                din(5)          => wr_in.pmsg(0),
                din(6)          => wr_in.phdr(0),
-               din(7)          => wr.oflow,
+               din(7)          => wr_in.oflow,
                rd_clk          => rdclk,
                rd_en           => advance,
                rd_data_count   => rd_data_count,
@@ -360,17 +447,6 @@ begin
       v := WR_REG_INIT_C;
     end if;
 
-    --  trigger bus
-    pdata            <= wr.tword;
-    pdataV           <= wr.twordV;
-    cntL0            <= wr.cntL0;
-    cntL1A           <= wr.cntL1A;
-    cntL1R           <= wr.cntL1R;
-    cntWrFifo        <= wr.cntWrF;
-    rstFifo          <= wr.rstF(0);
-    msgDelay         <= wr.msgD(1);
-    cntOflow         <= wr.ofcnt;
-  
     wr_in <= v;
   end process;
   
@@ -392,10 +468,6 @@ begin
       v.cntRdF := rd_data_count;
     end if;
 
-    if rdrst = '1' then
-      v := RD_REG_INIT_C;
-    end if;
-    
     cntRdFifo <= rd.cntRdF;
 
     rd_in <= v;
