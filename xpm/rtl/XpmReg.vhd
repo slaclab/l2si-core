@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-12-14
--- Last update: 2018-08-02
+-- Last update: 2018-12-18
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -32,6 +32,7 @@ use work.AxiStreamPkg.all;
 use work.SsiPkg.all;
 use work.AmcCarrierPkg.all;  -- ETH_AXIS_CONFIG_C
 use work.XpmPkg.all;
+use work.XpmOpts.all;
 
 entity XpmReg is
    port (
@@ -78,7 +79,6 @@ architecture rtl of XpmReg is
     axilWriteSlave : AxiLiteWriteSlaveType;
     axilRdEn       : slv(NPartitions-1 downto 0);
     linkDebug      : slv(4 downto 0);
-    tagStream      : sl;
     anaWrCount     : Slv32Array(NPartitions-1 downto 0);
   end record RegType;
 
@@ -102,7 +102,6 @@ architecture rtl of XpmReg is
     axilWriteSlave => AXI_LITE_WRITE_SLAVE_INIT_C,
     axilRdEn       => (others=>'1'),
     linkDebug      => (others=>'0'),
-    tagStream      => '0',
     anaWrCount     => (others=>(others=>'0')));
 
   constant TAG_AXIS_CONFIG_C : AxiStreamConfigType := ssiAxiStreamConfig(8);
@@ -131,6 +130,8 @@ architecture rtl of XpmReg is
   signal p0InhCh  : sl;
   signal p0InhErr : sl;
   signal pInhV    : slv(NPartitions-1 downto 0);
+
+  signal staUpdate : sl;
   
   component ila_0
     port ( clk : in sl;
@@ -214,28 +215,33 @@ begin
   GEN_PART : for i in 0 to NPartitions-1 generate
     U_Sync64_ena : entity work.SynchronizerFifo
       generic map ( DATA_WIDTH_G => 64 )
-      port map ( wr_clk => staClk, rd_clk=> axilClk, rd_en=> r.axilRdEn(i),
+      port map ( wr_clk => staClk, wr_en => staUpdate,
+                 rd_clk => axilClk, rd_en=> r.axilRdEn(i),
                  din  => status.partition(i).l0Select.enabled  ,
                  dout => s.partition(i).l0Select.enabled);
     U_Sync64_inh : entity work.SynchronizerFifo
       generic map ( DATA_WIDTH_G => 64 )
-      port map ( wr_clk => staClk, rd_clk=> axilClk, rd_en=> r.axilRdEn(i),
+      port map ( wr_clk => staClk, wr_en => staUpdate,
+                 rd_clk => axilClk, rd_en=> r.axilRdEn(i),
                  din  => status.partition(i).l0Select.inhibited  ,
                  valid => pInhV(i),
                  dout => s.partition(i).l0Select.inhibited);
     U_Sync64_num : entity work.SynchronizerFifo
       generic map ( DATA_WIDTH_G => 64 )
-      port map ( wr_clk => staClk, rd_clk=> axilClk, rd_en=> r.axilRdEn(i),
+      port map ( wr_clk => staClk, wr_en => staUpdate,
+                 rd_clk => axilClk, rd_en=> r.axilRdEn(i),
                  din  => status.partition(i).l0Select.num  ,
                  dout => s.partition(i).l0Select.num);
     U_Sync64_nin : entity work.SynchronizerFifo
       generic map ( DATA_WIDTH_G => 64 )
-      port map ( wr_clk => staClk, rd_clk=> axilClk, rd_en=> r.axilRdEn(i),
+      port map ( wr_clk => staClk, wr_en => staUpdate,
+                 rd_clk => axilClk, rd_en=> r.axilRdEn(i),
                  din  => status.partition(i).l0Select.numInh  ,
                  dout => s.partition(i).l0Select.numInh);
     U_Sync64_nac : entity work.SynchronizerFifo
       generic map ( DATA_WIDTH_G => 64 )
-      port map ( wr_clk => staClk, rd_clk=> axilClk, rd_en=> r.axilRdEn(i),
+      port map ( wr_clk => staClk, wr_en => staUpdate,
+                 rd_clk => axilClk, rd_en=> r.axilRdEn(i),
                  din  => status.partition(i).l0Select.numAcc  ,
                  dout => s.partition(i).l0Select.numAcc);
     U_SyncAna : entity work.SyncStatusVector
@@ -288,6 +294,10 @@ begin
     variable il         : integer;
     variable ia         : integer;
     variable ra         : integer;
+    variable groupL0Reset   : slv(NPartitions-1 downto 0);
+    variable groupL0Enable  : slv(NPartitions-1 downto 0);
+    variable groupL0Disable : slv(NPartitions-1 downto 0);
+    variable groupMsgInsert : slv(NPartitions-1 downto 0);
     -- Shorthand procedures for read/write register
     procedure axilRegRW(addr : in slv; offset : in integer; reg : inout slv) is
     begin
@@ -323,7 +333,11 @@ begin
     v.axilReadSlave.rdata := (others=>'0');
     v.partitionCfg.message.insert := '0';
     v.tagSlave.tReady      := '1';
-
+    for i in 0 to NPartitions-1 loop
+      v.config.partition(i).l0Select.reset := '0';
+      v.config.partition(i).message.insert := '0';
+    end loop;
+    
     ip := conv_integer(r.partition);
     il := conv_integer(r.link(3 downto 0));
     ia := conv_integer(r.amc);
@@ -378,7 +392,11 @@ begin
     axilRegRW (toSlv( ra,12), 10, v.linkDebug);
     axilRegRW (toSlv( ra,12), 16, v.amc);
     axilRegRW (toSlv( ra,12), 20, v.inhibit);
-    axilRegRW (toSlv( ra,12), 24, v.tagStream);
+    axilRegRW (toSlv( ra,12), 24, v.config.tagStream);
+    --axilRegRW (toSlv( ra,12), 25, v.config.usRxEnable);
+    --axilRegRW (toSlv( ra,12), 26, v.config.cuRxEnable);
+    axilRegR  (toSlv( ra,12), 25, US_RX_ENABLE_INIT_C);
+    axilRegR  (toSlv( ra,12), 26, CU_RX_ENABLE_INIT_C);
     
     v.load := '0';
     v.linkCfg.txDelayRst   := '0';
@@ -432,6 +450,7 @@ begin
     ra := ra+4;
     axilRegRW (toSlv(ra,12), 0, v.partitionCfg.l0Select.reset);
     axilRegRW (toSlv(ra,12),16, v.partitionCfg.l0Select.enabled);
+    axilRegRW (toSlv(ra,12),30, v.partitionCfg.master);
     axilRegRW (toSlv(ra,12),31, v.axilRdEn(ip));
 
     ra := ra+4;
@@ -459,7 +478,8 @@ begin
     axilRegR  (toSlv(ra+16,12), 0, r.anaWrCount(ip));
     axilRegR  (toSlv(ra+20,12), 0, muxSlVectorArray( anaRdCount(ip), 0));
 
-    axilRegRW (toSlv(ra+24,12), 0, v.partitionCfg.pipeline.depth);
+    axilRegRW (toSlv(ra+24,12), 0, v.partitionCfg.pipeline.depth_clks);
+    axilRegRW (toSlv(ra+24,12),16, v.partitionCfg.pipeline.depth_fids);
 
     axilRegRW (toSlv(ra+28,12),15, v.partitionCfg.message.insert);
     axilRegRW (toSlv(ra+28,12), 0, v.partitionCfg.message.hdr);
@@ -483,8 +503,33 @@ begin
       axilRegR (toSlv(272+j*4, 12), 29, monClkSlow(j));
       axilRegR (toSlv(272+j*4, 12), 30, monClkFast(j));
       axilRegR (toSlv(272+j*4, 12), 31, monClkLock(j));
-   end loop;
+    end loop;
 
+    groupL0Reset   := (others=>'0');
+    groupL0Enable  := (others=>'0');
+    groupL0Disable := (others=>'0');
+    groupMsgInsert := (others=>'0');
+
+    axilRegRW (toSlv(512, 12), 0, groupL0Reset);
+    axilRegRW (toSlv(516, 12), 0, groupL0Enable);
+    axilRegRW (toSlv(520, 12), 0, groupL0Disable);
+    axilRegRW (toSlv(524, 12), 0, groupMsgInsert);
+
+    for i in 0 to NPartitions-1 loop
+      if groupL0Reset(i)='1' then
+        v.config.partition(i).l0Select.reset := '1';
+      end if;
+      if groupL0Enable(i)='1' then
+        v.config.partition(i).l0Select.enabled := '1';
+      end if;
+      if groupL0Disable(i)='1' then
+        v.config.partition(i).l0Select.enabled := '0';
+      end if;
+      if groupMsgInsert(i)='1' then
+        v.config.partition(i).message.insert := '1';
+      end if;
+    end loop;
+    
     if r.partitionCfg.analysis.rst(1)='1' then
       v.anaWrCount(ip) := (others=>'0');
     elsif r.partitionCfg.analysis.push(1)='1' then
@@ -519,4 +564,23 @@ begin
       r <= r_in;
     end if;
   end process;
+
+  rseq : process (staClk, axilRst) is
+    constant STATUS_INTERVAL_C : slv(19 downto 0) := toSlv(910000-1,20);
+    variable cnt : slv(19 downto 0) := (others=>'0');
+  begin
+    if axilRst = '1' then
+      cnt       := (others=>'0');
+      staUpdate <= '0';
+    elsif rising_edge(staClk) then
+      if cnt = STATUS_INTERVAL_C then
+        cnt       := (others=>'0');
+        staUpdate <= '1';
+      else
+        cnt       := cnt+1;
+        staUpdate <= '0';
+      end if;
+    end if;
+  end process rseq;
+  
 end rtl;

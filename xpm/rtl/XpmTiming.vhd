@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-07-08
--- Last update: 2018-07-20
+-- Last update: 2018-11-15
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -65,13 +65,14 @@ entity XpmTiming is
       recTimingRst     : out sl;
       recTimingBus     : out TimingBusType;
       recData          : out TimingRxType;
-      appTimingPhy     : in  TimingPhyType;             -- Input for timing generator only
+      appTimingPhy     : in  TimingPhyType;             -- Timing feedback
       appTimingPhyClk  : out sl;
       appTimingPhyRst  : out sl;
       ----------------
       -- Core Ports --
       ----------------   
       -- LCLS Timing Ports
+      timingRxEnable   : in  sl := '1';
       timingRxP        : in  sl;
       timingRxN        : in  sl;
       timingTxP        : out sl;
@@ -85,30 +86,6 @@ entity XpmTiming is
 end XpmTiming;
 
 architecture mapping of XpmTiming is
-
-   -------------------------------------------------------------------------------------------------
-   -- rxClk Domain
-   -------------------------------------------------------------------------------------------------
-   type StateType is (IDLE_S, FRAME_S);
-
-   type RegType is record
-      state               : StateType;
-      rxDataShift         : slv(31 downto 0);
-      crcReset            : sl;
-      crcOut              : slv(31 downto 0);
-      sofStrobe           : sl;
-      eofStrobe           : sl;
-      crcErrorLatch       : sl;
-   end record;
-
-   constant REG_INIT_C : RegType := (
-      state               => IDLE_S,
-      rxDataShift         => (others=>'0'),
-      crcReset            => '1',
-      crcOut              => (others => '0'),
-      sofStrobe           => '0',
-      eofStrobe           => '0',
-      crcErrorLatch       => '0');
 
    constant GTH_ADDR : slv(31 downto 0) := TIMING_ADDR_C+x"00800000";
    
@@ -127,16 +104,6 @@ architecture mapping of XpmTiming is
    signal axilReadMasters  : AxiLiteReadMasterArray(1 downto 0);
    signal axilReadSlaves   : AxiLiteReadSlaveArray(1 downto 0);
 
-   signal r     : RegType := REG_INIT_C;
-   signal r_in  : RegType;
-
-   signal crcDataValid       : sl;
-   signal crcOut             : slv(31 downto 0);
-   signal rxDecErrSum        : sl;
-   signal rxDispErrSum       : sl;
-
-   signal rxClkCnt,txClkCnt : slv(3 downto 0) := (others=>'0');
-
    constant NUM_COUNTERS_C  : integer := 8;
    constant COUNTER_WIDTH_C : integer := 32;
 
@@ -144,22 +111,26 @@ architecture mapping of XpmTiming is
    signal axilStatusCounters : SlVectorArray(NUM_COUNTERS_C-1 downto 0, COUNTER_WIDTH_C-1 downto 0);
    signal axilRxLinkUp       : sl;
    signal stv                : slv(NUM_COUNTERS_C-1 downto 0);
-   signal txClkCntS          : slv(COUNTER_WIDTH_C-1 downto 0);
    
    signal timingRefClk     : sl;
 
    -- Rx ports
    signal rxControl      : TimingPhyControlType;
    signal rxStatus       : TimingPhyStatusType;
+   signal genStatus      : TimingPhyStatusType := (
+      locked       => '1',
+      resetDone    => '1',
+      bufferByDone => '1',
+      bufferByErr  => '0' );
+   signal recStatus      : TimingPhyStatusType;
+
    signal rxUsrClkActive : sl;
    signal rxCdrStable    : sl;
    signal rxUsrClk       : sl;
-   signal rxData         : slv(15 downto 0);
-   signal rxDataK        : slv(1 downto 0);
-   signal rxDispErr      : slv(1 downto 0);
-   signal rxDecErr       : slv(1 downto 0);
+   signal rxData         : TimingRxType;
    signal rxOutClk       : sl;
    signal txStatus       : TimingPhyStatusType := TIMING_PHY_STATUS_INIT_C;
+   signal txOutClk       : sl;
    signal txUsrClk       : sl;
    signal txUsrRst       : sl;
    signal txUsrClkActive : sl;
@@ -195,16 +166,14 @@ begin
          mAxiReadSlaves      => axilReadSlaves);
 
    timingRefClkOut  <= timingRefClk;
-   recTimingClk     <= rxOutClk;
+   recTimingClk     <= rxUsrClk;
    recTimingRst     <= rxRst;
 
-   txUsrRst         <= not (txStatus.resetDone);
    appTimingPhyClk  <= txUsrClk;
    appTimingPhyRst  <= txUsrRst;
    txUsrClkActive   <= '1';
-   rxRst            <= not(rxStatus.resetDone);
+   rxRst            <= not(recStatus.resetDone);
 
-   rxUsrClk         <= rxOutClk;
    rxUsrClkActive   <= '1';
 
    -------------------------------------------------------------------------------------------------
@@ -225,77 +194,57 @@ begin
    -------------------------------------------------------------------------------------------------
    -- GTH Timing Receiver
    -------------------------------------------------------------------------------------------------
-   GEN_MINI : if TPGMINI_C generate
-     U_AxilEmpty : entity work.AxiLiteEmpty
-       port map ( axiClk        => axilClk,
-                  axiClkRst     => axilRst,
-                  axiReadMaster => axilReadMasters(1),
-                  axiReadSlave  => axilReadSlaves (1),
-                  axiWriteMaster=> axilWriteMasters(1),
-                  axiWriteSlave => axilWriteSlaves (1) );
+   U_GENTIMING : BUFG_GT
+     port map ( I       => genTimingRef,
+                CE      => '1',
+                CEMASK  => '1',
+                CLR     => '0',
+                CLRMASK => '1',
+                DIV     => "000",           -- Divide-by-1
+                O       => genTimingRefG);
 
-     U_GENTIMING : BUFG_GT
-       port map ( I       => genTimingRef,
-                  CE      => '1',
-                  CEMASK  => '1',
-                  CLR     => '0',
-                  CLRMASK => '1',
-                  DIV     => "000",           -- Divide-by-1
-                  O       => genTimingRefG);
-
-     txUsrClk  <= genTimingRefG;
-     txStatus.locked       <= '1';
-     txStatus.resetDone    <= '1';
-     txStatus.bufferByDone <= '1';
-     txStatus.bufferByErr  <= '0';
-     rxOutClk  <= genTimingRefG;
-     rxData    <= genTimingPhy.data;
-     rxDataK   <= genTimingPhy.dataK;
-     rxDispErr <= "00";
-     rxDecErr  <= "00";
-     rxStatus.locked       <= '1';
-     rxStatus.resetDone    <= '1';
-     rxStatus.bufferByDone <= '1';
-     rxStatus.bufferByErr  <= '0';
-   end generate;
+   -- BUFGCTRL (asynchronous mux) 
+   txUsrClk  <= genTimingRefG when timingRxEnable='0' else txOutClk;
+   rxUsrClk  <= genTimingRefG when timingRxEnable='0' else rxOutClk;
+   txUsrRst  <= '0'           when timingRxEnable='0' else not (txStatus.resetDone);
+   recStatus <= genStatus     when timingRxEnable='0' else rxStatus;
+   recData   <= genTimingPhy  when timingRxEnable='0' else rxData;
    
-   GEN_NOMINI : if not TPGMINI_C generate
-     TimingGthCoreWrapper_1 : entity work.TimingGthCoreWrapper
-       generic map ( TPD_G            => TPD_G,
-                     AXIL_BASE_ADDR_G => GTH_ADDR )
-       port map (
-         axilClk        => axilClk,
-         axilRst        => axilRst,
-         axilReadMaster => axilReadMasters(1),
-         axilReadSlave  => axilReadSlaves (1),
-         axilWriteMaster=> axilWriteMasters(1),
-         axilWriteSlave => axilWriteSlaves (1),
-         stableClk      => axilClk,
-         gtRefClk       => timingRefClk,
-         gtRefClkDiv2   => '0',
-         gtRxP          => timingRxP,
-         gtRxN          => timingRxN,
-         gtTxP          => timingTxP,
-         gtTxN          => timingTxN,
-         rxControl      => rxControl,
-         rxStatus       => rxStatus,
-         rxUsrClkActive => rxUsrClkActive,
-         rxCdrStable    => rxCdrStable,
-         rxUsrClk       => rxUsrClk,
-         rxData         => rxData,
-         rxDataK        => rxDataK,
-         rxDispErr      => rxDispErr,
-         rxDecErr       => rxDecErr,
-         rxOutClk       => rxOutClk,
-         txControl      => appTimingPhy.control,
-         txStatus       => txStatus,
-         txUsrClk       => txUsrClk,
-         txUsrClkActive => txUsrClkActive,
-         txData         => appTimingPhy.data,
-         txDataK        => appTimingPhy.dataK,
-         txOutClk       => txUsrClk,  -- will this be source synchronous?
-         loopback       => loopback);
-   end generate;
+   TimingGthCoreWrapper_1 : entity work.TimingGthCoreWrapper
+     generic map ( TPD_G            => TPD_G,
+                   AXIL_BASE_ADDR_G => GTH_ADDR )
+     port map (
+       axilClk        => axilClk,
+       axilRst        => axilRst,
+       axilReadMaster => axilReadMasters(1),
+       axilReadSlave  => axilReadSlaves (1),
+       axilWriteMaster=> axilWriteMasters(1),
+       axilWriteSlave => axilWriteSlaves (1),
+       stableClk      => axilClk,
+       gtRefClk       => timingRefClk,
+       gtRefClkDiv2   => '0',
+       gtRxP          => timingRxP,
+       gtRxN          => timingRxN,
+       gtTxP          => timingTxP,
+       gtTxN          => timingTxN,
+       rxControl      => rxControl,
+       rxStatus       => rxStatus,
+       rxUsrClkActive => rxUsrClkActive,
+       rxCdrStable    => rxCdrStable,
+       rxUsrClk       => rxUsrClk,
+       rxData         => rxData.data,
+       rxDataK        => rxData.dataK,
+       rxDispErr      => rxData.dspErr,
+       rxDecErr       => rxData.decErr,
+       rxOutClk       => rxOutClk,
+       txControl      => appTimingPhy.control,
+       txStatus       => txStatus,
+       txUsrClk       => txOutClk,
+       txUsrClkActive => txUsrClkActive,
+       txData         => appTimingPhy.data,
+       txDataK        => appTimingPhy.dataK,
+       txOutClk       => txOutClk,  -- will this be source synchronous?
+       loopback       => loopback);
    
    -- Drive the external CLK MUX
    timingClkSel <= '1';
@@ -306,25 +255,25 @@ begin
          TPD_G        => TPD_G,
          XIL_DEVICE_G => "ULTRASCALE")
       port map (
-         clkIn   => rxOutClk,
+         clkIn   => rxUsrClk,
          clkOutP => timingRecClkOutP,
          clkOutN => timingRecClkOutN);
 
    TimingCore_1 : entity work.TimingCore
      generic map ( TPD_G             => TPD_G,
-                   TPGMINI_G         => TPGMINI_C,
+                   TPGMINI_G         => true,
                    AXIL_BASE_ADDR_G  => TIMING_ADDR_C,
                    AXIL_ERROR_RESP_G => AXI_RESP_DECERR_C )
      port map (
          gtTxUsrClk      => txUsrClk,
          gtTxUsrRst      => txUsrRst,
          gtRxRecClk      => rxOutClk,
-         gtRxData        => rxData,
-         gtRxDataK       => rxDataK,
-         gtRxDispErr     => rxDispErr,
-         gtRxDecErr      => rxDecErr,
+         gtRxData        => rxData.data,
+         gtRxDataK       => rxData.dataK,
+         gtRxDispErr     => rxData.dspErr,
+         gtRxDecErr      => rxData.decErr,
          gtRxControl     => rxControl,
-         gtRxStatus      => rxStatus,
+         gtRxStatus      => recStatus,
          gtLoopback      => loopback,
          appTimingClk    => rxOutClk,
          appTimingRst    => rxRst,
@@ -337,9 +286,4 @@ begin
          axilWriteMaster => axilWriteMasters(0),
          axilWriteSlave  => axilWriteSlaves (0));
 
-   recData.data   <= rxData;
-   recData.dataK  <= rxDataK;
-   recData.decErr <= rxDecErr;
-   recData.dspErr <= rxDispErr;
-   
 end mapping;

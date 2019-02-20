@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-12-14
--- Last update: 2018-09-06
+-- Last update: 2018-11-29
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -233,7 +233,7 @@ begin
     rxErrL (i)  <= rxErrIn(i);
     rxClk  (i)  <= rxUsrClk(i);
     rxRst  (i)  <= rxFifoRst(i);
-    rxDataK(i)  <= rxCtrl0Out(i);
+    rxDataK(i)  <= rxCtrl0Out(i)(1 downto 0);
 
     U_RstSyncTx : entity work.RstSync
       port map ( clk      => txUsrClk(i),

@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-12-14
--- Last update: 2018-10-31
+-- Last update: 2018-12-19
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -31,7 +31,7 @@ use ieee.std_logic_arith.all;
 
 use work.StdRtlPkg.all;
 use work.TimingPkg.all;
-use work.TPGPkg.all;
+use work.TimingExtnPkg.all;
 use work.XpmPkg.all;
 
 entity XpmL0Select is
@@ -43,6 +43,8 @@ entity XpmL0Select is
       config           : in  XpmL0SelectConfigType;
       -- current pulse timing information
       timingBus        : in  TimingBusType;
+      cuTiming         : in  CuTimingType;
+      cuTimingV        : in  sl;
       -- state of the deadtime assertion
       inhibit          : in  sl;
       -- strobe cycle when decision needs to be made
@@ -60,6 +62,7 @@ architecture rtl of XpmL0Select is
       accept   : sl;
       rejecc   : sl;
       seqWord  : slv(15 downto 0);
+      evtWord  : slv(15 downto 0);
       status   : XpmL0SelectStatusType;
    end record;
    constant REG_INIT_C : RegType := (
@@ -67,6 +70,7 @@ architecture rtl of XpmL0Select is
       accept   => '0',
       rejecc   => '0',
       seqWord  => (others=>'0'),
+      evtWord  => (others=>'0'),
       status   => XPM_L0_SELECT_STATUS_INIT_C );
 
    signal r   : RegType := REG_INIT_C;
@@ -74,8 +78,29 @@ architecture rtl of XpmL0Select is
 
    signal uconfig : XpmL0SelectConfigType;
 
+   component ila_0
+     port ( clk    : in sl;
+            probe0 : in slv(255 downto 0) );
+   end component;
 begin
 
+  GEN_DEBUG : if DEBUG_G generate
+    U_ILA : ila_0
+      port map ( clk      => clk,
+                 probe0(0) => timingBus.strobe,
+                 probe0(1) => uconfig.enabled,
+                 probe0(2) => strobe,
+                 probe0(3) => inhibit,
+                 probe0( 7 downto  4) => r.status.enabled  (3 downto 0),
+                 probe0(11 downto  8) => r.status.inhibited(3 downto 0),
+                 probe0(15 downto 12) => r.status.num      (3 downto 0),
+                 probe0(19 downto 16) => r.status.numInh   (3 downto 0),
+                 probe0(20) => uconfig.reset,
+                 probe0(21) => r.accept,
+                 probe0(22) => r.rejecc,
+                 probe0(255 downto 23) => (others=>'0') );
+  end generate;
+  
    accept <= r.accept;
    rejecc <= r.rejecc;
    status <= r.status;
@@ -92,12 +117,13 @@ begin
                  dataOut(32)           => uconfig.reset,
                  dataOut(33)           => uconfig.enabled);
                  
-   comb: process (r, inhibit, timingBus, uconfig, strobe) is
+   comb: process (r, inhibit, timingBus, cuTiming, cuTimingV, uconfig, strobe) is
       variable v : RegType;
       variable m       : TimingMessageType;
       variable rateSel : sl;
       variable destSel : sl;
       variable controlI : integer;
+      variable eventI   : integer;
    begin
       v := r;
 
@@ -107,11 +133,14 @@ begin
       m := timingBus.message; -- shorthand
       
       controlI      := conv_integer(uconfig.rateSel(13 downto 8));
-      if (controlI<MAXEXPSEQDEPTH) then
+      if (controlI<m.control'length) then
         v.seqWord := m.control(controlI);
       else
         v.seqWord := (others=>'0');
       end if;
+
+      eventI    := conv_integer(uconfig.rateSel(12 downto 8));
+      v.evtWord := cuTiming.eventCodes(eventI*16+15 downto eventI*16);
 
       if (timingBus.strobe='1') then
          v.strobeRdy := '1';
@@ -128,11 +157,13 @@ begin
                           rateSel := m.acRates(conv_integer(uconfig.rateSel(2 downto 0)));
                         end if;
            when "10" => rateSel := r.seqWord(conv_integer(uconfig.rateSel(3 downto 0)));
+           when "11" => rateSel := r.evtWord(conv_integer(uconfig.rateSel(3 downto 0)));
            when others => rateSel := '0';
          end case;
          -- calculate destSel
          if (uconfig.destSel(15)='1' or
-             uconfig.destSel(conv_integer(m.beamRequest(7 downto 4)))='1') then
+             ((uconfig.destSel(conv_integer(m.beamRequest(7 downto 4)))='1') and
+              (m.beamRequest(0)='1'))) then
            destSel := '1';
          else
            destSel := '0';

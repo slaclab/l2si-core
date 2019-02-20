@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver  <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-09-25
--- Last update: 2018-03-24
+-- Last update: 2018-12-28
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -45,8 +45,9 @@ entity XpmSequence is
       -- Configuration/Status (on clk domain)
       timingClk        : in  sl;
       timingRst        : in  sl;
-      timingDataIn     : in  TimingRxType;
-      timingDataOut    : out TimingRxType );
+      timingAdvance    : in  sl;
+      timingDataIn     : in  slv(15 downto 0);
+      timingDataOut    : out slv(15 downto 0) );
 end XpmSequence;
 
 architecture mapping of XpmSequence is
@@ -59,28 +60,29 @@ architecture mapping of XpmSequence is
   signal seqJump     : slv         (XPMSEQDEPTH-1 downto 0);
   signal seqJumpAddr : SeqAddrArray(XPMSEQDEPTH-1 downto 0);
   signal seqAddr     : SeqAddrArray(XPMSEQDEPTH-1 downto 0);
-  signal fiducial    : sl;
   signal frameSlv    : slv(TIMING_MESSAGE_BITS_C-1 downto 0);
   signal frame       : TimingMessageType;
   signal tframeSlv    : slv(TIMING_MESSAGE_BITS_C-1 downto 0);
   signal tframe       : TimingMessageType;
   
-  constant S0 : integer := 13;
+  constant S0 : integer := 12;
   constant SN : integer := S0+46;
   
   type RegType is record
+    advance : sl;
     frame   : slv(207 downto 0); -- Really 64b
     framel  : slv(207 downto 0);
     strobe  : slv(SN downto 0);
-    data    : TimingRxType;
+    data    : slv(15 downto 0);
     invalid : Slv32Array(XPMSEQDEPTH-1 downto 0);
   end record RegType;
 
   constant REG_INIT_C : RegType := (
+    advance => '0',
     frame   => (others=>'0'),
     framel  => (others=>'0'),
     strobe  => (others=>'0'),
-    data    => TIMING_RX_INIT_C,
+    data    => (others=>'0'),
     invalid => (others=>(others=>'0')) );
 
   signal r    : RegType := REG_INIT_C;
@@ -88,7 +90,7 @@ architecture mapping of XpmSequence is
 
 begin
 
-  timingDataOut <= r.data;
+  timingDataOut <= r_in.data;
   
   U_XBar : entity work.XpmSeqXbar
     generic map ( AXIL_BASEADDR_G => AXIL_BASEADDR_G )
@@ -102,13 +104,6 @@ begin
                rst            => timingRst,
                status         => status,
                config         => config );
-
-  U_Deserializer : entity work.TimingDeserializer
-    port map ( clk       => timingClk,
-               rst       => timingRst,
-               fiducial  => fiducial,
-               streamIds => (others=>x"0"),
-               data      => timingDataIn );
 
   frameSlv <= toSlv(0, TIMING_MESSAGE_BITS_C-r.framel'length) &
               r.framel;
@@ -172,14 +167,15 @@ begin
   --  Replace words in the timing frame.  Skip recalculating the CRC
   --  in the frame, since it will be done on transmission.
   --
-  comb: process ( timingRst, r, config, timingDataIn, fiducial,
+  comb: process ( timingRst, r, config, timingDataIn, timingAdvance,
                   seqReset, seqData, seqDataValid ) is
     variable v : RegType;
   begin
     v := r;
 
-    v.strobe := r.strobe(r.strobe'left-1 downto 0) & fiducial;
-    v.frame  := timingDataIn.data & r.frame(r.frame'left downto 16);
+    v.advance := timingAdvance;
+    v.strobe := r.strobe(r.strobe'left-1 downto 0) & (timingAdvance and not r.advance);
+    v.frame  := timingDataIn & r.frame(r.frame'left downto 16);
 
     if v.strobe(S0)='1' then
       v.framel := v.frame;
@@ -190,7 +186,7 @@ begin
     for i in 0 to XPMSEQDEPTH-1 loop
       if (config.seqEnable(i) = '1' and
           r.strobe(SN-XPMSEQDEPTH+i) = '1') then
-        v.data.data := seqData(i)(15 downto 0);
+        v.data := seqData(i)(15 downto 0);
         if seqDataValid(i) = '0' then
           v.invalid(i) := r.invalid(i)+1;
         end if;

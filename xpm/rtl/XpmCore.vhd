@@ -1,11 +1,11 @@
 -------------------------------------------------------------------------------
 -- Title      : 
 -------------------------------------------------------------------------------
--- File       : AmcCarrierCore.vhd
--- Author     : Larry Ruckman  <ruckman@slac.stanford.edu>
+-- File       : XpmCore.vhd
+-- Author     : Matt Weaver (weaver@slac.stanford.edu)
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-07-08
--- Last update: 2018-08-01
+-- Last update: 2018-12-21
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -31,6 +31,7 @@ use work.AxiPkg.all;
 use work.TimingPkg.all;
 use work.XpmOpts.all;
 use work.XpmPkg.all;
+use work.XpmBasePkg.all;
 use work.AmcCarrierSysRegPkg.all;
 use work.AmcCarrierPkg.all;
 
@@ -67,8 +68,8 @@ entity XpmCore is
       ibDebugMaster     : out   AxiStreamMasterType;
       ibDebugSlave      : in    AxiStreamSlaveType               := AXI_STREAM_SLAVE_FORCE_C;
       -- Timing Interface (timingClk domain)
-      timingData        : out   TimingRxType;
-      timingBus         : out   TimingBusType;
+--      timingData        : out   TimingRxType;
+      recStream         : out   XpmStreamType;
       timingPhy         : in    TimingPhyType                    := TIMING_PHY_INIT_C;  -- Input for timing generator only
       timingPhyClk      : out   sl;
       timingPhyRst      : out   sl;
@@ -102,7 +103,17 @@ entity XpmCore is
       ethClkP          : in    sl;
       ethClkN          : in    sl;
       ipAddr           : out   slv(31 downto 0);
+      -- LCLS-I Timing Ports
+      cuRxEnable       : in    sl := '0';
+      cuRxClk          : in    sl := '0';
+      cuRxRst          : in    sl := '1';
+      cuRx             : in    TimingRxType := TIMING_RX_INIT_C;
+      cuRxStatus       : in    TimingPhyStatusType := TIMING_PHY_STATUS_INIT_C;
+      cuRxControl      : out   TimingPhyControlType;
+      cuRxFiducial     : out   sl;
+      cuSync           : out   sl;
       -- Upstream Timing Ports
+      usRxEnable        : in    sl := '1';
       usRxP             : in    sl;
       usRxN             : in    sl;
       usTxP             : out   sl;
@@ -134,26 +145,6 @@ entity XpmCore is
       hsrScl            : inout Slv3Array(1 downto 0);
       hsrSda            : inout Slv3Array(1 downto 0);
       -- DDR3L SO-DIMM Ports
-      --ddrClkP           : in    sl;
-      --ddrClkN           : in    sl;
-      --ddrDm             : out   slv(7 downto 0);
-      --ddrDqsP           : inout slv(7 downto 0);
-      --ddrDqsN           : inout slv(7 downto 0);
-      --ddrDq             : inout slv(63 downto 0);
-      --ddrA              : out   slv(15 downto 0);
-      --ddrBa             : out   slv(2 downto 0);
-      --ddrCsL            : out   slv(1 downto 0);
-      --ddrOdt            : out   slv(1 downto 0);
-      --ddrCke            : out   slv(1 downto 0);
-      --ddrCkP            : out   slv(1 downto 0);
-      --ddrCkN            : out   slv(1 downto 0);
-      --ddrWeL            : out   sl;
-      --ddrRasL           : out   sl;
-      --ddrCasL           : out   sl;
-      --ddrRstL           : out   sl;
-      --ddrAlertL         : in    sl;
-      --ddrPg             : in    sl;
-      --ddrPwrEnL         : out   sl;
       ddrScl            : inout sl;
       ddrSda            : inout sl;
       -- SYSMON Ports
@@ -209,11 +200,23 @@ architecture mapping of XpmCore is
    signal localIp    : slv(31 downto 0);
    signal localAppId : slv(15 downto 0);
 
-   signal timingRefClkP : sl;
-   signal timingRefClkN : sl;
+   signal iusRefClk, usRefClk, usRefClkGt : sl;
+   signal usRecClk, usRecClkRst : sl;
+   signal usTxOutClk : sl;
+   
+   signal usRxControl : TimingPhyControlType; --reset,inhibit,polarity,bufferByRst,pllReset
+   signal usRxStatus , usTxStatus  : TimingPhyStatusType; --locked,resetDone,bufferByDone,bufferByErr
+   signal usRx       : TimingRxType;
+   signal usRxStable : sl;
+
+   signal irecTimingClk : sl;
+   
 begin
 
-  ipAddr <= localIp;
+  timingPhyClk <= usTxOutClk;
+  timingPhyRst <= not usTxStatus.resetDone;
+  ipAddr       <= localIp;
+  recTimingClk <= irecTimingClk;
   
   GEN_BSI_OVERRIDE: if OVERRIDE_BSI_G=true generate
     localIp    <= IP_ADDR_G;
@@ -228,16 +231,18 @@ begin
   regClk <= axilClk;
   regRst <= axilRst;
 
-  GEN_TPGMINI : if TPGMINI_C=true generate
-    timingRefClkP <= timingRefClkInP;
-    timingRefClkN <= timingRefClkInN;
-  end generate;
+  timingClkSel  <= '0';  -- timing xbar always receives LCLS-I
 
-  GEN_NO_TPGMINI : if TPGMINI_C=false generate
-    timingRefClkP <= usRefClkP;
-    timingRefClkN <= usRefClkN;
-  end generate;
-    
+  -- Send a copy of the timing clock to the AMC's clock cleaner
+  ClkOutBufDiff_Inst : entity work.ClkOutBufDiff
+    generic map (
+      TPD_G        => TPD_G,
+      XIL_DEVICE_G => "ULTRASCALE")
+    port map (
+      clkIn   => irecTimingClk,
+      clkOutP => timingRecClkOutP,
+      clkOutN => timingRecClkOutN);
+  
   --------------------------------
   -- Common Clock and Reset Module
   -------------------------------- 
@@ -271,8 +276,7 @@ begin
    ------------------------------------
    U_Eth : entity work.AmcCarrierEth
       generic map (
-         TPD_G             => TPD_G,
-         AXI_ERROR_RESP_G  => AXI_ERROR_RESP_C)
+         TPD_G             => TPD_G )
       port map (
          -- Local Configuration
          localMac          => localMac,
@@ -326,7 +330,6 @@ begin
       generic map (
          TPD_G               => TPD_G,
          BUILD_INFO_G        => BUILD_INFO_G,
-         AXI_ERROR_RESP_G    => AXI_ERROR_RESP_C,
          APP_TYPE_G          => APP_TYPE_G,
          FSBL_G              => FSBL_G)
       port map (
@@ -405,11 +408,8 @@ begin
    --------------
    -- Timing Core
    --------------
-   U_Timing : entity work.XpmTiming
-      generic map (
-         TPD_G               => TPD_G,
-         APP_TYPE_G          => APP_TYPE_G,
-         AXI_ERROR_RESP_G    => AXI_ERROR_RESP_C )
+   U_Timing : entity work.Xpm2Timing
+      generic map ( AXIL_BASE_ADDR_G => TIMING_ADDR_C )
       port map (
          -- AXI-Lite Interface (axilClk domain)
          axilClk          => axilClk,
@@ -418,33 +418,87 @@ begin
          axilReadSlave    => timingReadSlave,
          axilWriteMaster  => timingWriteMaster,
          axilWriteSlave   => timingWriteSlave,
-         ----------------------
-         -- Top Level Interface
-         ----------------------         
-         -- Timing Interface 
-         recTimingClk     => recTimingClk,
-         recTimingRst     => recTimingRst,
-         recTimingBus     => timingBus,
-         recData          => timingData,
-         
-         appTimingPhy     => timingPhy,
-         appTimingPhyClk  => timingPhyClk,
-         appTimingPhyRst  => timingPhyRst,
-         ----------------
-         -- Core Ports --
-         ----------------   
-         -- LCLS Timing Ports
-         timingRxP        => usRxP,
-         timingRxN        => usRxN,
-         timingTxP        => usTxP,
-         timingTxN        => usTxN,
-         timingRefClkInP  => timingRefClkP,
-         timingRefClkInN  => timingRefClkN,
-         timingRefClkOut  => timingRefClkOut,
-         timingRecClkOutP => timingRecClkOutP,
-         timingRecClkOutN => timingRecClkOutN,
-         timingClkSel     => timingClkSel);
+         usRefClk         => usRefClk,
+         usRefClkRst      => '0',
+         usRecClk         => usRecClk,
+         usRecClkRst      => usRecClkRst,
+         usRx             => usRx,
+         usRxStatus       => usRxStatus,
+         usRxControl      => usRxControl,
+         cuRecClk         => cuRxClk,
+         cuRecClkRst      => cuRxRst,
+         cuRx             => cuRx,
+         cuRxStatus       => cuRxStatus,
+         cuRxControl      => cuRxControl,
+         cuRxFiducial     => cuRxFiducial,
+         cuSync           => cuSync,
+         timingClk        => irecTimingClk,
+         timingRst        => recTimingRst,
+         timingStream     => recStream );
+          
+   -------------------------------------------------------------------------------------------------
+   -- Clock Buffers
+   -------------------------------------------------------------------------------------------------
+   TIMING_REFCLK_IBUFDS_GTE3 : IBUFDS_GTE3
+      generic map (
+         REFCLK_EN_TX_PATH  => '0',
+         REFCLK_HROW_CK_SEL => "01",    -- 2'b01: ODIV2 = Divide-by-2 version of O
+         REFCLK_ICNTL_RX    => "00")
+      port map (
+         I     => usRefClkP,
+         IB    => usRefClkN,
+         CEB   => '0',
+         ODIV2 => iusRefClk,
+         O     => usRefClkGt);
 
+  U_USREFCLK : BUFG_GT
+    port map ( I       => iusRefClk,
+               CE      => '1',
+               CEMASK  => '1',
+               CLR     => '0',
+               CLRMASK => '1',
+               DIV     => "000",           -- Divide-by-
+               O       => usRefClk );
+  
+   TimingGtCoreWrapper_1 : entity work.TimingGtCoreWrapper
+     generic map ( TPD_G            => TPD_G,
+                   AXIL_BASE_ADDR_G => x"00000000" )
+     port map (
+       axilClk        => axilClk,
+       axilRst        => axilRst,
+       axilReadMaster => AXI_LITE_READ_MASTER_INIT_C,
+       axilReadSlave  => open,
+       axilWriteMaster=> AXI_LITE_WRITE_MASTER_INIT_C,
+       axilWriteSlave => open,
+       stableClk      => axilClk,
+       stableRst      => axilRst,
+       gtRefClk       => usRefClkGt,
+       gtRefClkDiv2   => '0',
+       gtRxP          => usRxP,
+       gtRxN          => usRxN,
+       gtTxP          => usTxP,
+       gtTxN          => usTxN,
+       rxControl      => usRxControl,
+       rxStatus       => usRxStatus,
+       rxUsrClkActive => '1',
+       rxCdrStable    => usRxStable,
+       rxUsrClk       => usRecClk,
+       rxData         => usRx.data,
+       rxDataK        => usRx.dataK,
+       rxDispErr      => usRx.dspErr,
+       rxDecErr       => usRx.decErr,
+       rxOutClk       => usRecClk,
+       txControl      => timingPhy.control,
+       txStatus       => usTxStatus,
+       txUsrClk       => usTxOutClk,
+       txUsrClkActive => '1',
+       txData         => timingPhy.data,
+       txDataK        => timingPhy.dataK,
+       txOutClk       => usTxOutClk,  -- will this be source synchronous?
+       loopback       => "000" );
+
+    usRecClkRst <= not usRxStatus.resetDone;
+  
     U_HSRepeater : entity work.HSRepeater
      generic map (
        AXI_ERROR_RESP_G => AXI_ERROR_RESP_C,
@@ -460,55 +514,4 @@ begin
        hsrScl          => hsrScl,
        hsrSda          => hsrSda );
   
-   ------------------
-   -- DDR Memory Core
-   ------------------
-   --U_DdrMem : entity work.AmcCarrierDdrMem
-   --   generic map (
-   --      TPD_G            => TPD_G,
-   --      AXI_ERROR_RESP_G => AXI_ERROR_RESP_C,
-   --      FSBL_G           => FSBL_G,
-   --      SIM_SPEEDUP_G    => SIM_SPEEDUP_G)
-   --   port map (
-   --      -- AXI-Lite Interface
-   --      axilClk         => axilClk,
-   --      axilRst         => axilRst,
-   --      axilReadMaster  => ddrReadMaster,
-   --      axilReadSlave   => ddrReadSlave,
-   --      axilWriteMaster => ddrWriteMaster,
-   --      axilWriteSlave  => ddrWriteSlave,
-   --      memReady        => ddrMemReady,
-   --      memError        => ddrMemError,
-   --      -- AXI4 Interface
-   --      axiClk          => axiClk,
-   --      axiRst          => axiRst,
-   --      axiWriteMaster  => axiWriteMaster,
-   --      axiWriteSlave   => axiWriteSlave,
-   --      axiReadMaster   => axiReadMaster,
-   --      axiReadSlave    => axiReadSlave,
-   --      ----------------
-   --      -- Core Ports --
-   --      ----------------   
-   --      -- DDR3L SO-DIMM Ports
-   --      ddrClkP         => ddrClkP,
-   --      ddrClkN         => ddrClkN,
-   --      ddrDqsP         => ddrDqsP,
-   --      ddrDqsN         => ddrDqsN,
-   --      ddrDm           => ddrDm,
-   --      ddrDq           => ddrDq,
-   --      ddrA            => ddrA,
-   --      ddrBa           => ddrBa,
-   --      ddrCsL          => ddrCsL,
-   --      ddrOdt          => ddrOdt,
-   --      ddrCke          => ddrCke,
-   --      ddrCkP          => ddrCkP,
-   --      ddrCkN          => ddrCkN,
-   --      ddrWeL          => ddrWeL,
-   --      ddrRasL         => ddrRasL,
-   --      ddrCasL         => ddrCasL,
-   --      ddrRstL         => ddrRstL,
-   --      ddrPwrEnL       => ddrPwrEnL,
-   --      ddrPg           => ddrPg,
-   --      ddrAlertL       => ddrAlertL);
-
 end mapping;
