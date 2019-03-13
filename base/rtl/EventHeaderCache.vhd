@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-07-10
--- Last update: 2018-12-07
+-- Last update: 2018-12-14
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -93,8 +93,9 @@ architecture rtl of EventHeaderCache is
     cntL1A : slv(19 downto 0);
     cntL1R : slv(19 downto 0);
     cntWrF : slv(ADDR_WIDTH_G-1 downto 0);
-    rstF   : sl;
+    rstF   : slv(3 downto 0);
     msgD   : Slv7Array(1 downto 0);
+    oflow  : sl;
     ofcnt  : slv( 7 downto 0);
   end record;
 
@@ -112,8 +113,9 @@ architecture rtl of EventHeaderCache is
     cntL1A => (others=>'0'),
     cntL1R => (others=>'0'),
     cntWrF => (others=>'0'),
-    rstF   => '1',
+    rstF   => (others=>'1'),
     msgD   => (others=>(others=>'1')),
+    oflow  => '0',
     ofcnt  => (others=>'0') );
 
   signal wr    : WrRegType := WR_REG_INIT_C;
@@ -134,7 +136,7 @@ architecture rtl of EventHeaderCache is
   signal wrrst, rdrst : sl;
   signal entagr       : sl;
   signal daddr        : slv(  4 downto 0);
-  signal doutf        : slv(  6 downto 0);
+  signal doutf        : slv(  7 downto 0);
   signal doutb        : slv(191 downto 0);
   signal spartition   : slv(partition'range);
   signal wr_data_count: slv(ADDR_WIDTH_G-1 downto 0);
@@ -202,6 +204,7 @@ begin
   hdrOut.partitions <= doutb(143 downto 128);
   hdrOut.payload    <= doutb(191 downto 184);
   hdrOut.l1t        <= doutb(159 downto 144);
+  hdrOut.damaged    <= doutf(7);
   pmsg              <= doutf(5);
   phdr              <= doutf(6);
   valid             <= rd.valid and ivalid;
@@ -254,9 +257,9 @@ begin
 
   U_TagFifo : entity work.FifoAsync
     generic map ( ADDR_WIDTH_G => ADDR_WIDTH_G,
-                  DATA_WIDTH_G => 7,
+                  DATA_WIDTH_G => 8,
                   FWFT_EN_G    => true )
-    port map ( rst             => wr.rstF,
+    port map ( rst             => wr.rstF(0),
                wr_clk          => wrclk,
                wr_en           => hdrWe,
                wr_data_count   => wr_data_count,
@@ -266,6 +269,7 @@ begin
                din(4 downto 0) => ptag,
                din(5)          => wr_in.pmsg(0),
                din(6)          => wr_in.phdr(0),
+               din(7)          => wr.oflow,
                rd_clk          => rdclk,
                rd_en           => advance,
                rd_data_count   => rd_data_count,
@@ -291,7 +295,7 @@ begin
     v.pwordV    := '0';
     v.pmsg      := wr.pmsg(wr.pmsg'left-1 downto 0) & '0';
     v.phdr      := wr.phdr(wr.phdr'left-1 downto 0) & '0';
-    v.rstF      := '0';
+    v.rstF      := '0' & wr.rstF(wr.rstF'left downto 1);
     
     ip := conv_integer(spartition);
 
@@ -323,18 +327,20 @@ begin
       end if;
     end if;
 
+    if wr_overflow = '1' then
+      v.oflow := '1';
+      v.ofcnt := wr.ofcnt+1;
+    end if;
+    
     if wr.pmsg /= 0 and toPartitionMsg(wr.pvec).hdr = MSG_CLEAR_FIFO then
-      v.rstF := '1';
+      v.oflow := '0';
+      v.rstF  := (others=>'1');
     end if;
       
     if wr.rden = '1' then
       v.wren  := wr.pword.l0a or not wr.pvec(15);
     end if;
 
-    if wr_overflow = '1' then
-      v.ofcnt := wr.ofcnt+1;
-    end if;
-    
     if wr.pwordV = '1' then
       if wr.pword.l0a = '1' then
         v.cntL0 := wr.cntL0 + 1;
@@ -361,7 +367,7 @@ begin
     cntL1A           <= wr.cntL1A;
     cntL1R           <= wr.cntL1R;
     cntWrFifo        <= wr.cntWrF;
-    rstFifo          <= wr.rstF;
+    rstFifo          <= wr.rstF(0);
     msgDelay         <= wr.msgD(1);
     cntOflow         <= wr.ofcnt;
   

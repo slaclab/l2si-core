@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-07-08
--- Last update: 2018-10-30
+-- Last update: 2019-03-13
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -112,6 +112,21 @@ begin
    timingRecClkOut <= rxOutClk;
    timingBusOut    <= timingBus;
 
+   U_AxilXbar0 : entity work.AxiLiteCrossbar
+    generic map ( NUM_SLAVE_SLOTS_G  => 1,
+                  NUM_MASTER_SLOTS_G => AXIL_MASTERS_CONFIG_C'length,
+                  MASTERS_CONFIG_G   => AXIL_MASTERS_CONFIG_C )
+    port map    ( axiClk              => axilClk,
+                  axiClkRst           => axilRst,
+                  sAxiWriteMasters(0) => axilWriteMaster,
+                  sAxiWriteSlaves (0) => axilWriteSlave ,
+                  sAxiReadMasters (0) => axilReadMaster ,
+                  sAxiReadSlaves  (0) => axilReadSlave  ,
+                  mAxiWriteMasters    => axilWriteMasters,
+                  mAxiWriteSlaves     => axilWriteSlaves ,
+                  mAxiReadMasters     => axilReadMasters ,
+                  mAxiReadSlaves      => axilReadSlaves  );
+  
    -------------------------------------------------------------------------------------------------
    -- Clock Buffers
    -------------------------------------------------------------------------------------------------
@@ -143,14 +158,14 @@ begin
      TimingGthCoreWrapper_1 : entity work.TimingGtCoreWrapper
        generic map ( TPD_G            => TPD_G,
                      EXTREF_G         => true,
-                     AXIL_BASE_ADDR_G => (others=>'0') )
+                     AXIL_BASE_ADDR_G => AXIL_MASTERS_CONFIG_C(1).baseAddr )
        port map (
          axilClk        => axilClk,
          axilRst        => axilRst,
-         axilReadMaster => AXI_LITE_READ_MASTER_INIT_C,
-         axilReadSlave  => open,
-         axilWriteMaster=> AXI_LITE_WRITE_MASTER_INIT_C,
-         axilWriteSlave => open,
+         axilReadMaster => axilReadMasters (1),
+         axilReadSlave  => axilReadSlaves  (1),
+         axilWriteMaster=> axilWriteMasters(1),
+         axilWriteSlave => axilWriteSlaves (1),
          stableClk      => axilClk,
          stableRst      => axilRst,
          gtRefClk       => timingRefClk,
@@ -187,7 +202,7 @@ begin
                    CLKSEL_MODE_G     => "LCLSII",
                    USE_TPGMINI_G     => false,
                    ASYNC_G           => false,
-                   AXIL_BASE_ADDR_G  => AXIL_BASEADDR_G )
+                   AXIL_BASE_ADDR_G  => AXIL_MASTERS_CONFIG_C(0).baseAddr )
      port map (
          gtTxUsrClk      => txUsrClk,
          gtTxUsrRst      => txUsrRst,
@@ -205,10 +220,10 @@ begin
          timingPhy       => open, -- TPGMINI
          axilClk         => axilClk,
          axilRst         => axilRst,
-         axilReadMaster  => axilReadMaster,
-         axilReadSlave   => axilReadSlave,
-         axilWriteMaster => axilWriteMaster,
-         axilWriteSlave  => axilWriteSlave );
+         axilReadMaster  => axilReadMasters (0),
+         axilReadSlave   => axilReadSlaves  (0),
+         axilWriteMaster => axilWriteMasters(0),
+         axilWriteSlave  => axilWriteSlaves (0) );
 
    U_HeaderCache : entity work.EventHeaderCacheWrapper
       generic map (

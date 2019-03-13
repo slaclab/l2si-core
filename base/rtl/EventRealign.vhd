@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-07-10
--- Last update: 2018-11-02
+-- Last update: 2018-12-17
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -53,14 +53,12 @@ architecture rtl of EventRealign is
 
   type RegType is record
     rden   : sl;
-    wren   : sl;
     rdaddr : Slv7Array(NPartitions downto 0);
     pdelay : Slv7Array(NPartitions-1 downto 0);
   end record;
 
   constant REG_INIT_C : RegType := (
     rden   => '0',
-    wren   => '0',
     rdaddr => (others=>(others=>'0')),
     pdelay => (others=>(others=>'0')) );
 
@@ -111,25 +109,23 @@ begin
   
   comb : process( r, rst, timingI, exptBusI ) is
     variable v    : RegType;
-    variable pvec : slv(47 downto 0); 
+    variable pvec : slv(PADDR_LEN-1 downto 0); 
   begin
     v := r;
 
     v.rden      := '0';
-    v.wren      := '0';
     
     if timingI.strobe = '1' then
       v.rden   := '1';
       v.rdaddr(NPartitions) := timingI.pulseId(6 downto 0) - TF_DELAY_G;
       for ip in 0 to NPartitions-1 loop
         v.rdaddr(ip) := timingI.pulseId(6 downto 0) - TF_DELAY_G + r.pdelay(ip);
-        pvec := exptBusI.message.partitionWord(ip);
-        if (exptBusI.valid = '1' and
-            pvec(15) = '0' and
-            toPartitionMsg(pvec).hdr = MSG_DELAY_PWORD) then
-          v.pdelay(ip) := toPartitionMsg(pvec).payload(6 downto 0);
-        end if;
       end loop;
+
+      pvec := exptBusI.message.partitionAddr;
+      if (toXpmBroadcastType(pvec)=PDELAY) then
+        v.pdelay(toIndex(pvec)) := toValue(pvec)(6 downto 0);
+      end if;
     end if;
 
     if rst = '1' then
