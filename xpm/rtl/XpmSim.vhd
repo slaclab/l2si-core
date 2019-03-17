@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-07-10
--- Last update: 2018-11-02
+-- Last update: 2019-01-26
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -35,7 +35,9 @@ use work.TimingExtnPkg.all;
 use work.TimingPkg.all;
 use work.TPGPkg.all;
 use work.XpmPkg.all;
-
+use work.XpmBasePkg.all;
+use work.AxiLitePkg.all;
+ 
 library unisim;
 use unisim.vcomponents.all;
 
@@ -45,7 +47,6 @@ entity XpmSim is
             ENABLE_BP_LINKS_G : slv(NBPLinks-1 downto 0) := (others=>'0');
             RATE_DIV_G        : integer := 4;
             RATE_SELECT_G     : integer := 1;
-            TRIG_DELAY_G      : integer := 80;
             PIPELINE_DEPTH_G  : integer := 200 );
   port ( txRefClk     : in  sl := '0';
          dsRxClk      : in  slv       (NDSLinks-1 downto 0);
@@ -83,47 +84,14 @@ architecture top_level_app of XpmSim is
    signal linkStatus: XpmLinkStatusArray(NDSLinks-1 downto 0) := (others=>XPM_LINK_STATUS_INIT_C);
    
    -- Timing Interface (timingClk domain) 
-   signal xData     : TimingRxType := TIMING_RX_INIT_C;
-   signal timingBus : TimingBusType;
-   signal timingBusL: TimingBusType;
-   signal exptBus   : ExptBusType;
+--   signal xData      : TimingRxType := TIMING_RX_INIT_C;
+   signal xData      : XpmStreamType := (
+     fiducial => '0',
+     streams  => (others=>TIMING_SERIAL_INIT_C),
+     advance  => (others=>'0') );
    
    signal pconfig : XpmPartitionConfigArray(NPartitions-1 downto 0) := (others=>XPM_PARTITION_CONFIG_INIT_C);
    
-    function HexChar(v : in slv(3 downto 0)) return character is
-      variable result : character := '0';
-    begin
-      case(v) is
-      when x"0" => result := '0';
-      when x"1" => result := '1';
-      when x"2" => result := '2';
-      when x"3" => result := '3';
-      when x"4" => result := '4';
-      when x"5" => result := '5';
-      when x"6" => result := '6';
-      when x"7" => result := '7';
-      when x"8" => result := '8';
-      when x"9" => result := '9';
-      when x"A" => result := 'a';
-      when x"B" => result := 'b';
-      when x"C" => result := 'c';
-      when x"D" => result := 'd';
-      when x"E" => result := 'e';
-      when x"F" => result := 'f';
-      when others => null;
-    end case;
-    return result;
-  end function;
-
-  function HexString(v : in slv(31 downto 0)) return string is
-    variable result : string(8 downto 1);
-  begin
-    for i in 0 to 7 loop
-      result(i+1) := HexChar(v(4*i+3 downto 4*i));
-    end loop;
-    return result;
-  end function;
-
 begin
 
   --  Generate clocks and resets
@@ -167,13 +135,17 @@ begin
     port map ( txClk    => recTimingClk,
                txRst    => recTimingRst,
                txRdy    => '1',
-               txData   => xData.data,
-               txDataK  => xData.dataK,
+               --txData   => xData.data,
+               --txDataK  => xData.dataK,
+               streams  => xData.streams(0 downto 0),
+               advance  => xData.advance(0 downto 0),
+               fiducial => xData.fiducial,
                statusO  => open,
                configI  => tpgConfig );
 
   tpgConfig.FixedRateDivisors(RATE_SELECT_G) <= toSlv(RATE_DIV_G,20);
   tpgConfig.pulseIdWrEn                      <= '0';
+  tpgConfig.timeStampWrEn                    <= '0';
   
   xpmConfig.partition <= pconfig;
   xpmConfig.dsLink(0).txDelay <= toSlv(200,20);
@@ -196,7 +168,8 @@ begin
   process is
   begin
      for i in 0 to NPartitions-1 loop
-       pconfig(i).pipeline.depth <= toSlv((TRIG_DELAY_G+i)*200,20);
+       pconfig(i).pipeline.depth_clks <= toSlv((80+i)*200,16);
+       pconfig(i).pipeline.depth_fids <= toSlv((80+i),8);
      end loop;
        
      pconfig(0).analysis.rst  <= x"f";
@@ -229,11 +202,11 @@ begin
      wait until regClk='0';
 
      wait for 10000 ns;
-     for i in 0 to NPartitions-1 loop
-       pconfig(i).message.hdr     <= MSG_DELAY_PWORD;
-       pconfig(i).message.payload <= toSlv(TRIG_DELAY_G+i,8);
-       pconfig(i).message.insert  <= '1';
-     end loop;
+     --for i in 0 to NPartitions-1 loop
+     --  pconfig(i).message.hdr     <= MSG_DELAY_PWORD;
+     --  pconfig(i).message.payload <= toSlv(80+i,8);
+     --  pconfig(i).message.insert  <= '1';
+     --end loop;
    
      wait until regClk='1';
      wait until regClk='0';
@@ -242,9 +215,7 @@ begin
        pconfig(i).message.insert  <= '0';
      end loop;
 
-     for i in 0 to TRIG_DELAY_G loop
-       wait for 1 us;
-     end loop;
+     wait for 120 us;
      
      pconfig(0).l0Select.enabled <= '1';
      pconfig(0).l0Select.rateSel <= toSlv(RATE_SELECT_G,16);
@@ -286,50 +257,17 @@ begin
      wait;
    end process;
 
-   process
-    file     trigs : text;
-    variable oline : line;
-    variable enabld: sl := '0';
-    constant ENABLED_S  : string(7 downto 1) := "enabled";
-    constant DISABLED_S : string(8 downto 1) := "disabled";
-   begin
-     file_open(trigs, "trigs.txt", write_mode);
-     loop
-       wait until rising_edge(recTimingClk);
-       if enabld='0' and pconfig(0).l0Select.enabled='1' then
-         write(oline, ENABLED_S);
-         writeline(trigs, oline);
-       elsif enabld='1' and pconfig(0).l0Select.enabled='0' then
-         write(oline, DISABLED_S);
-         writeline(trigs, oline);
-       end if;
-       enabld := pconfig(0).l0Select.enabled;
-       
-       if pconfig(0).l0Select.enabled='1' and timingBus.strobe='1' and timingBus.message.fixedRates(1)='1' then
-         write(oline, HexString(timingBus.message.pulseId(31 downto  0)), right, 9);
-         write(oline, HexString(timingBus.message.pulseId(63 downto 32)), right, 9);
-         writeline(trigs, oline);
-       end if;
-     end loop;
-     file_close(trigs);
-   end process;
-
-   timingBus.stream <= TIMING_STREAM_INIT_C;
-   timingBus.v1     <= LCLS_V1_TIMING_DATA_INIT_C;
-   timingBus.v2     <= LCLS_V2_TIMING_DATA_INIT_C;
-
-   U_RxLcls2 : entity work.TimingFrameRx
-     port map ( rxClk               => recTimingClk,
-                rxRst               => recTimingRst,
-                rxData              => xData,
-                messageDelay        => (others=>'0'),
-                messageDelayRst     => '0',
-                timingMessage       => timingBus.message,
-                timingMessageStrobe => timingBus.strobe,
-                timingMessageValid  => timingBus.valid,
-                timingExtn          => exptBus.message,
-                timingExtnValid     => exptBus.valid );
-
+   U_SimSerializer : entity work.TimingSerializer
+     generic map ( STREAMS_C => xData.streams'length )
+     port map ( clk       => recTimingClk,
+                rst       => recTimingRst,
+                fiducial  => xData.fiducial,
+                streams   => xData.streams,
+                streamIds => (x"0",x"2",x"1"),
+                advance   => xData.advance,
+                data      => open,
+                dataK     => open );
+     
    U_Application : entity work.XpmApp
       generic map ( NDsLinks => linkStatus'length,
                     NBpLinks => bpRxLinkUp'length )
@@ -355,29 +293,19 @@ begin
          -- Top Level Interface
          ----------------------
          regclk          => regClk,
+         regrst          => regRst,
          update          => toSlv(1,NPartitions),
          status          => xpmStatus,
          config          => xpmConfig,
+         axilReadMaster  => AXI_LITE_READ_MASTER_INIT_C,
+         axilWriteMaster => AXI_LITE_WRITE_MASTER_INIT_C,
          -- Timing Interface (timingClk domain) 
          timingClk         => recTimingClk,
          timingRst         => recTimingRst,
-         timingin          => xData,
+         timingStream      => xData,
          timingFbClk       => '0',
          timingFbRst       => '1',
          timingFbId        => (others=>'0'),
          timingFb          => open );
---         timingBus         => timingBus,
---         exptBus           => exptBus );
-
-     busL: process( recTimingClk ) is
-     begin
-       if rising_edge(recTimingClk) then
-         if timingBus.strobe = '1' then
-           timingBusL <= timingBus;
-         else
-           timingBusL.strobe <= '0';
-         end if;
-       end if;
-     end process busL;
      
 end top_level_app;

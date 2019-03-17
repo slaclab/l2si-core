@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-07-10
--- Last update: 2019-03-13
+-- Last update: 2018-12-28
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -30,7 +30,10 @@ use ieee.std_logic_unsigned.all;
 use work.StdRtlPkg.all;
 use work.TimingExtnPkg.all;
 use work.TimingPkg.all;
+use work.AxiLitePkg.all;
+--use work.AmcCarrierPkg.all;
 use work.XpmPkg.all;
+use work.XpmBasePkg.all;
 
 library unisim;
 use unisim.vcomponents.all;
@@ -39,15 +42,21 @@ entity XpmApp is
    generic (
       TPD_G               : time                := 1 ns;
       NDsLinks            : integer             := 7;
-      NBpLinks            : integer             := 14 );
+      NBpLinks            : integer             := 14;
+      AXIL_BASEADDR_G     : slv(31 downto 0)    := (others=>'0') );
    port (
       -----------------------
       -- XpmApp Ports --
       -----------------------
       regclk            : in  sl;
+      regrst            : in  sl;
       update            : in  slv(NPartitions-1 downto 0);
       config            : in  XpmConfigType;
       status            : out XpmStatusType;
+      axilReadMaster    : in  AxiLiteReadMasterType;
+      axilReadSlave     : out AxiLiteReadSlaveType;
+      axilWriteMaster   : in  AxiLiteWriteMasterType;
+      axilWriteSlave    : out AxiLiteWriteSlaveType;
       -- AMC's DS Ports
       dsLinkStatus      : in  XpmLinkStatusArray(NDsLinks-1 downto 0);
       dsRxData          : in  Slv16Array        (NDsLinks-1 downto 0);
@@ -65,7 +74,8 @@ entity XpmApp is
       -- Timing Interface (timingClk domain) 
       timingClk         : in  sl;
       timingRst         : in  sl;
-      timingIn          : in  TimingRxType;
+--      timingIn          : in  TimingRxType;
+      timingStream      : in  XpmStreamType;
       timingFbClk       : in  sl;
       timingFbRst       : in  sl;
       timingFbId        : in  slv(31 downto 0);
@@ -76,35 +86,41 @@ architecture top_level_app of XpmApp is
 
   type LinkFullArray  is array (natural range<>) of slv(26 downto 0);
   type LinkL1InpArray is array (natural range<>) of XpmL1InputArray(NDsLinks-1 downto 0);
-    
+
   type StateType is (INIT_S, PADDR_S, EWORD_S, EOS_S);
   type RegType is record
     full       : LinkFullArray (NPartitions-1 downto 0);
+    fullfb     : slv           (NPartitions-1 downto 0);
     l1input    : LinkL1InpArray(NPartitions-1 downto 0);
     fiducial   : sl;
     source     : sl;
-    paddr      : slv(PADDR_LEN-1 downto 0);
-    taddr      : slv(PADDR_LEN-1 downto 0);
-    streams    : TimingSerialArray(1 downto 0);
-    advance    : slv( 1 downto 0);
+    paddr      : slv(PADDR_LEN-1 downto 0); -- platform address
+    bcastr     : slv(PADDR_LEN-1 downto 0); -- received Xpm Broadcast
+    bcastf     : slv(PADDR_LEN-1 downto 0); -- Xpm Broadcast to forward
+    streams    : TimingSerialArray(NSTREAMS_C-1 downto 0);
+    advance    : slv              (NSTREAMS_C-1 downto 0);
     state      : StateType;
     aword      : integer range 0 to paddr'left/16;
     eword      : integer range 0 to (NTagBytes+1)/2;
     ipart      : integer range 0 to 2*NPartitions-1;
+    bcastCount : integer range 0 to 8;
   end record;
   constant REG_INIT_C : RegType := (
     full       => (others=>(others=>'0')),
+    fullfb     => (others=>'0'),
     l1input    => (others=>(others=>XPM_L1_INPUT_INIT_C)),
     fiducial   => '0',
     source     => '1',
     paddr      => (others=>'1'),
-    taddr      => (others=>'1'),
+    bcastr     => (others=>'1'),
+    bcastf     => (others=>'1'),
     streams    => (others=>TIMING_SERIAL_INIT_C),
     advance    => (others=>'0'),
     state      => INIT_S,
     aword      => 0,
     eword      => 0,
-    ipart      => 0 );
+    ipart      => 0,
+    bcastCount => 0 );
 
   signal r   : RegType := REG_INIT_C;
   signal rin : RegType;
@@ -125,15 +141,16 @@ architecture top_level_app of XpmApp is
   signal txData         : slv(15 downto 0);
   signal txDataK        : slv( 1 downto 0);
 
-  constant STREAMS_C : integer := 2;
-  signal streams   : TimingSerialArray(STREAMS_C-1 downto 0);
-  signal streamIds : Slv4Array        (STREAMS_C-1 downto 0) := (x"1",x"0");
-  signal advance   : slv              (STREAMS_C-1 downto 0);
-  signal fiducial  : sl;
-  signal sof, eof, crcErr : sl;
-  signal pmaster     : slv(NPartitions-1 downto 0);
+  signal streams   : TimingSerialArray(NSTREAMS_C-1 downto 0);
+  signal streamIds : Slv4Array        (NSTREAMS_C-1 downto 0) := (x"1",x"2",x"0");
+  signal r_streamIds : Slv4Array      (NSTREAMS_C-1 downto 0) := (x"1",x"2",x"0");
+  signal advance   : slv              (NSTREAMS_C-1 downto 0);
+  signal pmaster     : slv       (NPartitions-1 downto 0);
+  signal pdepth      : Slv8Array (NPartitions-1 downto 0);
   signal expWord     : Slv48Array(NPartitions-1 downto 0);
-
+  signal fullfb      : slv       (NPartitions-1 downto 0);
+  signal stream0_data: slv(15 downto 0);
+  
 begin
 
   linkstatp: process (bpStatus, dsLinkStatus, dsRxRcvs, isXpm, dsId) is
@@ -163,29 +180,32 @@ begin
                dataIn  => r.paddr,
                dataOut => status.paddr );
   
+  U_FullFb : entity work.SynchronizerVector
+    generic map ( WIDTH_G => fullfb'length )
+    port map ( clk     => timingFbClk,
+               dataIn  => r.fullfb,
+               dataOut => fullfb );
+  
   U_TimingFb : entity work.XpmTimingFb
     port map ( clk        => timingFbClk,
                rst        => timingFbRst,
                id         => timingFbId,
                l1input    => (others=>XPM_L1_INPUT_INIT_C),
-               full       => (others=>'0'),
+               full       => fullfb,
                phy        => timingFb );
                
   GEN_DSLINK: for i in 0 to NDsLinks-1 generate
     U_TxLink : entity work.XpmTxLink
-      generic map ( ADDR => i )
+      generic map ( ADDR => i, STREAMS_G => 3 )
       port map ( clk             => timingClk,
                  rst             => timingRst,
                  config          => config.dsLink(i),
                  isXpm           => isXpm(i),
                  streams         => r.streams,
-                 streamIds       => streamIds,
-                 paddr           => r.paddr,
+                 streamIds       => r_streamIds,
+                 paddr           => r.bcastf,
                  advance_i       => r.advance,
                  fiducial        => r.fiducial,
-                 sof             => sof,
-                 eof             => eof,
-                 crcErr          => crcErr,
                  txData          => dsTxData (i),
                  txDataK         => dsTxDataK(i) );
     U_RxLink : entity work.XpmRxLink
@@ -205,36 +225,57 @@ begin
   end generate GEN_DSLINK;
 
   U_BpTx : entity work.XpmTxLink
-    generic map ( ADDR    => 15,
-                  DEBUG_G => true )
+    generic map ( ADDR      => 15,
+                  STREAMS_G => 3,
+                  DEBUG_G   => true )
     port map ( clk             => timingClk,
                rst             => timingRst,
                config          => config.bpLink(0),
                isXpm           => '1',
                streams         => r.streams,
-               streamIds       => streamIds,
-               paddr           => r.paddr,
+               streamIds       => r_streamIds,
+               paddr           => r.bcastf,
                advance_i       => r.advance,
                fiducial        => r.fiducial,
-               sof             => sof,
-               eof             => eof,
-               crcErr          => crcErr,
                txData          => bpTxData ,
                txDataK         => bpTxDataK );
 
-  U_Deserializer : entity work.TimingDeserializer
-    generic map ( STREAMS_C => 2 )
-    port map ( clk       => timingClk,
-               rst       => timingRst,
-               fiducial  => fiducial,
-               streams   => streams,
-               streamIds => streamIds,
-               advance   => advance,
-               data      => timingIn,
-               sof       => sof,
-               eof       => eof,
-               crcErr    => crcErr );
+  --U_Deserializer : entity work.TimingDeserializer
+  --  generic map ( STREAMS_C => 3,
+  --                DEBUG_G   => true )
+  --  port map ( clk       => timingClk,
+  --             rst       => timingRst,
+  --             fiducial  => fiducial,
+  --             streams   => streams,
+  --             streamIds => streamIds,
+  --             advance   => advance,
+  --             data      => timingIn,
+  --             sof       => sof,
+  --             eof       => eof,
+  --             crcErr    => crcErr );
+  
+  U_Seq : entity work.XpmSequence
+    generic map ( AXIL_BASEADDR_G => AXIL_BASEADDR_G )
+    port map ( axilClk         => regclk,
+               axilRst         => regrst,
+               axilReadMaster  => axilReadMaster ,
+               axilReadSlave   => axilReadSlave  ,
+               axilWriteMaster => axilWriteMaster,
+               axilWriteSlave  => axilWriteSlave ,
+               timingClk       => timingClk,
+               timingRst       => timingRst,
+--               fiducial        => timingStream.fiducial,
+               timingAdvance   => timingStream.advance(0),
+               timingDataIn    => timingStream.streams(0).data,
+               timingDataOut   => stream0_data );
 
+  streams_p : process (timingStream, stream0_data) is
+  begin
+    streams         <= timingStream.streams;
+    streams(0).data <= stream0_data;
+    advance         <= timingStream.advance;
+  end process;
+  
   GEN_PART : for i in 0 to NPartitions-1 generate
 
     U_Master : entity work.XpmAppMaster
@@ -249,32 +290,39 @@ begin
                  streams       => streams,
                  streamIds     => streamIds,
                  advance       => advance,
-                 fiducial      => fiducial,
-                 sof           => sof,
-                 eof           => eof,
-                 crcErr        => crcErr,
+                 fiducial      => timingStream.fiducial,
                  full          => r.full          (i),
                  l1Input       => r.l1input       (i),
                  result        => expWord         (i) );
 
     U_SyncMaster : entity work.Synchronizer
       port map ( clk     => timingClk,
-                 dataIn  => config.partition(i).l0Select.enabled,
+                 dataIn  => config.partition(i).master,
                  dataOut => pmaster(i) );
+    U_SyncDelay : entity work.SynchronizerVector
+      generic map ( WIDTH_G => 8 )
+      port map ( clk     => timingClk,
+                 dataIn  => config.partition(i).pipeline.depth_fids,
+                 dataOut => pdepth(i) );
   end generate;
 
-  comb : process ( r, timingRst, dsFull, bpRxLinkFullS, l1Input, fiducial, advance, expWord, streams, pmaster ) is
-    variable v : RegType;
+  comb : process ( r, timingRst, dsFull, bpRxLinkFullS, l1Input,
+                   timingStream, streams, advance,
+                   expWord, pmaster, pdepth ) is
+    variable v    : RegType;
+    variable tidx : integer;
+    constant pd   : XpmBroadcastType := PDELAY;
   begin
     v := r;
-    v.streams    := streams;
+    v.streams := streams;
     v.streams(0).ready := '1';
     v.streams(1).ready := '1';
+    v.streams(2).ready := '1';
     v.advance    := advance;
-    v.fiducial   := fiducial;
+    v.fiducial   := timingStream.fiducial;
     
     --  test if we are the top of the hierarchy
-    if streams(1).ready='1' then
+    if streams(2).ready='1' then
       v.source        := '0';
     end if;
 
@@ -285,24 +333,24 @@ begin
     case r.state is
       when INIT_S =>
         v.aword := 0;
-        if (r.source='0' and advance(1)='1') then
-          v.taddr := v.streams(1).data & r.taddr(r.paddr'left downto r.paddr'left-15);
+        if (r.source='0' and advance(2)='1') then
+          v.bcastr := v.streams(2).data & r.bcastr(r.bcastr'left downto r.bcastr'left-15);
           v.aword           := r.aword+1;
           v.state           := PADDR_S;
         elsif (r.source='1' and advance(0)='0' and r.advance(0)='1') then
-          v.advance(1)      := '1';
-          v.streams(1).data := r.paddr(15 downto 0);
+          v.advance(2)      := '1';
+          v.streams(2).data := r.bcastf(15 downto 0);
           v.aword           := r.aword+1;
           v.state           := PADDR_S;
         end if;
       when PADDR_S =>
         if r.source='1' then
-          v.advance(1)      := '1';
-          v.streams(1).data := r.paddr(r.aword*16+15 downto r.aword*16);
+          v.advance(2)      := '1';
+          v.streams(2).data := r.bcastf(r.aword*16+15 downto r.aword*16);
         else
-          v.taddr := v.streams(1).data & r.taddr(r.paddr'left downto r.paddr'left-15);
+          v.bcastr := v.streams(2).data & r.bcastr(r.bcastr'left downto r.bcastr'left-15);
         end if;
-        if (r.aword=r.paddr'left/16) then
+        if (r.aword=r.bcastf'left/16) then
           v.ipart := 0;
           v.eword := 0;
           v.state := EWORD_S;
@@ -311,9 +359,9 @@ begin
         end if;
       when EWORD_S =>
         v.eword      := r.eword+1;
-        v.advance(1) := '1';
+        v.advance(2) := '1';
         if r.source='1' or pmaster(r.ipart)='1' then
-          v.streams(1).data := expWord(r.ipart)(r.eword*16+15 downto r.eword*16);
+          v.streams(2).data := expWord(r.ipart)(r.eword*16+15 downto r.eword*16);
         end if;
         if (r.eword=(NTagBytes+1)/2) then
           if (r.ipart=NPartitions-1) then
@@ -324,8 +372,30 @@ begin
           end if;
         end if;
       when EOS_S =>
-        v.streams(1).ready := '0';
-        v.paddr := r.taddr;
+        v.streams(2).ready := '0';
+        v.bcastf := r.bcastr;
+        tidx := toIndex(r.bcastr);
+        if r.source='1' then
+          -- master of all : compose the word
+          if r.bcastCount = 8 then
+            v.bcastf := r.paddr;
+            v.bcastCount := 0;
+          else
+            v.bcastf := toPaddr(pd,r.bcastCount,pdepth(r.bcastCount));
+            v.bcastCount := r.bcastCount + 1;
+          end if;
+        else
+          case (toXpmBroadcastType(r.bcastr)) is
+            when PDELAY =>
+              if pmaster(tidx)='1' then
+                -- master of this partition : compose the word
+                v.bcastf := toPaddr(pd,tidx,pdepth(tidx));
+              end if;
+            when XADDR =>
+              v.paddr  := r.bcastr;
+            when others => null;
+          end case;
+        end if;
         v.aword := 0;
         v.state := INIT_S;
       when others => NULL;
@@ -339,6 +409,11 @@ begin
       for j in 0 to NBpLinks-1 loop
         v.full   (i)(j+16) := bpRxLinkFullS(j)(i);
       end loop;
+      if pmaster(i) = '0' and v.full(i)/=0 then
+        v.fullfb(i) := '1';
+      else
+        v.fullfb(i) := '0';
+      end if;
     end loop;
 
     if timingRst='1' then
