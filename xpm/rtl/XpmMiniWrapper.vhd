@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-12-14
--- Last update: 2019-03-13
+-- Last update: 2019-03-15
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -36,11 +36,13 @@ use work.AxiStreamPkg.all;
 use work.SsiPkg.all;
 use work.AxiLitePkg.all;
 use work.TimingPkg.all;
+use work.TPGPkg.all;
 use work.XpmPkg.all;
+use work.XpmMiniPkg.all;
 
 entity XpmMiniWrapper is
    generic ( NDsLinks        : integer := 1;
-             AXIL_BASEADDR_G : slv(31 downto 0) := (others=>'0') )
+             AXIL_BASEADDR_G : slv(31 downto 0) := (others=>'0') );
    port (
       --
       timingClk       : in    sl;
@@ -54,9 +56,9 @@ entity XpmMiniWrapper is
       axilClk         : in    sl;
       axilRst         : in    sl;
       axilReadMaster  : in    AxiLiteReadMasterType;
-      axilReadSlave   : in    AxiLiteReadSlaveType;
+      axilReadSlave   : out   AxiLiteReadSlaveType;
       axilWriteMaster : in    AxiLiteWriteMasterType;
-      axilWriteSlave  : in    AxiLiteWriteSlaveType );
+      axilWriteSlave  : out   AxiLiteWriteSlaveType );
 end XpmMiniWrapper;
 
 architecture top_level of XpmMiniWrapper is
@@ -87,7 +89,6 @@ begin
 
    U_XBAR : entity work.AxiLiteCrossbar
       generic map (
-         TPD_G              => TPD_G,
          NUM_SLAVE_SLOTS_G  => 1,
          NUM_MASTER_SLOTS_G => NUM_AXI_MASTERS_C,
          MASTERS_CONFIG_G   => AXI_CROSSBAR_MASTERS_CONFIG_C)
@@ -116,7 +117,6 @@ begin
                 
    U_TPG : entity work.TPGMini
       generic map (
-         TPD_G          => TPD_G,
          NARRAYSBSA     => 1,
          STREAM_INTF    => true )
       port map (
@@ -129,18 +129,19 @@ begin
          txRdy          => '1',
          streams    (0) => tpgStream,
          advance    (0) => tpgAdvance,
-         fiducial   (0) => tpgFiducial );
+         fiducial       => tpgFiducial );
 
    U_XpmReg : entity work.XpmMiniReg
-     port map ( axiClk         => axilClk,
-                axiRst         => axilRst,
-                axiReadMaster  => mAxilReadMasters (XPM_MINI_INDEX_C),
-                axiReadSlave   => mAxilReadSlaves  (XPM_MINI_INDEX_C),
-                axiWriteMaster => mAxilWriteMasters(XPM_MINI_INDEX_C),
-                axiWriteSlave  => mAxilWriteSlaves (XPM_MINI_INDEX_C),
-                axilUpdate     => update,
-                status         => xpmStatus,
-                config         => xpmConfig );
+     port map ( axilClk         => axilClk,
+                axilRst         => axilRst,
+                axilReadMaster  => mAxilReadMasters (XPM_MINI_INDEX_C),
+                axilReadSlave   => mAxilReadSlaves  (XPM_MINI_INDEX_C),
+                axilWriteMaster => mAxilWriteMasters(XPM_MINI_INDEX_C),
+                axilWriteSlave  => mAxilWriteSlaves (XPM_MINI_INDEX_C),
+                axilUpdate      => update,
+                staClk          => timingClk,
+                status          => xpmStatus,
+                config          => xpmConfig );
 
    xpmStream.fiducial   <= tpgFiducial;
    xpmStream.advance(0) <= tpgAdvance;

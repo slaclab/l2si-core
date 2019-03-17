@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-07-08
--- Last update: 2018-11-02
+-- Last update: 2019-03-16
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -86,11 +86,6 @@ architecture mapping of TDetTimingSim is
    signal rxDecErr       : slv(1 downto 0);
    signal rxOutClk       : sl;
    signal rxRst          : sl;
-   signal txStatus       : TimingPhyStatusType := (
-     locked       => '1',
-     resetDone    => '1',
-     bufferByDone => '1',
-     bufferByErr  => '0' );
    signal txUsrClk       : sl;
    signal txUsrRst       : sl;
    signal txOutClk       : sl;
@@ -276,7 +271,6 @@ begin
      generic map ( DEBUG_G => true )
      port map ( clk            => txUsrClk,
                 rst            => txUsrRst,
-                status         => txStatus,
                 pllReset       => rxControl.pllReset,
                 phyReset       => rxControl.reset,
                 id             => tdetTiming(0).id,

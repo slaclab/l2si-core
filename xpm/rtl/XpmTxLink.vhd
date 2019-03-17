@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-12-14
--- Last update: 2018-07-21
+-- Last update: 2018-12-21
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -39,21 +39,19 @@ use work.XpmPkg.all;
 
 entity XpmTxLink is
    generic (
-      ADDR    : integer := 0;
-      DEBUG_G : boolean := false );
+      ADDR      : integer := 0;
+      STREAMS_G : integer := 2;
+      DEBUG_G   : boolean := false );
    port (
       clk              : in  sl;
       rst              : in  sl;
       config           : in  XpmLinkConfigType;
       isXpm            : in  sl;
-      streams          : in  TimingSerialArray(1 downto 0);
-      streamIds        : in  Slv4Array        (1 downto 0) := (x"1",x"0");
+      streams          : in  TimingSerialArray(STREAMS_G-1 downto 0);
+      streamIds        : in  Slv4Array        (STREAMS_G-1 downto 0);
       paddr            : in  slv(PADDR_LEN-1 downto 0);
-      advance_i        : in  slv              (1 downto 0);
+      advance_i        : in  slv              (STREAMS_G-1 downto 0);
       fiducial         : in  sl;
-      sof              : in  sl;
-      eof              : in  sl;
-      crcErr           : in  sl;
       txData           : out slv(15 downto 0);
       txDataK          : out slv( 1 downto 0) );
 end XpmTxLink;
@@ -80,19 +78,19 @@ architecture rtl of XpmTxLink is
   signal r   : RegType := REG_INIT_C;
   signal rin : RegType;
 
-  signal fstreams  : TimingSerialArray(1 downto 0);
-  signal tfifoStream : TimingSerialType;
-  signal tfifoWr   : sl;
+  signal fstreams    : TimingSerialArray(STREAMS_G-1 downto 0);
+  signal tfifoStream : TimingSerialArray(STREAMS_G-1 downto 0);
+  signal tfifoWr     : slv              (STREAMS_G-1 downto 0);
+  signal advance     : slv              (STREAMS_G-1 downto 0);
+  signal fifoRst     : slv              (STREAMS_G-1 downto 0);
+  signal fiducialDelayed : slv          (STREAMS_G-1 downto 0);
   signal efifoWr   : sl;
   signal efifoFull : sl;
   signal efifoDin  : slv(15 downto 0);
   signal efifoV    : sl;
-  signal fiducialDelayed   : sl;
-  signal advance   : slv(1 downto 0);
   signal utxDelay  : slv(config.txDelay'range);
   signal itxData   : slv(15 downto 0);
   signal itxDataK  : slv( 1 downto 0);
-  signal fifoRst   : sl;
   
   component ila_0
     port ( clk    : in sl;
@@ -101,42 +99,42 @@ architecture rtl of XpmTxLink is
 
 begin
 
-  GEN_DEBUG : if DEBUG_G generate
-    U_ILA : ila_0
-      port map ( clk                   => clk,
-                 probe0( 15 downto  0) => itxData,
-                 probe0( 17 downto 16) => itxDataK,
-                 probe0( 18 )          => sof,
-                 probe0( 19 )          => eof,
-                 probe0( 20 )          => fiducial,
-                 probe0( 22 downto 21) => advance_i,
-                 probe0( 24 downto 23) => advance,
-                 probe0( 25 )          => crcErr,
-                 probe0( 26 )          => streams(0).ready,
-                 probe0( 27 )          => streams(1).ready,
-                 probe0( 28 )          => fstreams(0).ready,
-                 probe0( 29 )          => fstreams(1).ready,
-                 probe0( 32 downto 30) => r.fiducial,
-                 probe0( 33 )          => r.efifoV,
-                 probe0( 35 downto 34) => r.efifoWr,
-                 probe0( 36 )          => '0',
-                 probe0( 38 downto 37) => r.eadvance,
-                 probe0( 39 )          => tfifoWr,
-                 probe0( 40 )          => efifoWr,
-                 probe0( 41 )          => efifoFull,
-                 probe0( 57 downto 42) => efifoDin,
-                 probe0( 58 )          => efifoV,
-                 probe0( 59 )          => fiducialDelayed,
-                 probe0( 60 )          => fifoRst,
-                 probe0( 76 downto 61 )=> fstreams(1).data,
-                 probe0(255 downto 77) => (others=>'0') );
-  end generate;
+  --GEN_DEBUG : if DEBUG_G generate
+  --  U_ILA : ila_0
+  --    port map ( clk                   => clk,
+  --               probe0( 15 downto  0) => itxData,
+  --               probe0( 17 downto 16) => itxDataK,
+  --               probe0( 18 )          => sof,
+  --               probe0( 19 )          => eof,
+  --               probe0( 20 )          => fiducial,
+  --               probe0( 22 downto 21) => advance_i,
+  --               probe0( 24 downto 23) => advance,
+  --               probe0( 25 )          => crcErr,
+  --               probe0( 26 )          => streams(0).ready,
+  --               probe0( 27 )          => streams(1).ready,
+  --               probe0( 28 )          => fstreams(0).ready,
+  --               probe0( 29 )          => fstreams(1).ready,
+  --               probe0( 32 downto 30) => r.fiducial,
+  --               probe0( 33 )          => r.efifoV,
+  --               probe0( 35 downto 34) => r.efifoWr,
+  --               probe0( 36 )          => '0',
+  --               probe0( 38 downto 37) => r.eadvance,
+  --               probe0( 39 )          => tfifoWr,
+  --               probe0( 40 )          => efifoWr,
+  --               probe0( 41 )          => efifoFull,
+  --               probe0( 57 downto 42) => efifoDin,
+  --               probe0( 58 )          => efifoV,
+  --               probe0( 59 )          => fiducialDelayed,
+  --               probe0( 60 )          => fifoRst,
+  --               probe0( 76 downto 61 )=> fstreams(1).data,
+  --               probe0(255 downto 77) => (others=>'0') );
+  --end generate;
 
   txData  <= itxData;
   txDataK <= itxDataK;
   
   U_Serializer : entity work.TimingSerializer
-     generic map ( STREAMS_C => 2 )
+     generic map ( STREAMS_C => STREAMS_G )
      port map ( clk       => clk,
                 rst       => rst,
                 fiducial  => r.fiducial(0),
@@ -146,38 +144,50 @@ begin
                 data      => itxData,
                 dataK     => itxDataK );
 
-  U_TimingFifo : entity work.FifoSync
+  U_ScTimingFifo : entity work.FifoSync
     generic map ( FWFT_EN_G => true )
     port map ( clk     => clk,
-               rst     => rst,
-               wr_en   => tfifoWr,
-               din     => tfifoStream.data,
-               rd_en   => advance(0),
+               rst     => fifoRst (0),
+               wr_en   => tfifoWr (0),
+               din     => tfifoStream(0).data,
+               rd_en   => advance (0),
                dout    => fstreams(0).data,
                valid   => fstreams(0).ready );
   fstreams(0).last   <= '1';
   fstreams(0).offset <= (others=>'0');
   
+  U_CuTimingFifo : entity work.FifoSync
+    generic map ( FWFT_EN_G => true )
+    port map ( clk     => clk,
+               rst     => fifoRst (1),
+               wr_en   => tfifoWr (1),
+               din     => tfifoStream(1).data,
+               rd_en   => advance (1),
+               dout    => fstreams(1).data,
+               valid   => fstreams(1).ready );
+  fstreams(1).last   <= '1';
+  fstreams(1).offset <= (others=>'0');
+  
   U_ExptFifo : entity work.FifoSync
     generic map ( FWFT_EN_G => true )
     port map ( clk     => clk,
-               rst     => fifoRst,
+               rst     => rst,
                wr_en   => efifoWr,
                din     => efifoDin,
-               rd_en   => advance(1),
-               dout    => fstreams(1).data,
+               rd_en   => advance (2),
+               dout    => fstreams(2).data,
                valid   => efifoV,
                full    => efifoFull );
 
-  efifoWr            <= ((advance_i(1) and r.eadvance(0)) or uOr(r.efifoWr)) and not efifoFull;
-  efifoDin           <= streams(1).data     when (advance_i(1)='1') else
+  efifoWr            <= ((advance_i(2) and r.eadvance(0)) or uOr(r.efifoWr)) and not efifoFull;
+  efifoDin           <= streams(2).data     when (advance_i(2)='1') else
                         r.paddr(15 downto 0);
                         
-  fstreams(1).ready  <= efifoV;
-  fstreams(1).last   <= '1';
-  fstreams(1).offset <= (others=>'0');
+  fstreams(2).ready  <= efifoV;
+  fstreams(2).last   <= '1';
+  fstreams(2).offset <= (others=>'0');
 
-  U_Delay : entity work.XpmSerialDelay
+  U_ScDelay : entity work.XpmSerialDelay
      generic map ( DELAY_WIDTH_G => config.txDelay'length,
                    NWORDS_G => TIMING_MESSAGE_WORDS_C,
                    FDEPTH_G => 100 )
@@ -186,12 +196,29 @@ begin
                 delay      => r.txDelay,
                 delayRst   => config.txDelayRst,
                 fiducial_i => fiducial,
-                advance_i  => advance_i(0),
-                stream_i   => streams(0),
-                reset_o    => fifoRst,
-                fiducial_o => fiducialDelayed,
-                advance_o  => tfifoWr,
-                stream_o   => tfifoStream,
+                advance_i  => advance_i      (0),
+                stream_i   => streams        (0),
+                reset_o    => fifoRst        (0),
+                fiducial_o => fiducialDelayed(0),
+                advance_o  => tfifoWr        (0),
+                stream_o   => tfifoStream    (0),
+                overflow_o => open );
+
+  U_CuDelay : entity work.XpmSerialDelay
+     generic map ( DELAY_WIDTH_G => config.txDelay'length,
+                   NWORDS_G => TIMING_EXTN_WORDS_C(1),
+                   FDEPTH_G => 100 )
+     port map ( clk        => clk,
+                rst        => rst,
+                delay      => r.txDelay,
+                delayRst   => config.txDelayRst,
+                fiducial_i => fiducial,
+                advance_i  => advance_i      (1),
+                stream_i   => streams        (1),
+                reset_o    => fifoRst        (1),
+                fiducial_o => fiducialDelayed(1),
+                advance_o  => tfifoWr        (1),
+                stream_o   => tfifoStream    (1),
                 overflow_o => open );
 
   U_SyncDelay : entity work.SynchronizerVector
@@ -205,16 +232,16 @@ begin
    begin
      v := r;
 
-     v.fiducial := fiducialDelayed & r.fiducial(2 downto 1);
+     v.fiducial := fiducialDelayed(0) & r.fiducial(2 downto 1);
      v.efifoV   := efifoV;
      v.efifoWr  := (r.efifoV and not efifoV) & r.efifoWr(r.efifoWr'left downto 1);
-     if paddr'length>16 then
-       v.eadvance := advance_i(1) & r.eadvance(r.eadvance'left downto 1);
-     else
-       v.eadvance(0) := advance_i(1);
-     end if;
+     v.eadvance := advance_i(2) & r.eadvance(r.eadvance'left downto 1);
      if (r.efifoV='1' and efifoV='0') then
-       v.paddr  := paddr(paddr'left-4 downto 0) & toSlv(ADDR,4);
+       if toXpmBroadcastType(paddr)=XADDR then
+         v.paddr  := paddr(paddr'left-4 downto 0) & toSlv(ADDR,4);
+       else
+         v.paddr  := paddr;
+       end if;
      else
        v.paddr  := x"0000" & r.paddr(r.paddr'left downto 16);
      end if;

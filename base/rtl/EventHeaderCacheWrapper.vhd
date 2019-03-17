@@ -50,12 +50,10 @@ entity EventHeaderCacheWrapper is
       -- LCLS RX Timing Interface (rxClk domain)
       rxClk           : in  sl;
       rxRst           : in  sl;
-      rxControl       : in  TimingPhyControlType;
       timingBus       : in  TimingBusType;
       -- LCLS RX Timing Interface (txClk domain)
       txClk           : in  sl;
       txRst           : in  sl;
-      txStatus        : in  TimingPhyStatusType;
       timingPhy       : out TimingPhyType);
 end EventHeaderCacheWrapper;
 
@@ -83,7 +81,7 @@ architecture mapping of EventHeaderCacheWrapper is
 begin
 
    timingHdr          <= toTimingHeader (timingBus);
-   triggerBus.message <= ExptMessageType(timingBus.extn);
+   triggerBus.message <= timingBus.extn.expt;
    triggerBus.valid   <= timingBus.extnValid;
 
    U_Realign : entity work.EventRealign
@@ -189,15 +187,9 @@ begin
    end process fullp;
 
    U_TimingFb : entity work.XpmTimingFb
-      generic map (
---       TPD_G   => TPD_G,
-         DEBUG_G => true)
       port map (
          clk      => txClk,
          rst      => txRst,
-         status   => txStatus,
-         pllReset => rxControl.pllReset,
-         phyReset => rxControl.reset,
          id       => tdetTiming(0).id,
          l1input  => (others => XPM_L1_INPUT_INIT_C),
          full     => fullOut,

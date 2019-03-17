@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-07-10
--- Last update: 2019-03-13
+-- Last update: 2019-03-14
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -31,9 +31,8 @@ use work.StdRtlPkg.all;
 use work.TimingExtnPkg.all;
 use work.TimingPkg.all;
 use work.AxiLitePkg.all;
---use work.AmcCarrierPkg.all;
 use work.XpmPkg.all;
-use work.XpmBasePkg.all;
+use work.XpmMiniPkg.all;
 
 library unisim;
 use unisim.vcomponents.all;
@@ -68,7 +67,6 @@ architecture top_level_app of XpmMini is
   type StateType is (INIT_S, PADDR_S, EWORD_S, EOS_S);
   type RegType is record
     full       : LinkFullArray (NPartitions-1 downto 0);
-    fullfb     : slv           (NPartitions-1 downto 0);
     l1input    : LinkL1InpArray(NPartitions-1 downto 0);
     fiducial   : sl;
     source     : sl;
@@ -85,7 +83,6 @@ architecture top_level_app of XpmMini is
   end record;
   constant REG_INIT_C : RegType := (
     full       => (others=>(others=>'0')),
-    fullfb     => (others=>'0'),
     l1input    => (others=>(others=>XPM_L1_INPUT_INIT_C)),
     fiducial   => '0',
     source     => '1',
@@ -112,10 +109,12 @@ architecture top_level_app of XpmMini is
 
   signal l1Input        : L1InputArray(NDsLinks-1 downto 0);
   signal isXpm          : slv         (NDsLinks-1 downto 0);
+  signal rxErr          : slv         (NDsLinks-1 downto 0);
   signal dsFull         : FullArray   (NDsLinks-1 downto 0);
   signal dsRxRcvs       : Slv32Array  (NDsLinks-1 downto 0);
   signal dsId           : Slv32Array  (NDsLinks-1 downto 0);
   signal bpRxLinkFullS  : Slv16Array        (NBpLinks-1 downto 0);
+  signal linkConfig     : XpmLinkConfigArray(NDsLinks-1 downto 0);
   
   --  Serialized data to sensor links
   signal txData         : slv(15 downto 0);
@@ -127,12 +126,11 @@ architecture top_level_app of XpmMini is
   signal advance   : slv              (NSTREAMS_C-1 downto 0);
   signal pdepth      : Slv8Array (NPartitions-1 downto 0);
   signal expWord     : Slv48Array(NPartitions-1 downto 0);
-  signal fullfb      : slv       (NPartitions-1 downto 0);
   signal stream0_data: slv(15 downto 0);
-  
+
 begin
 
-  linkstatp: process (bpStatus, dsLinkStatus, dsRxRcvs, isXpm, dsId) is
+  linkstatp: process (dsRxRcvs, isXpm, dsId) is
     variable linkStat : XpmLinkStatusType;
   begin
     for i in 0 to NDsLinks-1 loop
@@ -144,24 +142,23 @@ begin
     end loop;
   end process;
 
-  U_SyncPaddr : entity work.SynchronizerVector
-    generic map ( WIDTH_G => status.paddr'length )
-    port map ( clk     => regclk,
-               dataIn  => r.paddr,
-               dataOut => status.paddr );
-  
-  U_FullFb : entity work.SynchronizerVector
-    generic map ( WIDTH_G => fullfb'length )
-    port map ( clk     => timingFbClk,
-               dataIn  => r.fullfb,
-               dataOut => fullfb );
-  
   GEN_DSLINK: for i in 0 to NDsLinks-1 generate
+    linkConfig(i).enable     <= config.dsLink(i).enable;
+    linkConfig(i).loopback   <= config.dsLink(i).loopback;
+    linkConfig(i).txReset    <= config.dsLink(i).txReset;
+    linkConfig(i).rxReset    <= config.dsLink(i).rxReset;
+    linkConfig(i).txPllReset <= config.dsLink(i).txPllReset;
+    linkConfig(i).rxPllReset <= config.dsLink(i).rxPllReset;
+    linkConfig(i).txDelayRst <= '0';
+    linkConfig(i).txDelay    <= (others=>'0');
+    linkConfig(i).partition  <= (others=>'0');
+    linkConfig(i).trigsrc    <= (others=>'0');
+      
     U_TxLink : entity work.XpmTxLink
       generic map ( ADDR => i, STREAMS_G => 3 )
       port map ( clk             => timingClk,
                  rst             => timingRst,
-                 config          => config.dsLink(i),
+                 config          => linkConfig(i),
                  isXpm           => isXpm(i),
                  streams         => r.streams,
                  streamIds       => r_streamIds,
@@ -170,13 +167,16 @@ begin
                  fiducial        => r.fiducial,
                  txData          => dsTx (i).data,
                  txDataK         => dsTx (i).dataK );
+
+    rxErr(i) <= '0' when (dsRx(i).dspErr="00" and dsRx(i).decErr="00") else '1';
+    
     U_RxLink : entity work.XpmRxLink
       port map ( clk             => timingClk,
                  rst             => timingRst,
-                 config          => config.dsLink(i),
+                 config          => linkConfig(i),
                  rxData          => dsRx     (i).data,
                  rxDataK         => dsRx     (i).dataK,
-                 rxErr           => dsRxErr  (i).dspErr,
+                 rxErr           => rxErr    (i),
                  rxClk           => dsRxClk  (i),
                  rxRst           => dsRxRst  (i),
                  isXpm           => isXpm    (i),
@@ -207,7 +207,6 @@ begin
                timingClk     => timingClk,
                timingRst     => timingRst,
                streams       => timingStream.streams,
-               streamIds     => timingStream.streamIds,
                advance       => timingStream.advance,
                fiducial      => timingStream.fiducial,
                full          => r.full          (0),
@@ -218,8 +217,7 @@ begin
       generic map ( WIDTH_G => 8 )
       port map ( clk     => timingClk,
                  dataIn  => partitionConfig.pipeline.depth_fids,
-                 dataOut => pdepth(i) );
-  end generate;
+                 dataOut => pdepth(0) );
 
   comb : process ( r, timingRst, dsFull, l1Input,
                    timingStream, streams, advance,

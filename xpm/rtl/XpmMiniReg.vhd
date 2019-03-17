@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-12-14
--- Last update: 2019-03-13
+-- Last update: 2019-03-14
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -30,12 +30,12 @@ use work.StdRtlPkg.all;
 use work.AxiLitePkg.all;
 use work.AxiStreamPkg.all;
 use work.XpmPkg.all;
+use work.XpmMiniPkg.all;
 
 entity XpmMiniReg is
    port (
       axilClk          : in  sl;
       axilRst          : in  sl;
-      axilUpdate       : out slv(NPartitions-1 downto 0);
       axilWriteMaster  : in  AxiLiteWriteMasterType;  
       axilWriteSlave   : out AxiLiteWriteSlaveType;  
       axilReadMaster   : in  AxiLiteReadMasterType;  
@@ -51,9 +51,9 @@ architecture rtl of XpmMiniReg is
 
   type RegType is record
     load           : sl;
-    config         : XpmConfigType;
+    config         : XpmMiniConfigType;
     link           : slv(3 downto 0);
-    linkCfg        : XpmLinkConfigType;
+    linkCfg        : XpmMiniLinkConfigType;
     linkStat       : XpmLinkStatusType;
     axilReadSlave  : AxiLiteReadSlaveType;
     axilWriteSlave : AxiLiteWriteSlaveType;
@@ -62,9 +62,9 @@ architecture rtl of XpmMiniReg is
 
   constant REG_INIT_C : RegType := (
     load           => '1',
-    config         => XPM_CONFIG_INIT_C,
+    config         => XPM_MINI_CONFIG_INIT_C,
     link           => (others=>'0'),
-    linkCfg        => XPM_LINK_CONFIG_INIT_C,
+    linkCfg        => XPM_MINI_LINK_CONFIG_INIT_C,
     linkStat       => XPM_LINK_STATUS_INIT_C,
     axilReadSlave  => AXI_LITE_READ_SLAVE_INIT_C,
     axilWriteSlave => AXI_LITE_WRITE_SLAVE_INIT_C,
@@ -73,10 +73,11 @@ architecture rtl of XpmMiniReg is
   signal r    : RegType := REG_INIT_C;
   signal r_in : RegType;
 
-  signal s    : XpmStatusType;
+  signal s    : XpmMiniStatusType;
   signal linkStat, slinkStat  : XpmLinkStatusType;
 
   signal staUpdate : sl;
+  signal pInhV     : sl;
   
 begin
 
@@ -96,7 +97,7 @@ begin
     port map ( wr_clk => staClk, wr_en => staUpdate,
                rd_clk => axilClk, rd_en=> r.axilRdEn,
                din  => status.partition.l0Select.inhibited  ,
-               valid => pInhV(i),
+               valid => pInhV,
                dout => s.partition.l0Select.inhibited);
   U_Sync64_num : entity work.SynchronizerFifo
     generic map ( DATA_WIDTH_G => LCtrDepth )
@@ -173,25 +174,25 @@ begin
     axiSlaveRegisterR(ep, toSlv(12,12),  0, r.linkStat.rxId);
     axiSlaveRegisterR(ep, toSlv(16,12),  0, r.linkStat.rxRcvCnts);
 
-    axiSlaveRegister (ep, toSlv(20,12), 0, v.partition.l0Select.reset);
-    axiSlaveRegister (ep, toSlv(20,12),16, v.partition.l0Select.enabled);
+    axiSlaveRegister (ep, toSlv(20,12), 0, v.config.partition.l0Select.reset);
+    axiSlaveRegister (ep, toSlv(20,12),16, v.config.partition.l0Select.enabled);
     axiSlaveRegister (ep, toSlv(20,12),31, v.axilRdEn);
 
-    axiSlaveRegister (ep, toSlv(24,12), 0, v.partition.l0Select.rateSel);
-    axiSlaveRegister (ep, toSlv(24,12),16, v.partition.l0Select.destSel);
+    axiSlaveRegister (ep, toSlv(24,12), 0, v.config.partition.l0Select.rateSel);
+    axiSlaveRegister (ep, toSlv(24,12),16, v.config.partition.l0Select.destSel);
 
-    axilRegR64(toSlv(toSlv(32,12), s.partition.l0Select.enabled);
-    axilRegR64(toSlv(toSlv(40,12), s.partition.l0Select.inhibited);
-    axilRegR64(toSlv(toSlv(48,12), s.partition.l0Select.num);
-    axilRegR64(toSlv(toSlv(56,12), s.partition.l0Select.numInh);
-    axilRegR64(toSlv(toSlv(64,12), s.partition.l0Select.numAcc);
+    axilRegR64(toSlv(32,12), s.partition.l0Select.enabled);
+    axilRegR64(toSlv(40,12), s.partition.l0Select.inhibited);
+    axilRegR64(toSlv(48,12), s.partition.l0Select.num);
+    axilRegR64(toSlv(56,12), s.partition.l0Select.numInh);
+    axilRegR64(toSlv(64,12), s.partition.l0Select.numAcc);
 
-    axiSlaveRegister (ep, toSlv(72,12), 0, v.partition.pipeline.depth_clks);
-    axiSlaveRegister (ep, toSlv(72,12),16, v.partition.pipeline.depth_fids);
+    axiSlaveRegister (ep, toSlv(72,12), 0, v.config.partition.pipeline.depth_clks);
+    axiSlaveRegister (ep, toSlv(72,12),16, v.config.partition.pipeline.depth_fids);
 
-    axiSlaveRegister (ep, toSlv(76,12),15, v.partition.message.insert);
-    axiSlaveRegister (ep, toSlv(76,12), 0, v.partition.message.hdr);
-    axiSlaveRegister (ep, toSlv(80,12), 0, v.partition.message.payload);
+    axiSlaveRegister (ep, toSlv(76,12),15, v.config.partition.message.insert);
+    axiSlaveRegister (ep, toSlv(76,12), 0, v.config.partition.message.hdr);
+    axiSlaveRegister (ep, toSlv(80,12), 0, v.config.partition.message.payload);
 
     -- Set the status
     axiSlaveDefault(ep, v.axilWriteSlave, v.axilReadSlave);

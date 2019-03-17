@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2016-03-25
--- Last update: 2019-03-13
+-- Last update: 2019-03-14
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -26,6 +26,7 @@ use ieee.std_logic_unsigned.all;
 use ieee.std_logic_arith.all;
 
 use work.StdRtlPkg.all;
+use work.TimingPkg.all;
 use work.XpmPkg.all;
 
 package XpmMiniPkg is
@@ -33,6 +34,14 @@ package XpmMiniPkg is
    -----------------------------------------------------------
    -- Application: Configurations, Constants and Records Types
    -----------------------------------------------------------
+
+   constant NSTREAMS_C : integer := 3;
+  
+   type XpmStreamType is record
+     fiducial : sl;
+     streams  : TimingSerialArray(NSTREAMS_C-1 downto 0);
+     advance  : slv              (NSTREAMS_C-1 downto 0);
+   end record;
 
    type XpmMiniPartitionStatusType is record
      l0Select   : XpmL0SelectStatusType;
@@ -81,7 +90,7 @@ package XpmMiniPkg is
      message    => XPM_PART_MSG_CONFIG_INIT_C );
 
    type XpmMiniConfigType is record
-     dsLink     : XpmMiniLinkConfigType(NDSLinks-1 downto 0);
+     dsLink     : XpmMiniLinkConfigArray(NDSLinks-1 downto 0);
      partition  : XpmMiniPartitionConfigType;
    end record;
 

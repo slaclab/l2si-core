@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-07-10
--- Last update: 2018-09-06
+-- Last update: 2019-03-13
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -30,7 +30,6 @@ use ieee.std_logic_unsigned.all;
 use work.StdRtlPkg.all;
 use work.TimingExtnPkg.all;
 use work.TimingPkg.all;
---use work.AmcCarrierPkg.all;
 use work.XpmPkg.all;
 
 library unisim;

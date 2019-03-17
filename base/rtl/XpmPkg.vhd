@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2016-03-25
--- Last update: 2018-12-17
+-- Last update: 2019-02-22
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -39,6 +39,7 @@ package XpmPkg is
    constant NPartitions : integer := 8;
    constant NTagBytes   : integer := 4;
    constant NL1Triggers : integer := 1;
+   constant LCtrDepth   : integer := 40;
    
    type XpmTxSerialType is record
       data      : slv(15 downto 0);
@@ -113,11 +114,11 @@ package XpmPkg is
    
    --    L0 Selection
    type XpmL0SelectStatusType is record
-      enabled     : slv(63 downto 0);
-      inhibited   : slv(63 downto 0);
-      num         : slv(63 downto 0);
-      numInh      : slv(63 downto 0);
-      numAcc      : slv(63 downto 0);
+      enabled     : slv(LCtrDepth-1 downto 0);
+      inhibited   : slv(LCtrDepth-1 downto 0);
+      num         : slv(LCtrDepth-1 downto 0);
+      numInh      : slv(LCtrDepth-1 downto 0);
+      numAcc      : slv(LCtrDepth-1 downto 0);
    end record;
    type XpmL0SelectStatusArray is array(natural range<>) of XpmL0SelectStatusType;
    constant XPM_L0_SELECT_STATUS_INIT_C : XpmL0SelectStatusType := (
@@ -128,7 +129,7 @@ package XpmPkg is
       numAcc      => (others=>'0'));
 
    type XpmL1SelectStatusType is record
-      numAcc      : slv(63 downto 0);
+      numAcc      : slv(LCtrDepth-1 downto 0);
    end record;
    constant XPM_L1_SELECT_STATUS_INIT_C : XpmL1SelectStatusType := (
       numAcc      => (others=>'0'));
@@ -293,8 +294,8 @@ package XpmPkg is
       depth_fids : slv( 7 downto 0);
    end record;
    constant XPM_PIPELINE_CONFIG_INIT_C : XpmPipelineConfigType := (
-      depth_clks => toSlv(200*100,16),
-      depth_fids => toSlv(200,8) );
+      depth_clks => toSlv(100*200,16),
+      depth_fids => toSlv(100,8) );
 
    type XpmBsaConfigType is record
       enabled    : sl;
@@ -330,8 +331,6 @@ package XpmPkg is
    type XpmPartitionConfigArray is array (natural range<>) of XpmPartitionConfigType;
    
    type XpmConfigType is record
-      usRxEnable : sl;
-      cuRxEnable : sl;
       dsLink     : XpmLinkConfigArray(NDSLinks-1 downto 0);
       bpLink     : XpmLinkConfigArray(NBPLinks   downto 0);
       pll        : XpmPllConfigArray(NAmcs-1 downto 0);
@@ -339,8 +338,6 @@ package XpmPkg is
       tagstream  : sl;
    end record;
    constant XPM_CONFIG_INIT_C : XpmConfigType := (
-      usRxEnable => '1',
-      cuRxEnable => '0',
       dsLink     => (others => XPM_LINK_CONFIG_INIT_C),
       bpLink     => (others => XPM_LINK_CONFIG_INIT_C),
       pll        => (others => XPM_PLL_CONFIG_INIT_C),
@@ -519,7 +516,7 @@ package body XpmPkg is
    function xpmTimingFbId(ip : slv) return slv is
      variable id  : slv(31 downto 0);
    begin
-     id := x"FF" & ip(23 downto 0);
+     id := x"FF" & ip(15 downto 8) & ip(23 downto 16) & ip(31 downto 24);
      return id;
    end function;
  

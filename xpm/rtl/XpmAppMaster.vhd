@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-07-10
--- Last update: 2018-12-21
+-- Last update: 2019-03-14
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -145,8 +145,7 @@ begin
   
   U_TimingDelay : entity work.TimingSerialDelay
     generic map ( NWORDS_G => TIMING_MESSAGE_WORDS_C,
-                  FDEPTH_G => 100,
-                  DEBUG_G  => DEBUG_G )
+                  FDEPTH_G => 100 )
     port map ( clk            => timingClk,
                rst            => l0Reset,
                delay          => resize(config.pipeline.depth_clks,20),
