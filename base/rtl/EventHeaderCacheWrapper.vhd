@@ -31,6 +31,7 @@ entity EventHeaderCacheWrapper is
       TPD_G              : time                := 1 ns;
       -- USER_AXIS_CONFIG_G : AxiStreamConfigType := TDET_AXIS_CONFIG_C;
       USER_AXIS_CONFIG_G : AxiStreamConfigType := ssiAxiStreamConfig(4);
+      USER_TIMING_BITS_G : integer             := 1;
       PIPE_STAGES_G      : natural             := 0;
       NDET_G             : natural             := 1);
    port (
@@ -51,6 +52,7 @@ entity EventHeaderCacheWrapper is
       rxClk           : in  sl;
       rxRst           : in  sl;
       timingBus       : in  TimingBusType;
+      userTimingIn    : in  slv(USER_TIMING_BITS_G-1 downto 0) := (others=>'0');
       -- LCLS RX Timing Interface (txClk domain)
       txClk           : in  sl;
       txRst           : in  sl;
@@ -64,11 +66,13 @@ architecture mapping of EventHeaderCacheWrapper is
 
    signal appTimingHdr : TimingHeaderType;  -- aligned
    signal appExptBus   : ExptBusType;       -- aligned
-
+   signal appUserTiming: slv(USER_TIMING_BITS_G-1 downto 0); -- aligned
+   
    signal pdata  : XpmPartitionDataArray(NDET_G-1 downto 0);
    signal pdataV : slv (NDET_G-1 downto 0);
-
-   signal fullOut : slv(NPartitions-1 downto 0);
+                             
+   signal pdelay  : Slv7Array(NPartitions-1 downto 0);
+   signal fullOut : slv      (NPartitions-1 downto 0);
 
    signal tdetMaster : AxiStreamMasterArray (NDET_G-1 downto 0);
    signal tdetSlave  : AxiStreamSlaveArray (NDET_G-1 downto 0);
@@ -86,25 +90,36 @@ begin
 
    U_Realign : entity work.EventRealign
       generic map (
-         TPD_G => TPD_G)
+         TPD_G              => TPD_G)
       port map (
-         clk      => rxClk,
-         rst      => rxRst,
-         timingI  => timingHdr,
-         exptBusI => triggerBus,
-         timingO  => appTimingHdr,
-         exptBusO => appExptBus,
-         delay    => open);
+         clk         => rxClk,
+         rst         => rxRst,
+         timingI     => timingHdr,
+         exptBusI    => triggerBus,
+         timingO     => appTimingHdr,
+         exptBusO    => appExptBus,
+         delay       => pdelay);
 
    GEN_DET : for i in 0 to NDET_G-1 generate
 
+     U_Realign : entity work.UserRealign
+       generic map (
+         WIDTH_G => USER_TIMING_BITS_G,
+         TPD_G   => TPD_G)
+       port map (
+         clk         => rxClk,
+         rst         => rxRst,
+         timingBus   => timingHdr,
+         delay       => pdelay(toSlv(tdetTiming(i).partition)),
+         userTimingI => userTimingIn,
+         userTimingO => trigBus(i).user(USER_TIMING_BITS_G-1 downto 0),
+     
       trigBus(i).l0a   <= pdata (i).l0a;
       trigBus(i).l0tag <= pdata (i).l0tag;
       trigBus(i).valid <= pdataV(i);
-
+      
       U_HeaderCache : entity work.EventHeaderCache
-         generic map (
-            TPD_G => TPD_G)
+         generic map ( TPD_G => TPD_G )
          port map (
             rst            => rxRst,
             --  Cache Input
@@ -120,7 +135,7 @@ begin
             expt_aligned   => appExptBus,
             -- trigger output
             pdata          => pdata (i),
-            pdataV         => pdataV (i),
+            pdataV         => pdataV(i),
             -- status
             cntL0          => tdetStatus(i).cntL0,
             cntL1A         => tdetStatus(i).cntL1A,

@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver  <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2018-07-20
--- Last update: 2018-10-30
+-- Last update: 2019-03-20
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -42,15 +42,19 @@ package TDetPkg is
       enable       => '0',
       aFull        => '0' );
 
+   constant TDET_USER_BITS_C : integer := 256;
+   
    type TDetTrigType is record
      l0a     : sl;
      l0tag   : slv( 4 downto 0);
+     user    : slv( TDET_USER_BITS_C-1 downto 0);
      valid   : sl;
    end record;
    type TDetTrigArray is array(natural range<>) of TDetTrigType;
    constant TDETTRIG_INIT_C : TDetTrigType := (
      l0a     => '0',
      l0tag   => (others=>'0'),
+     user    => (others=>'0'),
      valid   => '0' );
    
    type TDetEventType is record
