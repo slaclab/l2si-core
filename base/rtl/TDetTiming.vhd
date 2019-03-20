@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-07-08
--- Last update: 2019-03-13
+-- Last update: 2019-03-18
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -105,6 +105,12 @@ architecture mapping of TDetTiming is
    signal loopback       : slv(2 downto 0);
    signal timingPhy      : TimingPhyType;
    signal timingBus      : TimingBusType;
+
+   constant AXIL_CROSSBAR_MASTERS_CONFIG_C : AxiLiteCrossbarMasterConfigArray(1 downto 0) := genAxiLiteConfig( 2, AXIL_BASE_ADDR_G, 21, 16);
+   signal axilReadMasters  : AxiLiteReadMasterArray (1 downto 0);
+   signal axilReadSlaves   : AxiLiteReadSlaveArray  (1 downto 0);
+   signal axilWriteMasters : AxiLiteWriteMasterArray(1 downto 0);
+   signal axilWriteSlaves  : AxiLiteWriteSlaveArray (1 downto 0);
 
 begin
 
