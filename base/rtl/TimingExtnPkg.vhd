@@ -105,9 +105,19 @@ package body TimingExtnPkg is
 --     return toSlv(ExptMessageType(message));
 --   end function;
    
+--   function toTimingExtnType (vector : slv) return TimingExtnType is
+--   begin
+--     return TimingExtnType(toExptMessageType(vector));
+--   end function;
    function toTimingExtnType (vector : slv) return TimingExtnType is
+      variable message : TimingExtnType;
+      variable i       : integer := 0;
    begin
-     return TimingExtnType(toExptMessageType(vector));
-   end function;
+      assignRecord(i, vector, message.partitionAddr);
+      for j in message.partitionWord'range loop
+         assignRecord(i, vector, message.partitionWord(j));
+      end loop;
+      return message;
+   end function;   
    
 end package body TimingExtnPkg;
