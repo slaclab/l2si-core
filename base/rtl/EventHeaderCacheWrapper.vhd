@@ -112,7 +112,7 @@ begin
          timingBus   => timingHdr,
          delay       => pdelay(toSlv(tdetTiming(i).partition)),
          userTimingI => userTimingIn,
-         userTimingO => trigBus(i).user(USER_TIMING_BITS_G-1 downto 0),
+         userTimingO => trigBus(i).user(USER_TIMING_BITS_G-1 downto 0));
      
       trigBus(i).l0a   <= pdata (i).l0a;
       trigBus(i).l0tag <= pdata (i).l0tag;
