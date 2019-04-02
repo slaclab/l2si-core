@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-07-08
--- Last update: 2019-03-18
+-- Last update: 2019-03-29
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -103,10 +103,12 @@ architecture mapping of TDetTiming is
    signal txUsrRst       : sl;
    signal txOutClk       : sl;
    signal loopback       : slv(2 downto 0);
+   signal fbTx           : TimingPhyType;
    signal timingPhy      : TimingPhyType;
    signal timingBus      : TimingBusType;
+   signal timingMode     : sl;
 
-   constant AXIL_CROSSBAR_MASTERS_CONFIG_C : AxiLiteCrossbarMasterConfigArray(1 downto 0) := genAxiLiteConfig( 2, AXIL_BASE_ADDR_G, 21, 16);
+   constant AXIL_MASTERS_CONFIG_C : AxiLiteCrossbarMasterConfigArray(1 downto 0) := genAxiLiteConfig( 2, AXIL_BASEADDR_G, 21, 16);
    signal axilReadMasters  : AxiLiteReadMasterArray (1 downto 0);
    signal axilReadSlaves   : AxiLiteReadSlaveArray  (1 downto 0);
    signal axilWriteMasters : AxiLiteWriteMasterArray(1 downto 0);
@@ -223,6 +225,7 @@ begin
          appTimingClk    => rxOutClk,
          appTimingRst    => rxRst,
          appTimingBus    => timingBus,
+         appTimingMode   => timingMode,
          timingPhy       => open, -- TPGMINI
          axilClk         => axilClk,
          axilRst         => axilRst,
@@ -231,10 +234,15 @@ begin
          axilWriteMaster => axilWriteMasters(0),
          axilWriteSlave  => axilWriteSlaves (0) );
 
+   timingPhy.data    <= fbTx.data;
+   timingPhy.dataK   <= fbTx.dataK;
+   timingPhy.control <= rxControl;
+   
    U_HeaderCache : entity work.EventHeaderCacheWrapper
       generic map (
-         TPD_G   => TPD_G,  
-         NDET_G  => NDET_G)      
+         TPD_G              => TPD_G,
+         USER_AXIS_CONFIG_G => TDET_AXIS_CONFIG_C,
+         NDET_G             => NDET_G)      
       port map (         
          -- Trigger Interface (rxClk domain)
          trigBus         => trigBus,
@@ -252,12 +260,10 @@ begin
          -- LCLS RX Timing Interface (rxClk domain)
          rxClk           => rxOutClk,
          rxRst           => rxRst,
-         rxControl       => rxControl,
          timingBus       => timingBus,
          -- LCLS RX Timing Interface (txClk domain)
          txClk           => txUsrClk,
          txRst           => txUsrRst,
-         txStatus        => txStatus,
-         timingPhy       => timingPhy);
+         timingPhy       => fbTx );
          
 end mapping;

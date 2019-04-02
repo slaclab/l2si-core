@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-07-10
--- Last update: 2019-03-14
+-- Last update: 2019-03-29
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -124,9 +124,8 @@ architecture top_level_app of XpmMini is
   signal streamIds : Slv4Array        (NSTREAMS_C-1 downto 0) := (x"1",x"2",x"0");
   signal r_streamIds : Slv4Array      (NSTREAMS_C-1 downto 0) := (x"1",x"2",x"0");
   signal advance   : slv              (NSTREAMS_C-1 downto 0);
-  signal pdepth      : Slv8Array (NPartitions-1 downto 0);
-  signal expWord     : Slv48Array(NPartitions-1 downto 0);
-  signal stream0_data: slv(15 downto 0);
+  signal pdepth      : Slv8Array (NPartitions-1 downto 0) := (others=>x"00");
+  signal expWord     : Slv48Array(NPartitions-1 downto 0) := (others=>x"800080008000");
 
 begin
 
@@ -219,6 +218,9 @@ begin
                  dataIn  => partitionConfig.pipeline.depth_fids,
                  dataOut => pdepth(0) );
 
+  streams <= timingStream.streams;
+  advance <= timingStream.advance;
+    
   comb : process ( r, timingRst, dsFull, l1Input,
                    timingStream, streams, advance,
                    expWord, pdepth ) is

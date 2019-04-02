@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2016-03-25
--- Last update: 2019-03-14
+-- Last update: 2019-03-29
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -43,6 +43,11 @@ package XpmMiniPkg is
      advance  : slv              (NSTREAMS_C-1 downto 0);
    end record;
 
+   constant XPM_STREAM_INIT_C : XpmStreamType := (
+     fiducial => '0',
+     streams  => (others=>TIMING_SERIAL_INIT_C),
+     advance  => (others=>'0') );
+   
    type XpmMiniPartitionStatusType is record
      l0Select   : XpmL0SelectStatusType;
    end record;

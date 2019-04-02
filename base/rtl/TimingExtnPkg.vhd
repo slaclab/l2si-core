@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver  <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2018-07-20
--- Last update: 2019-02-14
+-- Last update: 2019-03-28
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -179,10 +179,12 @@ package body TimingExtnPkg is
 
    function toTimingExtnType(vector : slv) return TimingExtnType is
      variable message : TimingExtnType := TIMING_EXTN_INIT_C;
+     variable curxv   : slv(CU_TIMING_BITS_C-1 downto 0);
    begin
      message.expt := toExptMessageType(vector(EXPT_MESSAGE_BITS_C-1 downto 0));
      message.cuValid := vector(EXPT_MESSAGE_BITS_C);
-     message.curx := toCuTimingType(vector(EXPT_MESSAGE_BITS_C+CU_TIMING_BITS_C downto EXPT_MESSAGE_BITS_C+1));
+     curxv        := vector(EXPT_MESSAGE_BITS_C+CU_TIMING_BITS_C downto EXPT_MESSAGE_BITS_C+1);
+     message.curx := toCuTimingType(curxv);
      return message;
    end function;
    

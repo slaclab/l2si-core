@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-07-10
--- Last update: 2018-12-14
+-- Last update: 2019-04-01
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -38,6 +38,7 @@ entity EventHeaderCache is
    generic (
       TPD_G               : time                := 1 ns;
       ADDR_WIDTH_G        : integer             := 4;
+      FULL_THRES_G        : integer             := 10;
       DEBUG_G             : boolean             := false );
    port (
      rst             : in  sl;
@@ -56,6 +57,7 @@ entity EventHeaderCache is
      pdata           : out XpmPartitionDataType;
      pdataV          : out sl;
      -- status
+     aFull           : out sl;
      cntL0           : out slv(19 downto 0);
      cntL1A          : out slv(19 downto 0);
      cntL1R          : out slv(19 downto 0);
@@ -151,7 +153,6 @@ architecture rtl of EventHeaderCache is
 
   signal wr_ack       : sl;
   signal wr_overflow  : sl;
-  signal wr_full      : sl;
 
   component ila_0
     port ( clk    : in sl;
@@ -170,7 +171,6 @@ architecture rtl of EventHeaderCache is
     wren          : sl;
     wr_ack        : sl;
     wr_overflow   : sl;
-    wr_full       : sl;
     wr_data_count : slv(4 downto 0);
     debug         : slv(7 downto 0);
   end record;
@@ -187,7 +187,6 @@ architecture rtl of EventHeaderCache is
     wren          => '0',
     wr_ack        => '0',
     wr_overflow   => '0',
-    wr_full       => '0',
     wr_data_count => (others=>'0'),
     debug         => (others=>'0') );
   
@@ -258,6 +257,7 @@ begin
   U_TagFifo : entity work.FifoAsync
     generic map ( ADDR_WIDTH_G => ADDR_WIDTH_G,
                   DATA_WIDTH_G => 8,
+                  FULL_THRES_G => FULL_THRES_G,
                   FWFT_EN_G    => true )
     port map ( rst             => wr.rstF(0),
                wr_clk          => wrclk,
@@ -265,7 +265,7 @@ begin
                wr_data_count   => wr_data_count,
                wr_ack          => wr_ack,
                overflow        => wr_overflow,
-               full            => wr_full,
+               prog_full       => aFull,
                din(4 downto 0) => ptag,
                din(5)          => wr_in.pmsg(0),
                din(6)          => wr_in.phdr(0),

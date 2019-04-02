@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-07-10
--- Last update: 2019-03-20
+-- Last update: 2019-03-25
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -52,7 +52,7 @@ architecture rtl of UserRealign is
 
   constant REG_INIT_C : RegType := (
     rden   => '0',
-    rdaddr => (others=>(others=>'0')) );
+    rdaddr => (others=>'0') );
 
   signal r    : RegType := REG_INIT_C;
   signal r_in : RegType;
@@ -65,7 +65,7 @@ begin
     port map ( clka                 => clk,
                ena                  => '1',
                wea                  => timingI.strobe,
-               addra                => timingI.message.pulseId(6 downto 0),
+               addra                => timingI.pulseId(6 downto 0),
                dina                 => userTimingI,
                clkb                 => clk,
                rstb                 => rst,
@@ -73,9 +73,8 @@ begin
                addrb                => r.rdaddr,
                doutb                => userTimingO );
   
-  comb : process( r, rst, timingI ) is
+  comb : process( r, rst, timingI, delay ) is
     variable v    : RegType;
-    variable pvec : slv(PADDR_LEN-1 downto 0); 
   begin
     v := r;
 

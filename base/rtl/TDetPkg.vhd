@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver  <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2018-07-20
--- Last update: 2019-03-20
+-- Last update: 2019-03-28
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -25,6 +25,7 @@ use ieee.std_logic_1164.all;
 use work.StdRtlPkg.all;
 use work.AxiStreamPkg.all;
 use work.EventPkg.all;
+use work.TimingPkg.all;
 
 package TDetPkg is
 
@@ -77,10 +78,26 @@ package TDetPkg is
      cntRdFifo       : slv( 3 downto 0);
      msgDelay        : slv( 6 downto 0);
      cntOflow        : slv( 7 downto 0);
+     fullToTrig      : slv(11 downto 0);
+     nfullToTrig     : slv(11 downto 0);
+     txStatus        : TimingPhyStatusType;
    end record;
    type TDetStatusArray is array(natural range<>) of TDetStatusType;
 
-   constant TDETSTATUS_BITS_C : natural := 117;
+   constant TDET_STATUS_INIT_C : TDetStatusType := (
+     partitionAddr   => (others=>'0'),
+     cntL0           => (others=>'0'),
+     cntL1A          => (others=>'0'),
+     cntL1R          => (others=>'0'),
+     cntWrFifo       => (others=>'0'),
+     cntRdFifo       => (others=>'0'),
+     msgDelay        => (others=>'0'),
+     cntOflow        => (others=>'0'),
+     fullToTrig      => (others=>'0'),
+     nfullToTrig     => (others=>'1'),
+     txStatus        => TIMING_PHY_STATUS_INIT_C );
+     
+   constant TDETSTATUS_BITS_C : natural := 145;
 
    constant TDET_AXIS_CONFIG_C : AxiStreamConfigType := (
      TSTRB_EN_C    => false,
@@ -111,6 +128,12 @@ package body TDetPkg is
       assignSlv(i, vector, status.cntRdFifo);
       assignSlv(i, vector, status.msgDelay);
       assignSlv(i, vector, status.cntOflow);
+      assignSlv(i, vector, status.fullToTrig);
+      assignSlv(i, vector, status.nfullToTrig);
+      assignSlv(i, vector, status.txStatus.locked);
+      assignSlv(i, vector, status.txStatus.resetDone);
+      assignSlv(i, vector, status.txStatus.bufferByDone);
+      assignSlv(i, vector, status.txStatus.bufferByErr);
       return vector;
    end function;
       
@@ -127,6 +150,12 @@ package body TDetPkg is
       assignRecord(i, vector, status.cntRdFifo);
       assignRecord(i, vector, status.msgDelay);
       assignRecord(i, vector, status.cntOflow);
+      assignRecord(i, vector, status.fullToTrig);
+      assignRecord(i, vector, status.nfullToTrig);
+      assignRecord(i, vector, status.txStatus.locked);
+      assignRecord(i, vector, status.txStatus.resetDone);
+      assignRecord(i, vector, status.txStatus.bufferByDone);
+      assignRecord(i, vector, status.txStatus.bufferByErr);
       return status;
    end function;
    

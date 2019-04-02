@@ -147,28 +147,28 @@ begin
        timingBus.message.timeStamp  <= pulseId;
        timingBus.strobe    <= '1';
 
-       timingBus.extn.partitionWord(0)(0)  <= '0'; -- No L0
-       timingBus.extn.partitionWord(0)(15) <= '1'; -- No Msg
+       timingBus.extn.expt.partitionWord(0)(0)  <= '0'; -- No L0
+       timingBus.extn.expt.partitionWord(0)(15) <= '1'; -- No Msg
        if frame = x"0" then
          pmsg.hdr     := MSG_DELAY_PWORD;
          pmsg.payload := toSlv(3,8);
          pmsg.anatag  := anatag;
          anatag       := anatag+1;
-         timingBus.extn.partitionWord(0) <= toSlv(pmsg);
-         timingBus.extnValid             <= '1';
+         timingBus.extn.expt.partitionWord(0) <= toSlv(pmsg);
+         timingBus.extnValid                  <= '1';
        elsif frame = x"8" then
          pmsg.l0tag   := anatag(4 downto 0);
          pmsg.hdr     := toSlv(2,8);
          pmsg.payload := x"FE";
          pmsg.anatag  := anatag;
          anatag       := anatag+1;
-         timingBus.extn.partitionWord(0) <= toSlv(pmsg);
+         timingBus.extn.expt.partitionWord(0) <= toSlv(pmsg);
        elsif frame = x"F" then
          pdat.l0a    := '1';
          pdat.l0tag  := anatag(4 downto 0);
          pdat.anatag := anatag;
          anatag      := anatag+1;
-         timingBus.extn.partitionWord(0) <= toSlv(pdat);
+         timingBus.extn.expt.partitionWord(0) <= toSlv(pdat);
        end if;
        if frame /= x"F" then
          frame := frame+1;
