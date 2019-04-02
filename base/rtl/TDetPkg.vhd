@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver  <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2018-07-20
--- Last update: 2019-03-28
+-- Last update: 2019-04-01
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -74,8 +74,8 @@ package TDetPkg is
      cntL0           : slv(19 downto 0);
      cntL1A          : slv(19 downto 0);
      cntL1R          : slv(19 downto 0);
-     cntWrFifo       : slv( 3 downto 0);
-     cntRdFifo       : slv( 3 downto 0);
+     cntWrFifo       : slv( 4 downto 0);
+     cntRdFifo       : slv( 4 downto 0);
      msgDelay        : slv( 6 downto 0);
      cntOflow        : slv( 7 downto 0);
      fullToTrig      : slv(11 downto 0);
@@ -97,7 +97,7 @@ package TDetPkg is
      nfullToTrig     => (others=>'1'),
      txStatus        => TIMING_PHY_STATUS_INIT_C );
      
-   constant TDETSTATUS_BITS_C : natural := 145;
+   constant TDETSTATUS_BITS_C : natural := 147;
 
    constant TDET_AXIS_CONFIG_C : AxiStreamConfigType := (
      TSTRB_EN_C    => false,

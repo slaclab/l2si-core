@@ -136,7 +136,7 @@ architecture mapping of EventHeaderCacheWrapper is
    end component;
 
    signal evCountTrig, evCountTrigRx : sl;
-   signal cntWrFifo, cntRdFifo : Slv4Array(NDET_G-1 downto 0);
+   signal cntWrFifo, cntRdFifo : Slv5Array(NDET_G-1 downto 0);
 
 begin
 
@@ -176,6 +176,8 @@ begin
       
       U_HeaderCache : entity work.EventHeaderCache
          generic map ( TPD_G => TPD_G,
+                       ADDR_WIDTH_G => 5,
+                       FULL_THRES_G => 24,
                        DEBUG_G => DEBUG_C )
          port map (
             rst            => rxRst,
