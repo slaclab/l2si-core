@@ -32,6 +32,7 @@ package TDetPkg is
    type TDetTimingType is record
       id           :  slv(31 downto 0);
       partition    :  slv( 2 downto 0);
+      reset        :  sl;
       enable       :  sl;
       aFull        :  sl;
    end record TDetTimingType;
@@ -40,6 +41,7 @@ package TDetPkg is
    constant TDET_TIMING_INIT_C : TDetTimingType := (
       id           => (others=>'0'),
       partition    => (others=>'0'),
+      reset        => '0',
       enable       => '0',
       aFull        => '0' );
 

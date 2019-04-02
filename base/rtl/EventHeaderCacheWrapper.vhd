@@ -86,6 +86,7 @@ architecture mapping of EventHeaderCacheWrapper is
    signal hdrOut    : EventHeaderArray (NDET_G-1 downto 0);
    signal hdrFull   : slv              (NDET_G-1 downto 0);
    signal hdrFullT  : slv              (NDET_G-1 downto 0);
+   signal hdrRst    : slv              (NDET_G-1 downto 0);
    signal aFullRx   : slv              (NDET_G-1 downto 0);
 
    type DbgRegType is record
@@ -249,6 +250,11 @@ begin
             mAxisSlaves (0) => tdetEventSlave (i),
             mAxisSlaves (1) => tdetTransSlave (i));
 
+     U_SyncHdrRst : entity work.Synchronizer
+       port map ( clk     => rxClk,
+                  dataIn  => tdetTiming(i).reset,
+                  dataOut => hdrRst(i) );
+     
      U_SyncFullRx : entity work.Synchronizer
        port map ( clk     => rxClk,
                   dataIn  => tdetTiming(i).afull,
@@ -302,7 +308,7 @@ begin
          full     => fullOut,
          phy      => timingPhy);
 
-   comb : process ( rxRst, r, triggerBus, timingBus, aFullRx, hdrFull, pdata, pdataV,
+   comb : process ( rxRst, hdrRst, r, triggerBus, timingBus, aFullRx, hdrFull, pdata, pdataV,
                     pdelay, spartition ) is
      variable v     : RegType;
      variable vfull : sl;
@@ -343,6 +349,17 @@ begin
          end if;
        end if;
 
+       if hdrRst(i) = '1' then
+         v.status     (i) := TDET_STATUS_INIT_C;
+         v.spartition (i) := (others=>'0');
+         v.afull      (i) := '0';
+         v.stable     (i) := '0';
+         v.cntOflow   (i) := '0';
+         v.cnts       (i) := (others=>'0');
+         v.cntsToTrig (i) := (others=>'0');
+         v.cntsFullToTrig  (i) := (others=>'0');
+         v.cntsNfullToTrig (i) := (others=>'0');
+       end if;
      end loop;
 
      for i in 0 to 3 loop
@@ -391,20 +408,21 @@ begin
                   probe0(71)           => tdetSlave (3).tReady,
                   probe0(72)           => tdetMaster(0).tValid,
                   probe0(73)           => tdetMaster(0).tLast,
-                  probe0(77 downto 74)   => cntRdFifo(0),
-                  probe0(81 downto 78)   => cntRdFifo(1),
-                  probe0(85 downto 82)   => cntRdFifo(2),
-                  probe0(89 downto 86)   => cntRdFifo(3),
-                  probe0(90)             => hdrOut(0).damaged,
-                  probe0(91)             => hdrOut(0).damaged,
-                  probe0(92)             => hdrOut(0).damaged,
-                  probe0(93)             => hdrOut(0).damaged,
-                  probe0( 98 downto  94)   => hdrOut(0).l1t(5 downto 1),
-                  probe0(103 downto  99)   => hdrOut(1).l1t(5 downto 1),
-                  probe0(108 downto 104)   => hdrOut(2).l1t(5 downto 1),
-                  probe0(113 downto 109)   => hdrOut(3).l1t(5 downto 1),
-                  probe0(117 downto 114)   => hdrFullT(3 downto 0),
-                  probe0(255 downto 118) => (others=>'0') );
+                  probe0(78 downto 74)   => cntRdFifo(0),
+                  probe0(83 downto 79)   => cntRdFifo(1),
+                  probe0(88 downto 84)   => cntRdFifo(2),
+                  probe0(93 downto 89)   => cntRdFifo(3),
+                  probe0(97 downto 94)   => (others=>'0'),
+                  probe0(98)             => hdrOut(0).damaged,
+                  probe0(99)             => hdrOut(0).damaged,
+                  probe0(100)            => hdrOut(0).damaged,
+                  probe0(101)            => hdrOut(0).damaged,
+                  probe0(106 downto 102)   => hdrOut(0).l1t(5 downto 1),
+                  probe0(111 downto 107)   => hdrOut(1).l1t(5 downto 1),
+                  probe0(116 downto 112)   => hdrOut(2).l1t(5 downto 1),
+                  probe0(121 downto 117)   => hdrOut(3).l1t(5 downto 1),
+                  probe0(125 downto 122)   => hdrFullT(3 downto 0),
+                  probe0(255 downto 126) => (others=>'0') );
 
      U_ILA_DT : ila_0
        port map ( clk                    => rxClk,
@@ -417,16 +435,17 @@ begin
                   probe0( 50 downto  39) => r.status(0).nfullToTrig,
                   probe0(            51) => r.cntOflow(0),
                   probe0(            52) => hdrFull(0),
-                  probe0( 56 downto  53) => cntWrFifo(0),
-                  probe0( 57 )           => pdataV(0),
-                  probe0( 58 )           => pdata(0).l0a,
-                  probe0( 59 )           => evCountTrigRx,
+                  probe0( 57 downto  53) => cntWrFifo(0),
+                  probe0( 58 )           => pdataV(0),
+                  probe0( 59 )           => pdata(0).l0a,
                   probe0( 91 downto  60) => r.dbg.evCountDiff,
                   probe0( 99 downto  92) => r.dbg.evCount(0),
                   probe0(107 downto 100) => r.dbg.evCount(1),
                   probe0(115 downto 108) => r.dbg.evCount(2),
                   probe0(123 downto 116) => r.dbg.evCount(3),
-                  probe0(255 downto 124) => (others=>'0') );
+                  probe0(124 )           => evCountTrigRx,
+                  probe0(131 downto 125) => spdelay(0),
+                  probe0(255 downto 132) => (others=>'0') );
    end generate;
    
    tcomb : process ( dr, tdetRst, tdetMaster, tdetSlave, hdrOut ) is
