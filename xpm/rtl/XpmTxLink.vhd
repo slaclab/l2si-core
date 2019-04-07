@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-12-14
--- Last update: 2018-12-21
+-- Last update: 2019-03-23
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -79,11 +79,11 @@ architecture rtl of XpmTxLink is
   signal rin : RegType;
 
   signal fstreams    : TimingSerialArray(STREAMS_G-1 downto 0);
-  signal tfifoStream : TimingSerialArray(STREAMS_G-1 downto 0);
-  signal tfifoWr     : slv              (STREAMS_G-1 downto 0);
+  signal tfifoStream : TimingSerialArray(STREAMS_G-1 downto 0) := (others=>TIMING_SERIAL_INIT_C);
+  signal tfifoWr     : slv              (STREAMS_G-1 downto 0) := (others=>'0');
   signal advance     : slv              (STREAMS_G-1 downto 0);
-  signal fifoRst     : slv              (STREAMS_G-1 downto 0);
-  signal fiducialDelayed : slv          (STREAMS_G-1 downto 0);
+  signal fifoRst     : slv              (STREAMS_G-1 downto 0) := (others=>'0');
+  signal fiducialDelayed : slv          (STREAMS_G-1 downto 0) := (others=>'0');
   signal efifoWr   : sl;
   signal efifoFull : sl;
   signal efifoDin  : slv(15 downto 0);

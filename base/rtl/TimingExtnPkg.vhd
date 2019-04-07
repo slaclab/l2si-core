@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver  <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2018-07-20
--- Last update: 2019-03-28
+-- Last update: 2019-04-07
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -23,6 +23,7 @@ library ieee;
 use ieee.std_logic_1164.all;
 
 use work.StdRtlPkg.all;
+use work.XpmPkg.all;
 
 package TimingExtnPkg is
 
@@ -31,13 +32,12 @@ package TimingExtnPkg is
    --
    --  Experiment timing information (appended by downstream masters)
    --
-   constant PADDR_LEN : integer := 32;
-   constant PWORD_LEN : integer := 48;
    constant EXPT_MESSAGE_BITS_C : integer := PADDR_LEN+8*PWORD_LEN;
-
+   constant EXPT_PARTITIONS_C : integer := NPartitions;
+   
    type ExptMessageType is record
      partitionAddr   : slv(31 downto 0);
-     partitionWord   : Slv48Array(0 to 7);
+     partitionWord   : Slv48Array(0 to EXPT_PARTITIONS_C-1);
    end record;
    constant EXPT_MESSAGE_INIT_C : ExptMessageType := (
      partitionAddr  => (others=>'1'),
@@ -79,7 +79,7 @@ package TimingExtnPkg is
 
    function toSlv(message : CuTimingType) return slv;
    function toCuTimingType (vector : slv) return CuTimingType;
-   
+   function toTrigVector(message : ExptMessageType) return slv;
    --
    -- The extended interface
    --
@@ -167,13 +167,25 @@ package body TimingExtnPkg is
       assignRecord(i, vector, message.bsaDone   );
       return message;
    end function;
-   
+
+   function toTrigVector(message : ExptMessageType) return slv is
+     variable vector : slv(EXPT_PARTITIONS_C-1 downto 0);
+     variable word   : XpmPartitionDataType;
+   begin
+     for i in 0 to EXPT_PARTITIONS_C-1 loop
+       word      := toPartitionWord(message.partitionWord(i));
+       vector(i) := word.l0a or not message.partitionWord(i)(15);
+     end loop;
+     return vector;
+   end function;
+
    function toSlv(message : TimingExtnType) return slv is
      variable vector : slv(TIMING_EXTN_BITS_C-1 downto 0);
+     variable i : integer := 0;
    begin
-     vector(EXPT_MESSAGE_BITS_C-1 downto 0)           := toSlv(message.expt);
-     vector(EXPT_MESSAGE_BITS_C)                      := message.cuValid;
-     vector(vector'left downto EXPT_MESSAGE_BITS_C+1) := toSlv(message.curx);
+     assignSlv(i, vector, toSlv(message.expt));
+     assignSlv(i, vector, message.cuValid);
+     assignSlv(i, vector, toSlv(message.curx));
      return vector;
    end function;
 

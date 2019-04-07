@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2016-03-25
--- Last update: 2019-02-22
+-- Last update: 2019-03-25
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -26,13 +26,15 @@ use ieee.std_logic_unsigned.all;
 use ieee.std_logic_arith.all;
 
 use work.StdRtlPkg.all;
-use work.TimingExtnPkg.all;
 
 package XpmPkg is
 
    -----------------------------------------------------------
    -- Application: Configurations, Constants and Records Types
    -----------------------------------------------------------
+   constant PADDR_LEN : integer := 32;
+   constant PWORD_LEN : integer := 48;
+
    constant NAmcs       : integer := 2;
    constant NDSLinks    : integer := 14;
    constant NBPLinks    : integer := 6;
@@ -107,10 +109,12 @@ package XpmPkg is
    --
    --    L0 Inhibit
    type XpmInhibitStatusType is record
-      counts  : Slv32Array(31 downto 0);
+      evcounts : Slv32Array(31 downto 0);
+      tmcounts : Slv32Array(31 downto 0);
    end record;
    constant XPM_INHIBIT_STATUS_INIT_C : XpmInhibitStatusType := (
-      counts  => (others=>(others=>'0')) );
+      evcounts => (others=>(others=>'0')),
+      tmcounts => (others=>(others=>'0')) );
    
    --    L0 Selection
    type XpmL0SelectStatusType is record

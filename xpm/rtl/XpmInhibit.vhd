@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-12-14
--- Last update: 2017-09-25
+-- Last update: 2019-03-25
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -63,13 +63,18 @@ architecture rtl of XpmInhibit is
    signal proginhb : slv(config.setup'range);
    signal fullb    : slv(27 downto 0);
    signal inhSrc   : slv(31 downto 0);
-   signal counts   : SlVectorArray(31 downto 0, 31 downto 0);
+   signal dtSrc    : slv(31 downto 0);
+   signal evcounts : SlVectorArray(31 downto 0, 31 downto 0);
+   signal tmcounts : SlVectorArray(31 downto 0, 31 downto 0);
    
 begin
    status  <= r.status;
    inhibit <= uOr(fullb) or uOr(proginhb);
 
    inhSrc  <= (proginhb & fullb) when rejecc='1' else
+              (others=>'0');
+
+   dtSrc   <= (proginhb & fullb) when fiducial='1' else
               (others=>'0');
 
    U_SyncFull : entity work.SynchronizerVector
@@ -83,7 +88,16 @@ begin
      port map ( statusIn     => inhSrc,
                 cntRstIn     => clear,
                 rollOverEnIn => (others=>'1'),
-                cntOut       => counts,
+                cntOut       => evcounts,
+                wrClk        => clk,
+                rdClk        => regclk );
+
+   U_DtStatus : entity work.SyncStatusVector
+     generic map ( WIDTH_G => 32 )
+     port map ( statusIn     => dtSrc,
+                cntRstIn     => clear,
+                rollOverEnIn => (others=>'1'),
+                cntOut       => tmcounts,
                 wrClk        => clk,
                 rdClk        => regclk );
 
@@ -97,14 +111,15 @@ begin
                   inhibit    => proginhb    (i) );
    end generate;
 
-   process (r, clear, counts, update) is
+   process (r, clear, evcounts, tmcounts, update) is
      variable v : RegType;
    begin
      v := r;
 
      if update='1' then
        for i in 0 to 31 loop
-         v.status.counts(i) := muxSlVectorArray(counts,i);
+         v.status.evcounts(i) := muxSlVectorArray(evcounts,i);
+         v.status.tmcounts(i) := muxSlVectorArray(tmcounts,i);
        end loop;
      end if;
 

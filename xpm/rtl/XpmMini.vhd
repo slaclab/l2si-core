@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-07-10
--- Last update: 2019-03-29
+-- Last update: 2019-04-07
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -120,12 +120,10 @@ architecture top_level_app of XpmMini is
   signal txData         : slv(15 downto 0);
   signal txDataK        : slv( 1 downto 0);
 
-  signal streams   : TimingSerialArray(NSTREAMS_C-1 downto 0);
-  signal streamIds : Slv4Array        (NSTREAMS_C-1 downto 0) := (x"1",x"2",x"0");
   signal r_streamIds : Slv4Array      (NSTREAMS_C-1 downto 0) := (x"1",x"2",x"0");
-  signal advance   : slv              (NSTREAMS_C-1 downto 0);
-  signal pdepth      : Slv8Array (NPartitions-1 downto 0) := (others=>x"00");
-  signal expWord     : Slv48Array(NPartitions-1 downto 0) := (others=>x"800080008000");
+  signal pdepth      : Slv8Array (NPartitions-1 downto 0);
+  signal expWord     : Slv48Array(NPartitions-1 downto 0) := (others=>toSlv(XPM_PARTITION_DATA_INIT_C));
+  signal stream0_data: slv(15 downto 0);
 
 begin
 
@@ -167,6 +165,7 @@ begin
                  txData          => dsTx (i).data,
                  txDataK         => dsTx (i).dataK );
 
+    dsTx(i).control <= TIMING_PHY_CONTROL_INIT_C;
     rxErr(i) <= '0' when (dsRx(i).dspErr="00" and dsRx(i).decErr="00") else '1';
     
     U_RxLink : entity work.XpmRxLink
@@ -222,28 +221,28 @@ begin
   advance <= timingStream.advance;
     
   comb : process ( r, timingRst, dsFull, l1Input,
-                   timingStream, streams, advance,
+                   timingStream,
                    expWord, pdepth ) is
     variable v    : RegType;
     variable tidx : integer;
     constant pd   : XpmBroadcastType := PDELAY;
   begin
     v := r;
-    v.streams := streams;
-    v.streams(0).ready := '1';
+    v.streams := timingStream.streams;
+    --v.streams(0).ready := '1';
     v.streams(1).ready := '1';
-    v.streams(2).ready := '1';
-    v.advance    := advance;
+    --v.streams(2).ready := '1';
+    v.advance    := timingStream.advance;
     v.fiducial   := timingStream.fiducial;
     
-    if (advance(0)='0' and r.advance(0)='1') then
-      v.streams(0).ready := '0';
-    end if;
+    --if (timingStream.advance(0)='0' and r.advance(0)='1') then
+    --  v.streams(0).ready := '0';
+    --end if;
     
     case r.state is
       when INIT_S =>
         v.aword := 0;
-        if (advance(0)='0' and r.advance(0)='1') then
+        if (timingStream.advance(0)='0' and r.advance(0)='1') then
           v.advance(2)      := '1';
           v.streams(2).data := r.bcastf(15 downto 0);
           v.aword           := r.aword+1;
