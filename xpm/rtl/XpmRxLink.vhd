@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-12-14
--- Last update: 2019-03-23
+-- Last update: 2019-04-07
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -65,6 +65,7 @@ architecture rtl of XpmRxLink is
     pfull     : slv(NPartitions-1 downto 0);
     l1input   : XpmL1InputType;
     strobe    : slv(NPartitions-1 downto 0);
+    timeout   : slv(8 downto 0);
   end record;
   constant REG_INIT_C : RegType := (
     state     => IDLE_S,
@@ -74,7 +75,8 @@ architecture rtl of XpmRxLink is
     rxRcvs    => (others=>'0'),
     pfull     => (others=>'1'),
     l1input   => XPM_L1_INPUT_INIT_C,
-    strobe    => (others=>'0') );
+    strobe    => (others=>'0'),
+    timeout   => (others=>'0') );
 
   signal r   : RegType := REG_INIT_C;
   signal rin : RegType;
@@ -143,6 +145,7 @@ begin
 
     case (r.state) is
       when IDLE_S =>
+        v.timeout := r.timeout+1;
         if (rxDataK="01") then
           if (rxData=(D_215_C & K_EOS_C)) then
             v.isXpm  := '1';
@@ -155,6 +158,7 @@ begin
           end if;
         end if;
       when PFULL_S =>
+        v.timeout := (others=>'0');
         v.pfull := rxData(r.pfull'range);
         v.state := ID1_S;
       when ID1_S =>
@@ -189,6 +193,7 @@ begin
         if (rxDataK="01" and rxData=(D_215_C & K_EOF_C)) then
           v.state := IDLE_S;
         else
+          v.timeout             := (others=>'0');
           v.pfull               := (others=>'0');
           v.pfull (r.partition) := rxData(15);
           v.strobe(r.partition) := rxData(14);
@@ -206,6 +211,9 @@ begin
     if (uconfig.enable='0') then
       v.pfull  := (others=>'0');
       v.strobe := (others=>'0');
+    elsif (r.timeout = uconfig.rxTimeOut) then
+      v.pfull   := (others=>'1');
+      v.timeout := (others=>'0');
     end if;
     
     rin <= v;

@@ -195,7 +195,8 @@ package XpmPkg is
      txPllReset : sl;
      rxPllReset : sl;
      txDelayRst : sl;
-     txDelay    : slv(17 downto 0);
+     txDelay    : slv( 8 downto 0);
+     rxTimeOut  : slv( 8 downto 0);
      partition  : slv( 3 downto 0);
      trigsrc    : slv( 3 downto 0);
    end record;
@@ -209,6 +210,7 @@ package XpmPkg is
      rxPllReset => '0',
      txDelayRst => '0',
      txDelay    => (others=>'0'),
+     rxTimeOut  => toSlv(200,9),
      partition  => (others=>'0'),
      trigsrc    => (others=>'0') );
    type XpmL0SelectConfigType is record
