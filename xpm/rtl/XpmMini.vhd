@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-07-10
--- Last update: 2019-04-07
+-- Last update: 2019-04-14
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -217,9 +217,6 @@ begin
                  dataIn  => partitionConfig.pipeline.depth_fids,
                  dataOut => pdepth(0) );
 
-  streams <= timingStream.streams;
-  advance <= timingStream.advance;
-    
   comb : process ( r, timingRst, dsFull, l1Input,
                    timingStream,
                    expWord, pdepth ) is
