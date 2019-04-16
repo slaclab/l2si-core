@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2016-03-25
--- Last update: 2019-03-27
+-- Last update: 2019-04-15
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -94,12 +94,7 @@ package body EventPkg is
      end if;
      assignSlv(i, vector, v.damaged   );
      assignSlv(i, vector, v.timeStamp );
-     if v.l1t(15) = '1' then
-       assignSlv(i, vector, v.partitions);
-     else
-       assignSlv(i, vector, v.payload);
-       assignSlv(i, vector, x"00");
-     end if;
+     assignSlv(i, vector, v.partitions);
      assignSlv(i, vector, v.l1t       );
      assignSlv(i, vector, v.count     );
      assignSlv(i, vector, v.version   );
