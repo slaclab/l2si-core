@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-07-10
--- Last update: 2019-04-01
+-- Last update: 2019-04-16
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -209,7 +209,8 @@ begin
   valid             <= rd.valid and ivalid;
 
   GEN_GROUPS : for i in 0 to NPartitions-1 generate
-    gword(i) <= '1' when (toPartitionWord(expt_aligned.message.partitionWord(i)).l0a='1') else
+    gword(i) <= '1' when (toPartitionWord(expt_aligned.message.partitionWord(i)).l0a='1' or
+                          expt_aligned.message.partitionWord(i)(15)='0') else
                 '0';
   end generate;
   gword(15 downto 8) <= (others=>'0');
