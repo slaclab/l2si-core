@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-07-10
--- Last update: 2019-01-26
+-- Last update: 2019-04-23
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -35,7 +35,7 @@ use work.TimingExtnPkg.all;
 use work.TimingPkg.all;
 use work.TPGPkg.all;
 use work.XpmPkg.all;
-use work.XpmBasePkg.all;
+use work.XpmMiniPkg.all;
 use work.AxiLitePkg.all;
  
 library unisim;
@@ -171,7 +171,8 @@ begin
        pconfig(i).pipeline.depth_clks <= toSlv((80+i)*200,16);
        pconfig(i).pipeline.depth_fids <= toSlv((80+i),8);
      end loop;
-       
+
+     pconfig(0).master        <= '1';
      pconfig(0).analysis.rst  <= x"f";
      pconfig(0).analysis.tag  <= x"00000000";
      pconfig(0).analysis.push <= x"0";

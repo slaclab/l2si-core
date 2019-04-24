@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-07-10
--- Last update: 2019-03-23
+-- Last update: 2019-04-23
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -33,7 +33,7 @@ use work.TimingPkg.all;
 use work.AxiLitePkg.all;
 --use work.AmcCarrierPkg.all;
 use work.XpmPkg.all;
-use work.XpmBasePkg.all;
+use work.XpmMiniPkg.all;
 
 library unisim;
 use unisim.vcomponents.all;
