@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver  <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-09-15
--- Last update: 2018-03-24
+-- Last update: 2019-05-16
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -72,6 +72,13 @@ package XpmSeqPkg is
     );
 
   type XpmSeqConfigArray is array(natural range<>) of XpmSeqConfigType;
+
+  type XpmSeqNotifyType is record
+    valid : sl;
+    addr  : SeqAddrType;
+  end record;
+
+  type XpmSeqNotifyArray is array(natural range<>) of XpmSeqNotifyType;
   
 end XpmSeqPkg;
 

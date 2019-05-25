@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-12-14
--- Last update: 2019-04-07
+-- Last update: 2019-05-24
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -121,10 +121,10 @@ begin
                   dataOut=> full );
 
   U_Partition : entity work.SynchronizerVector
-    generic map ( WIDTH_G => config.partition'length )
+    generic map ( WIDTH_G => config.groupMask'length )
     port map   ( clk     => rxClk,
-                 dataIn  => config.partition,
-                 dataOut => uconfig.partition );
+                 dataIn  => config.groupMask,
+                 dataOut => uconfig.groupMask );
 
   U_TrigSrc : entity work.SynchronizerVector
     generic map ( WIDTH_G => config.trigsrc'length )
@@ -139,27 +139,23 @@ begin
     v := r;
     v.strobe := (others=>'0');
 
-    if r.isXpm='0' then
-      v.partition := conv_integer(uconfig.partition);
-    end if;
-
+    v.isXpm := uAnd(r.id(31 downto 24));
+      
     case (r.state) is
       when IDLE_S =>
         v.timeout := r.timeout+1;
         if (rxDataK="01") then
           if (rxData=(D_215_C & K_EOS_C)) then
-            v.isXpm  := '1';
             v.rxRcvs := r.rxRcvs+1;
             v.state  := PFULL_S;
           elsif (rxData=(D_215_C & K_SOF_C)) then
-            v.isXpm  := '0';
             v.rxRcvs := r.rxRcvs+1;
             v.state  := DDATA_S;
           end if;
         end if;
       when PFULL_S =>
         v.timeout := (others=>'0');
-        v.pfull := rxData(r.pfull'range);
+        v.pfull := rxData(r.pfull'range) and uconfig.groupMask;
         v.state := ID1_S;
       when ID1_S =>
         if (rxDataK="01" and rxData=(D_215_C & K_EOF_C)) then
@@ -195,8 +191,12 @@ begin
         else
           v.timeout             := (others=>'0');
           v.pfull               := (others=>'0');
-          v.pfull (r.partition) := rxData(15);
-          v.strobe(r.partition) := rxData(14);
+          if rxData(15) = '1' then
+            v.pfull             := uconfig.groupMask;
+          end if;
+          if rxData(14) = '1' then
+            v.strobe            := uconfig.groupMask;
+          end if;
           v.l1input.trigword    := rxData(13 downto 5);
           v.l1input.tag         := rxData( 4 downto 0);
           v.l1input.trigsrc     := uconfig.trigsrc;
@@ -205,14 +205,15 @@ begin
     end case;
 
     if (rxRst='1' or rxErr='1') then
-      v := REG_INIT_C;
+      v         := REG_INIT_C;
+      v.pfull   := uconfig.groupMask;
     end if;
 
     if (uconfig.enable='0') then
-      v.pfull  := (others=>'0');
-      v.strobe := (others=>'0');
+      v.pfull   := (others=>'0');
+      v.strobe  := (others=>'0');
     elsif (r.timeout = uconfig.rxTimeOut) then
-      v.pfull   := (others=>'1');
+      v.pfull   := uconfig.groupMask;
       v.timeout := (others=>'0');
     end if;
     

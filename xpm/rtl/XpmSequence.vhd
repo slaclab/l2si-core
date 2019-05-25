@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver  <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-09-25
--- Last update: 2018-12-28
+-- Last update: 2019-05-20
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -30,6 +30,9 @@ use work.AxiLitePkg.all;
 use work.TimingPkg.all;
 use work.TPGPkg.all;
 use work.XpmSeqPkg.all;
+use work.AxiStreamPkg.all;
+use work.SsiPkg.all;
+use work.EthMacPkg.all;
 
 entity XpmSequence is
    generic (
@@ -42,6 +45,8 @@ entity XpmSequence is
       axilReadSlave    : out AxiLiteReadSlaveType;
       axilWriteMaster  : in  AxiLiteWriteMasterType;
       axilWriteSlave   : out AxiLiteWriteSlaveType;
+      obAppMaster      : out AxiStreamMasterType;
+      obAppSlave       : in  AxiStreamSlaveType;
       -- Configuration/Status (on clk domain)
       timingClk        : in  sl;
       timingRst        : in  sl;
@@ -75,6 +80,8 @@ architecture mapping of XpmSequence is
     strobe  : slv(SN downto 0);
     data    : slv(15 downto 0);
     invalid : Slv32Array(XPMSEQDEPTH-1 downto 0);
+    master  : AxiStreamMasterType;
+    ack     : slv       (XPMSEQDEPTH-1 downto 0);
   end record RegType;
 
   constant REG_INIT_C : RegType := (
@@ -83,14 +90,34 @@ architecture mapping of XpmSequence is
     framel  => (others=>'0'),
     strobe  => (others=>'0'),
     data    => (others=>'0'),
-    invalid => (others=>(others=>'0')) );
+    invalid => (others=>(others=>'0')),
+    master  => axiStreamMasterInit(EMAC_AXIS_CONFIG_C),
+    ack     => (others=>'0') );
 
   signal r    : RegType := REG_INIT_C;
   signal r_in : RegType;
 
+  signal seqNotifyValid : slv         (XPMSEQDEPTH-1 downto 0);
+  signal seqNotify      : SeqAddrArray(XPMSEQDEPTH-1 downto 0);
+
+  signal axisSlave      : AxiStreamSlaveType;
+    
 begin
 
   timingDataOut <= r_in.data;
+
+  U_FIFO : entity work.AxiStreamFifoV2
+    generic map ( SLAVE_AXI_CONFIG_G  => EMAC_AXIS_CONFIG_C,
+                  MASTER_AXI_CONFIG_G => EMAC_AXIS_CONFIG_C,
+                  FIFO_ADDR_WIDTH_G   => 4 )
+    port map ( sAxisClk    => timingClk,
+               sAxisRst    => timingRst,
+               sAxisMaster => r.master,
+               sAxisSlave  => axisSlave,
+               mAxisClk    => axilClk,
+               mAxisRst    => axilRst,
+               mAxisMaster => obAppMaster,
+               mAxisSlave  => obAppSlave );
   
   U_XBar : entity work.XpmSeqXbar
     generic map ( AXIL_BASEADDR_G => AXIL_BASEADDR_G )
@@ -154,9 +181,9 @@ begin
         seqReset     => seqJump            (i),
         startAddr    => seqJumpAddr        (i),
         seqState     => status.seqState    (i),
-        seqNotify    => open,
-        seqNotifyWr  => open,
-        seqNotifyAck => '1',
+        seqNotify    => seqNotify          (i),
+        seqNotifyWr  => seqNotifyValid     (i),
+        seqNotifyAck => r.ack              (i),
         dataO        => seqData            (i),
         dataValid    => seqDataValid       (i),
         monReset     => seqReset           (i),
@@ -168,7 +195,7 @@ begin
   --  in the frame, since it will be done on transmission.
   --
   comb: process ( timingRst, r, config, timingDataIn, timingAdvance,
-                  seqReset, seqData, seqDataValid ) is
+                  seqReset, seqData, seqDataValid, seqNotify, seqNotifyValid, axisSlave ) is
     variable v : RegType;
   begin
     v := r;
@@ -196,11 +223,31 @@ begin
       end if;
       status.countInvalid(i) <= r.invalid(i);
     end loop;
-        
+
+    v.master.tLast  := '1';
+    v.master.tKeep  := genTKeep(XPMSEQDEPTH*2+2);
+    
+    if axisSlave.tReady = '1' then
+      v.master.tValid := '0';
+    end if;
+
+    if v.master.tValid = '0' and seqNotifyValid /= 0 then
+      v.ack           := seqNotifyValid;
+      ssiSetUserSof (EMAC_AXIS_CONFIG_C, v.master, '1');
+      ssiSetUserEofe(EMAC_AXIS_CONFIG_C, v.master, '0');
+      v.master.tValid := '1';
+      v.master.tData(15 downto 0) := resize(seqNotifyValid,16);
+      for i in 0 to XPMSEQDEPTH-1 loop
+        if seqNotifyValid(i) = '1' then
+          v.master.tData(16*i+31 downto 16*i+16) := resize(slv(seqNotify(i)),16);
+        end if;
+      end loop;
+    end if;
+    
     if timingRst = '1' then
       v := REG_INIT_C;
     end if;
-    
+
     r_in <= v;
   end process comb;
 

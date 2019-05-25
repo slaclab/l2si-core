@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-07-10
--- Last update: 2019-04-14
+-- Last update: 2019-05-15
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -148,7 +148,7 @@ begin
     linkConfig(i).rxPllReset <= config.dsLink(i).rxPllReset;
     linkConfig(i).txDelayRst <= '0';
     linkConfig(i).txDelay    <= (others=>'0');
-    linkConfig(i).partition  <= (others=>'0');
+    linkConfig(i).groupMask  <= toSlv(1,NPartitions);
     linkConfig(i).trigsrc    <= (others=>'0');
       
     U_TxLink : entity work.XpmTxLink

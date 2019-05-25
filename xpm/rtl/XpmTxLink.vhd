@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-12-14
--- Last update: 2019-03-23
+-- Last update: 2019-05-22
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -99,42 +99,44 @@ architecture rtl of XpmTxLink is
 
 begin
 
-  --GEN_DEBUG : if DEBUG_G generate
-  --  U_ILA : ila_0
-  --    port map ( clk                   => clk,
-  --               probe0( 15 downto  0) => itxData,
-  --               probe0( 17 downto 16) => itxDataK,
-  --               probe0( 18 )          => sof,
-  --               probe0( 19 )          => eof,
-  --               probe0( 20 )          => fiducial,
-  --               probe0( 22 downto 21) => advance_i,
-  --               probe0( 24 downto 23) => advance,
-  --               probe0( 25 )          => crcErr,
-  --               probe0( 26 )          => streams(0).ready,
-  --               probe0( 27 )          => streams(1).ready,
-  --               probe0( 28 )          => fstreams(0).ready,
-  --               probe0( 29 )          => fstreams(1).ready,
-  --               probe0( 32 downto 30) => r.fiducial,
-  --               probe0( 33 )          => r.efifoV,
-  --               probe0( 35 downto 34) => r.efifoWr,
-  --               probe0( 36 )          => '0',
-  --               probe0( 38 downto 37) => r.eadvance,
-  --               probe0( 39 )          => tfifoWr,
-  --               probe0( 40 )          => efifoWr,
-  --               probe0( 41 )          => efifoFull,
-  --               probe0( 57 downto 42) => efifoDin,
-  --               probe0( 58 )          => efifoV,
-  --               probe0( 59 )          => fiducialDelayed,
-  --               probe0( 60 )          => fifoRst,
-  --               probe0( 76 downto 61 )=> fstreams(1).data,
-  --               probe0(255 downto 77) => (others=>'0') );
-  --end generate;
+  GEN_DEBUG : if DEBUG_G generate
+    U_ILA : ila_0
+      port map ( clk                   => clk,
+                 probe0( 15 downto  0) => itxData,
+                 probe0( 17 downto 16) => itxDataK,
+                 probe0( 18 )          => tfifoWr(0),
+                 probe0( 19 )          => tfifoWr(1),
+                 probe0( 20 )          => fiducial,
+                 probe0( 22 downto 21) => advance_i(1 downto 0),
+                 probe0( 24 downto 23) => advance  (1 downto 0),
+                 probe0( 25 )          => fifoRst(0),
+                 probe0( 26 )          => streams(0).ready,
+                 probe0( 27 )          => streams(1).ready,
+                 probe0( 28 )          => fstreams(0).ready,
+                 probe0( 29 )          => fstreams(1).ready,
+                 probe0( 32 downto 30) => r.fiducial,
+                 probe0( 33 )          => r.efifoV,
+                 probe0( 35 downto 34) => r.efifoWr,
+                 probe0( 36 )          => fifoRst(1),
+                 probe0( 38 downto 37) => r.eadvance,
+                 probe0( 39 )          => '0',
+                 probe0( 40 )          => efifoWr,
+                 probe0( 41 )          => efifoFull,
+                 probe0( 57 downto 42) => efifoDin,
+                 probe0( 58 )          => efifoV,
+                 probe0( 59 )          => fiducialDelayed(0),
+                 probe0( 60 )          => fiducialDelayed(1),
+                 probe0( 76 downto 61 )=> streams (0).data,
+                 probe0( 92 downto 77 )=> fstreams(0).data,
+                 probe0(255 downto 93) => (others=>'0') );
+  end generate;
 
   txData  <= itxData;
   txDataK <= itxDataK;
   
   U_Serializer : entity work.TimingSerializer
-     generic map ( STREAMS_C => STREAMS_G )
+     generic map ( STREAMS_C => STREAMS_G,
+                   DEBUG_G   => DEBUG_G )
      port map ( clk       => clk,
                 rst       => rst,
                 fiducial  => r.fiducial(0),

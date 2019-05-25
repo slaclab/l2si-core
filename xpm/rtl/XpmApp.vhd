@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-07-10
--- Last update: 2019-04-23
+-- Last update: 2019-05-24
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -31,6 +31,7 @@ use work.StdRtlPkg.all;
 use work.TimingExtnPkg.all;
 use work.TimingPkg.all;
 use work.AxiLitePkg.all;
+use work.AxiStreamPkg.all;
 --use work.AmcCarrierPkg.all;
 use work.XpmPkg.all;
 use work.XpmMiniPkg.all;
@@ -57,6 +58,9 @@ entity XpmApp is
       axilReadSlave     : out AxiLiteReadSlaveType;
       axilWriteMaster   : in  AxiLiteWriteMasterType;
       axilWriteSlave    : out AxiLiteWriteSlaveType;
+      obAppMaster       : out AxiStreamMasterType;
+      obAppSlave        : in  AxiStreamSlaveType;
+      groupLinkClear    : out slv               (NPartitions-1 downto 0);
       -- AMC's DS Ports
       dsLinkStatus      : in  XpmLinkStatusArray(NDsLinks-1 downto 0);
       dsRxData          : in  Slv16Array        (NDsLinks-1 downto 0);
@@ -102,8 +106,12 @@ architecture top_level_app of XpmApp is
     state      : StateType;
     aword      : integer range 0 to paddr'left/16;
     eword      : integer range 0 to (NTagBytes+1)/2;
-    ipart      : integer range 0 to 2*NPartitions-1;
+    ipart      : integer range 0 to NPartitions-1;
     bcastCount : integer range 0 to 8;
+    msg        : slv(PWORD_LEN-1 downto 0);
+    msgComplete : sl;
+    msgGroup    : integer range 0 to NPartitions-1;
+    groupLinkClear : slv(NPartitions-1 downto 0);
   end record;
   constant REG_INIT_C : RegType := (
     full       => (others=>(others=>'0')),
@@ -120,7 +128,12 @@ architecture top_level_app of XpmApp is
     aword      => 0,
     eword      => 0,
     ipart      => 0,
-    bcastCount => 0 );
+    bcastCount => 0,
+    msg        => (others=>'0'),
+    msgComplete=> '0',
+    msgGroup   => 0,
+    groupLinkClear => (others=>'0')
+    );
 
   signal r   : RegType := REG_INIT_C;
   signal rin : RegType;
@@ -150,7 +163,7 @@ architecture top_level_app of XpmApp is
   signal expWord     : Slv48Array(NPartitions-1 downto 0);
   signal fullfb      : slv       (NPartitions-1 downto 0);
   signal stream0_data: slv(15 downto 0);
-  
+  signal paddr       : slv       (PADDR_LEN-1 downto 0);
 begin
 
   linkstatp: process (bpStatus, dsLinkStatus, dsRxRcvs, isXpm, dsId) is
@@ -174,17 +187,29 @@ begin
                  dataOut => bpRxLinkFullS(i) );
   end generate;
   
-  U_SyncPaddr : entity work.SynchronizerVector
+  U_SyncPaddrRx : entity work.SynchronizerVector
     generic map ( WIDTH_G => status.paddr'length )
     port map ( clk     => regclk,
                dataIn  => r.paddr,
                dataOut => status.paddr );
+  
+  U_SyncPaddrTx : entity work.SynchronizerVector
+    generic map ( WIDTH_G => config.paddr'length )
+    port map ( clk     => timingClk,
+               dataIn  => config.paddr,
+               dataOut => paddr );
   
   U_FullFb : entity work.SynchronizerVector
     generic map ( WIDTH_G => fullfb'length )
     port map ( clk     => timingFbClk,
                dataIn  => r.fullfb,
                dataOut => fullfb );
+
+  U_GroupClear : entity work.SynchronizerOneShotVector
+    generic map ( WIDTH_G => NPartitions )
+    port map ( clk        => regclk,
+               dataIn     => r.groupLinkClear,
+               dataOut    => groupLinkClear );
   
   U_TimingFb : entity work.XpmTimingFb
     port map ( clk        => timingFbClk,
@@ -196,7 +221,7 @@ begin
                
   GEN_DSLINK: for i in 0 to NDsLinks-1 generate
     U_TxLink : entity work.XpmTxLink
-      generic map ( ADDR => i, STREAMS_G => 3 )
+      generic map ( ADDR => i, STREAMS_G => 3, DEBUG_G => i<1 )
       port map ( clk             => timingClk,
                  rst             => timingRst,
                  config          => config.dsLink(i),
@@ -262,6 +287,8 @@ begin
                axilReadSlave   => axilReadSlave  ,
                axilWriteMaster => axilWriteMaster,
                axilWriteSlave  => axilWriteSlave ,
+               obAppMaster     => obAppMaster,
+               obAppSlave      => obAppSlave,
                timingClk       => timingClk,
                timingRst       => timingRst,
 --               fiducial        => timingStream.fiducial,
@@ -308,9 +335,10 @@ begin
 
   comb : process ( r, timingRst, dsFull, bpRxLinkFullS, l1Input,
                    timingStream, streams, advance,
-                   expWord, pmaster, pdepth ) is
+                   expWord, pmaster, pdepth, paddr ) is
     variable v    : RegType;
     variable tidx : integer;
+    variable mhdr : slv(7 downto 0);
     constant pd   : XpmBroadcastType := PDELAY;
   begin
     v := r;
@@ -320,6 +348,7 @@ begin
     v.streams(2).ready := '1';
     v.advance    := advance;
     v.fiducial   := timingStream.fiducial;
+    v.msgComplete:= '0';
     
     --  test if we are the top of the hierarchy
     if streams(2).ready='1' then
@@ -363,7 +392,13 @@ begin
         if r.source='1' or pmaster(r.ipart)='1' then
           v.streams(2).data := expWord(r.ipart)(r.eword*16+15 downto r.eword*16);
         end if;
+
+        --  Collect the partition message to be forwarded,
+        v.msg := v.streams(2).data & r.msg(r.msg'left downto 16);
+        
         if (r.eword=(NTagBytes+1)/2) then
+          v.msgComplete := '1';
+          v.msgGroup    := r.ipart;
           if (r.ipart=NPartitions-1) then
             v.state := EOS_S;
           else
@@ -378,7 +413,7 @@ begin
         if r.source='1' then
           -- master of all : compose the word
           if r.bcastCount = 8 then
-            v.bcastf := r.paddr;
+            v.bcastf := paddr;
             v.bcastCount := 0;
           else
             v.bcastf := toPaddr(pd,r.bcastCount,pdepth(r.bcastCount));
@@ -392,6 +427,7 @@ begin
                 v.bcastf := toPaddr(pd,tidx,pdepth(tidx));
               end if;
             when XADDR =>
+              v.bcastf := paddr;
               v.paddr  := r.bcastr;
             when others => null;
           end case;
@@ -416,6 +452,25 @@ begin
       end if;
     end loop;
 
+    v.groupLinkClear := (others=>'0');
+    if r.msgComplete = '1' and r.msg(15) = '0' then
+      mhdr := toPartitionMsg(r.msg).hdr;
+      case (mhdr(7 downto 6)) is
+        when "00"  => -- Transition
+          NULL;
+        when "01"  => -- Occurrence
+          case (mhdr(5 downto 0)) is
+            when "00000" => -- ClearReadout
+              v.groupLinkClear(r.msgGroup) := '1';
+            when others => NULL;
+          end case;
+        when "10"  => -- Marker
+          NULL;
+        when others=> -- Unknown
+          NULL;
+      end case;
+    end if;
+    
     if timingRst='1' then
       v := REG_INIT_C;
     end if;
