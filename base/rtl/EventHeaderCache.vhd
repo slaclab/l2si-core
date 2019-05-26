@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-07-10
--- Last update: 2019-04-16
+-- Last update: 2019-05-26
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -38,8 +38,7 @@ entity EventHeaderCache is
    generic (
       TPD_G               : time                := 1 ns;
       ADDR_WIDTH_G        : integer             := 4;
-      FULL_THRES_G        : integer             := 10;
-      DEBUG_G             : boolean             := false );
+      FULL_THRES_G        : integer             := 10 );
    port (
      rst             : in  sl;
      --  Cache Input
@@ -153,11 +152,6 @@ architecture rtl of EventHeaderCache is
 
   signal wr_ack       : sl;
   signal wr_overflow  : sl;
-
-  component ila_0
-    port ( clk    : in sl;
-           probe0 : in slv(255 downto 0) );
-  end component;
 
   type DbgRegType is record
     count         : slv(6 downto 0);
@@ -367,7 +361,8 @@ begin
     cntL0            <= wr.cntL0;
     cntL1A           <= wr.cntL1A;
     cntL1R           <= wr.cntL1R;
-    cntWrFifo        <= wr.cntWrF;
+--    cntWrFifo        <= wr.cntWrF;
+    cntWrFifo        <= wr_data_count;
     rstFifo          <= wr.rstF(0);
     msgDelay         <= wr.msgD(1);
     cntOflow         <= wr.ofcnt;
@@ -397,7 +392,8 @@ begin
       v := RD_REG_INIT_C;
     end if;
     
-    cntRdFifo <= rd.cntRdF;
+--    cntRdFifo <= rd.cntRdF;
+    cntRdFifo <= rd_data_count;
 
     rd_in <= v;
   end process;

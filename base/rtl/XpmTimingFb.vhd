@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-07-08
--- Last update: 2019-03-16
+-- Last update: 2019-05-26
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -30,9 +30,12 @@ use work.TimingPkg.all;
 use work.XpmPkg.all;
 
 entity XpmTimingFb is
+   generic ( DEBUG_G : boolean := false );
    port (
       clk            : in  sl;
       rst            : in  sl;
+      pllReset       : in  sl := '0';
+      phyReset       : in  sl := '0';
       id             : in  slv(31 downto 0) := (others=>'1');
       l1input        : in  XpmL1InputArray(NPartitions-1 downto 0);
       full           : in  slv            (NPartitions-1 downto 0);
@@ -70,19 +73,16 @@ architecture rtl of XpmTimingFb is
   signal r   : RegType := REG_INIT_C;
   signal rin : RegType;
 
-  component ila_0
-    port ( clk     : in  sl;
-           probe0  : in  slv(255 downto 0) );
-  end component;
-
-  signal s_state : slv(2 downto 0);
-  
 begin
 
   l1ack       <= r.strobe;
   phy.data    <= r.txData;
   phy.dataK   <= r.txDataK;
-  phy.control <= TIMING_PHY_CONTROL_INIT_C;
+  phy.control.pllReset    <= pllReset;
+  phy.control.reset       <= phyReset;
+  phy.control.inhibit     <= '0';
+  phy.control.polarity    <= '0';
+  phy.control.bufferByRst <= '0';
   
   comb: process (r, full, l1input, rst, id) is
     variable v : RegType;

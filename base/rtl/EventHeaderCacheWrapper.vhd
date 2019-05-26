@@ -89,18 +89,6 @@ architecture mapping of EventHeaderCacheWrapper is
    signal hdrRst    : slv              (NDET_G-1 downto 0);
    signal aFullRx   : slv              (NDET_G-1 downto 0);
 
-   type DbgRegType is record
-     evCount     : Slv8Array(3 downto 0);
-     evCountDiff : slv(31 downto 0);
-   end record;
-
-   constant DBG_REG_INIT_C : DbgRegType := (
-     evCount      => (others=>(others=>'0')),
-     evCountDiff  => (others=>'0') );
-
-   signal dr   : DbgRegType := DBG_REG_INIT_C;
-   signal drin : DbgRegType;
-
    type RegType is record
      status          : TDetStatusArray(NDET_G-1 downto 0);
      spartition      : Slv3Array      (NDET_G-1 downto 0);
@@ -111,7 +99,6 @@ architecture mapping of EventHeaderCacheWrapper is
      cntsToTrig      : Slv12Array     (NDET_G-1 downto 0);
      cntsFullToTrig  : Slv12Array     (NDET_G-1 downto 0);
      cntsNFullToTrig : Slv12Array     (NDET_G-1 downto 0);
-     dbg             : DbgRegType;
    end record;
 
    constant REG_INIT_C : RegType := (
@@ -123,20 +110,11 @@ architecture mapping of EventHeaderCacheWrapper is
      cnts            => (others=>(others=>'0')),
      cntsToTrig      => (others=>(others=>'0')),
      cntsFullToTrig  => (others=>(others=>'0')),
-     cntsNFullToTrig => (others=>(others=>'1')),
-     dbg             => DBG_REG_INIT_C );
+     cntsNFullToTrig => (others=>(others=>'1')) );
 
    signal r    : RegType := REG_INIT_C;
    signal rin  : RegType;
 
-   constant DEBUG_C : boolean := true;
-
-   component ila_0
-     port ( clk    : in sl;
-            probe0 : in slv(255 downto 0) );
-   end component;
-
-   signal evCountTrig, evCountTrigRx : sl;
    signal cntWrFifo, cntRdFifo : Slv5Array(NDET_G-1 downto 0);
 
 begin
@@ -178,8 +156,7 @@ begin
       U_HeaderCache : entity work.EventHeaderCache
          generic map ( TPD_G => TPD_G,
                        ADDR_WIDTH_G => 5,
-                       FULL_THRES_G => 24,
-                       DEBUG_G => DEBUG_C )
+                       FULL_THRES_G => 24 )
          port map (
             rst            => rxRst,
             --  Cache Input
@@ -280,11 +257,6 @@ begin
                 dataIn  => hdrFull,
                 dataOut => hdrFullT );
 
-   U_SyncEvCountTrig : entity work.Synchronizer
-     port map ( clk     => rxClk,
-                dataIn  => evCountTrig,
-                dataOut => evCountTrigRx );
-   
    fullp : process (tdetTiming, hdrFullT) is
       variable vfull : slv(NPartitions-1 downto 0);
    begin
@@ -362,13 +334,6 @@ begin
        end if;
      end loop;
 
-     for i in 0 to 3 loop
-       if pdataV(i) = '1' and pdata(i).l0a = '1' then
-         v.dbg.evCount(i)  := pdata(i).anatag(7 downto 0);
-         v.dbg.evCountDiff(8*i+7 downto 8*i) := v.dbg.evCount(i) - r.dbg.evCount(i);
-       end if;
-     end loop;
-       
      if rxRst = '1' then
        v := REG_INIT_C;
      end if;
@@ -390,94 +355,4 @@ begin
      end if;
    end process seq;
 
-   GEN_DEBUG : if DEBUG_C generate
-     U_ILA : ila_0
-       port map ( clk      => tdetClk,
-                  probe0(31 downto  0) => dr.evCountDiff,
-                  probe0(39 downto 32) => dr.evCount(0),
-                  probe0(47 downto 40) => dr.evCount(1),
-                  probe0(55 downto 48) => dr.evCount(2),
-                  probe0(63 downto 56) => dr.evCount(3),
-                  probe0(64)           => tdetMaster(0).tValid,
-                  probe0(65)           => tdetMaster(1).tValid,
-                  probe0(66)           => tdetMaster(2).tValid,
-                  probe0(67)           => tdetMaster(3).tValid,
-                  probe0(68)           => tdetSlave (0).tReady,
-                  probe0(69)           => tdetSlave (1).tReady,
-                  probe0(70)           => tdetSlave (2).tReady,
-                  probe0(71)           => tdetSlave (3).tReady,
-                  probe0(72)           => tdetMaster(0).tValid,
-                  probe0(73)           => tdetMaster(0).tLast,
-                  probe0(78 downto 74)   => cntRdFifo(0),
-                  probe0(83 downto 79)   => cntRdFifo(1),
-                  probe0(88 downto 84)   => cntRdFifo(2),
-                  probe0(93 downto 89)   => cntRdFifo(3),
-                  probe0(97 downto 94)   => (others=>'0'),
-                  probe0(98)             => hdrOut(0).damaged,
-                  probe0(99)             => hdrOut(0).damaged,
-                  probe0(100)            => hdrOut(0).damaged,
-                  probe0(101)            => hdrOut(0).damaged,
-                  probe0(106 downto 102)   => hdrOut(0).l1t(5 downto 1),
-                  probe0(111 downto 107)   => hdrOut(1).l1t(5 downto 1),
-                  probe0(116 downto 112)   => hdrOut(2).l1t(5 downto 1),
-                  probe0(121 downto 117)   => hdrOut(3).l1t(5 downto 1),
-                  probe0(125 downto 122)   => hdrFullT(3 downto 0),
-                  probe0(255 downto 126) => (others=>'0') );
-
-     U_ILA_DT : ila_0
-       port map ( clk                    => rxClk,
-                  probe0(             0) => r.stable(0),
-                  probe0( 12 downto   1) => r.cnts(0),
-                  probe0(            13) => r.afull(0),
-                  probe0(            14) => aFullRx(0),
-                  probe0( 26 downto  15) => r.cntsToTrig(0),
-                  probe0( 38 downto  27) => r.status(0).fullToTrig,
-                  probe0( 50 downto  39) => r.status(0).nfullToTrig,
-                  probe0(            51) => r.cntOflow(0),
-                  probe0(            52) => hdrFull(0),
-                  probe0( 57 downto  53) => cntWrFifo(0),
-                  probe0( 58 )           => pdataV(0),
-                  probe0( 59 )           => pdata(0).l0a,
-                  probe0( 91 downto  60) => r.dbg.evCountDiff,
-                  probe0( 99 downto  92) => r.dbg.evCount(0),
-                  probe0(107 downto 100) => r.dbg.evCount(1),
-                  probe0(115 downto 108) => r.dbg.evCount(2),
-                  probe0(123 downto 116) => r.dbg.evCount(3),
-                  probe0(124 )           => evCountTrigRx,
-                  probe0(131 downto 125) => spdelay(0),
-                  probe0(255 downto 132) => (others=>'0') );
-   end generate;
-   
-   tcomb : process ( dr, tdetRst, tdetMaster, tdetSlave, hdrOut ) is
-     variable v : DbgRegType;
-   begin
-     v := dr;
-
-     for i in 0 to 3 loop
-       if (tdetMaster(i).tValid = '1' and tdetSlave(i).tReady = '1') then
-         v.evCount(i)  := hdrOut(i).count(7 downto 0);
-         v.evCountDiff(8*i+7 downto 8*i) := v.evCount(i) - dr.evCount(i);
-       end if;
-     end loop;
-       
-     if tdetRst = '1' then
-       v := DBG_REG_INIT_C;
-     end if;
-
-     drin <= v;
-
-     if dr.evCountDiff(7 downto 0) = x"01" then
-       evCountTrig <= '0';
-     else
-       evCountTrig <= '1';
-     end if;
-   end process tcomb;
-
-   tseq : process ( tdetClk ) is
-   begin
-     if rising_edge(tdetClk) then
-       dr <= drin;
-     end if;
-   end process tseq;
-   
 end mapping;

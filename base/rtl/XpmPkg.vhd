@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2016-03-25
--- Last update: 2019-03-25
+-- Last update: 2019-05-25
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -197,7 +197,7 @@ package XpmPkg is
      txDelayRst : sl;
      txDelay    : slv( 8 downto 0);
      rxTimeOut  : slv( 8 downto 0);
-     partition  : slv( 3 downto 0);
+     groupMask  : slv(NPartitions-1 downto 0);
      trigsrc    : slv( 3 downto 0);
    end record;
    type XpmLinkConfigArray is array (natural range<>) of XpmLinkConfigType;
@@ -211,7 +211,7 @@ package XpmPkg is
      txDelayRst => '0',
      txDelay    => (others=>'0'),
      rxTimeOut  => toSlv(200,9),
-     partition  => (others=>'0'),
+     groupMask  => (others=>'0'),
      trigsrc    => (others=>'0') );
    type XpmL0SelectConfigType is record
       reset            : sl;
@@ -341,6 +341,7 @@ package XpmPkg is
       bpLink     : XpmLinkConfigArray(NBPLinks   downto 0);
       pll        : XpmPllConfigArray(NAmcs-1 downto 0);
       partition  : XpmPartitionConfigArray(NPartitions-1 downto 0);
+      paddr      : slv(PADDR_LEN-1 downto 0);
       tagstream  : sl;
    end record;
    constant XPM_CONFIG_INIT_C : XpmConfigType := (
@@ -348,6 +349,7 @@ package XpmPkg is
       bpLink     => (others => XPM_LINK_CONFIG_INIT_C),
       pll        => (others => XPM_PLL_CONFIG_INIT_C),
       partition  => (others => XPM_PARTITION_CONFIG_INIT_C),
+      paddr      => (others => '0'),
       tagstream  => '0' );
 
    type XpmAcceptFrameType is record
@@ -430,7 +432,7 @@ end package XpmPkg;
 package body XpmPkg is
 
    function toSlv(s : XpmLinkStatusType) return slv is
-     variable vector : slv(21 downto 0) := (others=>'0');
+     variable vector : slv(85 downto 0) := (others=>'0');
      variable i      : integer := 0;
    begin
      assignSlv(i, vector, s.txResetDone);
@@ -439,7 +441,9 @@ package body XpmPkg is
      assignSlv(i, vector, s.rxReady);
      assignSlv(i, vector, s.rxErr);
      assignSlv(i, vector, s.rxErrCnts);
+     assignSlv(i, vector, s.rxRcvCnts);
      assignSlv(i, vector, s.rxIsXpm);
+     assignSlv(i, vector, s.rxId);
      return vector;
    end function;
 
@@ -453,7 +457,9 @@ package body XpmPkg is
      assignRecord(i, vector, v.rxReady);
      assignRecord(i, vector, v.rxErr);
      assignRecord(i, vector, v.rxErrCnts);
+     assignRecord(i, vector, v.rxRcvCnts);
      assignRecord(i, vector, v.rxIsXpm);
+     assignRecord(i, vector, v.rxId);
      return v;
    end function;
 
