@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-07-10
--- Last update: 2019-05-24
+-- Last update: 2019-05-28
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -159,6 +159,7 @@ architecture top_level_app of XpmApp is
   signal r_streamIds : Slv4Array      (NSTREAMS_C-1 downto 0) := (x"1",x"2",x"0");
   signal advance   : slv              (NSTREAMS_C-1 downto 0);
   signal pmaster     : slv       (NPartitions-1 downto 0);
+  signal pdepthI     : Slv8Array (NPartitions-1 downto 0);
   signal pdepth      : Slv8Array (NPartitions-1 downto 0);
   signal expWord     : Slv48Array(NPartitions-1 downto 0);
   signal fullfb      : slv       (NPartitions-1 downto 0);
@@ -326,10 +327,16 @@ begin
       port map ( clk     => timingClk,
                  dataIn  => config.partition(i).master,
                  dataOut => pmaster(i) );
+
+    --
+    --  Actual delay is 1 greater than configuration
+    --
+    pdepthI(i) <= config.partition(i).pipeline.depth_fids+1;
+
     U_SyncDelay : entity work.SynchronizerVector
       generic map ( WIDTH_G => 8 )
       port map ( clk     => timingClk,
-                 dataIn  => config.partition(i).pipeline.depth_fids,
+                 dataIn  => pdepthI(i),
                  dataOut => pdepth(i) );
   end generate;
 
