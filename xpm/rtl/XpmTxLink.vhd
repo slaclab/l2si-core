@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-12-14
--- Last update: 2019-05-22
+-- Last update: 2019-06-01
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -135,8 +135,7 @@ begin
   txDataK <= itxDataK;
   
   U_Serializer : entity work.TimingSerializer
-     generic map ( STREAMS_C => STREAMS_G,
-                   DEBUG_G   => DEBUG_G )
+     generic map ( STREAMS_C => STREAMS_G )
      port map ( clk       => clk,
                 rst       => rst,
                 fiducial  => r.fiducial(0),

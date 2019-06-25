@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-07-10
--- Last update: 2019-04-23
+-- Last update: 2019-06-07
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -37,6 +37,7 @@ use work.TPGPkg.all;
 use work.XpmPkg.all;
 use work.XpmMiniPkg.all;
 use work.AxiLitePkg.all;
+use work.AxiStreamPkg.all;
  
 library unisim;
 use unisim.vcomponents.all;
@@ -154,14 +155,12 @@ begin
   GEN_DS_ENABLE : for i in 0 to NDSLinks-1 generate
     GEN_ENABLE: if ENABLE_DS_LINKS_G(i)='1' generate
       xpmConfig.dsLink(i).enable     <= '1';
-      xpmConfig.dsLink(i).partition  <= toSlv( 0, 4);
     end generate;
   end generate;
    
   GEN_BP_ENABLE : for i in 0 to NBPLinks-1 generate
     GEN_ENABLE: if ENABLE_BP_LINKS_G(i)='1' generate
       xpmConfig.bpLink(i).enable     <= '1';
-      xpmConfig.dsLink(i).partition  <= toSlv( 0, 4);
     end generate;
   end generate;
 
@@ -300,6 +299,8 @@ begin
          config          => xpmConfig,
          axilReadMaster  => AXI_LITE_READ_MASTER_INIT_C,
          axilWriteMaster => AXI_LITE_WRITE_MASTER_INIT_C,
+         obAppMaster     => open,
+         obAppSlave      => AXI_STREAM_SLAVE_INIT_C,
          -- Timing Interface (timingClk domain) 
          timingClk         => recTimingClk,
          timingRst         => recTimingRst,

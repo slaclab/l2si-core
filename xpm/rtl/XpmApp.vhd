@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-07-10
--- Last update: 2019-05-28
+-- Last update: 2019-06-07
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -467,7 +467,7 @@ begin
           NULL;
         when "01"  => -- Occurrence
           case (mhdr(5 downto 0)) is
-            when "00000" => -- ClearReadout
+            when "000000" => -- ClearReadout
               v.groupLinkClear(r.msgGroup) := '1';
             when others => NULL;
           end case;
