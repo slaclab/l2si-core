@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-07-10
--- Last update: 2019-06-07
+-- Last update: 2019-07-17
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -72,6 +72,7 @@ end XpmSim;
 architecture top_level_app of XpmSim is
 
    constant GEN_CLEAR_G : boolean := false;
+   constant SIM_ANALYSIS_TAG_G : boolean := false;
    
    -- Reference Clocks and Resets
    signal recTimingClk : sl;
@@ -167,55 +168,58 @@ begin
   process is
   begin
      for i in 0 to NPartitions-1 loop
-       pconfig(i).pipeline.depth_clks <= toSlv((80+i)*200,16);
-       pconfig(i).pipeline.depth_fids <= toSlv((80+i),8);
+       -- Realistic
+       -- pconfig(i).pipeline.depth_clks <= toSlv((80+i)*200,16);
+       -- pconfig(i).pipeline.depth_fids <= toSlv((80+i),8);
+       -- Faster simulation
+       pconfig(i).pipeline.depth_clks <= toSlv((20+i)*200,16);
+       pconfig(i).pipeline.depth_fids <= toSlv((20+i),8);
      end loop;
 
-     pconfig(0).master        <= '1';
-     pconfig(0).analysis.rst  <= x"f";
-     pconfig(0).analysis.tag  <= x"00000000";
-     pconfig(0).analysis.push <= x"0";
-     wait for 100 ns;
-     pconfig(0).analysis.rst  <= x"0";
-     wait for 5000 ns;
-     wait until regClk='0';
-     pconfig(0).analysis.tag  <= x"00000001";
-     pconfig(0).analysis.push <= x"1";
-     wait until regClk='1';
-     wait until regClk='0';
-     pconfig(0).analysis.push <= x"0";
-     wait until regClk='1';
-     wait until regClk='0';
-     pconfig(0).analysis.tag  <= x"00000002";
-     pconfig(0).analysis.push <= x"1";
-     wait until regClk='1';
-     wait until regClk='0';
-     pconfig(0).analysis.push <= x"0";
-     wait until regClk='1';
-     wait until regClk='0';
-     pconfig(0).analysis.tag  <= x"00000003";
-     pconfig(0).analysis.push <= x"1";
-     wait until regClk='1';
-     wait until regClk='0';
-     pconfig(0).analysis.push <= x"0";
-     wait until regClk='1';
-     wait until regClk='0';
+     if SIM_ANALYSIS_TAG_G then
+       pconfig(0).master        <= '1';
+       pconfig(0).analysis.rst  <= x"f";
+       pconfig(0).analysis.tag  <= x"00000000";
+       pconfig(0).analysis.push <= x"0";
+       wait for 100 ns;
+       pconfig(0).analysis.rst  <= x"0";
+       wait for 5000 ns;
+       wait until regClk='0';
+       pconfig(0).analysis.tag  <= x"00000001";
+       pconfig(0).analysis.push <= x"1";
+       wait until regClk='1';
+       wait until regClk='0';
+       pconfig(0).analysis.push <= x"0";
+       wait until regClk='1';
+       wait until regClk='0';
+       pconfig(0).analysis.tag  <= x"00000002";
+       pconfig(0).analysis.push <= x"1";
+       wait until regClk='1';
+       wait until regClk='0';
+       pconfig(0).analysis.push <= x"0";
+       wait until regClk='1';
+       wait until regClk='0';
+       pconfig(0).analysis.tag  <= x"00000003";
+       pconfig(0).analysis.push <= x"1";
+       wait until regClk='1';
+       wait until regClk='0';
+       pconfig(0).analysis.push <= x"0";
+       wait until regClk='1';
+       wait until regClk='0';
 
-     wait for 10000 ns;
-     --for i in 0 to NPartitions-1 loop
-     --  pconfig(i).message.hdr     <= MSG_DELAY_PWORD;
-     --  pconfig(i).message.payload <= toSlv(80+i,8);
-     --  pconfig(i).message.insert  <= '1';
-     --end loop;
+       wait for 10000 ns;
    
-     wait until regClk='1';
-     wait until regClk='0';
-     
-     for i in 0 to NPartitions-1 loop
-       pconfig(i).message.insert  <= '0';
-     end loop;
+       wait until regClk='1';
+       wait until regClk='0';
+       
+       for i in 0 to NPartitions-1 loop
+         pconfig(i).message.insert  <= '0';
+       end loop;
 
-     wait for 120 us;
+       wait for 120 us;
+     else
+       wait for 20 us;
+     end if;
      
      pconfig(0).l0Select.enabled <= '1';
      pconfig(0).l0Select.rateSel <= toSlv(RATE_SELECT_G,16);
