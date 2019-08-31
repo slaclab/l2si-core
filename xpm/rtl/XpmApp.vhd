@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-07-10
--- Last update: 2019-06-07
+-- Last update: 2019-07-27
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -222,7 +222,7 @@ begin
                
   GEN_DSLINK: for i in 0 to NDsLinks-1 generate
     U_TxLink : entity work.XpmTxLink
-      generic map ( ADDR => i, STREAMS_G => 3, DEBUG_G => i<1 )
+      generic map ( ADDR => i, STREAMS_G => 3, DEBUG_G => false )
       port map ( clk             => timingClk,
                  rst             => timingRst,
                  config          => config.dsLink(i),
@@ -253,7 +253,7 @@ begin
   U_BpTx : entity work.XpmTxLink
     generic map ( ADDR      => 15,
                   STREAMS_G => 3,
-                  DEBUG_G   => true )
+                  DEBUG_G   => false )
     port map ( clk             => timingClk,
                rst             => timingRst,
                config          => config.bpLink(0),
@@ -308,7 +308,7 @@ begin
 
     U_Master : entity work.XpmAppMaster
       generic map ( NDsLinks   => NDsLinks,
-                    DEBUG_G    => ite(i>0, false, true) )
+                    DEBUG_G    => (i<1) )
       port map ( regclk        => regclk,
                  update        => update          (i),
                  config        => config.partition(i),

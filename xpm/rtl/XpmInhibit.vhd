@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-12-14
--- Last update: 2019-03-25
+-- Last update: 2019-07-25
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -77,11 +77,13 @@ begin
    dtSrc   <= (proginhb & fullb) when fiducial='1' else
               (others=>'0');
 
-   U_SyncFull : entity work.SynchronizerVector
-     generic map ( WIDTH_G => 28 )
-     port map ( clk     => clk,
-                dataIn  => full,
-                dataOut => fullb );
+   --U_SyncFull : entity work.SynchronizerVector
+   --  generic map ( WIDTH_G => 28 )
+   --  port map ( clk     => clk,
+   --             dataIn  => full,
+   --             dataOut => fullb );
+   --  Already synchronous
+   fullb   <= full;
        
    U_Status : entity work.SyncStatusVector
      generic map ( WIDTH_G => 32 )

@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-07-10
--- Last update: 2019-03-14
+-- Last update: 2019-07-29
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -80,6 +80,8 @@ architecture rtl of XpmAppMaster is
   signal msgConfig      : XpmPartMsgConfigType;
   signal messageDin     : slv(msgConfig.hdr'length+msgConfig.payload'length-1 downto 0);
   signal messageDout    : slv(msgConfig.hdr'length+msgConfig.payload'length-1 downto 0);
+  signal msgWr          : sl;
+  signal msgRdCount     : slv(3 downto 0);
   
   --  input data from sensor links
   --  L0 inhibit decision
@@ -118,26 +120,17 @@ begin
   GEN_ILA: if DEBUG_G generate
     U_ILA : ila_0
       port map ( clk                    => timingClk,
-                 probe0( 15 downto   0) => streams(0).data,
-                 probe0( 31 downto  16) => streams(1).data,
-                 probe0( 47 downto  32) => streams(2).data,
-                 probe0( 48 )           => advance(0),
-                 probe0( 49 )           => advance(1),
-                 probe0( 50 )           => advance(2),
-                 probe0( 51 )           => l0Accept,
-                 probe0( 52 )           => timingBus_strobe,
-                 probe0( 60 downto 53 ) => l0Tag      (7 downto 0),
-                 probe0( 68 downto 61 ) => l1AcceptTag(7 downto 0),
-                 probe0( 69 )           => fiducial,
-                 probe0( 70 )           => timingBus_valid,
-                 probe0( 71 )           => delayOverflow,
-                 probe0( 72 )           => streams(0).ready,
-                 probe0( 73 )           => streams(1).ready,
-                 probe0( 74 )           => streams(2).ready,
-                 probe0( 75 )           => streams(0).last,
-                 probe0( 76 )           => streams(1).last,
-                 probe0( 77 )           => streams(2).last,
-                 probe0(255 downto 78 ) => (others=>'0'));
+                 probe0(  0 )           => l0Accept,
+                 probe0(  1 )           => timingBus_strobe,
+                 probe0(  2 )           => fiducial,
+                 probe0(  3 )           => timingBus_valid,
+                 probe0(  4 )           => config.message.insert,
+                 probe0(  5 )           => msgWr,
+                 probe0(  6 )           => r.insertMsg,
+                 probe0(  7 )           => r.strobeMsg,
+                 probe0( 15 downto 8 )  => l0Tag      (7 downto 0),
+                 probe0( 19 downto 16 ) => msgRdCount,
+                 probe0(255 downto 20 ) => (others=>'0'));
   end generate;
 
   result <= r.result;
@@ -239,14 +232,24 @@ begin
   messageDin        <= config.message.payload & config.message.hdr;
   msgConfig.hdr     <= messageDout(config.message.hdr'range);
   msgConfig.payload <= messageDout(config.message.payload'left+config.message.hdr'length downto config.message.hdr'length);
+
+  U_LatchMsg : entity work.SynchronizerOneShot
+    port map ( clk     => regClk,
+               dataIn  => config.message.insert,
+               dataOut => msgWr );
   
-  U_SyncMsgPayload : entity work.SynchronizerFifo
-    generic map ( DATA_WIDTH_G => messageDin'length )
-    port map ( wr_clk  => regClk,
-               wr_en   => config.message.insert,
+  U_SyncMsgPayload : entity work.FifoAsync
+    generic map ( DATA_WIDTH_G => messageDin'length,
+                  ADDR_WIDTH_G => 4,
+                  FWFT_EN_G    => true )
+    port map ( rst     => timingRst,
+               wr_clk  => regClk,
+               wr_en   => msgWr,
                din     => messageDin,
+               --
                rd_clk  => timingClk,
-               rd_en   => r.insertMsg,
+               rd_en   => r.strobeMsg,
+               rd_data_count => msgRdCount,
                valid   => msgConfig.insert,
                dout    => messageDout );
 
@@ -258,7 +261,7 @@ begin
   --  Unimplemented L1 trigger
   --
   l1Accept <= l0Accept;
-  
+
   comb : process ( r, timingRst, frame, cuRx_frame, cuRx_valid,
                    timingBus_strobe, timingBus_valid, msgConfig,
                    l0Tag, l0Accept, l0Reject ) is
@@ -271,7 +274,7 @@ begin
     v.partStrobe := r.timingBus.strobe;
     v.latch      := r.partStrobe;
     v.strobeMsg  := '0';
-    
+
     if msgConfig.insert = '1' and r.timingBus.strobe = '1' then
       v.insertMsg := '1';
     end if;
