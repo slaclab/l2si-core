@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2016-03-25
--- Last update: 2019-05-25
+-- Last update: 2019-09-18
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -371,39 +371,39 @@ package XpmPkg is
       tag       => (others=>'0'),
       trigword  => (others=>'0'));
 
-   type XpmPartitionMsgType is record
-      l0tag   : slv(4 downto 0);
-      hdr     : slv(7 downto 0);
-      payload : slv(7 downto 0);
-      anatag  : slv(23 downto 0);
-   end record;
+--    type XpmPartitionMsgType is record
+--       l0tag   : slv(4 downto 0);
+--       hdr     : slv(7 downto 0);
+--       payload : slv(7 downto 0);
+--       anatag  : slv(23 downto 0);
+--    end record;
 
-   constant XPM_PARTITION_MSG_INIT_C : XpmPartitionMsgType := (
-     l0tag    => (others=>'0'),
-     hdr      => (others=>'0'),
-     payload  => (others=>'0'),
-     anatag   => (others=>'0') );
+--    constant XPM_PARTITION_MSG_INIT_C : XpmPartitionMsgType := (
+--      l0tag    => (others=>'0'),
+--      hdr      => (others=>'0'),
+--      payload  => (others=>'0'),
+--      anatag   => (others=>'0') );
 
-   type XpmPartitionDataType is record
-      l0a     : sl;
-      l0tag   : slv(4 downto 0);
-      l0r     : sl;
-      l1e     : sl;
-      l1a     : sl;
-      l1tag   : slv(4 downto 0);
-      anatag  : slv(23 downto 0);
-   end record;
+--    type XpmPartitionDataType is record
+--       l0a     : sl;                     -- l0 accept
+--       l0tag   : slv(4 downto 0);
+--       l0r     : sl;                     -- l0 reject
+--       l1e     : sl;                     -- l1 expexted
+--       l1a     : sl;                     -- l1 accepted
+--       l1tag   : slv(4 downto 0);
+--       anatag  : slv(23 downto 0);       -- not using anymore
+--    end record;
 
-   constant XPM_PARTITION_DATA_INIT_C : XpmPartitionDataType := (
-     l0a      => '0',
-     l0tag    => (others=>'0'),
-     l0r      => '0',
-     l1e      => '0',
-     l1a      => '0',
-     l1tag    => (others=>'0'),
-     anatag   => (others=>'0') );
+--    constant XPM_PARTITION_DATA_INIT_C : XpmPartitionDataType := (
+--      l0a      => '0',
+--      l0tag    => (others=>'0'),
+--      l0r      => '0',
+--      l1e      => '0',
+--      l1a      => '0',
+--      l1tag    => (others=>'0'),
+--      anatag   => (others=>'0') );
 
-   type XpmPartitionDataArray is array(natural range<>) of XpmPartitionDataType;
+--    type XpmPartitionDataArray is array(natural range<>) of XpmPartitionDataType;
 
    type XpmBroadcastType is ( RSVD0, RSVD1, RSVD2, RSVD3,
                               RSVD4, RSVD5, RSVD6, RSVD7,
@@ -491,39 +491,6 @@ package body XpmPkg is
      return pword;
    end function;
    
-   function toSlv  (pword : XpmPartitionDataType) return slv is
-     variable vector : slv(47 downto 0) := (others=>'0');
-     variable i      : integer          := 0;
-   begin
-     assignSlv(i, vector, pword.l0a);
-     assignSlv(i, vector, pword.l0tag);
-     assignSlv(i, vector, "0");
-     assignSlv(i, vector, pword.l0r);
-     assignSlv(i, vector, pword.l1e);
-     assignSlv(i, vector, pword.l1a);
-     assignSlv(i, vector, pword.l1tag);
-     assignSlv(i, vector, "1");  -- valid trigger word
-     assignSlv(i, vector, pword.anatag);
-     assignSlv(i, vector, x"00");
-     return vector;
-   end function;
-   
-   function toPartitionWord(vector : slv) return XpmPartitionDataType is
-     variable pword : XpmPartitionDataType := XPM_PARTITION_DATA_INIT_C;
-     variable i     : integer              := 0;
-   begin
-     assignRecord(i, vector, pword.l0a);
-     assignRecord(i, vector, pword.l0tag);
-     i := i+1;
-     assignRecord(i, vector, pword.l0r);
-     assignRecord(i, vector, pword.l1e);
-     assignRecord(i, vector, pword.l1a);
-     assignRecord(i, vector, pword.l1tag);
-     i := i+1;
-     assignRecord(i, vector, pword.anatag);
-     i := i+8;
-     return pword;
-   end function;
 
    function xpmTimingFbId(ip : slv) return slv is
      variable id  : slv(31 downto 0);

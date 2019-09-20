@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2016-03-25
--- Last update: 2019-04-15
+-- Last update: 2019-09-17
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -28,46 +28,12 @@ use work.TimingPkg.all;
 
 package EventPkg is
 
-   type TimingHeaderType is record
-      strobe    : sl;
-      pulseId   : slv(63 downto 0);
-      timeStamp : slv(63 downto 0);
-   end record;
-   constant TIMING_HEADER_INIT_C : TimingHeaderType := (
-      strobe    => '0',
-      pulseId   => (others=>'0'),
-      timeStamp => (others=>'0') );
 
-   function toTimingHeader(v : TimingBusType) return TimingHeaderType;
-
+   ------------------------------------------------
+   -- Partition Data
+   -- Convert Partiton words to event
+   ------------------------------------------------
    
-   constant EVENT_HEADER_VERSION_C : integer := 0;
-   constant L1A_INFO_C : slv(6 downto 0) := toSlv(12,7);
-   
-   type EventHeaderType is record
-     pulseId    : slv(63 downto 0);
-     timeStamp  : slv(63 downto 0);
-     count      : slv(23 downto 0);
-     version    : slv( 7 downto 0);
-     partitions : slv(15 downto 0);   -- readout groups
-     l1t        : slv(15 downto 0);   -- L1 trigger lines
-     payload    : slv( 7 downto 0);   -- transition payload
-     damaged    : sl;
-   end record;
-
-   constant EVENT_HEADER_INIT_C : EventHeaderType := (
-     pulseId    => (others=>'0'),
-     timeStamp  => (others=>'0'),
-     count      => (others=>'0'),
-     version    => toSlv(EVENT_HEADER_VERSION_C,8),
-     partitions => (others=>'0'),
-     l1t        => (others=>'0'),
-     payload    => (others=>'0'),
-     damaged    => '0' );
-
-   type EventHeaderArray is array(natural range<>) of EventHeaderType;
-   
-   function toSlv(v : EventHeaderType) return slv;
    
 end package EventPkg;
 

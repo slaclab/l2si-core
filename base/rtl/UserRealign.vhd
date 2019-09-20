@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-07-10
--- Last update: 2019-03-25
+-- Last update: 2019-09-18
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -24,79 +24,84 @@ library ieee;
 use ieee.std_logic_1164.all;
 use ieee.std_logic_unsigned.all;
 
+-- surf
 use work.StdRtlPkg.all;
-use work.EventPkg.all;
+
+-- l2si
+use work.L2SiPkg.all;
 
 library unisim;
 use unisim.vcomponents.all;
 
 entity UserRealign is
    generic (
-      TPD_G    : time    := 1 ns;
-      WIDTH_G  : integer := 1 );
+      TPD_G   : time    := 1 ns;
+      WIDTH_G : integer := 1);
    port (
-     rst             : in  sl;
-     clk             : in  sl;
-     delay           : in  slv(6 downto 0);
-     timingI         : in  TimingHeaderType;
-     userTimingI     : in  slv(WIDTH_G-1 downto 0) := (others=>'0');
-     userTimingO     : out slv(WIDTH_G-1 downto 0) );
+      rst               : in  sl;
+      clk               : in  sl;
+      delay             : in  slv(6 downto 0);
+      timingHeader      : in  TimingHeaderType;
+      userTiming        : in  slv(WIDTH_G-1 downto 0) := (others => '0');
+      alignedUserTiming : out slv(WIDTH_G-1 downto 0));
 end UserRealign;
 
 architecture rtl of UserRealign is
 
-  type RegType is record
-    rden   : sl;
-    rdaddr : slv(6 downto 0);
-  end record;
+   type RegType is record
+      rden   : sl;
+      rdaddr : slv(6 downto 0);
+   end record;
 
-  constant REG_INIT_C : RegType := (
-    rden   => '0',
-    rdaddr => (others=>'0') );
+   constant REG_INIT_C : RegType := (
+      rden   => '0',
+      rdaddr => (others => '0'));
 
-  signal r    : RegType := REG_INIT_C;
-  signal r_in : RegType;
-    
+   signal r    : RegType := REG_INIT_C;
+   signal r_in : RegType;
+
 begin
 
-  U_Ram : entity work.SimpleDualPortRam
-    generic map ( DATA_WIDTH_G => WIDTH_G,
-                  ADDR_WIDTH_G => 7 )
-    port map ( clka                 => clk,
-               ena                  => '1',
-               wea                  => timingI.strobe,
-               addra                => timingI.pulseId(6 downto 0),
-               dina                 => userTimingI,
-               clkb                 => clk,
-               rstb                 => rst,
-               enb                  => r.rden,
-               addrb                => r.rdaddr,
-               doutb                => userTimingO );
-  
-  comb : process( r, rst, timingI, delay ) is
-    variable v    : RegType;
-  begin
-    v := r;
+   U_Ram : entity work.SimpleDualPortRam
+      generic map (
+         DATA_WIDTH_G => WIDTH_G,
+         ADDR_WIDTH_G => 7)
+      port map (
+         clka  => clk,
+         ena   => '1',
+         wea   => timingHeader.strobe,
+         addra => timingHeader.pulseId(6 downto 0),
+         dina  => userTimingI,
+         clkb  => clk,
+         rstb  => rst,
+         enb   => r.rden,
+         addrb => r.rdaddr,
+         doutb => alignedUserTiming);
 
-    v.rden      := '0';
-    
-    if timingI.strobe = '1' then
-      v.rden   := '1';
-      v.rdaddr := timingI.pulseId(6 downto 0) + delay;
-    end if;
+   comb : process(r, rst, timingHeader, delay) is
+      variable v : RegType;
+   begin
+      v := r;
 
-    if rst = '1' then
-      v := REG_INIT_C;
-    end if;
+      v.rden := '0';
 
-    r_in <= v;
-  end process;
-  
-  seq : process (clk) is
-  begin
-    if rising_edge(clk) then
-      r <= r_in;
-    end if;
-  end process;
+      if timingHeader.strobe = '1' then
+         v.rden   := '1';
+         v.rdaddr := timingHeader.pulseId(6 downto 0) + delay;
+      end if;
+
+      if rst = '1' then
+         v := REG_INIT_C;
+      end if;
+
+      r_in <= v;
+   end process;
+
+   seq : process (clk) is
+   begin
+      if rising_edge(clk) then
+         r <= r_in;
+      end if;
+   end process;
 
 end rtl;

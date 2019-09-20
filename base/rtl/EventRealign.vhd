@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-07-10
--- Last update: 2018-12-17
+-- Last update: 2019-09-18
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -24,122 +24,133 @@ library ieee;
 use ieee.std_logic_1164.all;
 use ieee.std_logic_unsigned.all;
 
+-- SURF
 use work.StdRtlPkg.all;
-use work.TimingExtnPkg.all;
+
+-- lcls-timing-core
 use work.TimingPkg.all;
-use work.EventPkg.all;
-use work.XpmPkg.all;
+
+-- L2Si
+use work.L2SiPkg.all;
+
 
 library unisim;
 use unisim.vcomponents.all;
 
 entity EventRealign is
    generic (
-      TPD_G               : time                := 1 ns;
-      TF_DELAY_G          : slv(6 downto 0)     := toSlv(100,7) );
+      TPD_G      : time            := 1 ns;
+      TF_DELAY_G : slv(6 downto 0) := toSlv(100, 7));
    port (
-     rst             : in  sl;
-     clk             : in  sl;
-     timingI         : in  TimingHeaderType; -- prompt
-     exptBusI        : in  ExptBusType;      -- prompt
-     timingO         : out TimingHeaderType; -- delayed
-     exptBusO        : out ExptBusType;      -- delayed
-     delay           : out Slv7Array(NPartitions-1 downto 0));
+      rst                      : in  sl;
+      clk                      : in  sl;
+      promptTimingHeader       : in  TimingHeaderType;                                -- prompt
+      promptExperimentMessage  : in  ExperimentMessageType;                           -- prompt
+      alignedTimingHeader      : out TimingHeaderType;                                -- delayed
+      alignedExperimentMessage : out ExperimentMessageType;                           -- delayed
+      partitionDelays          : out Slv7Array(EXPERIMENT_PARTITIONS_C-1 downto 0));  -- 8 partitions
 end EventRealign;
 
 architecture rtl of EventRealign is
 
-  constant NPartitions : integer := 8;
 
-  type RegType is record
-    rden   : sl;
-    rdaddr : Slv7Array(NPartitions downto 0);
-    pdelay : Slv7Array(NPartitions-1 downto 0);
-  end record;
+   type RegType is record
+      rden   : sl;
+      rdaddr : Slv7Array(EXPERIMENT_PARTITIONS_C downto 0);
+      pdelay : Slv7Array(EXPERIMENT_PARTITIONS_C-1 downto 0);
+   end record;
 
-  constant REG_INIT_C : RegType := (
-    rden   => '0',
-    rdaddr => (others=>(others=>'0')),
-    pdelay => (others=>(others=>'0')) );
+   constant REG_INIT_C : RegType := (
+      rden   => '0',
+      rdaddr => (others => (others => '0')),
+      pdelay => (others => (others => '0')));
 
-  signal r    : RegType := REG_INIT_C;
-  signal r_in : RegType;
-    
-  constant EXPT_INIT_C : slv(47 downto 0) := x"000000008000";
+   signal r   : RegType := REG_INIT_C;
+   signal rin : RegType;
+
+   constant EXPT_INIT_C : slv(47 downto 0) := x"000000008000";
 
 begin
 
-  delay <= r.pdelay;
-  
-  U_Ram : entity work.SimpleDualPortRam
-    generic map ( DATA_WIDTH_G => 129,
-                  ADDR_WIDTH_G => 7 )
-    port map ( clka                 => clk,
-               ena                  => '1',
-               wea                  => timingI.strobe,
-               addra                => timingI.pulseId(6 downto 0),
-               dina( 63 downto  0)  => timingI.pulseId,
-               dina(127 downto 64)  => timingI.timeStamp,
-               dina(128)            => exptBusI.valid,
-               clkb                 => clk,
-               rstb                 => rst,
-               enb                  => r.rden,
-               addrb                => r.rdaddr(NPartitions),
-               doutb( 63 downto  0) => timingO.pulseId,
-               doutb(127 downto 64) => timingO.timeStamp,
-               doutb(128)           => exptBusO.valid );
-  timingO.strobe <= r.rden;
-  
-  GEN_PART : for i in 0 to NPartitions-1 generate
-    U_Ram : entity work.SimpleDualPortRam
-    generic map ( DATA_WIDTH_G => 48,
-                  ADDR_WIDTH_G => 7,
-                  INIT_G       => EXPT_INIT_C)
-    port map ( clka   => clk,
-               ena    => '1',
-               wea    => timingI .strobe,
-               addra  => timingI .pulseId(6 downto 0),
-               dina   => exptBusI.message.partitionWord(i),
-               clkb   => clk,
-               enb    => '1',
-               addrb  => r.rdaddr(i),
-               doutb  => exptBusO.message.partitionWord(i) );
-  end generate;
-  exptBusO.message.partitionAddr <= exptBusI.message.partitionAddr;
-  
-  comb : process( r, rst, timingI, exptBusI ) is
-    variable v    : RegType;
-    variable pvec : slv(PADDR_LEN-1 downto 0); 
-  begin
-    v := r;
+   delay <= r.pdelay;
 
-    v.rden      := '0';
-    
-    if timingI.strobe = '1' then
-      v.rden   := '1';
-      v.rdaddr(NPartitions) := timingI.pulseId(6 downto 0) - TF_DELAY_G;
-      for ip in 0 to NPartitions-1 loop
-        v.rdaddr(ip) := timingI.pulseId(6 downto 0) - TF_DELAY_G + r.pdelay(ip);
-      end loop;
+   -- Write each timing header into ram buffer
+   U_Ram : entity work.SimpleDualPortRam
+      generic map (
+         DATA_WIDTH_G => 129,
+         ADDR_WIDTH_G => 7)
+      port map (
+         clka                 => clk,
+         ena                  => '1',
+         wea                  => promptTimingHeader.strobe,
+         addra                => promptTimingHeader.pulseId(6 downto 0),
+         dina(63 downto 0)    => promptTimingHeader.pulseId,
+         dina(127 downto 64)  => promptTimingHeader.timeStamp,
+         dina(128)            => promptExperimentMessage.valid,
+         clkb                 => clk,
+         rstb                 => rst,
+         enb                  => r.rden,
+         addrb                => r.rdaddr(EXPERIMENT_PARTITIONS_C),
+         doutb(63 downto 0)   => alignedTimingHeader.pulseId,
+         doutb(127 downto 64) => alignedTimingHeader.timeStamp,
+         doutb(128)           => alignedExperimentMessage.valid);
+   alignedTimingHeader.strobe <= r.rden;
 
-      pvec := exptBusI.message.partitionAddr;
-      if (toXpmBroadcastType(pvec)=PDELAY) then
-        v.pdelay(toIndex(pvec)) := toValue(pvec)(6 downto 0);
+   -- Write each experiment message partition word into ram buffer
+   GEN_PART : for i in 0 to EXPERIMENT_PARTITIONS_C-1 generate
+      U_Ram : entity work.SimpleDualPortRam
+         generic map (
+            DATA_WIDTH_G => 48,
+            ADDR_WIDTH_G => 7,
+            INIT_G       => EXPT_INIT_C)
+         port map (
+            clka  => clk,
+            ena   => '1',
+            wea   => promptTimingHeader.strobe,
+            addra => promptTimingHeader.pulseId(6 downto 0),
+            dina  => promptExperimentMessage.partitionWord(i),
+            clkb  => clk,
+            enb   => '1',
+            addrb => r.rdaddr(i),
+            doutb => alignedExperimentMessage.partitionWord(i));
+   end generate;
+   alignedExperimentMessage.partitionAddr <= promptExperimentMessage.partitionAddr;
+
+   comb : process(r, rst, promptTimingHeader, promptExperimentMessage) is
+      variable v            : RegType;
+      variable delayMessage : ExperimentDelayDataType;
+   begin
+      v := r;
+
+      v.rden := '0';
+
+      if promptTimingHeader.strobe = '1' then
+         v.rden                            := '1';
+         v.rdaddr(EXPERIMENT_PARTITIONS_C) := promptTimingHeader.pulseId(6 downto 0) - TF_DELAY_G;
+         for ip in 0 to EXPERIMENT_PARTITIONS_C-1 loop
+            -- partition words delayed by additional pdelay
+            v.rdaddr(ip) := promptTimingHeader.pulseId(6 downto 0) - TF_DELAY_G + r.pdelay(ip);
+         end loop;
+
+         -- Update pdelay values when partitionAddr indicates new PDELAYs
+         delayMessage := toExperimentDelayType(promptExperimentMessage.partitionAddr);
+         if (delayMessage.valid = '1') then
+            v.pdelay(delayMessage.index) := delayMessage.data
+         end if;
       end if;
-    end if;
 
-    if rst = '1' then
-      v := REG_INIT_C;
-    end if;
+      if rst = '1' then
+         v := REG_INIT_C;
+      end if;
 
-    r_in <= v;
-  end process;
-  
-  seq : process (clk) is
-  begin
-    if rising_edge(clk) then
-      r <= r_in;
-    end if;
-  end process;
+      rin <= v;
+   end process;
+
+   seq : process (clk) is
+   begin
+      if rising_edge(clk) then
+         r <= rin after TPD_G;
+      end if;
+   end process;
 
 end rtl;
