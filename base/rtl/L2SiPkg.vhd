@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver  <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2018-07-20
--- Last update: 2019-09-19
+-- Last update: 2019-09-23
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -21,8 +21,14 @@
 -------------------------------------------------------------------------------
 library ieee;
 use ieee.std_logic_1164.all;
+use ieee.std_logic_unsigned.all;
 
+-- surf
 use work.StdRtlPkg.all;
+use work.AxiStreamPkg.all;
+
+-- lcls-timing-core
+use work.TimingPkg.all;
 
 package L2SiPkg is
 
@@ -51,8 +57,7 @@ package L2SiPkg is
 
 --   function toSlv(message                   : ExperimentMessageType) return slv;
    --function toExperimentMessageType (vector : slv(EXPERIMENT_MESSAGE_BITS_C-1 downto 0)) return ExperimentMessageType;
-   function toExperimentMessageType (msg : TimingExtensionMessageType) return ExperimentMessageType;
-
+   function toExperimentMessageType (timing : TimingExtensionMessageType) return ExperimentMessageType;
 
    ----------------------------------------------------
    -- Event and Timing Header interface
@@ -70,7 +75,7 @@ package L2SiPkg is
 
    function toTimingHeader(timingBus : TimingBusType) return TimingHeaderType;
 
-   constant EVENT_HEADER_VERSION_C : slv(7 downto 0) : toSlv(0, 8);
+   constant EVENT_HEADER_VERSION_C : slv(7 downto 0) := toSlv(0, 8);
    constant L1A_INFO_C             : slv(6 downto 0) := toSlv(12, 7);
 
    type EventHeaderType is record
@@ -89,10 +94,12 @@ package L2SiPkg is
       pulseId     => (others => '0'),
       timeStamp   => (others => '0'),
       count       => (others => '0'),
-      version     => toSlv(EVENT_HEADER_VERSION_C, 8),
+      version     => EVENT_HEADER_VERSION_C,
       partitions  => (others => '0'),
       triggerInfo => (others => '0'),
       payload     => (others => '0'));
+
+   constant EVENT_HEADER_BITS_C : integer := 192;
 
    function toSlv(eventHeader     : EventHeaderType) return slv;
    function toEventHeader (vector : slv) return EventHeaderType;
@@ -151,6 +158,12 @@ package L2SiPkg is
       count   => (others => '0'),
       payload => (others => '0'));
 
+   --  Clear event header -> event data match fifos
+   constant MSG_CLEAR_FIFO_C  : slv(7 downto 0) := toSlv(0,8);
+   --  Communicate delay of pword
+   constant MSG_DELAY_PWORD_C : slv(7 downto 0) := toSlv(1,8);
+   
+
    function toSlv (experimentTransition                  : ExperimentTransitionDataType) return slv;
    function toExperimentTransitionDataType(partitionWord : slv(47 downto 0)) return ExperimentTransitionDataType;
 
@@ -194,10 +207,10 @@ package body L2SiPkg is
    begin
       experiment.valid := timing.valid;
       assignRecord(i, timing.data, experiment.partitionAddr);
-      for j in message.partitionWord'range loop
+      for j in 0 to EXPERIMENT_PARTITIONS_C-1 loop
          assignRecord(i, timing.data, experiment.partitionWord(j));
       end loop;
-      return message;
+      return experiment;
    end function;
 
 
@@ -221,7 +234,7 @@ package body L2SiPkg is
       -- Steal the top 8 bits of puslseId
       -- It is redundant to have these triggerInfo bits here
       -- but software expects it this way
-      assignSlv(i, vector, ite(eventHeader.triggerInfo(15), L1A_INFO_C, eventHeader.triggerInfo(12 downto 6)));
+      assignSlv(i, vector, ite(eventHeader.triggerInfo(15) = '1', L1A_INFO_C, eventHeader.triggerInfo(12 downto 6)));
       i := i+1;
       assignSlv(i, vector, eventHeader.timeStamp);
       assignSlv(i, vector, eventHeader.partitions);
@@ -281,16 +294,16 @@ package body L2SiPkg is
       variable experimentEvent : ExperimentEventDataType := EXPERIMENT_EVENT_DATA_INIT_C;
       variable i               : integer                 := 0;
    begin
-      assignRecord(i, vector, experimentEvent.l0Accept);  -- 0
-      assignRecord(i, vector, experimentEvent.l0Tag);     -- 5:1
+      assignRecord(i, partitionWord, experimentEvent.l0Accept);  -- 0
+      assignRecord(i, partitionWord, experimentEvent.l0Tag);     -- 5:1
       i := i+1;                                           -- 6
-      assignRecord(i, vector, experimentEvent.l0Reject);  -- 7
-      assignRecord(i, vector, experimentEvent.l1Expect);  -- 8
-      assignRecord(i, vector, experimentEvent.l1Accept);  -- 9
-      assignRecord(i, vector, experimentEvent.l1Tag);     --14:10
-      assignRecord(i, vector, experimentEvent.valid);     -- 15
-      assignRecord(i, vector, experimentEvent.count);     -- 39:16
-      assignRecord(i, vector, experimentEvent.payload);   -- 47:40
+      assignRecord(i, partitionWord, experimentEvent.l0Reject);  -- 7
+      assignRecord(i, partitionWord, experimentEvent.l1Expect);  -- 8
+      assignRecord(i, partitionWord, experimentEvent.l1Accept);  -- 9
+      assignRecord(i, partitionWord, experimentEvent.l1Tag);     --14:10
+      assignRecord(i, partitionWord, experimentEvent.valid);     -- 15
+      assignRecord(i, partitionWord, experimentEvent.count);     -- 39:16
+      assignRecord(i, partitionWord, experimentEvent.payload);   -- 47:40
 
       return experimentEvent;
    end function;
@@ -315,14 +328,14 @@ package body L2SiPkg is
       variable i                    : integer                      := 0;
    begin
       i := i+1;
-      assignRecord(i, vector, experimentTransition.l0Tag);
-      assignRecord(i, vector, experimentTransition.header);
+      assignRecord(i, partitionWord, experimentTransition.l0Tag);
+      assignRecord(i, partitionWord, experimentTransition.header);
       i := i+1;
 
-      assignRecord(i, vector, experimentTransition.valid);
+      assignRecord(i, partitionWord, experimentTransition.valid);
       experimentTransition.valid := not experimentTransition.valid;
-      assignRecord(i, vector, experimentTransition.count);
-      assignRecord(i, vector, experimentTransition.payload);
+      assignRecord(i, partitionWord, experimentTransition.count);
+      assignRecord(i, partitionWord, experimentTransition.payload);
       return experimentTransition;
    end function;
 
