@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-07-10
--- Last update: 2019-09-18
+-- Last update: 2019-09-20
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -135,7 +135,7 @@ begin
          -- Update pdelay values when partitionAddr indicates new PDELAYs
          delayMessage := toExperimentDelayType(promptExperimentMessage.partitionAddr);
          if (delayMessage.valid = '1') then
-            v.pdelay(delayMessage.index) := delayMessage.data
+            v.pdelay(delayMessage.index) := delayMessage.data;
          end if;
       end if;
 
