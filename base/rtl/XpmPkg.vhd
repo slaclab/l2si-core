@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2016-03-25
--- Last update: 2019-09-18
+-- Last update: 2019-09-25
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -358,18 +358,18 @@ package XpmPkg is
    constant XPM_ACCEPT_FRAME_INIT_C : XpmAcceptFrameType := (
       strobe    => '0' );
    
-   type XpmL1InputType is record
-      valid      : sl;
-      trigsrc    : slv( 3 downto 0);
-      tag        : slv( 4 downto 0);
-      trigword   : slv( 8 downto 0);
-   end record;
-   type XpmL1InputArray is array (natural range<>) of XpmL1InputType;
-   constant XPM_L1_INPUT_INIT_C : XpmL1InputType := (
-      valid     => '0',
-      trigsrc   => (others=>'0'),
-      tag       => (others=>'0'),
-      trigword  => (others=>'0'));
+--    type XpmL1InputType is record
+--       valid      : sl;
+--       trigsrc    : slv( 3 downto 0);
+--       tag        : slv( 4 downto 0);
+--       trigword   : slv( 8 downto 0);
+--    end record;
+--    type XpmL1InputArray is array (natural range<>) of XpmL1InputType;
+--    constant XPM_L1_INPUT_INIT_C : XpmL1InputType := (
+--       valid     => '0',
+--       trigsrc   => (others=>'0'),
+--       tag       => (others=>'0'),
+--       trigword  => (others=>'0'));
 
 --    type XpmPartitionMsgType is record
 --       l0tag   : slv(4 downto 0);

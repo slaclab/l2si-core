@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver  <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2018-07-20
--- Last update: 2019-09-23
+-- Last update: 2019-09-25
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -141,7 +141,7 @@ package L2SiPkg is
       payload  => (others => '0'));
 
    function toSlv (experimentEvent                  : ExperimentEventDataType) return slv;
-   function toExperimentEventDataType(partitionWord : slv(47 downto 0)) return ExperimentEventDataType;
+   function toExperimentEventDataType(partitionWord : slv(47 downto 0), valid : sl := 'Z') return ExperimentEventDataType;
 
    type ExperimentTransitionDataType is record
       valid   : sl;
@@ -180,6 +180,22 @@ package L2SiPkg is
    function toExperimentDelayType (partitionAddr : slv(31 downto 0)) return ExperimentDelayType;
 
 --   function toTrigVector(message : ExperimentMessageType) return slv;
+
+   type ExperimentL1FeedbackType is record
+      valid      : sl;
+      trigsrc    : slv( 3 downto 0);
+      tag        : slv( 4 downto 0);
+      trigword   : slv( 8 downto 0);
+   end record;
+
+   type ExperimentL1FeedbackArray is array (natural range<>) of ExperimentL1FeedbackType;
+   
+   constant EXPERIMENT_L1_FEEDBACK_INIT_C : ExperimentL1FeedbackType := (
+      valid     => '0',
+      trigsrc   => (others=>'0'),
+      tag       => (others=>'0'),
+      trigword  => (others=>'0'));
+
 
 end package L2SiPkg;
 
@@ -290,7 +306,7 @@ package body L2SiPkg is
       return vector;
    end function;
 
-   function toExperimentEventDataType(partitionWord : slv(47 downto 0)) return ExperimentEventDataType is
+   function toExperimentEventDataType(partitionWord : slv(47 downto 0), valid : sl := 'Z') return ExperimentEventDataType is
       variable experimentEvent : ExperimentEventDataType := EXPERIMENT_EVENT_DATA_INIT_C;
       variable i               : integer                 := 0;
    begin
@@ -301,7 +317,7 @@ package body L2SiPkg is
       assignRecord(i, partitionWord, experimentEvent.l1Expect);  -- 8
       assignRecord(i, partitionWord, experimentEvent.l1Accept);  -- 9
       assignRecord(i, partitionWord, experimentEvent.l1Tag);     --14:10
-      assignRecord(i, partitionWord, experimentEvent.valid);     -- 15
+      assignRecord(i, partitionWord, ite(valid='Z', experimentEvent.valid, valid));     -- 15
       assignRecord(i, partitionWord, experimentEvent.count);     -- 39:16
       assignRecord(i, partitionWord, experimentEvent.payload);   -- 47:40
 

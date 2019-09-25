@@ -36,11 +36,11 @@ entity EventHeaderCache2 is
       TPD_G : time := 1 ns);
 
    port (
-      timingClk : in sl;
-      timingRst : in sl;
+      timingRxClk : in sl;
+      timingRxRst : in sl;
 
       -- AXI Lite bus for configuration and status
-      -- This needs to be sync'd to timingClk
+      -- This needs to be sync'd to timingRxClk
       axilReadMaster  : in  AxiLiteReadMasterType;
       axilReadSlave   : out AxiLiteReadSlaveType;
       axilWriteMaster : in  AxiLiteWriteMasterType;
@@ -48,16 +48,23 @@ entity EventHeaderCache2 is
 
 
       -- Prompt header and event bus
-      promptTimingHeader      : in TimingHeaderType;
+      promptTimingStrobe      : in sl;
+      promptTimingMessage     : in TimingMessageType;
       promptExperimentMessage : in ExperimentMessageType;
 
       -- Aligned header and event bus
-      alignedTimingHeader      : in  TimingHeaderType;
-      alignedExperimentMessage : in  ExperimentMessageType;
-      almostFull               : out sl;
-      overflow                 : out sl;
+      alignedTimingStrobe      : in sl;
+      alignedTimingMessage     : in TimingMessageType;
+      alignedExperimentMessage : in ExperimentMessageType;
+
+      -- Feedback
+      partition : out slv(2 downto 0);
+      full      : out sl;
+      overflow  : out sl;
 
       -- Trigger output
+      triggerClk  : in  sl;
+      triggerRst  : in  sl;
       triggerData : out ExperimentEventDataType;
 
       -- Event/Transition output
@@ -135,7 +142,7 @@ begin
          SLAVE_AXI_CONFIG_G  => EVENT_AXIS_CONFIG_C,
          MASTER_AXI_CONFIG_G => EVENT_AXIS_CONFIG_C)
       port map (
-         sAxisClk        => timingClk,          -- [in]
+         sAxisClk        => timingRxClk,        -- [in]
          sAxisRst        => r.fifoRst,          -- [in]
          sAxisMaster     => r.fifoAxisMaster,   -- [in]
          sAxisSlave      => fifoAxisSlave,      -- [out]
@@ -147,13 +154,14 @@ begin
          mAxisMaster     => eventAxisMaster,    -- [out]
          mAxisSlave      => eventAxisSlave);    -- [in]
 
-   almostFull <= fifoAxisCtrl.pause;
+   full <= fifoAxisCtrl.pause or eventAxisCtrl.pause;
 
-   comb : process (alignedTimingHeader, axilReadMaster, axilWriteMaster, fifoAxisCtrl,
-                   fifoAxisSlave, promptExperimentMessage, promptTimingHeader, r, timingRst) is
+   comb : process (alignedExperimentMessage, alignedTimingMessage, alignedTimingStrobe,
+                   axilReadMaster, axilWriteMaster, fifoAxisCtrl, promptExperimentMessage,
+                   promptTimingStrobe, r, timingRxRst) is
       variable v              : RegType;
       variable axilEp         : AxiLiteEndpointType;
-      variable partition      : integer;
+      variable partitionV     : integer;
       variable eventData      : ExperimentEventDataType;
       variable transitionData : ExperimentTransitionDataType;
       variable tmpEventData   : ExperimentEventDataType;
@@ -162,20 +170,20 @@ begin
    begin
       v := r;
 
-      partition := conv_integer(r.partition);
+      partitionV := conv_integer(r.partition);
 
       v.fifoRst := '0';
 
-      -- Check if data is accepted
---       if (fifoAxisSlave.tReady = '1') then
---          v.fifoAxisMaster.tValid := '0';
---       end if;
+      v.fifoAxisMaster.tValid := '0';
 
+      --------------------------------------------
+      -- Trigger output logic
       -- Watch for and decode triggers on prompt interface
       -- Output on triggerData interface
+      --------------------------------------------
       v.triggerData.valid := '0';
-      if (promptTimingHeader.strobe = '1' and promptExperimentMessage.valid = '1') then
-         v.triggerData := toExperimentEventDataType(promptExperimentMessage.partitionWord(partition));
+      if (promptTimingStrobe = '1' and promptExperimentMessage.valid = '1') then
+         v.triggerData := toExperimentEventDataType(promptExperimentMessage.partitionWord(partitionV));
 
          -- Count time since last event
          v.messageDelay(0) := r.messageDelay(0) + 1;
@@ -189,13 +197,16 @@ begin
          end if;
       end if;
 
+      --------------------------------------------
+      -- Event/Transition logic
       -- Watch for events/transitions on aligned interface
       -- Place entries into FIFO
-      if (alignedTimingHeader.strobe = '1' and alignedExperimentMessage.valid = '1') then
+      --------------------------------------------
+      if (alignedTimingStrobe = '1' and alignedExperimentMessage.valid = '1') then
          -- Decode event data from configured partitionWord
          -- Decode as both event and transition and use the .valid field to determine which one to use
-         eventData      := toExperimentEventDataType(alignedExperimentMessage.partitionWord(partition));
-         transitionData := toExperimentTransitionDataType(alignedExperimentMessage.partitionWord(partition));
+         eventData      := toExperimentEventDataType(alignedExperimentMessage.partitionWord(partitionV));
+         transitionData := toExperimentTransitionDataType(alignedExperimentMessage.partitionWord(partitionV));
 
          -- Pass on events with l0Accept
          -- Pass on transitions
@@ -206,17 +217,17 @@ begin
             streamValid := '0';
          end if;
 
-         -- Latch time since last event
+         -- Latch delay between prompt and aligned (should match the configured delay)
          if (eventData.valid = '1') then
             v.messageDelay(1) := r.messageDelay(0);
          end if;
 
          -- Create the EventHeader from timing and event data
-         eventHeader.pulseId     := alignedTimingHeader.pulseId;
-         eventHeader.timeStamp   := alignedTimingHeader.timeStamp;
+         eventHeader.pulseId     := alignedTimingMessage.pulseId;
+         eventHeader.timeStamp   := alignedTimingMessage.timeStamp;
          eventHeader.count       := eventData.count;
          eventHeader.payload     := eventData.payload;
-         eventHeader.triggerInfo := alignedExperimentMessage.partitionWord(partition)(15 downto 0);  -- Fix this uglyness later
+         eventHeader.triggerInfo := alignedExperimentMessage.partitionWord(partitionV)(15 downto 0);  -- Fix this uglyness later
          eventHeader.partitions  := (others => '0');
          for i in 0 to 7 loop
             tmpEventData              := toExperimentEventDataType(alignedExperimentMessage.partitionWord(i));
@@ -226,6 +237,7 @@ begin
          -- Place the EventHeader into an AXI-Stream transaction
          if (streamValid = '1') then
             if (fifoAxisCtrl.pause = '0') then
+               v.fifoAxisMaster.tValid                                := '1';
                v.fifoAxisMaster.tdata(EVENT_HEADER_BITS_C-1 downto 0) := toSlv(eventHeader);
                v.fifoAxisMaster.tDest(0)                              := transitionData.valid;
                v.fifoAxisMaster.tLast                                 := '1';
@@ -279,7 +291,7 @@ begin
 
       axiSlaveDefault(axilEp, v.axilWriteSlave, v.axilReadSlave, AXI_RESP_DECERR_C);
 
-      if (timingRst = '1') then
+      if (timingRxRst = '1') then
          v := REG_INIT_C;
       end if;
 
@@ -287,19 +299,40 @@ begin
 
       axilWriteSlave <= r.axilWriteSlave;
       axilReadSlave  <= r.axilReadSlave;
-      triggerData    <= r.triggerData;
-      overflow       <= r.overflow;
+      partition      <= r.partition;
+
+      overflow <= r.overflow;
 
 
    end process comb;
 
-   seq : process (timingClk) is
+   seq : process (timingRxClk) is
    begin
-      if (rising_edge(timingClk)) then
+      if (rising_edge(timingRxClk)) then
          r <= rin after TPD_G;
       end if;
    end process seq;
 
+   -----------------------------------------------
+   -- Synchronize trigger data to trigger clock
+   -----------------------------------------------
+   triggerDataSlv <= toSlv(r.triggerData);
+   U_SynchronizerFifo_1 : entity work.SynchronizerFifo
+      generic map (
+         TPD_G        => TPD_G,
+         COMMON_CLK_G => false,
+--         BRAM_EN_G     => BRAM_EN_G,
+         DATA_WIDTH_G => 48)
+      port map (
+         rst    => timingRxRst,           -- [in]
+         wr_clk => timingRxClk,           -- [in]
+         wr_en  => r.triggerData.valid,   -- [in]
+         din    => triggerDataSlv,        -- [in]
+         rd_clk => triggerClk,            -- [in]
+         rd_en  => syncTriggerDataValid,  -- [in]
+         valid  => syncTriggerDataValid,  -- [out]
+         dout   => syncTriggerDataSlv);   -- [out]
+   triggerData <= toExperimentEventDataType(syncTriggerDataSlv, syncTriggerDataValid);
 
 
 end architecture rtl;

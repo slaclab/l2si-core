@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-07-08
--- Last update: 2019-05-26
+-- Last update: 2019-09-25
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -30,145 +30,176 @@ use work.TimingPkg.all;
 use work.XpmPkg.all;
 
 entity XpmTimingFb is
-   generic ( DEBUG_G : boolean := false );
+   generic (
+      TPD_G           : time                 := 1 ns;
+      NUM_DETECTORS_G : integer range 1 to 8 := 8);
    port (
-      clk            : in  sl;
-      rst            : in  sl;
-      pllReset       : in  sl := '0';
-      phyReset       : in  sl := '0';
-      id             : in  slv(31 downto 0) := (others=>'1');
-      l1input        : in  XpmL1InputArray(NPartitions-1 downto 0);
-      full           : in  slv            (NPartitions-1 downto 0);
-      l1ack          : out slv            (NPartitions-1 downto 0);
-      phy            : out TimingPhyType );
+      clk                : in  sl;
+      rst                : in  sl;
+      pllReset           : in  sl               := '0';
+      phyReset           : in  sl               := '0';
+      id                 : in  slv(31 downto 0) := (others => '1');
+      detectorPartitions : in  slv3Array(NUM_DETECTORS_G-1 downto 0);
+      full               : in  slv(NUM_DETECTORS_G-1 downto 0);
+      overflow           : in  slv(NUM_DETECTORS_G-1 downto 0);
+      l1Feedbacks        : in  ExperimentL1FeedbackArray(NUM_DETECTORS_G-1 downto 0);
+      l1Acks             : out slv(NUM_DETECTORS_G-1 downto 0);
+      phy                : out TimingPhyType);
 end XpmTimingFb;
 
 architecture rtl of XpmTimingFb is
 
-  type StateType is (IDLE_S, PFULL_S, ID1_S, ID2_S, PDATA1_S, PDATA2_S, EOF_S);
-  
-  constant MAX_IDLE_C : slv(7 downto 0) := x"0F";
+   type StateType is (IDLE_S, PFULL_S, ID1_S, ID2_S, PDATA1_S, PDATA2_S, EOF_S);
 
-  type RegType is record
-    state             : StateType;
-    idleCnt           : slv(MAX_IDLE_C'range);
-    txData            : slv(15 downto 0);
-    txDataK           : slv( 1 downto 0);
-    full              : slv(NPartitions-1 downto 0);
-    strobe            : slv(NPartitions-1 downto 0);
-    ready             : sl;
-    partition         : integer range 0 to NPartitions-1;
-  end record;
+   constant MAX_IDLE_C : slv(7 downto 0) := x"0F";
 
-  constant REG_INIT_C : RegType := (
-    state             => IDLE_S,
-    idleCnt           => (others=>'0'),
-    txData            => (D_215_C & K_COM_C),
-    txDataK           => "01",
-    full              => (others=>'1'),
-    strobe            => (others=>'0'),
-    ready             => '0',
-    partition         => 0 );
+   type RegType is record
+      ready        : sl;
+      state        : StateType;
+      idleCnt      : slv(MAX_IDLE_C'range);
+      partition    : integer range 0 to NUM_DETECTORS_G-1;
+      lastFull     : slv(NUM_DETECTORS_G-1 downto 0);
+      lastOverflow : slv(NUM_DETECTORS_G-1 downto 0);
+      l1Ack        : slv(NUM_DETECTORS_G-1 downto 0);
+      txData       : slv(15 downto 0);
+      txDataK      : slv(1 downto 0);
+   end record;
 
-  signal r   : RegType := REG_INIT_C;
-  signal rin : RegType;
+   constant REG_INIT_C : RegType := (
+      ready        => '0',
+      state        => IDLE_S,
+      idleCnt      => (others => '0'),
+      detector     => 0,
+      lastFull     => (others => '1'),
+      lastOverflow => (others => '0'),
+      l1Ack        => (others => '0'),
+      txData       => (D_215_C & K_COM_C),
+      txDataK      => "01");
+
+   signal r   : RegType := REG_INIT_C;
+   signal rin : RegType;
+
 
 begin
 
-  l1ack       <= r.strobe;
-  phy.data    <= r.txData;
-  phy.dataK   <= r.txDataK;
-  phy.control.pllReset    <= pllReset;
-  phy.control.reset       <= phyReset;
-  phy.control.inhibit     <= '0';
-  phy.control.polarity    <= '0';
-  phy.control.bufferByRst <= '0';
-  
-  comb: process (r, full, l1input, rst, id) is
-    variable v : RegType;
-  begin
-    v := r;
+   l1Ack                   <= r.l1Ack;
+   phy.data                <= r.txData;
+   phy.dataK               <= r.txDataK;
+   phy.control.pllReset    <= pllReset;
+   phy.control.reset       <= phyReset;
+   phy.control.inhibit     <= '0';
+   phy.control.polarity    <= '0';
+   phy.control.bufferByRst <= '0';
 
-    v.txDataK := "01";
-    v.strobe  := (others=>'0');
-    v.ready   := '0';
-    
-    if (r.full/=full) then
-      v.ready := '1';
-    end if;
-    if (r.idleCnt=MAX_IDLE_C) then
-      v.ready := '1';
-    end if;
-    for i in 0 to NPartitions-1 loop
-      if l1input(i).valid='1' then
-        v.ready := '1';
+   comb : process (r, full, l1input, rst, id) is
+      variable v                 : RegType;
+      variable partitionFull     : slv(EXPERIMENT_PARTITIONS_C-1 downto 0);
+      variable partitionOverflow : slv(EXPERIMENT_PARTITIONS_C-1 downto 0);
+
+   begin
+      v := r;
+
+      v.txDataK := "01";
+      v.l1Acks  := (others => '0');
+      v.ready   := '0';
+
+      -- Full and overflow arrive per DETECTOR
+      -- reorganize them according to partition
+      for i in EXPERIMENT_PARTITIONS_C-1 downto 0 loop
+         for j in NUM_DETECTORS_G-1 downto 0 loop
+            if (full(j) = '1') then
+               partitionFull(i) := '1';
+            end if;
+            if (overflow(j) = '1') then
+               partitionOverflow(i) = '1';
+            end if;
+         end loop;
+      end loop;
+
+
+      if (r.lastFull /= partitionOverflow) or (r.lastOverflow /= partitionOverflow) then
+         v.ready := '1';
       end if;
-    end loop;
-    
-    case (r.state) is
-      when IDLE_S =>
-        v.idleCnt := r.idleCnt+1;
-        if (r.ready='1') then
-          v.idleCnt := (others=>'0');
-          v.txData  := D_215_C & K_EOS_C;
-          v.state   := PFULL_S;
-        else
-          v.txData  := D_215_C & K_COM_C;
-        end if;
-      when PFULL_S =>
-        v.txDataK := "00";
-        v.txData  := (others=>'0');
-        v.txData(full'range) := full;
-        v.full := full;
-        v.state   := ID1_S;
-      when ID1_S =>
-        v.txDataK := "00";
-        v.txData  := id(15 downto 0);
-        v.state   := ID2_S;
-      when ID2_S =>
-        v.txDataK := "00";
-        v.txData  := id(31 downto 16);
-        v.state   := EOF_S;
-        v.partition := 0;
-        for i in 0 to NPartitions-1 loop
-          if (l1input(i).valid='1') then
-            v.partition := i;
-            v.state     := PDATA1_S;
-          end if;
-        end loop;
-      when PDATA1_S =>
-        v.txDataK := "00";
-        v.txData             := (others=>'0');
-        v.txData(7 downto 4) := l1input(r.partition).trigsrc;
-        v.txData(3 downto 0) := toSlv(r.partition,4);
-        v.state   := PDATA2_S;
-      when PDATA2_S =>
-        v.txDataK := "00";
-        v.txData              := (others=>'0');
-        v.txData(14)          := '1';
-        v.txData(13 downto 5) := l1input(r.partition).trigword;
-        v.txData( 4 downto 0) := l1input(r.partition).tag;
-        v.strobe(r.partition) := '1';
-        v.state   := PFULL_S;
-      when EOF_S =>
-        v.txData  := D_215_C & K_EOF_C;
-        v.state   := IDLE_S;
-      when others => null;
-    end case;
+      if (r.idleCnt = MAX_IDLE_C) then
+         v.ready := '1';
+      end if;
+      for i in 0 to NUM_DETECTORS_G loop
+         if l1Feedbacks(i).valid = '1' then
+            v.ready := '1';
+         end if;
+      end loop;
 
-    if (rst='1') then
-      v := REG_INIT_C;
-    end if;
-    
-    rin <= v;
+      case (r.state) is
+         when IDLE_S =>
+            v.idleCnt := r.idleCnt+1;
+            if (r.ready = '1') then
+               v.idleCnt := (others => '0');
+               v.txData  := D_215_C & K_EOS_C;
+               v.state   := PFULL_S;
+            else
+               v.txData := D_215_C & K_COM_C;
+            end if;
+         when PFULL_S =>
+            v.txDataK             := "00";
+            v.txData              := (others => '0');
+            v.txData(7 downto 0)  := partitionFull;
+            v.txData(15 downto 8) := partitionOverflow;
+            v.lastFull            := partitionFull;
+            v.lastOverflow        := partitionOverflow;
+            v.state               := ID1_S;
+         when ID1_S =>
+            v.txDataK := "00";
+            v.txData  := id(15 downto 0);
+            v.state   := ID2_S;
+         when ID2_S =>
+            v.txDataK  := "00";
+            v.txData   := id(31 downto 16);
+            v.state    := EOF_S;
+            v.detector := 0;
+            v.state    := PDATA1_S;
 
-  end process comb;
+         when PDATA1_S =>
+            v.txDataK            := "00";
+            v.txData             := (others => '0');
+            v.txData(7 downto 4) := l1Feedbacks(r.detector).trigsrc;
+            v.txData(3 downto 1) := detectorPartitions(r.detector);
+            v.txData(0)          := l1Feedbacks(r.detector).valid;
+            v.state              := PDATA2_S;
+         when PDATA2_S =>
+            v.txDataK             := "00";
+            v.txData              := (others => '0');
+            v.txData(13 downto 5) := l1Feedbacks(r.detector).trigword;
+            v.txData(4 downto 0)  := l1Feedbacks(r.detector).tag;
+            v.l1Acks(r.detector)  := '1';  -- Ack the feedback message
 
-  seq : process (clk) is
-  begin
-    if (rising_edge(clk)) then
-      r <= rin;
-    end if;
-  end process seq;
+            -- Done after iterating through all detectors
+            if (r.detector = NUM_DETECTORS_G-1) then
+               v.detector := 0;
+               v.state    := EOF_S;
+            else
+               v.detector := r.detector + 1;
+               v.state    := PDATA1_S;
+            end if;
+
+         when EOF_S =>
+            v.txData := D_215_C & K_EOF_C;
+            v.state  := IDLE_S;
+         when others => null;
+      end case;
+
+      if (rst = '1') then
+         v := REG_INIT_C;
+      end if;
+
+      rin <= v;
+
+   end process comb;
+
+   seq : process (clk) is
+   begin
+      if (rising_edge(clk)) then
+         r <= rin;
+      end if;
+   end process seq;
 
 end rtl;
