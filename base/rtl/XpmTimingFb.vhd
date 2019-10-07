@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-07-08
--- Last update: 2019-09-25
+-- Last update: 2019-10-07
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -111,7 +111,7 @@ begin
                partitionFull(i) := '1';
             end if;
             if (overflow(j) = '1') then
-               partitionOverflow(i) = '1';
+               partitionOverflow(i) := '1';
             end if;
          end loop;
       end loop;
