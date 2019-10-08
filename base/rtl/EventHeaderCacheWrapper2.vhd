@@ -28,14 +28,15 @@ use work.TimingPkg.all;
 -- l2si
 use work.L2SiPkg.all;
 
-
-
 entity EventHeaderCacheWrapper2 is
 
    generic (
-      TPD_G           : time                 := 1 ns;
-      NUM_DETECTORS_G : integer range 1 to 8 := 8);
-
+      TPD_G                          : time                 := 1 ns;
+      NUM_DETECTORS_G                : integer range 1 to 8 := 8;
+      AXIL_BASE_ADDR_G               : slv(31 downto 0)     := (others => '0');
+      L1_CLK_IS_TIMING_TX_CLK_G      : boolean              := false;
+      TRIGGER_CLK_IS_TIMING_RX_CLK_G : boolean              := false;
+      EVENT_CLK_IS_TIMING_RX_CLK_G   : boolean              := false);
    port (
       -- Timing Rx interface
       timingRxClk : in sl;
@@ -45,26 +46,26 @@ entity EventHeaderCacheWrapper2 is
       -- Timing Tx Feedback
       timingTxClk : in  sl;
       timingTxRst : in  sl;
-      timingPhy   : out TimingPhyType;
+      timingTxPhy : out TimingPhyType;
 
       -- Triggers 
-      triggerClk : in  sl;
-      triggerRst : in  sl;
-      triggers   : out ExperimentEventDataArray(NUM_DETECTORS_G-1 downto 0);
+      triggerClk  : in  sl;
+      triggerRst  : in  sl;
+      triggerData : out ExperimentEventDataArray(NUM_DETECTORS_G-1 downto 0);
 
       -- L1 trigger feedback
-      l1Clk       : in  sl;
-      l1Rst       : in  sl;
-      l1Feedbacks : in  ExperimentL1FeedbackArray(NUM_DETECTORS_G-1 downto 0);
+      l1Clk       : in  sl                                                    := '0';
+      l1Rst       : in  sl                                                    := '0';
+      l1Feedbacks : in  ExperimentL1FeedbackArray(NUM_DETECTORS_G-1 downto 0) := (others => EXPERIMENT_L1_FEEDBACK_INIT_C);
       l1Acks      : out slv(NUM_DETECTORS_G-1 downto 0);
 
-      -- Output Streams and triggers
-      eventClk           : in  sl;
-      eventRst           : in  sl;
-      eventTimingMessage : out TimingMessageArray(NUM_DETECTORS_G-1 downto 0);
-      eventAxisMasters   : out AxiStreamMasterArray(NUM_DETECTORS_G-1 downto 0);
-      eventAxisSlaves    : in  AxiStreamSlaveArray(NUM_DETECTORS_G-1 downto 0);
-      eventAxisCtrl      : in  AxiStreamCtrlArray(NUM_DETECTORS_G-1 downto 0);
+      -- Output Streams
+      eventClk            : in  sl;
+      eventRst            : in  sl;
+      eventTimingMessages : out TimingMessageArray(NUM_DETECTORS_G-1 downto 0);
+      eventAxisMasters    : out AxiStreamMasterArray(NUM_DETECTORS_G-1 downto 0);
+      eventAxisSlaves     : in  AxiStreamSlaveArray(NUM_DETECTORS_G-1 downto 0);
+      eventAxisCtrl       : in  AxiStreamCtrlArray(NUM_DETECTORS_G-1 downto 0);
 
       -- AXI-Lite
       axilClk         : in  sl;
@@ -78,10 +79,44 @@ end entity EventHeaderCacheWrapper2;
 
 architecture rtl of EventHeaderCacheWrapper2 is
 
+   constant AXIL_MASTERS_C : integer                              := 9;
+   constant AXIL_REALIGN_C : integer                              := 0;
+   constant AXIL_EHC_C     : IntegerArray(0 to NUM_DETECTORS_G-1) := list(1, NUM_DETECTORS_G, 1);
+
+   constant AXIL_XBAR_CONFIG_C : AxiLiteCrossbarMasterConfigArray(AXIL_MASTERS_C-1 downto 0) := genAxiLiteConfig(AXIL_MASTERS_C, AXIL_BASE_ADDR_G, 12, 8);
+
+                                        -- Axi bus sync'd to timingClk
+   signal timingAxilReadMaster  : AxiLiteReadMasterType;
+   signal timingAxilReadSlave   : AxiLiteReadSlaveType;
+   signal timingAxilWriteMaster : AxiLiteWriteMasterType;
+   signal timingAxilWriteSlave  : AxiLiteWriteSlaveType;
+
+   -- Fanned out Axi bus
+   signal locAxilReadMasters  : AxiLiteReadMasterArray(AXIL_MASTERS_C-1 downto 0);
+   signal locAxilReadSlaves   : AxiLiteReadSlaveArray(AXIL_MASTERS_C-1 downto 0)  := (others => AXI_LITE_READ_SLAVE_EMPTY_DECERR_C);
+   signal locAxilWriteMasters : AxiLiteWriteMasterArray(AXIL_MASTERS_C-1 downto 0);
+   signal locAxilWriteSlaves  : AxiLiteWriteSlaveArray(AXIL_MASTERS_C-1 downto 0) := (others => AXI_LITE_WRITE_SLAVE_EMPTY_DECERR_C);
+
+   -- Experiment message
+   signal experimentMessage : ExperimentMessageType;
+
+   -- Aligner outputs
+   signal xpmId                    : slv(31 downto 0);
+   signal alignedTimingStrobe      : sl;
+   signal alignedTimingMessage     : TimingMessageType;
+   signal alignedExperimentMessage : ExperimentMessageType;
+
+   -- Event header cache outputs
+   signal detectorPartitions : slv3array(NUM_DETECTORS_G-1 downto 0);
+   signal full               : slv(NUM_DETECTORS_G-1 downto 0);
+   signal overflow           : slv(NUM_DETECTORS_G-1 downto 0);
+
+
    -----------------------------------------------
-   -- SLV conversion functions for synchronization
+   -- SLV conversion constnants, functions and signals for synchronization
    -----------------------------------------------
-   constant FB_SYNC_VECTOR_BITS_C : integer := 32 + (3 * NUM_DETECTORS_G) + (2 * NUM_DETECTORS_G) - 1 downto 0);
+   constant FB_SYNC_VECTOR_BITS_C : integer := 32 + (3 * NUM_DETECTORS_G) + (2 * NUM_DETECTORS_G);
+
    function toSlv (
       xpmId              : slv(31 downto 0);
       detectorPartitions : slv3Array(NUM_DETECTORS_G-1 downto 0);
@@ -102,20 +137,40 @@ architecture rtl of EventHeaderCacheWrapper2 is
    end function;
 
    procedure fromSlv (
-      vector             : in  slv(FB_SYNC_VECTOR_BITS_C-1 downto 0);
-      xpmId              : out slv(31 downto 0);
-      detectorPartitions : out slv3Array(NUM_DETECTORS_G-1 downto 0);
-      full               : out slv(NUM_DETECTORS_G-1 downto 0);
-      overflow           : out slv(NUM_DETECTORS_G-1 downto 0)) is
-      variable i : integer := 0;
+      signal vector             : in  slv(FB_SYNC_VECTOR_BITS_C-1 downto 0);
+      signal xpmId              : out slv(31 downto 0);
+      signal detectorPartitions : out slv3Array(NUM_DETECTORS_G-1 downto 0);
+      signal full               : out slv(NUM_DETECTORS_G-1 downto 0);
+      signal overflow           : out slv(NUM_DETECTORS_G-1 downto 0)) is
+      variable i           : integer := 0;
+      variable xpmIdTmp    : slv(31 downto 0);
+      variable dpTmp      : slv3array(NUM_DETECTORS_G-1 downto 0);
+      variable fullTmp     : slv(NUM_DETECTORS_G-1 downto 0);
+      variable overflowTmp : slv(NUM_DETECTORS_G-1 downto 0);
    begin
-      assignRecord(i, vector, xpmId);
+      assignRecord(i, vector, xpmIdTmp);
       for j in 0 to NUM_DETECTORS_G-1 loop
-         assignRecord(i, vector, detectorPartitions(j));
+         assignRecord(i, vector, dpTmp(j));
       end loop;
-      assignRecord(i, vector, full);
-      assignRecord(i, vector, overflow);
+      assignRecord(i, vector, fullTmp);
+      assignRecord(i, vector, overflowTmp);
+      
+      xpmId              <= xpmIdTmp;
+      detectorPartitions <= dpTmp;
+      full               <= fullTmp;
+      overflow           <= overflowTmp;
    end procedure fromSlv;
+
+   signal timingRxtoTimingTxSyncSlvIn  : slv(FB_SYNC_VECTOR_BITS_C-1 downto 0);
+   signal timingRxtoTimingTxSyncSlvOut : slv(FB_SYNC_VECTOR_BITS_C-1 downto 0);
+
+   signal xpmIdSync              : slv(31 downto 0);
+   signal detectorPartitionsSync : slv3array(NUM_DETECTORS_G-1 downto 0);
+   signal fullSync               : slv(NUM_DETECTORS_G-1 downto 0);
+   signal overflowSync           : slv(NUM_DETECTORS_G-1 downto 0);
+
+   signal l1FeedbacksSync : ExperimentL1FeedbackArray(NUM_DETECTORS_G-1 downto 0);
+   signal l1AcksTx        : slv(NUM_DETECTORS_G-1 downto 0);
 
 
 begin
@@ -128,7 +183,7 @@ begin
          TPD_G => TPD_G)
       port map (
          sAxiClk         => axilClk,                -- [in]
-         sAxiClkRst      => axilClkRst,             -- [in]
+         sAxiClkRst      => axilRst,                -- [in]
          sAxiReadMaster  => axilReadMaster,         -- [in]
          sAxiReadSlave   => axilReadSlave,          -- [out]
          sAxiWriteMaster => axilWriteMaster,        -- [in]
@@ -168,7 +223,7 @@ begin
    U_EventRealign_1 : entity work.EventRealign
       generic map (
          TPD_G      => TPD_G,
-         TF_DELAY_G => TF_DELAY_G)
+         TF_DELAY_G => 100)
       port map (
          clk                      => timingRxClk,                          -- [in]
          rst                      => timingRxRst,                          -- [in]
@@ -188,31 +243,34 @@ begin
    GEN_DETECTORS : for i in NUM_DETECTORS_G-1 downto 0 generate
       U_EventHeaderCache2_1 : entity work.EventHeaderCache2
          generic map (
-            TPD_G => TPD_G)
+            TPD_G                          => TPD_G,
+            TRIGGER_CLK_IS_TIMING_RX_CLK_G => TRIGGER_CLK_IS_TIMING_RX_CLK_G,
+            EVENT_CLK_IS_TIMING_RX_CLK_G   => EVENT_CLK_IS_TIMING_RX_CLK_G)
          port map (
-            timingRxClk              => timingRxClk,               -- [in]
-            timingRxRst              => timingRxRst,               -- [in]
-            axilReadMaster           => locAxilReadMasters(i),     -- [in]
-            axilReadSlave            => locAxilReadSlaves(i),      -- [out]
-            axilWriteMaster          => locAxilWriteMasters(i),    -- [in]
-            axilWriteSlave           => locAxilWriteSlaves(i),     -- [out]
-            promptTimingStrobe       => timingBus.strobe,          -- [in]            
-            promptTimingMessage      => timingBus.message,         -- [in]
-            promptExperimentMessage  => experimentMessage,         -- [in]
-            alignedTimingstrobe      => alignedTimingStrobe,       -- [in]
-            alignedTimingMessage     => alignedTimingMessage       -- [in]
-            alignedExperimentMessage => alignedExperimentMessage,  -- [in]
-            detectorPartitions       => detectorPartitions(i)      -- [out]
-            full                     => full(i),                   -- [out]
-            overflow                 => overflow(i),               -- [out]
-            triggerClk               => triggerClk,                -- [in]
-            triggerRst               => triggerRst,                -- [in]
-            triggerData              => triggerData,               -- [out]
-            eventClk                 => eventClk,                  -- [in]
-            eventRst                 => eventRst,                  -- [in]
-            eventAxisMaster          => eventAxisMaster(i),        -- [out]
-            eventAxisSlave           => eventAxisSlave(i),         -- [in]
-            eventAxisCtrl            => eventAxisCtrl(i));         -- [in]
+            timingRxClk              => timingRxClk,                         -- [in]
+            timingRxRst              => timingRxRst,                         -- [in]
+            axilReadMaster           => locAxilReadMasters(AXIL_EHC_C(i)),   -- [in]
+            axilReadSlave            => locAxilReadSlaves(AXIL_EHC_C(i)),    -- [out]
+            axilWriteMaster          => locAxilWriteMasters(AXIL_EHC_C(i)),  -- [in]
+            axilWriteSlave           => locAxilWriteSlaves(AXIL_EHC_C(i)),   -- [out]
+            promptTimingStrobe       => timingBus.strobe,                    -- [in]            
+            promptTimingMessage      => timingBus.message,                   -- [in]
+            promptExperimentMessage  => experimentMessage,                   -- [in]
+            alignedTimingstrobe      => alignedTimingStrobe,                 -- [in]
+            alignedTimingMessage     => alignedTimingMessage,                -- [in]
+            alignedExperimentMessage => alignedExperimentMessage,            -- [in]
+            partition                => detectorPartitions(i),               -- [out]
+            full                     => full(i),                             -- [out]
+            overflow                 => overflow(i),                         -- [out]
+            triggerClk               => triggerClk,                          -- [in]
+            triggerRst               => triggerRst,                          -- [in]
+            triggerData              => triggerData(i),                      -- [out]
+            eventClk                 => eventClk,                            -- [in]
+            eventRst                 => eventRst,                            -- [in]
+            eventTimingMessage       => eventTimingMessages(i),              -- [out]
+            eventAxisMaster          => eventAxisMasters(i),                 -- [out]
+            eventAxisSlave           => eventAxisSlaves(i),                  -- [in]
+            eventAxisCtrl            => eventAxisCtrl(i));                   -- [in]
    end generate GEN_DETECTORS;
 
 
@@ -220,8 +278,6 @@ begin
    -- Send almost full and overflow data back upstream
    -----------------------------------------------
    -- Synchronize to transmit clock
-   -- Use 1 wide Synchronizer Fifo
-   -- It's nice to keep everything aligned
    timingRxToTimingTxSyncSlvIn <= toSlv(xpmId, detectorPartitions, full, overflow);
    U_SynchronizerFifo_xpmId : entity work.SynchronizerFifo
       generic map (
@@ -236,16 +292,20 @@ begin
          rd_clk => timingTxClk,                    -- [in]
          dout   => timingRxToTimingTxSyncSlvOut);  -- [out]
 
-   conv_slv : process () is
+   conv_slv : process (timingRxToTimingTxSyncSlvOut) is
    begin
       fromSlv(timingRxToTimingTxSyncSlvOut, xpmIdSync, detectorPartitionsSync, fullSync, overflowSync);
    end process conv_slv;
 
+   -----------------------------------------------
+   -- Synchronize l1Feedbacks from l1Clk to timingTxClk
+   -----------------------------------------------
    l1_sync_gen : for i in 0 to NUM_DETECTORS_G-1 generate
       U_Synchronizer_1 : entity work.Synchronizer
          generic map (
-            TPD_G    => TPD_G,
-            STAGES_G => 3)
+            TPD_G         => TPD_G,
+            BYPASS_SYNC_G => L1_CLK_IS_TIMING_TX_CLK_G,
+            STAGES_G      => 3)
          port map (
             clk     => timingTxClk,                -- [in]
             rst     => timingTxRst,                -- [in]
@@ -254,28 +314,26 @@ begin
 
       U_SynchronizerVector : entity work.SynchronizerVector
          generic map (
-            TPD_G        => TPD_G,
-            COMMON_CLK_G => false,
-            STAGES_G     => 2,
-            DATA_WIDTH_G => 17)
+            TPD_G         => TPD_G,
+            BYPASS_SYNC_G => L1_CLK_IS_TIMING_TX_CLK_G,
+            STAGES_G      => 2,
+            WIDTH_G       => 18)
          port map (
-            clk                 => timingTxClk,                   -- [in]
-            rst                 => timingTxRst,                   -- [in]
-            dataIn(3 downto 0)  => l1Feedbacks(i).trigsrc,        -- [in]
-            dataIn(8 downto 4)  => l1Feedbacks(i).tag,            -- [in]
-            dataIn(17 downto 9) => l1Feedbacks(i).trigword,       -- [in]                                                            -- 
-            dout(3 downto 0)    => l1FeedbacksSync(i).trigsrc,    -- [out]
-            dout(8 downto 4)    => l1FeedbacksSync(i).tag,        -- [out]
-            dout(17 downto 9)   => l1FeedbacksSync(i).trigword);  -- [out]
-
+            clk                  => timingTxClk,                   -- [in]
+            rst                  => timingTxRst,                   -- [in]
+            dataIn(3 downto 0)   => l1Feedbacks(i).trigsrc,        -- [in]
+            dataIn(8 downto 4)   => l1Feedbacks(i).tag,            -- [in]
+            dataIn(17 downto 9)  => l1Feedbacks(i).trigword,       -- [in]                                                            -- 
+            dataOut(3 downto 0)  => l1FeedbacksSync(i).trigsrc,    -- [out]
+            dataOut(8 downto 4)  => l1FeedbacksSync(i).tag,        -- [out]
+            dataOut(17 downto 9) => l1FeedbacksSync(i).trigword);  -- [out]
    end generate l1_sync_gen;  --
-
 
    -- Sync l1Acks from timingTxClk to l1Clk
    U_SynchronizerVector_1 : entity work.SynchronizerVector
       generic map (
          TPD_G         => TPD_G,
-         BYPASS_SYNC_G => BYPASS_SYNC_G,
+         BYPASS_SYNC_G => L1_CLK_IS_TIMING_TX_CLK_G,
          WIDTH_G       => NUM_DETECTORS_G)
       port map (
          clk     => l1Clk,              -- [in]
@@ -297,7 +355,7 @@ begin
          overflow           => overflowSync,            -- [in]
          l1Feedbacks        => l1FeedbacksSync,         -- [in]
          l1Acks             => l1AcksTx,                -- [out]
-         phy                => timingPhy);              -- [out]
+         phy                => timingTxPhy);            -- [out]
 
 
 end architecture rtl;

@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-07-08
--- Last update: 2019-10-07
+-- Last update: 2019-10-08
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -25,9 +25,15 @@ use ieee.std_logic_1164.all;
 use ieee.std_logic_unsigned.all;
 use ieee.std_logic_arith.all;
 
+-- Surf
 use work.StdRtlPkg.all;
+
+-- lcls-timing-core
 use work.TimingPkg.all;
+
+-- L2si-core
 use work.XpmPkg.all;
+use work.L2SiPkg.all;
 
 entity XpmTimingFb is
    generic (
@@ -57,10 +63,10 @@ architecture rtl of XpmTimingFb is
       ready        : sl;
       state        : StateType;
       idleCnt      : slv(MAX_IDLE_C'range);
-      partition    : integer range 0 to NUM_DETECTORS_G-1;
+      detector     : integer range 0 to NUM_DETECTORS_G-1;
       lastFull     : slv(NUM_DETECTORS_G-1 downto 0);
       lastOverflow : slv(NUM_DETECTORS_G-1 downto 0);
-      l1Ack        : slv(NUM_DETECTORS_G-1 downto 0);
+      l1Acks       : slv(NUM_DETECTORS_G-1 downto 0);
       txData       : slv(15 downto 0);
       txDataK      : slv(1 downto 0);
    end record;
@@ -72,7 +78,7 @@ architecture rtl of XpmTimingFb is
       detector     => 0,
       lastFull     => (others => '1'),
       lastOverflow => (others => '0'),
-      l1Ack        => (others => '0'),
+      l1Acks       => (others => '0'),
       txData       => (D_215_C & K_COM_C),
       txDataK      => "01");
 
@@ -82,7 +88,7 @@ architecture rtl of XpmTimingFb is
 
 begin
 
-   l1Ack                   <= r.l1Ack;
+   l1Acks                  <= r.l1Acks;
    phy.data                <= r.txData;
    phy.dataK               <= r.txDataK;
    phy.control.pllReset    <= pllReset;
@@ -91,7 +97,7 @@ begin
    phy.control.polarity    <= '0';
    phy.control.bufferByRst <= '0';
 
-   comb : process (r, full, l1input, rst, id) is
+   comb : process (detectorPartitions, full, id, l1Feedbacks, overflow, r, rst) is
       variable v                 : RegType;
       variable partitionFull     : slv(EXPERIMENT_PARTITIONS_C-1 downto 0);
       variable partitionOverflow : slv(EXPERIMENT_PARTITIONS_C-1 downto 0);
@@ -105,15 +111,17 @@ begin
 
       -- Full and overflow arrive per DETECTOR
       -- reorganize them according to partition
-      for i in EXPERIMENT_PARTITIONS_C-1 downto 0 loop
-         for j in NUM_DETECTORS_G-1 downto 0 loop
-            if (full(j) = '1') then
-               partitionFull(i) := '1';
-            end if;
-            if (overflow(j) = '1') then
-               partitionOverflow(i) := '1';
-            end if;
-         end loop;
+      partitionFull := (others => '0');
+      partitionOverflow := (others => '0');
+
+      for d in NUM_DETECTORS_G-1 downto 0 loop
+         if (full(d) = '1') then
+            partitionFull(conv_integer(detectorPartitions(d))) := '1';
+         end if;
+
+         if (overflow(d) = '1') then
+            partitionOverflow(conv_integer(detectorPartitions(d))) := '1';
+         end if;
       end loop;
 
 
@@ -123,7 +131,7 @@ begin
       if (r.idleCnt = MAX_IDLE_C) then
          v.ready := '1';
       end if;
-      for i in 0 to NUM_DETECTORS_G loop
+      for i in 0 to NUM_DETECTORS_G-1 loop
          if l1Feedbacks(i).valid = '1' then
             v.ready := '1';
          end if;

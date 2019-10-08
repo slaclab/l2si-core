@@ -33,8 +33,9 @@ use work.L2SiPkg.all;
 entity EventHeaderCache2 is
 
    generic (
-      TPD_G : time := 1 ns);
-
+      TPD_G                          : time    := 1 ns;
+      TRIGGER_CLK_IS_TIMING_RX_CLK_G : boolean := false;
+      EVENT_CLK_IS_TIMING_RX_CLK_G   : boolean := false);
    port (
       timingRxClk : in sl;
       timingRxRst : in sl;
@@ -68,11 +69,12 @@ entity EventHeaderCache2 is
       triggerData : out ExperimentEventDataType;
 
       -- Event/Transition output
-      eventClk        : in  sl;
-      eventRst        : in  sl;
-      eventAxisMaster : out AxiStreamMasterType;
-      eventAxisSlave  : in  AxiStreamSlaveType;
-      eventAxisCtrl   : in  AxiStreamCtrlType);
+      eventClk           : in  sl;
+      eventRst           : in  sl;
+      eventTimingMessage : out TimingMessageType;
+      eventAxisMaster    : out AxiStreamMasterType;
+      eventAxisSlave     : in  AxiStreamSlaveType;
+      eventAxisCtrl      : in  AxiStreamCtrlType);
 
 end entity EventHeaderCache2;
 
@@ -85,6 +87,7 @@ architecture rtl of EventHeaderCache2 is
       enableCache     : sl;
       partition       : slv(2 downto 0);
       fifoPauseThresh : slv(FIFO_ADDR_WIDTH_C-1 downto 0);
+      triggerDelay    : slv(31 downto 0);
       overflow        : sl;
       fifoRst         : sl;
       messageDelay    : slv8Array(1 downto 0);
@@ -106,6 +109,7 @@ architecture rtl of EventHeaderCache2 is
       enableCache     => '0',
       partition       => (others => '0'),
       fifoPauseThresh => (others => '0'),
+      triggerDelay    => (others => '0'),
       overflow        => '0',
       fifoRst         => '0',
       messageDelay    => (others => (others => '0')),
@@ -126,39 +130,21 @@ architecture rtl of EventHeaderCache2 is
    signal fifoAxisCtrl  : AxiStreamCtrlType;
    signal fifoWrCnt     : slv(FIFO_ADDR_WIDTH_C-1 downto 0);
 
+   signal alignedTimingMessageSlv : slv(TIMING_MESSAGE_BITS_NO_BSA_C-1 downto 0);
+   signal eventTimingMessageSlv   : slv(TIMING_MESSAGE_BITS_NO_BSA_C-1 downto 0);
+
+   signal triggerDataSlv          : slv(47 downto 0);
+   signal delayedTriggerDataSlv   : slv(47 downto 0);
+   signal delayedTriggerDataValid : sl;
+   signal syncTriggerDataValid    : sl;
+   signal syncTriggerDataSlv      : slv(47 downto 0);
+
 begin
 
-   U_AxiStreamFifoV2_1 : entity work.AxiStreamFifoV2
-      generic map (
-         TPD_G               => TPD_G,
-         INT_PIPE_STAGES_G   => 1,
-         PIPE_STAGES_G       => 1,
-         SLAVE_READY_EN_G    => false,
-         BRAM_EN_G           => true,
-         GEN_SYNC_FIFO_G     => false,
-         FIFO_ADDR_WIDTH_G   => FIFO_ADDR_WIDTH_C,
-         FIFO_FIXED_THRESH_G => false,
-         FIFO_PAUSE_THRESH_G => 16,
-         SLAVE_AXI_CONFIG_G  => EVENT_AXIS_CONFIG_C,
-         MASTER_AXI_CONFIG_G => EVENT_AXIS_CONFIG_C)
-      port map (
-         sAxisClk        => timingRxClk,        -- [in]
-         sAxisRst        => r.fifoRst,          -- [in]
-         sAxisMaster     => r.fifoAxisMaster,   -- [in]
-         sAxisSlave      => fifoAxisSlave,      -- [out]
-         sAxisCtrl       => fifoAxisCtrl,       -- [out]
-         fifoPauseThresh => r.fifoPauseThresh,  -- [in]
-         fifoWrCnt       => fifoWrCnt,          -- [out]
-         mAxisClk        => eventClk,           -- [in]
-         mAxisRst        => eventRst,           -- [in]
-         mAxisMaster     => eventAxisMaster,    -- [out]
-         mAxisSlave      => eventAxisSlave);    -- [in]
-
-   full <= fifoAxisCtrl.pause or eventAxisCtrl.pause;
 
    comb : process (alignedExperimentMessage, alignedTimingMessage, alignedTimingStrobe,
-                   axilReadMaster, axilWriteMaster, fifoAxisCtrl, promptExperimentMessage,
-                   promptTimingStrobe, r, timingRxRst) is
+                   axilReadMaster, axilWriteMaster, fifoAxisCtrl,
+                   promptExperimentMessage, promptTimingStrobe, r, timingRxRst) is
       variable v              : RegType;
       variable axilEp         : AxiLiteEndpointType;
       variable partitionV     : integer;
@@ -182,7 +168,7 @@ begin
       -- Output on triggerData interface
       --------------------------------------------
       v.triggerData.valid := '0';
-      if (promptTimingStrobe = '1' and promptExperimentMessage.valid = '1') then
+      If (promptTimingStrobe = '1' and promptExperimentMessage.valid = '1') then
          v.triggerData := toExperimentEventDataType(promptExperimentMessage.partitionWord(partitionV));
 
          -- Count time since last event
@@ -288,6 +274,7 @@ begin
       axiSlaveRegisterR(axilEp, x"10", 0, r.l0Count);
       axiSlaveRegisterR(axilEp, x"14", 0, r.l1AcceptCount);
       axiSlaveRegisterR(axilEp, x"1C", 0, r.l1RejectCount);
+      axiSlaveRegister(axilEp, X"20", 0, v.triggerDelay);
 
       axiSlaveDefault(axilEp, v.axilWriteSlave, v.axilReadSlave, AXI_RESP_DECERR_C);
 
@@ -297,12 +284,11 @@ begin
 
       rin <= v;
 
+      -- outputs
       axilWriteSlave <= r.axilWriteSlave;
       axilReadSlave  <= r.axilReadSlave;
       partition      <= r.partition;
-
-      overflow <= r.overflow;
-
+      overflow       <= r.overflow;
 
    end process comb;
 
@@ -314,26 +300,105 @@ begin
    end process seq;
 
    -----------------------------------------------
-   -- Synchronize trigger data to trigger clock
+   -- Delay triggerData according to AXI-Lite register
    -----------------------------------------------
    triggerDataSlv <= toSlv(r.triggerData);
-   U_SynchronizerFifo_1 : entity work.SynchronizerFifo
+   U_SlvDelayFifo_1 : entity work.SlvDelayFifo
       generic map (
-         TPD_G        => TPD_G,
-         COMMON_CLK_G => false,
---         BRAM_EN_G     => BRAM_EN_G,
-         DATA_WIDTH_G => 48)
+         TPD_G             => TPD_G,
+         DATA_WIDTH_G      => 48,
+         DELAY_BITS_G      => 32,
+         FIFO_ADDR_WIDTH_G => FIFO_ADDR_WIDTH_C,
+         FIFO_BRAM_EN_G    => true)
       port map (
-         rst    => timingRxRst,           -- [in]
-         wr_clk => timingRxClk,           -- [in]
-         wr_en  => r.triggerData.valid,   -- [in]
-         din    => triggerDataSlv,        -- [in]
-         rd_clk => triggerClk,            -- [in]
-         rd_en  => syncTriggerDataValid,  -- [in]
-         valid  => syncTriggerDataValid,  -- [out]
-         dout   => syncTriggerDataSlv);   -- [out]
-   triggerData <= toExperimentEventDataType(syncTriggerDataSlv, syncTriggerDataValid);
+         clk         => timingRxClk,               -- [in]
+         rst         => timingRxRst,               -- [in]
+         delay       => r.triggerDelay,            -- [in]
+         inputData   => triggerDataSlv,            -- [in]
+         inputValid  => r.triggerData.valid,       -- [in]
+         outputData  => delayedTriggerDataSlv,     -- [out]
+         outputValid => delayedTriggerDataValid);  -- [out]
 
+   -----------------------------------------------
+   -- Synchronize trigger data to trigger clock
+   -----------------------------------------------
+   TRIGGER_SYNC_GEN : if (not TRIGGER_CLK_IS_TIMING_RX_CLK_G) generate
+      U_SynchronizerFifo_1 : entity work.SynchronizerFifo
+         generic map (
+            TPD_G        => TPD_G,
+            COMMON_CLK_G => false,
+--         BRAM_EN_G     => BRAM_EN_G,
+            DATA_WIDTH_G => 48)
+         port map (
+            rst    => timingRxRst,              -- [in]
+            wr_clk => timingRxClk,              -- [in]
+            wr_en  => delayedTriggerDataValid,  -- [in]
+            din    => delayedTriggerDataSlv,    -- [in]
+            rd_clk => triggerClk,               -- [in]
+            rd_en  => syncTriggerDataValid,     -- [in]
+            valid  => syncTriggerDataValid,     -- [out]
+            dout   => syncTriggerDataSlv);      -- [out]
+      triggerData <= toExperimentEventDataType(syncTriggerDataSlv, syncTriggerDataValid);
+   end generate TRIGGER_SYNC_GEN;
+
+   NO_TRIGGER_SYNC_GEN : if (TRIGGER_CLK_IS_TIMING_RX_CLK_G) generate
+      triggerData <= toExperimentEventDataType(delayedTriggerDataSlv, delayedTriggerDataValid);
+   end generate NO_TRIGGER_SYNC_GEN;
+
+   -----------------------------------------------
+   -- Buffer event data in a fifo
+   -----------------------------------------------
+   U_AxiStreamFifoV2_1 : entity work.AxiStreamFifoV2
+      generic map (
+         TPD_G               => TPD_G,
+         INT_PIPE_STAGES_G   => 1,
+         PIPE_STAGES_G       => 1,
+         SLAVE_READY_EN_G    => false,
+         BRAM_EN_G           => true,
+         GEN_SYNC_FIFO_G     => EVENT_CLK_IS_TIMING_RX_CLK_G,
+         FIFO_ADDR_WIDTH_G   => FIFO_ADDR_WIDTH_C,
+         FIFO_FIXED_THRESH_G => false,
+         FIFO_PAUSE_THRESH_G => 16,
+         SLAVE_AXI_CONFIG_G  => EVENT_AXIS_CONFIG_C,
+         MASTER_AXI_CONFIG_G => EVENT_AXIS_CONFIG_C)
+      port map (
+         sAxisClk        => timingRxClk,        -- [in]
+         sAxisRst        => r.fifoRst,          -- [in]
+         sAxisMaster     => r.fifoAxisMaster,   -- [in]
+         sAxisSlave      => fifoAxisSlave,      -- [out]
+         sAxisCtrl       => fifoAxisCtrl,       -- [out]
+         fifoPauseThresh => r.fifoPauseThresh,  -- [in]
+         fifoWrCnt       => fifoWrCnt,          -- [out]
+         mAxisClk        => eventClk,           -- [in]
+         mAxisRst        => eventRst,           -- [in]
+         mAxisMaster     => eventAxisMaster,    -- [out]
+         mAxisSlave      => eventAxisSlave);    -- [in]
+
+   full <= fifoAxisCtrl.pause or eventAxisCtrl.pause;
+
+   -----------------------------------------------
+   -- Buffer TimingMessage that corresponds to each event placed in event fifo
+   -----------------------------------------------
+   alignedTimingMessageSlv <= toSlvNoBsa(alignedTimingMessage);
+   U_Fifo_1 : entity work.Fifo
+      generic map (
+         TPD_G           => TPD_G,
+         GEN_SYNC_FIFO_G => EVENT_CLK_IS_TIMING_RX_CLK_G,
+         BRAM_EN_G       => true,
+         FWFT_EN_G       => true,
+         USE_BUILT_IN_G  => false,
+         PIPE_STAGES_G   => 1,               -- make sure this lines up right with event fifo
+         DATA_WIDTH_G    => TIMING_MESSAGE_BITS_NO_BSA_C,
+         ADDR_WIDTH_G    => FIFO_ADDR_WIDTH_C)
+      port map (
+         rst    => r.fifoRst,                -- [in]
+         wr_clk => timingRxClk,              -- [in]
+         wr_en  => r.fifoAxisMaster.tValid,  -- [in]
+         din    => alignedTimingMessageSlv,  -- [in]
+         rd_clk => eventClk,                 -- [in]
+         rd_en  => eventAxisSlave.tReady,    -- [in] -- This is probably wrong
+         dout   => eventTimingMessageSlv);   -- [out]
+   eventTimingMessage <= toTimingMessageType(eventTimingMessageSlv);
 
 end architecture rtl;
 
