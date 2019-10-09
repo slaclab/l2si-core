@@ -56,30 +56,18 @@ package L2SiPkg is
    ----------------------------------------------------
    -- Event and Timing Header interface
    ----------------------------------------------------
-   type TimingHeaderType is record
-      strobe    : sl;
-      pulseId   : slv(63 downto 0);
-      timeStamp : slv(63 downto 0);
-   end record;
-
-   constant TIMING_HEADER_INIT_C : TimingHeaderType := (
-      strobe    => '0',
-      pulseId   => (others => '0'),
-      timeStamp => (others => '0'));
-
-   function toTimingHeader(timingBus : TimingBusType) return TimingHeaderType;
-
    constant EVENT_HEADER_VERSION_C : slv(7 downto 0) := toSlv(0, 8);
    constant L1A_INFO_C             : slv(6 downto 0) := toSlv(12, 7);
 
    type EventHeaderType is record
-      pulseId     : slv(63 downto 0);
-      timeStamp   : slv(63 downto 0);
-      count       : slv(23 downto 0);
-      version     : slv(7 downto 0);
-      partitions  : slv(15 downto 0);   -- readout groups
-      triggerInfo : slv(15 downto 0);   -- L1 trigger lines
-      payload     : slv(7 downto 0);    -- transition payload
+      pulseId     : slv(63 downto 0);   -- timingMessage.pulseId
+      timeStamp   : slv(63 downto 0);   -- timingMessage.timestmp
+      version     : slv(7 downto 0);    -- EVENT_HEADER_VERSION_C
+      partitions  : slv(7 downto 0);    -- active partions
+      payload     : slv(7 downto 0);    -- event payload
+      count       : slv(23 downto 0);   -- event count
+      triggerInfo : slv(15 downto 0);   -- event trigger info
+
    end record;
 
    type EventHeaderArray is array(natural range <>) of EventHeaderType;
@@ -87,11 +75,12 @@ package L2SiPkg is
    constant EVENT_HEADER_INIT_C : EventHeaderType := (
       pulseId     => (others => '0'),
       timeStamp   => (others => '0'),
-      count       => (others => '0'),
       version     => EVENT_HEADER_VERSION_C,
       partitions  => (others => '0'),
-      triggerInfo => (others => '0'),
-      payload     => (others => '0'));
+      payload     => (others => '0'),
+      count       => (others => '0'),
+      triggerInfo => (others => '0'));
+
 
    constant EVENT_HEADER_BITS_C : integer := 192;
 
@@ -227,15 +216,6 @@ package body L2SiPkg is
    --------------------------------------------------------
    -- Timing Header decode
    --------------------------------------------------------
-   function toTimingHeader(timingBus : TimingBusType) return TimingHeaderType is
-      variable result : TimingHeaderType;
-   begin
-      result.strobe    := timingBus.strobe;
-      result.pulseId   := timingBus.message.pulseId;
-      result.timeStamp := timingBus.message.timeStamp;
-      return result;
-   end function;
-
    function toSlv(eventHeader : EventHeaderType) return slv is
       variable vector : slv(191 downto 0) := (others => '0');
       variable i      : integer           := 0;
