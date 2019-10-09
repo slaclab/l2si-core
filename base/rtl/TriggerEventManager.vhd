@@ -3,7 +3,10 @@
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
--- Description: I don't even know
+-- Description: Abstraction interface layer between timing bus trigger/event
+-- extension interface and an application that uses triggers and events.
+-- Provides programmable trigger delay, event buffering, and flow control
+-- feedback.
 -------------------------------------------------------------------------------
 -- This file is part of L2SI. It is subject to
 -- the license terms in the LICENSE.txt file found in the top-level directory
@@ -28,7 +31,7 @@ use work.TimingPkg.all;
 -- l2si
 use work.L2SiPkg.all;
 
-entity EventHeaderCacheWrapper2 is
+entity TriggerEventManager is
 
    generic (
       TPD_G                          : time                 := 1 ns;
@@ -75,9 +78,9 @@ entity EventHeaderCacheWrapper2 is
       axilWriteMaster : in  AxiLiteWriteMasterType;
       axilWriteSlave  : out AxiLiteWriteSlaveType);
 
-end entity EventHeaderCacheWrapper2;
+end entity TriggerEventManager;
 
-architecture rtl of EventHeaderCacheWrapper2 is
+architecture rtl of TriggerEventManager is
 
    constant AXIL_MASTERS_C : integer                              := 9;
    constant AXIL_REALIGN_C : integer                              := 0;

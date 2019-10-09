@@ -30,7 +30,7 @@ use work.TimingPkg.all;
 -- l2si
 use work.L2SiPkg.all;
 
-entity EventHeaderCache2 is
+entity TriggerEventBuffer is
 
    generic (
       TPD_G                          : time    := 1 ns;
@@ -76,9 +76,9 @@ entity EventHeaderCache2 is
       eventAxisSlave     : in  AxiStreamSlaveType;
       eventAxisCtrl      : in  AxiStreamCtrlType);
 
-end entity EventHeaderCache2;
+end entity TriggerEventBuffer;
 
-architecture rtl of EventHeaderCache2 is
+architecture rtl of TriggerEventBuffer is
 
    constant FIFO_ADDR_WIDTH_C : integer := 5;
 
