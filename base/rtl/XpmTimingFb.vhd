@@ -64,8 +64,8 @@ architecture rtl of XpmTimingFb is
       state        : StateType;
       idleCnt      : slv(MAX_IDLE_C'range);
       detector     : integer range 0 to NUM_DETECTORS_G-1;
-      lastFull     : slv(NUM_DETECTORS_G-1 downto 0);
-      lastOverflow : slv(NUM_DETECTORS_G-1 downto 0);
+      lastFull     : slv(EXPERIMENT_PARTITIONS_C-1 downto 0);
+      lastOverflow : slv(EXPERIMENT_PARTITIONS_C-1 downto 0);
       l1Acks       : slv(NUM_DETECTORS_G-1 downto 0);
       txData       : slv(15 downto 0);
       txDataK      : slv(1 downto 0);
