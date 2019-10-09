@@ -1,21 +1,15 @@
 -------------------------------------------------------------------------------
--- Title      : TimingPkg
--------------------------------------------------------------------------------
--- File       : TimingExtnPkg.vhd
--- Author     : Matt Weaver  <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
--- Created    : 2018-07-20
--- Last update: 2019-10-08
--- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
--- Description: 
+-- Description: Provides constants, types and conversion functions to
+-- facilitate use of L2Si components.
 -------------------------------------------------------------------------------
--- This file is part of 'LCLS2 Timing Core'.
+-- This file is part of 'L2Si-core'.
 -- It is subject to the license terms in the LICENSE.txt file found in the 
 -- top-level directory of this distribution and at: 
 --    https://confluence.slac.stanford.edu/display/ppareg/LICENSE.html. 
--- No part of 'LCLS2 Timing Core', including this file, 
+-- No part of 'L2Si-core', including this file, 
 -- may be copied, modified, propagated, or distributed except according to 
 -- the terms contained in the LICENSE.txt file.
 -------------------------------------------------------------------------------
@@ -181,8 +175,6 @@ package L2SiPkg is
 
    function toExperimentDelayType (partitionAddr : slv(31 downto 0)) return ExperimentDelayType;
 
---   function toTrigVector(message : ExperimentMessageType) return slv;
-
    type ExperimentL1FeedbackType is record
       valid    : sl;
       trigsrc  : slv(3 downto 0);
@@ -275,21 +267,6 @@ package body L2SiPkg is
       assignRecord(i, vector, eventHeader.version);
       return eventHeader;
    end function;
-
-
-
-   -- Figure out what to do with this
---    function toTrigVector(message : ExperimentMessageType) return slv is
---       variable vector : slv(EXPERIMENT_PARTITIONS_C-1 downto 0);
---       variable word   : XpmPartitionDataType;
---    begin
---       for i in 0 to EXPERIMENT_PARTITIONS_C-1 loop
---          word      := toPartitionWord(message.partitionWord(i));
---          vector(i) := word.l0a or not message.partitionWord(i)(15);
---       end loop;
---       return vector;
---    end function;
-
 
    function toSlv (experimentEvent : ExperimentEventDataType) return slv is
       variable vector : slv(47 downto 0) := (others => '0');
