@@ -199,7 +199,7 @@ begin
          mAxiWriteSlave  => timingAxilWriteSlave);  -- [in]
 
    -----------------------------------------------
-   -- Fan out AXI-Lite to each EventHeaderCache
+   -- Fan out AXI-Lite 
    -----------------------------------------------
    U_AxiLiteCrossbar_1 : entity work.AxiLiteCrossbar
       generic map (
@@ -244,7 +244,7 @@ begin
 
 
    GEN_DETECTORS : for i in NUM_DETECTORS_G-1 downto 0 generate
-      U_EventHeaderCache2_1 : entity work.EventHeaderCache2
+      U_TriggerEventBuffer_1 : entity work.TriggerEventBuffer
          generic map (
             TPD_G                          => TPD_G,
             TRIGGER_CLK_IS_TIMING_RX_CLK_G => TRIGGER_CLK_IS_TIMING_RX_CLK_G,
