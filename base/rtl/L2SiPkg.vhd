@@ -39,7 +39,7 @@ package L2SiPkg is
 
    type ExperimentMessageType is record
       valid         : sl;
-      partitionAddr : slv(EXPERIMENT_PARTITION_ADDR_LENGTH_C downto 0);
+      partitionAddr : slv(EXPERIMENT_PARTITION_ADDR_LENGTH_C-1 downto 0);
       partitionWord : Slv48Array(0 to EXPERIMENT_PARTITIONS_C-1);
    end record;
 
@@ -49,52 +49,8 @@ package L2SiPkg is
       partitionWord => (others => x"800080008000"));
    type ExperimentMessageArray is array (integer range<>) of ExperimentMessageType;
 
---   function toSlv(message                   : ExperimentMessageType) return slv;
-   --function toExperimentMessageType (vector : slv(EXPERIMENT_MESSAGE_BITS_C-1 downto 0)) return ExperimentMessageType;
+   -- Convert TimingExtensionMessage (512-bit slv) to ExperimentMessage
    function toExperimentMessageType (timing : TimingExtensionMessageType) return ExperimentMessageType;
-
-   ----------------------------------------------------
-   -- Event and Timing Header interface
-   ----------------------------------------------------
-   constant EVENT_HEADER_VERSION_C : slv(7 downto 0) := toSlv(0, 8);
-   constant L1A_INFO_C             : slv(6 downto 0) := toSlv(12, 7);
-
-   type EventHeaderType is record
-      pulseId     : slv(63 downto 0);   -- timingMessage.pulseId
-      timeStamp   : slv(63 downto 0);   -- timingMessage.timestmp
-      version     : slv(7 downto 0);    -- EVENT_HEADER_VERSION_C
-      partitions  : slv(7 downto 0);    -- active partions
-      payload     : slv(7 downto 0);    -- event payload
-      count       : slv(23 downto 0);   -- event count
-      triggerInfo : slv(15 downto 0);   -- event trigger info
-
-   end record;
-
-   type EventHeaderArray is array(natural range <>) of EventHeaderType;
-
-   constant EVENT_HEADER_INIT_C : EventHeaderType := (
-      pulseId     => (others => '0'),
-      timeStamp   => (others => '0'),
-      version     => EVENT_HEADER_VERSION_C,
-      partitions  => (others => '0'),
-      payload     => (others => '0'),
-      count       => (others => '0'),
-      triggerInfo => (others => '0'));
-
-
-   constant EVENT_HEADER_BITS_C : integer := 192;
-
-   function toSlv(eventHeader     : EventHeaderType) return slv;
-   function toEventHeader (vector : slv) return EventHeaderType;
-
-   constant EVENT_AXIS_CONFIG_C : AxiStreamConfigType := (
-      TSTRB_EN_C    => false,
-      TDATA_BYTES_C => 24,              -- 192 bits
-      TDEST_BITS_C  => 1,
-      TID_BITS_C    => 0,
-      TKEEP_MODE_C  => TKEEP_FIXED_C,
-      TUSER_BITS_C  => 0,
-      TUSER_MODE_C  => TUSER_NONE_C);
 
    -----------------------------------------------
    -- Experiment Event Decode
@@ -143,19 +99,15 @@ package L2SiPkg is
       count   => (others => '0'),
       payload => (others => '0'));
 
-   --  Clear event header -> event data match fifos
+   --  Clear event buffers (transition data header)
    constant MSG_CLEAR_FIFO_C  : slv(7 downto 0) := toSlv(0, 8);
    --  Communicate delay of pword
-   constant MSG_DELAY_PWORD_C : slv(7 downto 0) := toSlv(1, 8);
-
+   constant MSG_DELAY_PWORD_C : slv(7 downto 0) := toSlv(1, 8);  -- Not used!!
 
    function toSlv (experimentTransition                  : ExperimentTransitionDataType) return slv;
    function toExperimentTransitionDataType(partitionWord : slv(47 downto 0)) return ExperimentTransitionDataType;
 
-
-   -----------------------------------------------
    -- partitionAddr gets decoded to look for delay commands
-   -----------------------------------------------
    type ExperimentDelayType is record
       valid : sl;
       index : integer;
@@ -164,6 +116,7 @@ package L2SiPkg is
 
    function toExperimentDelayType (partitionAddr : slv(31 downto 0)) return ExperimentDelayType;
 
+   -- 
    type ExperimentL1FeedbackType is record
       valid    : sl;
       trigsrc  : slv(3 downto 0);
@@ -178,26 +131,56 @@ package L2SiPkg is
       trigsrc  => (others => '0'),
       tag      => (others => '0'),
       trigword => (others => '0'));
+   
+
+   ----------------------------------------------------
+   -- Event and Timing Header interface
+   ----------------------------------------------------
+   constant EVENT_HEADER_VERSION_C : slv(7 downto 0) := toSlv(0, 8);
+   constant L1A_INFO_C             : slv(6 downto 0) := toSlv(12, 7);
+
+   type EventHeaderType is record
+      pulseId     : slv(63 downto 0);   -- timingMessage.pulseId
+      timeStamp   : slv(63 downto 0);   -- timingMessage.timestmp
+      version     : slv(7 downto 0);    -- EVENT_HEADER_VERSION_C
+      partitions  : slv(7 downto 0);    -- active partions
+      payload     : slv(7 downto 0);    -- event payload
+      count       : slv(23 downto 0);   -- event count
+      triggerInfo : slv(15 downto 0);   -- event trigger info
+
+   end record;
+
+   type EventHeaderArray is array(natural range <>) of EventHeaderType;
+
+   constant EVENT_HEADER_INIT_C : EventHeaderType := (
+      pulseId     => (others => '0'),
+      timeStamp   => (others => '0'),
+      version     => EVENT_HEADER_VERSION_C,
+      partitions  => (others => '0'),
+      payload     => (others => '0'),
+      count       => (others => '0'),
+      triggerInfo => (others => '0'));
+
+
+   constant EVENT_HEADER_BITS_C : integer := 192;
+
+   function toSlv(eventHeader     : EventHeaderType) return slv;
+   function toEventHeader (vector : slv) return EventHeaderType;
+
+   constant EVENT_AXIS_CONFIG_C : AxiStreamConfigType := (
+      TSTRB_EN_C    => false,
+      TDATA_BYTES_C => 24,              -- 192 bits
+      TDEST_BITS_C  => 1,
+      TID_BITS_C    => 0,
+      TKEEP_MODE_C  => TKEEP_FIXED_C,
+      TUSER_BITS_C  => 0,
+      TUSER_MODE_C  => TUSER_NONE_C);
+
 
 
 end package L2SiPkg;
 
 package body L2SiPkg is
-
-   --------------------------------------------------------
-   -- Timing Extension Decode functions
-   --------------------------------------------------------
---    function toSlv(message : ExperimentMessageType) return slv
---    is
---       variable vector : slv(EXPERIMENT_MESSAGE_BITS_C-1 downto 0) := (others => '0');
---       variable i : integer := 0;
---    begin
---       assignSlv(i, vector, message.partitionAddr);
---       for j in message.partitionWord'range loop
---          assignSlv(i, vector, message.partitionWord(j));
---       end loop;
---       return vector;
---    end function;
 
    function toExperimentMessageType (timing : TimingExtensionMessageType) return ExperimentMessageType
    is
