@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2016-03-25
--- Last update: 2019-10-07
+-- Last update: 2019-10-16
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -358,75 +358,10 @@ package XpmPkg is
    constant XPM_ACCEPT_FRAME_INIT_C : XpmAcceptFrameType := (
       strobe    => '0' );
    
---    type XpmL1InputType is record
---       valid      : sl;
---       trigsrc    : slv( 3 downto 0);
---       tag        : slv( 4 downto 0);
---       trigword   : slv( 8 downto 0);
---    end record;
---    type XpmL1InputArray is array (natural range<>) of XpmL1InputType;
---    constant XPM_L1_INPUT_INIT_C : XpmL1InputType := (
---       valid     => '0',
---       trigsrc   => (others=>'0'),
---       tag       => (others=>'0'),
---       trigword  => (others=>'0'));
-
---    type XpmPartitionMsgType is record
---       l0tag   : slv(4 downto 0);
---       hdr     : slv(7 downto 0);
---       payload : slv(7 downto 0);
---       anatag  : slv(23 downto 0);
---    end record;
-
---    constant XPM_PARTITION_MSG_INIT_C : XpmPartitionMsgType := (
---      l0tag    => (others=>'0'),
---      hdr      => (others=>'0'),
---      payload  => (others=>'0'),
---      anatag   => (others=>'0') );
-
---    type XpmPartitionDataType is record
---       l0a     : sl;                     -- l0 accept
---       l0tag   : slv(4 downto 0);
---       l0r     : sl;                     -- l0 reject
---       l1e     : sl;                     -- l1 expexted
---       l1a     : sl;                     -- l1 accepted
---       l1tag   : slv(4 downto 0);
---       anatag  : slv(23 downto 0);       -- not using anymore
---    end record;
-
---    constant XPM_PARTITION_DATA_INIT_C : XpmPartitionDataType := (
---      l0a      => '0',
---      l0tag    => (others=>'0'),
---      l0r      => '0',
---      l1e      => '0',
---      l1a      => '0',
---      l1tag    => (others=>'0'),
---      anatag   => (others=>'0') );
-
---    type XpmPartitionDataArray is array(natural range<>) of XpmPartitionDataType;
-
-   type XpmBroadcastType is ( RSVD0, RSVD1, RSVD2, RSVD3,
-                              RSVD4, RSVD5, RSVD6, RSVD7,
-                              RSVD8, RSVD9, RSVDA, RSVDB,
-                              RSVDC, RSVDD, PDELAY, XADDR );
-   
    function toSlv(s : XpmLinkStatusType) return slv;
    function toLinkStatus(vector : slv) return XpmLinkStatusType;
 
---    function toSlv  (pword : XpmPartitionMsgType) return slv;
---    function toPartitionMsg (vector : slv) return XpmPartitionMsgType;
---    function toSlv  (pword : XpmPartitionDataType) return slv;
---    function toPartitionWord(vector : slv) return XpmPartitionDataType;
 
---   function xpmTimingFbId(ip : slv) return slv;
-
---    function toXpmBroadcastType(vector : slv) return XpmBroadcastType;
---    function toIndex           (vector : slv) return integer;
---    function toValue           (vector : slv) return slv;
---    -- vivado cant resolve toSlv(enum)
---    function toPaddr           (btype  : XpmBroadcastType;
---                                ipart  : integer;
---                                value  : slv) return slv;
 end package XpmPkg;
 
 package body XpmPkg is
@@ -463,79 +398,5 @@ package body XpmPkg is
      return v;
    end function;
 
---    function toSlv  (pword : XpmPartitionMsgType) return slv is
---      variable vector : slv(47 downto 0) := (others=>'0');
---      variable i      : integer          := 0;
---    begin
---      assignSlv(i, vector, "0");
---      assignSlv(i, vector, pword.l0tag);
---      assignSlv(i, vector, pword.hdr);
---      assignSlv(i, vector, "0");
---      assignSlv(i, vector, "0");  -- message indicator
---      assignSlv(i, vector, pword.anatag);
---      assignSlv(i, vector, pword.payload);
---      return vector;
---    end function;
-   
---    function toPartitionMsg (vector : slv) return XpmPartitionMsgType is
---      variable pword : XpmPartitionMsgType := XPM_PARTITION_MSG_INIT_C;
---      variable i     : integer              := 0;
---    begin
---      i := i+1;
---      assignRecord(i, vector, pword.l0tag);
---      assignRecord(i, vector, pword.hdr);
---      i := i+1;
---      i := i+1;
---      assignRecord(i, vector, pword.anatag);
---      assignRecord(i, vector, pword.payload);
---      return pword;
---    end function;
-   
-
---    function xpmTimingFbId(ip : slv) return slv is
---      variable id  : slv(31 downto 0);
---    begin
---      id := x"FF" & ip(15 downto 8) & ip(23 downto 16) & ip(31 downto 24);
---      return id;
---    end function;
- 
---   function toXpmBroadcastType(vector : slv) return XpmBroadcastType is
---      variable result : XpmBroadcastType := XADDR;
---    begin
---      if vector(PADDR_LEN-1 downto PADDR_LEN-4)=x"E" then
---        result := PDELAY;
---      end if;
---      return result;
---    end function;
-
---    function toIndex           (vector : slv) return integer is
---      variable result : integer;
---    begin
---      result := conv_integer(vector(26 downto 24));
---      return result;
---    end function;
-   
---    function toValue           (vector : slv) return slv is
---      variable result : slv(23 downto 0);
---    begin
---      result := vector(23 downto 0);
---      return result;
---    end function;
-
---    function toPaddr            (btype : XpmBroadcastType;
---                                ipart : integer;
---                                value : slv) return slv is
---      variable vector : slv(PADDR_LEN-1 downto 0) := (others=>'0');
---      variable i : integer := 0;
---    begin
---      case (btype) is
---        when PDELAY =>
---          assignSlv(i, vector, resize(value,24));
---          assignSlv(i, vector, toSlv(ipart,4));
---          assignSlv(i, vector, x"E");
---        when others => null;
---      end case;
---      return vector;
---    end function;
      
 end package body XpmPkg;

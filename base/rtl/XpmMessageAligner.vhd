@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-07-10
--- Last update: 2019-10-08
+-- Last update: 2019-10-16
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -32,13 +32,12 @@ use work.AxiLitePkg.all;
 use work.TimingPkg.all;
 
 -- L2Si
-use work.L2SiPkg.all;
-
+use work.XpmExtensionPkg.all;
 
 library unisim;
 use unisim.vcomponents.all;
 
-entity EventRealign is
+entity XpmMessageAligner is
    generic (
       TPD_G      : time    := 1 ns;
       TF_DELAY_G : integer := 100);
@@ -55,23 +54,23 @@ entity EventRealign is
       xpmId : out slv(31 downto 0);
 
       -- Prompt timing data
-      promptTimingStrobe      : in sl;
-      promptTimingMessage     : in TimingMessageType;      -- prompt
-      promptExperimentMessage : in ExperimentMessageType;  -- prompt
+      promptTimingStrobe  : in sl;
+      promptTimingMessage : in TimingMessageType;  -- prompt
+      promptXpmMessage    : in XpmMessageType;     -- prompt
 
       -- Aligned timing data
-      alignedTimingStrobe      : out sl;
-      alignedTimingMessage     : out TimingMessageType;       -- delayed
-      alignedExperimentMessage : out ExperimentMessageType);  -- delayed
+      alignedTimingStrobe  : out sl;
+      alignedTimingMessage : out TimingMessageType;  -- delayed
+      alignedXpmMessage    : out XpmMessageType);    -- delayed
 
-end EventRealign;
+end XpmMessageAligner;
 
-architecture rtl of EventRealign is
+architecture rtl of XpmMessageAligner is
 
 
    type RegType is record
       xpmId           : slv(31 downto 0);
-      partitionDelays : Slv7Array(EXPERIMENT_PARTITIONS_C-1 downto 0);
+      partitionDelays : Slv7Array(XPM_PARTITIONS_C-1 downto 0);
       axilWriteSlave  : AxiLiteWriteSlaveType;
       axilReadSlave   : AxiLiteReadSlaveType;
    end record;
@@ -85,9 +84,9 @@ architecture rtl of EventRealign is
    signal r   : RegType := REG_INIT_C;
    signal rin : RegType;
 
-   signal promptTimingMessageSlv        : slv(TIMING_MESSAGE_BITS_NO_BSA_C-1 downto 0);
-   signal alignedTimingMessageSlv       : slv(TIMING_MESSAGE_BITS_NO_BSA_C-1 downto 0);
-   signal alignedExperimentMessageValid : slv(EXPERIMENT_PARTITIONS_C-1 downto 0);
+   signal promptTimingMessageSlv  : slv(TIMING_MESSAGE_BITS_NO_BSA_C-1 downto 0);
+   signal alignedTimingMessageSlv : slv(TIMING_MESSAGE_BITS_NO_BSA_C-1 downto 0);
+   signal alignedXpmMessageValid  : slv(XPM_PARTITIONS_C-1 downto 0);
 
 begin
 
@@ -125,7 +124,7 @@ begin
    -- corresponding timing message so this gets
    -- them back into alignment
    -----------------------------------------------
-   GEN_PART : for i in 0 to EXPERIMENT_PARTITIONS_C-1 generate
+   GEN_PART : for i in 0 to XPM_PARTITIONS_C-1 generate
       U_SlvDelayRam_2 : entity work.SlvDelayRam
          generic map (
             TPD_G            => TPD_G,
@@ -134,42 +133,42 @@ begin
             RAM_ADDR_WIDTH_G => 7,
             BRAM_EN_G        => true)
          port map (
-            rst                       => rst,                                        -- [in]
-            clk                       => clk,                                        -- [in]
-            delay                     => r.partitionDelays(i),                       -- [in]
-            inputValid                => promptTimingStrobe,                         -- [in]
-            inputVector(47 downto 0)  => promptExperimentMessage.partitionWord(i),   -- [in]
-            inputVector(48)           => promptExperimentMessage.valid,              -- [in]            
-            inputAddr                 => promptTimingMessage.pulseId(6 downto 0),    -- [in]
-            outputValid               => open,                                       -- [in] (in theory will always be the same as alignedTimingStrobe
-            outputVector(47 downto 0) => alignedExperimentMessage.partitionWord(i),  -- [out]
-            outputVector(48)          => alignedExperimentMessageValid(i));          -- [out]
+            rst                       => rst,                                      -- [in]
+            clk                       => clk,                                      -- [in]
+            delay                     => r.partitionDelays(i),                     -- [in]
+            inputValid                => promptTimingStrobe,                       -- [in]
+            inputVector(47 downto 0)  => promptXpmMessage.partitionWord(i),        -- [in]
+            inputVector(48)           => promptXpmMessage.valid,                   -- [in]            
+            inputAddr                 => promptTimingMessage.pulseId(6 downto 0),  -- [in]
+            outputValid               => open,                                     -- [in] (in theory will always be the same as alignedTimingStrobe
+            outputVector(47 downto 0) => alignedXpmMessage.partitionWord(i),       -- [out]
+            outputVector(48)          => alignedXpmMessageValid(i));               -- [out]
    end generate;
 
    -- Maybe zero this out?
-   alignedExperimentMessage.partitionAddr <= promptExperimentMessage.partitionAddr;
+   alignedXpmMessage.partitionAddr <= promptXpmMessage.partitionAddr;
 
    -- This never happens during normal running but could happen breifly after switching delays   
-   alignedExperimentMessage.valid <= uAnd(alignedExperimentMessageValid);
+   alignedXpmMessage.valid <= uAnd(alignedXpmMessageValid);
 
-   comb : process(axilReadMaster, axilWriteMaster, promptExperimentMessage, promptTimingStrobe, r, rst) is
+   comb : process(axilReadMaster, axilWriteMaster, promptXpmMessage, promptTimingStrobe, r, rst) is
       variable v            : RegType;
       variable axilEp       : AxiLiteEndpointType;
-      variable delayMessage : ExperimentDelayType;
+      variable broadcastMessage : XpmBroadcastType;
    begin
       v := r;
 
       if promptTimingStrobe = '1' then
          -- Update partitionDelays values when partitionAddr indicates new PDELAYs
-         delayMessage := toExperimentDelayType(promptExperimentMessage.partitionAddr);
-         if (delayMessage.valid = '1') then
-            v.partitionDelays(delayMessage.index) := delayMessage.value;
+         broadcastMessage := toXpmBroadcastType(promptXpmMessage.partitionAddr);
+         if (broadcastMessage.btype = XPM_BROADCAST_PDELAY_C) then
+            v.partitionDelays(broadcastMessage.index) := broadcastMessage.value;
          end if;
       end if;
 
       axiSlaveWaitTxn(axilEp, axilWriteMaster, axilReadMaster, v.axilWriteSlave, v.axilReadSlave);
 
-      for i in 0 to EXPERIMENT_PARTITIONS_C-1 loop
+      for i in 0 to XPM_PARTITIONS_C-1 loop
          axiSlaveRegisterR(axilEp, X"00"+ i*4, 0, r.partitionDelays(i));
       end loop;
 

@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-07-08
--- Last update: 2019-10-08
+-- Last update: 2019-10-16
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -32,8 +32,7 @@ use work.StdRtlPkg.all;
 use work.TimingPkg.all;
 
 -- L2si-core
-use work.XpmPkg.all;
-use work.L2SiPkg.all;
+use work.XpmExtensionPkg.all;
 
 entity XpmTimingFb is
    generic (
@@ -48,7 +47,7 @@ entity XpmTimingFb is
       detectorPartitions : in  slv3Array(NUM_DETECTORS_G-1 downto 0);
       full               : in  slv(NUM_DETECTORS_G-1 downto 0);
       overflow           : in  slv(NUM_DETECTORS_G-1 downto 0);
-      l1Feedbacks        : in  ExperimentL1FeedbackArray(NUM_DETECTORS_G-1 downto 0);
+      l1Feedbacks        : in  XpmL1FeedbackArray(NUM_DETECTORS_G-1 downto 0);
       l1Acks             : out slv(NUM_DETECTORS_G-1 downto 0);
       phy                : out TimingPhyType);
 end XpmTimingFb;
@@ -64,8 +63,8 @@ architecture rtl of XpmTimingFb is
       state        : StateType;
       idleCnt      : slv(MAX_IDLE_C'range);
       detector     : integer range 0 to NUM_DETECTORS_G-1;
-      lastFull     : slv(EXPERIMENT_PARTITIONS_C-1 downto 0);
-      lastOverflow : slv(EXPERIMENT_PARTITIONS_C-1 downto 0);
+      lastFull     : slv(XPM_PARTITIONS_C-1 downto 0);
+      lastOverflow : slv(XPM_PARTITIONS_C-1 downto 0);
       l1Acks       : slv(NUM_DETECTORS_G-1 downto 0);
       txData       : slv(15 downto 0);
       txDataK      : slv(1 downto 0);
@@ -99,8 +98,8 @@ begin
 
    comb : process (detectorPartitions, full, id, l1Feedbacks, overflow, r, rst) is
       variable v                 : RegType;
-      variable partitionFull     : slv(EXPERIMENT_PARTITIONS_C-1 downto 0);
-      variable partitionOverflow : slv(EXPERIMENT_PARTITIONS_C-1 downto 0);
+      variable partitionFull     : slv(XPM_PARTITIONS_C-1 downto 0);
+      variable partitionOverflow : slv(XPM_PARTITIONS_C-1 downto 0);
 
    begin
       v := r;
@@ -111,7 +110,7 @@ begin
 
       -- Full and overflow arrive per DETECTOR
       -- reorganize them according to partition
-      partitionFull := (others => '0');
+      partitionFull     := (others => '0');
       partitionOverflow := (others => '0');
 
       for d in NUM_DETECTORS_G-1 downto 0 loop

@@ -29,6 +29,7 @@ use work.TimingPkg.all;
 
 -- l2si
 use work.L2SiPkg.all;
+use work.XpmExtensionPkg.all;
 
 entity TriggerEventBuffer is
 
@@ -51,12 +52,12 @@ entity TriggerEventBuffer is
       -- Prompt header and event bus
       promptTimingStrobe      : in sl;
       promptTimingMessage     : in TimingMessageType;
-      promptExperimentMessage : in ExperimentMessageType;
+      promptXpmMessage : in XpmMessageType;
 
       -- Aligned header and event bus
       alignedTimingStrobe      : in sl;
       alignedTimingMessage     : in TimingMessageType;
-      alignedExperimentMessage : in ExperimentMessageType;
+      alignedXpmMessage : in XpmMessageType;
 
       -- Feedback
       partition : out slv(2 downto 0);
@@ -66,7 +67,7 @@ entity TriggerEventBuffer is
       -- Trigger output
       triggerClk  : in  sl;
       triggerRst  : in  sl;
-      triggerData : out ExperimentEventDataType;
+      triggerData : out TriggerEventDataType;
 
       -- Event/Transition output
       eventClk           : in  sl;
@@ -98,7 +99,7 @@ architecture rtl of TriggerEventBuffer is
       fifoAxisMaster : AxiStreamMasterType;
 
       -- outputs
-      triggerData    : ExperimentEventDataType;
+      triggerData    : XpmEventDataType;
       axilReadSlave  : AxiLiteReadSlaveType;
       axilWriteSlave : AxiLiteWriteSlaveType;
 
@@ -119,7 +120,7 @@ architecture rtl of TriggerEventBuffer is
 
       fifoAxisMaster => axiStreamMasterInit(EVENT_AXIS_CONFIG_C),
       -- outputs     =>
-      triggerData    => EXPERIMENT_EVENT_DATA_INIT_C,
+      triggerData    => XPM_EVENT_DATA_INIT_C,
       axilReadSlave  => AXI_LITE_READ_SLAVE_INIT_C,
       axilWriteSlave => AXI_LITE_WRITE_SLAVE_INIT_C);
 
@@ -142,15 +143,15 @@ architecture rtl of TriggerEventBuffer is
 begin
 
 
-   comb : process (alignedExperimentMessage, alignedTimingMessage, alignedTimingStrobe,
+   comb : process (alignedXpmMessage, alignedTimingMessage, alignedTimingStrobe,
                    axilReadMaster, axilWriteMaster, fifoAxisCtrl,
-                   promptExperimentMessage, promptTimingStrobe, r, timingRxRst) is
+                   promptXpmMessage, promptTimingStrobe, r, timingRxRst) is
       variable v              : RegType;
       variable axilEp         : AxiLiteEndpointType;
       variable partitionV     : integer;
-      variable eventData      : ExperimentEventDataType;
-      variable transitionData : ExperimentTransitionDataType;
-      variable tmpEventData   : ExperimentEventDataType;
+      variable eventData      : XpmEventDataType;
+      variable transitionData : XpmTransitionDataType;
+      variable tmpEventData   : XpmEventDataType;
       variable eventHeader    : EventHeaderType;
       variable streamValid    : sl;
    begin
@@ -168,8 +169,8 @@ begin
       -- Output on triggerData interface
       --------------------------------------------
       v.triggerData.valid := '0';
-      If (promptTimingStrobe = '1' and promptExperimentMessage.valid = '1') then
-         v.triggerData := toExperimentEventDataType(promptExperimentMessage.partitionWord(partitionV));
+      If (promptTimingStrobe = '1' and promptXpmMessage.valid = '1') then
+         v.triggerData := toXpmEventDataType(promptXpmMessage.partitionWord(partitionV));
 
          -- Count time since last event
          v.messageDelay(0) := r.messageDelay(0) + 1;
@@ -188,11 +189,11 @@ begin
       -- Watch for events/transitions on aligned interface
       -- Place entries into FIFO
       --------------------------------------------
-      if (alignedTimingStrobe = '1' and alignedExperimentMessage.valid = '1') then
+      if (alignedTimingStrobe = '1' and alignedXpmMessage.valid = '1') then
          -- Decode event data from configured partitionWord
          -- Decode as both event and transition and use the .valid field to determine which one to use
-         eventData      := toExperimentEventDataType(alignedExperimentMessage.partitionWord(partitionV));
-         transitionData := toExperimentTransitionDataType(alignedExperimentMessage.partitionWord(partitionV));
+         eventData      := toXpmEventDataType(alignedXpmMessage.partitionWord(partitionV));
+         transitionData := toXpmTransitionDataType(alignedXpmMessage.partitionWord(partitionV));
 
          -- Pass on events with l0Accept
          -- Pass on transitions
@@ -213,10 +214,10 @@ begin
          eventHeader.timeStamp   := alignedTimingMessage.timeStamp;
          eventHeader.count       := eventData.count;
          eventHeader.payload     := eventData.payload;
-         eventHeader.triggerInfo := alignedExperimentMessage.partitionWord(partitionV)(15 downto 0);  -- Fix this uglyness later
+         eventHeader.triggerInfo := alignedXpmMessage.partitionWord(partitionV)(15 downto 0);  -- Fix this uglyness later
          eventHeader.partitions  := (others => '0');
          for i in 0 to 7 loop
-            tmpEventData              := toExperimentEventDataType(alignedExperimentMessage.partitionWord(i));
+            tmpEventData              := toXpmEventDataType(alignedXpmMessage.partitionWord(i));
             eventHeader.partitions(i) := tmpEventData.l0Accept or not tmpEventData.valid;
          end loop;
 
@@ -338,11 +339,11 @@ begin
             rd_en  => syncTriggerDataValid,     -- [in]
             valid  => syncTriggerDataValid,     -- [out]
             dout   => syncTriggerDataSlv);      -- [out]
-      triggerData <= toExperimentEventDataType(syncTriggerDataSlv, syncTriggerDataValid);
+      triggerData <= toXpmEventDataType(syncTriggerDataSlv, syncTriggerDataValid);
    end generate TRIGGER_SYNC_GEN;
 
    NO_TRIGGER_SYNC_GEN : if (TRIGGER_CLK_IS_TIMING_RX_CLK_G) generate
-      triggerData <= toExperimentEventDataType(delayedTriggerDataSlv, delayedTriggerDataValid);
+      triggerData <= toXpmEventDataType(delayedTriggerDataSlv, delayedTriggerDataValid);
    end generate NO_TRIGGER_SYNC_GEN;
 
    -----------------------------------------------
