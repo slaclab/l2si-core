@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-12-14
--- Last update: 2018-12-19
+-- Last update: 2019-10-17
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -31,8 +31,9 @@ use ieee.std_logic_arith.all;
 
 use work.StdRtlPkg.all;
 use work.TimingPkg.all;
-use work.TimingExtnPkg.all;
+
 use work.XpmPkg.all;
+use work.CuTimingPkg.all;
 
 entity XpmL0Select is
    generic ( DEBUG_G : boolean := false );

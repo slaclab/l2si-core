@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-07-08
--- Last update: 2019-10-16
+-- Last update: 2019-10-17
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -44,9 +44,9 @@ entity XpmTimingFb is
       pllReset           : in  sl               := '0';
       phyReset           : in  sl               := '0';
       id                 : in  slv(31 downto 0) := (others => '1');
-      detectorPartitions : in  slv3Array(NUM_DETECTORS_G-1 downto 0);
-      full               : in  slv(NUM_DETECTORS_G-1 downto 0);
-      overflow           : in  slv(NUM_DETECTORS_G-1 downto 0);
+      detectorPartitions : in  slv3Array(NUM_DETECTORS_G-1 downto 0) := (others => (others => '0'));
+      full               : in  slv(NUM_DETECTORS_G-1 downto 0) := (others => '0');
+      overflow           : in  slv(NUM_DETECTORS_G-1 downto 0) := (others => '0');
       l1Feedbacks        : in  XpmL1FeedbackArray(NUM_DETECTORS_G-1 downto 0);
       l1Acks             : out slv(NUM_DETECTORS_G-1 downto 0);
       phy                : out TimingPhyType);

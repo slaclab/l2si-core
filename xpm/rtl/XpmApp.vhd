@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-07-10
--- Last update: 2019-07-27
+-- Last update: 2019-10-17
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -27,13 +27,17 @@ library ieee;
 use ieee.std_logic_1164.all;
 use ieee.std_logic_unsigned.all;
 
+-- surf
 use work.StdRtlPkg.all;
-use work.TimingExtnPkg.all;
-use work.TimingPkg.all;
 use work.AxiLitePkg.all;
 use work.AxiStreamPkg.all;
---use work.AmcCarrierPkg.all;
+
+-- lcls-timing-core
+use work.TimingPkg.all;
+
+-- l2si-core
 use work.XpmPkg.all;
+use work.XpmExtensionPkg.all;
 use work.XpmMiniPkg.all;
 
 library unisim;
@@ -89,13 +93,13 @@ end XpmApp;
 architecture top_level_app of XpmApp is
 
   type LinkFullArray  is array (natural range<>) of slv(26 downto 0);
-  type LinkL1InpArray is array (natural range<>) of XpmL1InputArray(NDsLinks-1 downto 0);
+  type LinkL1InpArray is array (natural range<>) of XpmL1FeedbackArray(NDsLinks-1 downto 0);
 
   type StateType is (INIT_S, PADDR_S, EWORD_S, EOS_S);
   type RegType is record
     full       : LinkFullArray (NPartitions-1 downto 0);
     fullfb     : slv           (NPartitions-1 downto 0);
-    l1input    : LinkL1InpArray(NPartitions-1 downto 0);
+    l1feedback    : LinkL1InpArray(NPartitions-1 downto 0);
     fiducial   : sl;
     source     : sl;
     paddr      : slv(PADDR_LEN-1 downto 0); -- platform address
@@ -116,7 +120,7 @@ architecture top_level_app of XpmApp is
   constant REG_INIT_C : RegType := (
     full       => (others=>(others=>'0')),
     fullfb     => (others=>'0'),
-    l1input    => (others=>(others=>XPM_L1_INPUT_INIT_C)),
+    l1feedback    => (others=>(others=>XPM_L1_FEEDBACK_INIT_C)),
     fiducial   => '0',
     source     => '1',
     paddr      => (others=>'1'),
@@ -139,11 +143,11 @@ architecture top_level_app of XpmApp is
   signal rin : RegType;
   
 
-  --  input data from sensor links
-  type L1InputArray is array (natural range<>) of XpmL1InputArray(NPartitions-1 downto 0);
+  --  feedback data from sensor links
+  type L1FeedbackArray is array (natural range<>) of XpmL1FeedbackArray(NPartitions-1 downto 0);
   type FullArray    is array (natural range<>) of slv            (NPartitions-1 downto 0);
 
-  signal l1Input        : L1InputArray(NDsLinks-1 downto 0);
+  signal l1Feedback        : L1FeedbackArray(NDsLinks-1 downto 0);
   signal isXpm          : slv         (NDsLinks-1 downto 0);
   signal dsFull         : FullArray   (NDsLinks-1 downto 0);
   signal dsRxRcvs       : Slv32Array  (NDsLinks-1 downto 0);
@@ -216,13 +220,14 @@ begin
     port map ( clk        => timingFbClk,
                rst        => timingFbRst,
                id         => timingFbId,
-               l1input    => (others=>XPM_L1_INPUT_INIT_C),
+               detectorPartitions => (others => (others => '0')),
                full       => fullfb,
+               l1feedbacks    => (others=>XPM_L1_FEEDBACK_INIT_C),
                phy        => timingFb );
                
   GEN_DSLINK: for i in 0 to NDsLinks-1 generate
     U_TxLink : entity work.XpmTxLink
-      generic map ( ADDR => i, STREAMS_G => 3, DEBUG_G => false )
+      generic map ( ADDR_G => i, STREAMS_G => 3, DEBUG_G => false )
       port map ( clk             => timingClk,
                  rst             => timingRst,
                  config          => config.dsLink(i),
@@ -247,11 +252,11 @@ begin
                  id              => dsId     (i),
                  rxRcvs          => dsRxRcvs (i),
                  full            => dsFull   (i),
-                 l1Input         => l1Input  (i) );
+                 l1Feedback         => l1Feedback  (i) );
   end generate GEN_DSLINK;
 
   U_BpTx : entity work.XpmTxLink
-    generic map ( ADDR      => 15,
+    generic map ( ADDR_G      => 15,
                   STREAMS_G => 3,
                   DEBUG_G   => false )
     port map ( clk             => timingClk,
@@ -320,7 +325,7 @@ begin
                  advance       => advance,
                  fiducial      => timingStream.fiducial,
                  full          => r.full          (i),
-                 l1Input       => r.l1input       (i),
+                 l1Feedback       => r.l1feedback       (i),
                  result        => expWord         (i) );
 
     U_SyncMaster : entity work.Synchronizer
@@ -340,13 +345,13 @@ begin
                  dataOut => pdepth(i) );
   end generate;
 
-  comb : process ( r, timingRst, dsFull, bpRxLinkFullS, l1Input,
+  comb : process ( r, timingRst, dsFull, bpRxLinkFullS, l1Feedback,
                    timingStream, streams, advance,
                    expWord, pmaster, pdepth, paddr ) is
     variable v    : RegType;
     variable tidx : integer;
     variable mhdr : slv(7 downto 0);
-    constant pd   : XpmBroadcastType := PDELAY;
+    variable broadcast : XpmBroadcastType;
   begin
     v := r;
     v.streams := streams;
@@ -416,24 +421,27 @@ begin
       when EOS_S =>
         v.streams(2).ready := '0';
         v.bcastf := r.bcastr;
-        tidx := toIndex(r.bcastr);
+        tidx := toXpmBroadcastType(r.bcastr).index;
         if r.source='1' then
           -- master of all : compose the word
           if r.bcastCount = 8 then
             v.bcastf := paddr;
             v.bcastCount := 0;
           else
-            v.bcastf := toPaddr(pd,r.bcastCount,pdepth(r.bcastCount));
+             broadcast := (btype => XPM_BROADCAST_PDELAY_C, index => r.bcastCount, value => pdepth(r.bcastCount)(6 downto 0));
+            v.bcastf := toXpmPartitionAddress(broadcast);
             v.bcastCount := r.bcastCount + 1;
           end if;
         else
-          case (toXpmBroadcastType(r.bcastr)) is
-            when PDELAY =>
+           broadcast := toXpmBroadcastType(r.bcastr);
+          case (broadcast.btype) is
+            when XPM_BROADCAST_PDELAY_C =>
               if pmaster(tidx)='1' then
-                -- master of this partition : compose the word
-                v.bcastf := toPaddr(pd,tidx,pdepth(tidx));
+                 -- master of this partition : compose the word
+                 broadcast := (btype => XPM_BROADCAST_PDELAY_C, index => tidx, value => pdepth(tidx)(6 downto 0));                 
+                v.bcastf := toXpmPartitionAddress(broadcast);
               end if;
-            when XADDR =>
+            when XPM_BROADCAST_XADDR_C =>
               v.bcastf := paddr;
               v.paddr  := r.bcastr;
             when others => null;
@@ -447,7 +455,7 @@ begin
     for i in 0 to NPartitions-1 loop
       for j in 0 to NDsLinks-1 loop
         v.full   (i)(j) := dsFull (j)(i);
-        v.l1input(i)(j) := l1Input(j)(i);
+        v.l1feedback(i)(j) := l1Feedback(j)(i);
       end loop;
       for j in 0 to NBpLinks-1 loop
         v.full   (i)(j+16) := bpRxLinkFullS(j)(i);
@@ -461,7 +469,7 @@ begin
 
     v.groupLinkClear := (others=>'0');
     if r.msgComplete = '1' and r.msg(15) = '0' then
-      mhdr := toPartitionMsg(r.msg).hdr;
+      mhdr := toXpmTransitionDataType(r.msg).header;
       case (mhdr(7 downto 6)) is
         when "00"  => -- Transition
           NULL;

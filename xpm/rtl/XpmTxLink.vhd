@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-12-14
--- Last update: 2019-06-01
+-- Last update: 2019-10-17
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -32,14 +32,19 @@ use ieee.std_logic_1164.all;
 use ieee.std_logic_unsigned.all;
 use ieee.std_logic_arith.all;
 
+-- surf
 use work.StdRtlPkg.all;
-use work.TimingExtnPkg.all;
+
+-- lcls-timing-core
 use work.TimingPkg.all;
+
+-- l2si-core
+use work.XpmExtensionPkg.all;
 use work.XpmPkg.all;
 
 entity XpmTxLink is
    generic (
-      ADDR      : integer := 0;
+      ADDR_G      : integer := 0;
       STREAMS_G : integer := 2;
       DEBUG_G   : boolean := false );
    port (
@@ -49,7 +54,7 @@ entity XpmTxLink is
       isXpm            : in  sl;
       streams          : in  TimingSerialArray(STREAMS_G-1 downto 0);
       streamIds        : in  Slv4Array        (STREAMS_G-1 downto 0);
-      paddr            : in  slv(PADDR_LEN-1 downto 0);
+      paddr            : in  slv(XPM_PARTITION_ADDR_LENGTH_C-1 downto 0);
       advance_i        : in  slv              (STREAMS_G-1 downto 0);
       fiducial         : in  sl;
       txData           : out slv(15 downto 0);
@@ -58,7 +63,7 @@ end XpmTxLink;
 
 architecture rtl of XpmTxLink is
 
-  constant PBITS : integer := log2(NPartitions-1);
+  constant PBITS : integer := log2(XPM_PARTITIONS_C-1);
                               
   type RegType is record
     fiducial  : slv(2 downto 0);
@@ -207,7 +212,7 @@ begin
 
   U_CuDelay : entity work.XpmSerialDelay
      generic map ( DELAY_WIDTH_G => config.txDelay'length,
-                   NWORDS_G => TIMING_EXTN_WORDS_C(1),
+                   NWORDS_G => XPM_MESSAGE_WORDS_C,
                    FDEPTH_G => 100 )
      port map ( clk        => clk,
                 rst        => rst,
@@ -238,8 +243,8 @@ begin
      v.efifoWr  := (r.efifoV and not efifoV) & r.efifoWr(r.efifoWr'left downto 1);
      v.eadvance := advance_i(2) & r.eadvance(r.eadvance'left downto 1);
      if (r.efifoV='1' and efifoV='0') then
-       if toXpmBroadcastType(paddr)=XADDR then
-         v.paddr  := paddr(paddr'left-4 downto 0) & toSlv(ADDR,4);
+       if toXpmBroadcastType(paddr).btype = XPM_BROADCAST_XADDR_C then
+         v.paddr  := paddr(paddr'left-4 downto 0) & toSlv(ADDR_G,4);
        else
          v.paddr  := paddr;
        end if;

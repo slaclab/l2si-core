@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-07-10
--- Last update: 2019-07-29
+-- Last update: 2019-10-17
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -20,8 +20,10 @@ use ieee.std_logic_unsigned.all;
 
 use work.StdRtlPkg.all;
 use work.TimingPkg.all;
-use work.TimingExtnPkg.all;
+
 use work.XpmPkg.all;
+use work.XpmExtensionPkg.all;
+use work.CuTimingPkg.all;
 
 library unisim;
 use unisim.vcomponents.all;
@@ -48,7 +50,7 @@ entity XpmAppMaster is
       advance           : in  slv              (2 downto 0);
       fiducial          : in  sl;
       full              : in  slv              (26 downto 0);
-      l1Input           : in  XpmL1InputArray  (NDsLinks-1 downto 0) := (others=>XPM_L1_INPUT_INIT_C);
+      l1Feedback           : in  XpmL1FeedbackArray  (NDsLinks-1 downto 0) := (others=>XPM_L1_FEEDBACK_INIT_C);
       result            : out slv              (47 downto 0) );
 end XpmAppMaster;
 
@@ -83,11 +85,11 @@ architecture rtl of XpmAppMaster is
   signal msgWr          : sl;
   signal msgRdCount     : slv(3 downto 0);
   
-  --  input data from sensor links
+  --  feedback data from sensor links
   --  L0 inhibit decision
   signal l0Reset        : sl;
   signal inhibit        : sl;
-  signal presult        : XpmPartitionDataType;
+
   --  L0 trigger output
   signal l0Accept       : sl;
   signal l0Reject       : sl;
@@ -105,7 +107,7 @@ architecture rtl of XpmAppMaster is
   signal timingBus_valid  : sl;
   signal delayOverflow : sl;
 
-  signal cuRx_frame         : slv(16*TIMING_EXTN_WORDS_C(1)-1 downto 0);
+  signal cuRx_frame         : slv(CU_TIMING_BITS_C-1 downto 0);
   signal cuRx_strobe        : sl;
   signal cuRx_valid         : sl;
   signal cuRx_delayOverflow : sl;
@@ -151,7 +153,7 @@ begin
                overflow_o     => delayOverflow );
 
   U_CuRx : entity work.TimingSerialDelay
-    generic map ( NWORDS_G => TIMING_EXTN_WORDS_C(1),
+    generic map ( NWORDS_G => CU_TIMING_WORDS_C,
                   FDEPTH_G => 100 )
     port map ( clk            => timingClk,
                rst            => l0Reset,
@@ -213,7 +215,7 @@ begin
   --  port map ( clk            => timingClk,
   --             rst            => timingRst,
   --             config         => config.l1Select,
-  --             links          => l1Input,
+  --             links          => l1Feedback,
   --             enable         => l1Out,
   --             --accept         => l1Accept,
   --             --tag            => l1AcceptTag );
@@ -266,8 +268,8 @@ begin
                    timingBus_strobe, timingBus_valid, msgConfig,
                    l0Tag, l0Accept, l0Reject ) is
     variable v     : RegType;
-    variable pword : XpmPartitionDataType;
-    variable msg   : XpmPartitionMsgType;
+    variable pword : XpmEventDataType;
+    variable msg   : XpmTransitionDataType;
   begin
     v := r;
 
@@ -284,18 +286,18 @@ begin
         v.insertMsg  := '0';
         v.strobeMsg  := '1';
         msg.l0tag    := l0Tag(msg.l0tag'range);
-        msg.hdr      := msgConfig.hdr;
+        msg.header      := msgConfig.hdr;
         msg.payload  := msgConfig.payload;
-        msg.anatag   := l0Tag(msg.anatag'range);
+        msg.count   := l0Tag(msg.count'range);
         v.result     := toSlv(msg);
       else
-        pword.l0a    := l0Accept;
-        pword.l0r    := l0Reject;
-        pword.l1a    := l0Accept;
-        pword.l1e    := l0Accept;
+        pword.l0Accept    := l0Accept;
+        pword.l0Reject    := l0Reject;
+        pword.l1Accept    := l0Accept;
+        pword.l1Expect    := l0Accept;
         pword.l0tag  := l0Tag(pword.l0tag'range);
         pword.l1tag  := l0Tag(pword.l1tag'range);
-        pword.anatag := l0Tag(pword.anatag'range);
+        pword.count := l0Tag(pword.count'range);
         v.result     := toSlv(pword);
       end if;
     end if;

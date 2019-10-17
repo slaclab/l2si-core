@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-12-14
--- Last update: 2019-05-24
+-- Last update: 2019-10-17
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -32,9 +32,15 @@ use ieee.std_logic_1164.all;
 use ieee.std_logic_arith.all;
 use ieee.std_logic_unsigned.all;
 
+-- surf
 use work.StdRtlPkg.all;
+
+-- lcls-timing-core
 use work.TimingPkg.all;
+
+-- l2si-core
 use work.XpmPkg.all;
+use work.XpmExtensionPkg.all;
 
 entity XpmRxLink is
   port (
@@ -50,7 +56,7 @@ entity XpmRxLink is
     id               : out slv(31 downto 0);
     rxRcvs           : out slv(31 downto 0);
     full             : out slv            (NPartitions-1 downto 0);
-    l1Input          : out XpmL1InputArray(NPartitions-1 downto 0) );
+    l1Feedback          : out XpmL1FeedbackArray(NPartitions-1 downto 0) );
 end XpmRxLink;
 
 architecture rtl of XpmRxLink is
@@ -63,7 +69,7 @@ architecture rtl of XpmRxLink is
     id        : slv(31 downto 0);
     rxRcvs    : slv(31 downto 0);
     pfull     : slv(NPartitions-1 downto 0);
-    l1input   : XpmL1InputType;
+    l1feedback   : XpmL1FeedbackType;
     strobe    : slv(NPartitions-1 downto 0);
     timeout   : slv(8 downto 0);
   end record;
@@ -74,7 +80,7 @@ architecture rtl of XpmRxLink is
     id        => (others=>'0'),
     rxRcvs    => (others=>'0'),
     pfull     => (others=>'1'),
-    l1input   => XPM_L1_INPUT_INIT_C,
+    l1feedback   => XPM_L1_FEEDBACK_INIT_C,
     strobe    => (others=>'0'),
     timeout   => (others=>'0') );
 
@@ -97,15 +103,15 @@ begin
       port map ( rst                => rxRst,
                  wr_clk             => rxClk,
                  wr_en              => r.strobe(i),
-                 din (17 downto  9) => r.l1input.trigword,
-                 din ( 8 downto  4) => r.l1input.tag,
-                 din ( 3 downto  0) => r.l1input.trigsrc,
+                 din (17 downto  9) => r.l1feedback.trigword,
+                 din ( 8 downto  4) => r.l1feedback.tag,
+                 din ( 3 downto  0) => r.l1feedback.trigsrc,
                  rd_clk             => clk,
                  rd_en              => '1',
-                 valid              => l1Input(i).valid,
-                 dout(17 downto  9) => l1Input(i).trigword,
-                 dout( 8 downto  4) => l1Input(i).tag,
-                 dout( 3 downto  0) => l1Input(i).trigsrc );
+                 valid              => l1Feedback(i).valid,
+                 dout(17 downto  9) => l1Feedback(i).trigword,
+                 dout( 8 downto  4) => l1Feedback(i).tag,
+                 dout( 3 downto  0) => l1Feedback(i).trigsrc );
   end generate;
   
   U_Enable : entity work.Synchronizer
@@ -171,7 +177,7 @@ begin
         if (rxDataK="01" and rxData=(D_215_C & K_EOF_C)) then
           v.state := IDLE_S;
         else
-          v.l1input.trigsrc    := rxData( 7 downto 4);
+          v.l1feedback.trigsrc    := rxData( 7 downto 4);
           v.partition          := conv_integer(rxData( 3 downto 0));
           v.state := PDATA2_S;
         end if;
@@ -180,8 +186,8 @@ begin
           v.state := IDLE_S;
         else
           v.strobe(r.partition) := rxData(14);
-          v.l1input.trigword    := rxData(13 downto 5);
-          v.l1input.tag         := rxData( 4 downto 0);
+          v.l1feedback.trigword    := rxData(13 downto 5);
+          v.l1feedback.tag         := rxData( 4 downto 0);
           v.state := PFULL_S;
         end if;
 
@@ -197,9 +203,9 @@ begin
           if rxData(14) = '1' then
             v.strobe            := uconfig.groupMask;
           end if;
-          v.l1input.trigword    := rxData(13 downto 5);
-          v.l1input.tag         := rxData( 4 downto 0);
-          v.l1input.trigsrc     := uconfig.trigsrc;
+          v.l1feedback.trigword    := rxData(13 downto 5);
+          v.l1feedback.tag         := rxData( 4 downto 0);
+          v.l1feedback.trigsrc     := uconfig.trigsrc;
         end if;
       when others => null;
     end case;
