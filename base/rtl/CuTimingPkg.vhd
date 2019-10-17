@@ -24,7 +24,11 @@ use ieee.std_logic_arith.all;
 use work.StdRtlPkg.all;
 
 package CuTimingPkg is
+
+   constant CU_TIMING_STREAM_ID_C : integer := 2;
+   
    constant CU_TIMING_BITS_C : integer := 256+64+80;
+   constant CU_TIMING_WORDS_C : integer := CU_TIMING_BITS_C / 16;
 
    -- Cu Accelerator Timing System
    type CuTimingType is record

@@ -34,6 +34,7 @@ package XpmExtensionPkg is
    constant XPM_PARTITION_ADDR_LENGTH_C : integer := 32;
    constant XPM_PARTITION_WORD_LENGTH_C : integer := 48;
    constant XPM_MESSAGE_BITS_C          : integer := 32 + 8 * 48;
+   constant XPM_MESSAGE_WORDS_C : integer := XPM_MESSAGE_BITS_C / 16;
 
    type XpmMessageType is record
       valid         : sl;
