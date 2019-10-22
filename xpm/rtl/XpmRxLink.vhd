@@ -41,8 +41,10 @@ use surf.StdRtlPkg.all;
 use work.TimingPkg.all;
 
 -- l2si-core
-use work.XpmPkg.all;
-use work.XpmExtensionPkg.all;
+
+library l2si_core;
+use l2si_core.XpmPkg.all;
+use l2si_core.XpmExtensionPkg.all;
 
 entity XpmRxLink is
   port (

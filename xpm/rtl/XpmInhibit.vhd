@@ -30,7 +30,9 @@ use ieee.std_logic_1164.all;
 
 library surf;
 use surf.StdRtlPkg.all;
-use work.XpmPkg.all;
+
+library l2si_core;
+use l2si_core.XpmPkg.all;
 
 entity XpmInhibit is
    port (
@@ -106,7 +108,7 @@ begin
                 rdClk        => regclk );
 
    GEN_L0INH : for i in config.setup'range generate
-     U_L0INH : entity work.XpmTrigInhibit
+     U_L0INH : entity l2si_core.XpmTrigInhibit
        port map ( rst        => rst,
                   clk        => clk,
                   config     => config.setup(i),

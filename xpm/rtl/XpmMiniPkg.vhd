@@ -29,7 +29,9 @@ use ieee.std_logic_arith.all;
 library surf;
 use surf.StdRtlPkg.all;
 use work.TimingPkg.all;
-use work.XpmPkg.all;
+
+library l2si_core;
+use l2si_core.XpmPkg.all;
 
 package XpmMiniPkg is
 

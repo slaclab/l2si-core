@@ -35,7 +35,9 @@ library surf;
 use surf.StdRtlPkg.all;
 use surf.AxiStreamPkg.all;
 use surf.AxiLitePkg.all;
-use work.DtiPkg.all;
+
+library l2si_core;
+use l2si_core.DtiPkg.all;
 use surf.Pgp2bPkg.all;
 
 entity DtiPgpFb is

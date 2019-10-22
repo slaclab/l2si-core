@@ -31,8 +31,10 @@ library surf;
 use surf.StdRtlPkg.all;
 use surf.AxiLitePkg.all;
 use surf.AxiStreamPkg.all;
-use work.XpmPkg.all;
-use work.XpmMiniPkg.all;
+
+library l2si_core;
+use l2si_core.XpmPkg.all;
+use l2si_core.XpmMiniPkg.all;
 
 entity XpmMiniReg is
    port (

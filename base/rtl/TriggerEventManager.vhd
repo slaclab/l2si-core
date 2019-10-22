@@ -31,8 +31,10 @@ use surf.AxiStreamPkg.all;
 use work.TimingPkg.all;
 
 -- l2si
-use work.L2SiPkg.all;
-use work.XpmExtensionPkg.all;
+
+library l2si_core;
+use l2si_core.L2SiPkg.all;
+use l2si_core.XpmExtensionPkg.all;
 
 entity TriggerEventManager is
 
@@ -226,7 +228,7 @@ begin
    xpmMessage <= toXpmMessageType(timingBus.extension(XPM_STREAM_ID_C));
 
    -- Align timing message and xpm partition words according to PDELAY broadcasts on xpm bus
-   U_XpmMessageAligner_1 : entity work.XpmMessageAligner
+   U_XpmMessageAligner_1 : entity l2si_core.XpmMessageAligner
       generic map (
          TPD_G      => TPD_G,
          TF_DELAY_G => 100)
@@ -247,7 +249,7 @@ begin
 
 
    GEN_DETECTORS : for i in NUM_DETECTORS_G-1 downto 0 generate
-      U_TriggerEventBuffer_1 : entity work.TriggerEventBuffer
+      U_TriggerEventBuffer_1 : entity l2si_core.TriggerEventBuffer
          generic map (
             TPD_G                          => TPD_G,
             TRIGGER_CLK_IS_TIMING_RX_CLK_G => TRIGGER_CLK_IS_TIMING_RX_CLK_G,
@@ -348,7 +350,7 @@ begin
          dataOut => l1Acks);            -- [out]
 
    -- Create upstream message
-   U_XpmTimingFb_1 : entity work.XpmTimingFb
+   U_XpmTimingFb_1 : entity l2si_core.XpmTimingFb
       generic map (
          TPD_G           => TPD_G,
          NUM_DETECTORS_G => NUM_DETECTORS_G)

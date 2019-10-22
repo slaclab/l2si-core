@@ -36,8 +36,10 @@ use surf.StdRtlPkg.all;
 use work.TimingExtnPkg.all;
 use work.TimingPkg.all;
 use work.TPGPkg.all;
-use work.XpmPkg.all;
-use work.XpmMiniPkg.all;
+
+library l2si_core;
+use l2si_core.XpmPkg.all;
+use l2si_core.XpmMiniPkg.all;
 use surf.AxiLitePkg.all;
 use surf.AxiStreamPkg.all;
  
@@ -274,7 +276,7 @@ begin
                 data      => open,
                 dataK     => open );
      
-   U_Application : entity work.XpmApp
+   U_Application : entity l2si_core.XpmApp
       generic map ( NDsLinks => linkStatus'length,
                     NBpLinks => bpRxLinkUp'length )
       port map (

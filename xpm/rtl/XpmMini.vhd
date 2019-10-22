@@ -33,8 +33,10 @@ use surf.StdRtlPkg.all;
 use work.TimingExtnPkg.all;
 use work.TimingPkg.all;
 use surf.AxiLitePkg.all;
-use work.XpmPkg.all;
-use work.XpmMiniPkg.all;
+
+library l2si_core;
+use l2si_core.XpmPkg.all;
+use l2si_core.XpmMiniPkg.all;
 
 library unisim;
 use unisim.vcomponents.all;
@@ -153,7 +155,7 @@ begin
     linkConfig(i).groupMask  <= toSlv(1,NPartitions);
     linkConfig(i).trigsrc    <= (others=>'0');
       
-    U_TxLink : entity work.XpmTxLink
+    U_TxLink : entity l2si_core.XpmTxLink
       generic map ( ADDR => i, STREAMS_G => 3 )
       port map ( clk             => timingClk,
                  rst             => timingRst,
@@ -170,7 +172,7 @@ begin
     dsTx(i).control <= TIMING_PHY_CONTROL_INIT_C;
     rxErr(i) <= '0' when (dsRx(i).dspErr="00" and dsRx(i).decErr="00") else '1';
     
-    U_RxLink : entity work.XpmRxLink
+    U_RxLink : entity l2si_core.XpmRxLink
       port map ( clk             => timingClk,
                  rst             => timingRst,
                  config          => linkConfig(i),
@@ -198,7 +200,7 @@ begin
 
   status.partition.l0Select <= partitionStatus.l0Select;
   
-  U_Master : entity work.XpmAppMaster
+  U_Master : entity l2si_core.XpmAppMaster
     generic map ( NDsLinks   => NDsLinks )
     port map ( regclk        => regclk,
                update        => update,

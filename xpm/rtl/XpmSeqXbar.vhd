@@ -30,7 +30,9 @@ library surf;
 use surf.StdRtlPkg.all;
 use surf.AxiLitePkg.all;
 use work.TPGPkg.all;
-use work.XpmSeqPkg.all;
+
+library l2si_core;
+use l2si_core.XpmSeqPkg.all;
 
 entity XpmSeqXbar is
    generic (
@@ -112,7 +114,7 @@ begin
          mAxiReadMasters     => mAxilReadMasters,
          mAxiReadSlaves      => mAxilReadSlaves);
 
-   U_SeqJumpReg : entity work.XpmSeqJumpReg
+   U_SeqJumpReg : entity l2si_core.XpmSeqJumpReg
       port map (
          axiReadMaster  => mAxilReadMasters (SEQJUMP_INDEX_C),
          axiReadSlave   => mAxilReadSlaves  (SEQJUMP_INDEX_C),
@@ -123,7 +125,7 @@ begin
          axiClk         => clk,
          axiRst         => rst);
 
-   U_SeqStateReg : entity work.XpmSeqStateReg
+   U_SeqStateReg : entity l2si_core.XpmSeqStateReg
       port map (
          axiReadMaster  => mAxilReadMasters (SEQSTATE_INDEX_C),
          axiReadSlave   => mAxilReadSlaves  (SEQSTATE_INDEX_C),
@@ -134,7 +136,7 @@ begin
          axiClk         => clk,
          axiRst         => rst);
 
-   U_SeqMemReg : entity work.XpmSeqMemReg
+   U_SeqMemReg : entity l2si_core.XpmSeqMemReg
       port map (
          axiReadMaster  => mAxilReadMasters (SEQMEM_INDEX_C),
          axiReadSlave   => mAxilReadSlaves  (SEQMEM_INDEX_C),

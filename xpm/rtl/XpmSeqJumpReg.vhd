@@ -30,7 +30,9 @@ library surf;
 use surf.StdRtlPkg.all;
 use surf.AxiLitePkg.all;
 use work.TPGPkg.all;
-use work.XpmSeqPkg.all;
+
+library l2si_core;
+use l2si_core.XpmSeqPkg.all;
 
 entity XpmSeqJumpReg is
    generic (

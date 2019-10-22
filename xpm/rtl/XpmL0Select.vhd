@@ -34,8 +34,10 @@ library surf;
 use surf.StdRtlPkg.all;
 use work.TimingPkg.all;
 
-use work.XpmPkg.all;
-use work.CuTimingPkg.all;
+
+library l2si_core;
+use l2si_core.XpmPkg.all;
+use l2si_core.CuTimingPkg.all;
 
 entity XpmL0Select is
    generic ( DEBUG_G : boolean := false );

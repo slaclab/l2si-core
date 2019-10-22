@@ -34,8 +34,10 @@ use work.TimingExtnPkg.all;
 use work.TimingPkg.all;
 use surf.AxiLitePkg.all;
 use work.TPGPkg.all;
-use work.XpmPkg.all;
-use work.XpmMiniPkg.all;
+
+library l2si_core;
+use l2si_core.XpmPkg.all;
+use l2si_core.XpmMiniPkg.all;
 
 library unisim;
 use unisim.vcomponents.all;
@@ -110,7 +112,7 @@ begin
 
   tpgAdvance <= tpgStream.ready;
   
-  U_Xpm : entity work.XpmMini
+  U_Xpm : entity l2si_core.XpmMini
     generic map ( NDsLinks => 1 )
     port map ( regclk       => timingClk,
                regrst       => timingRst,

@@ -31,7 +31,9 @@ use surf.StdRtlPkg.all;
 use surf.AxiLitePkg.all;
 use work.TimingPkg.all;
 use work.TPGPkg.all;
-use work.XpmSeqPkg.all;
+
+library l2si_core;
+use l2si_core.XpmSeqPkg.all;
 use surf.AxiStreamPkg.all;
 use surf.SsiPkg.all;
 use surf.EthMacPkg.all;
@@ -121,7 +123,7 @@ begin
                mAxisMaster => obAppMaster,
                mAxisSlave  => obAppSlave );
   
-  U_XBar : entity work.XpmSeqXbar
+  U_XBar : entity l2si_core.XpmSeqXbar
     generic map ( AXIL_BASEADDR_G => AXIL_BASEADDR_G )
     port map ( axiClk         => axilClk,
                axiRst         => axilRst,
@@ -143,7 +145,7 @@ begin
   tframe    <= toTimingMessageType( tframeSlv );
   
   GEN_SEQ : for i in 0 to XPMSEQDEPTH-1 generate
-    U_SeqRst : entity work.SeqReset
+    U_SeqRst : entity l2si_core.SeqReset
       port map (
         clk      => timingClk,
         rst      => timingRst,
@@ -152,7 +154,7 @@ begin
         strobe   => r.strobe(S0),
         resetReq => config.seqRestart(i),
         resetO   => seqReset(i));
-    U_Jump_i : entity work.SeqJump
+    U_Jump_i : entity l2si_core.SeqJump
       port map (
         clk      => timingClk,
         rst      => timingRst,
@@ -165,7 +167,7 @@ begin
         jumpReq  => seqJump(i),
         jumpAddr => seqJumpAddr(i));
 
-    U_Seq : entity work.Sequence
+    U_Seq : entity l2si_core.Sequence
       port map (
         clkA         => timingClk,
         rstA         => timingRst,

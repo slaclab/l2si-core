@@ -30,8 +30,10 @@ use surf.AxiStreamPkg.all;
 use work.TimingPkg.all;
 
 -- l2si
-use work.L2SiPkg.all;
-use work.XpmExtensionPkg.all;
+
+library l2si_core;
+use l2si_core.L2SiPkg.all;
+use l2si_core.XpmExtensionPkg.all;
 
 entity TriggerEventBuffer is
 

@@ -23,9 +23,11 @@ library surf;
 use surf.StdRtlPkg.all;
 use work.TimingPkg.all;
 
-use work.XpmPkg.all;
-use work.XpmExtensionPkg.all;
-use work.CuTimingPkg.all;
+
+library l2si_core;
+use l2si_core.XpmPkg.all;
+use l2si_core.XpmExtensionPkg.all;
+use l2si_core.CuTimingPkg.all;
 
 library unisim;
 use unisim.vcomponents.all;
@@ -168,7 +170,7 @@ begin
                valid_o        => cuRx_valid,
                overflow_o     => cuRx_delayOverflow );
 
-  U_Inhibit : entity work.XpmInhibit
+  U_Inhibit : entity l2si_core.XpmInhibit
     port map ( regclk         => regclk,
                update         => update,
                clear          => config.l0Select.reset,
@@ -185,7 +187,7 @@ begin
                rejecc         => l0Reject,
                inhibit        => inhibit );
   
-  U_L0Select : entity work.XpmL0Select
+  U_L0Select : entity l2si_core.XpmL0Select
     generic map ( DEBUG_G => DEBUG_G )
     port map ( clk            => timingClk,
                rst            => timingRst,
@@ -199,7 +201,7 @@ begin
                rejecc         => l0Reject,
                status         => status.l0Select );
 
-  U_L0Tag : entity work.XpmL0Tag
+  U_L0Tag : entity l2si_core.XpmL0Tag
     generic map ( TAG_WIDTH_G => l0Tag'length )
     port map ( clk            => timingClk,
                rst            => timingRst,
@@ -213,7 +215,7 @@ begin
                pop_tag        => l1AcceptTag,
                pop_frame      => l1AcceptFrame );
 
-  --U_L1Select : entity work.XpmL1Select
+  --U_L1Select : entity l2si_core.XpmL1Select
   --  port map ( clk            => timingClk,
   --             rst            => timingRst,
   --             config         => config.l1Select,
@@ -224,7 +226,7 @@ begin
   --             accept         => open,
   --             tag            => open );
 
-  --U_AnalysisTag : entity work.XpmAnalysisTag
+  --U_AnalysisTag : entity l2si_core.XpmAnalysisTag
   --  port map ( wrclk          => regclk,
   --             config         => config.analysis,
   --             rdclk          => timingClk,

@@ -27,7 +27,9 @@ use surf.AxiStreamPkg.all;
 use work.TimingPkg.all;
 
 -- L2si
-use work.XpmExtensionPkg.all;
+
+library l2si_core;
+use l2si_core.XpmExtensionPkg.all;
 
 package L2SiPkg is
 

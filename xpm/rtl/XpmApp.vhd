@@ -38,9 +38,11 @@ use surf.AxiStreamPkg.all;
 use work.TimingPkg.all;
 
 -- l2si-core
-use work.XpmPkg.all;
-use work.XpmExtensionPkg.all;
-use work.XpmMiniPkg.all;
+
+library l2si_core;
+use l2si_core.XpmPkg.all;
+use l2si_core.XpmExtensionPkg.all;
+use l2si_core.XpmMiniPkg.all;
 
 library unisim;
 use unisim.vcomponents.all;
@@ -218,7 +220,7 @@ begin
                dataIn     => r.groupLinkClear,
                dataOut    => groupLinkClear );
   
-  U_TimingFb : entity work.XpmTimingFb
+  U_TimingFb : entity l2si_core.XpmTimingFb
     port map ( clk        => timingFbClk,
                rst        => timingFbRst,
                id         => timingFbId,
@@ -228,7 +230,7 @@ begin
                phy        => timingFb );
                
   GEN_DSLINK: for i in 0 to NDsLinks-1 generate
-    U_TxLink : entity work.XpmTxLink
+    U_TxLink : entity l2si_core.XpmTxLink
       generic map ( ADDR_G => i, STREAMS_G => 3, DEBUG_G => false )
       port map ( clk             => timingClk,
                  rst             => timingRst,
@@ -241,7 +243,7 @@ begin
                  fiducial        => r.fiducial,
                  txData          => dsTxData (i),
                  txDataK         => dsTxDataK(i) );
-    U_RxLink : entity work.XpmRxLink
+    U_RxLink : entity l2si_core.XpmRxLink
       port map ( clk             => timingClk,
                  rst             => timingRst,
                  config          => config.dsLink(i),
@@ -257,7 +259,7 @@ begin
                  l1Feedback         => l1Feedback  (i) );
   end generate GEN_DSLINK;
 
-  U_BpTx : entity work.XpmTxLink
+  U_BpTx : entity l2si_core.XpmTxLink
     generic map ( ADDR_G      => 15,
                   STREAMS_G => 3,
                   DEBUG_G   => false )
@@ -287,7 +289,7 @@ begin
   --             eof       => eof,
   --             crcErr    => crcErr );
   
-  U_Seq : entity work.XpmSequence
+  U_Seq : entity l2si_core.XpmSequence
     generic map ( AXIL_BASEADDR_G => AXIL_BASEADDR_G )
     port map ( axilClk         => regclk,
                axilRst         => regrst,
@@ -313,7 +315,7 @@ begin
   
   GEN_PART : for i in 0 to NPartitions-1 generate
 
-    U_Master : entity work.XpmAppMaster
+    U_Master : entity l2si_core.XpmAppMaster
       generic map ( NDsLinks   => NDsLinks,
                     DEBUG_G    => (i<1) )
       port map ( regclk        => regclk,

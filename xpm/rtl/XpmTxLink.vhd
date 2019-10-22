@@ -41,8 +41,10 @@ use surf.StdRtlPkg.all;
 use work.TimingPkg.all;
 
 -- l2si-core
-use work.XpmExtensionPkg.all;
-use work.XpmPkg.all;
+
+library l2si_core;
+use l2si_core.XpmExtensionPkg.all;
+use l2si_core.XpmPkg.all;
 
 entity XpmTxLink is
    generic (
@@ -195,7 +197,7 @@ begin
   fstreams(2).last   <= '1';
   fstreams(2).offset <= (others=>'0');
 
-  U_ScDelay : entity work.XpmSerialDelay
+  U_ScDelay : entity l2si_core.XpmSerialDelay
      generic map ( DELAY_WIDTH_G => config.txDelay'length,
                    NWORDS_G => TIMING_MESSAGE_WORDS_C,
                    FDEPTH_G => 100 )
@@ -212,7 +214,7 @@ begin
                 stream_o   => tfifoStream    (0),
                 overflow_o => open );
 
-  U_CuDelay : entity work.XpmSerialDelay
+  U_CuDelay : entity l2si_core.XpmSerialDelay
      generic map ( DELAY_WIDTH_G => config.txDelay'length,
                    NWORDS_G => XPM_MESSAGE_WORDS_C,
                    FDEPTH_G => 100 )

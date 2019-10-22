@@ -35,7 +35,9 @@ use ieee.std_logic_1164.all;
 library surf;
 use surf.StdRtlPkg.all;
 use work.TimingPkg.all;
-use work.XpmPkg.all;
+
+library l2si_core;
+use l2si_core.XpmPkg.all;
 
 entity XpmL1Select is
    port (

@@ -39,8 +39,10 @@ use surf.SsiPkg.all;
 use surf.AxiLitePkg.all;
 use work.TimingPkg.all;
 use work.TPGPkg.all;
-use work.XpmPkg.all;
-use work.XpmMiniPkg.all;
+
+library l2si_core;
+use l2si_core.XpmPkg.all;
+use l2si_core.XpmMiniPkg.all;
 
 entity XpmMiniWrapper is
    generic ( NDsLinks        : integer := 1;
@@ -133,7 +135,7 @@ begin
          advance    (0) => tpgAdvance,
          fiducial       => tpgFiducial );
 
-   U_XpmReg : entity work.XpmMiniReg
+   U_XpmReg : entity l2si_core.XpmMiniReg
      port map ( axilClk         => axilClk,
                 axilRst         => axilRst,
                 axilReadMaster  => mAxilReadMasters (XPM_MINI_INDEX_C),
@@ -151,7 +153,7 @@ begin
 
    tpgAdvance <= tpgStream.ready;
    
-   U_Xpm : entity work.XpmMini
+   U_Xpm : entity l2si_core.XpmMini
      generic map ( NDsLinks => NDsLinks )
      port map ( regclk       => axilClk,
                 regrst       => axilRst,

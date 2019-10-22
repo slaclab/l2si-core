@@ -34,7 +34,9 @@ use surf.StdRtlPkg.all;
 use work.TimingPkg.all;
 
 -- L2si-core
-use work.XpmExtensionPkg.all;
+
+library l2si_core;
+use l2si_core.XpmExtensionPkg.all;
 
 entity XpmTimingFb is
    generic (
