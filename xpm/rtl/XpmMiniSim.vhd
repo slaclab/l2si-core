@@ -27,10 +27,12 @@ library ieee;
 use ieee.std_logic_1164.all;
 use ieee.std_logic_unsigned.all;
 
-use work.StdRtlPkg.all;
+
+library surf;
+use surf.StdRtlPkg.all;
 use work.TimingExtnPkg.all;
 use work.TimingPkg.all;
-use work.AxiLitePkg.all;
+use surf.AxiLitePkg.all;
 use work.TPGPkg.all;
 use work.XpmPkg.all;
 use work.XpmMiniPkg.all;

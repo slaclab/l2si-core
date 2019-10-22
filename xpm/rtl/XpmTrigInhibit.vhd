@@ -29,7 +29,9 @@ use ieee.std_logic_1164.all;
 use ieee.std_logic_unsigned.all;
 use ieee.std_logic_arith.all;
 
-use work.StdRtlPkg.all;
+
+library surf;
+use surf.StdRtlPkg.all;
 use work.XpmPkg.all;
 
 entity XpmTrigInhibit is
@@ -70,24 +72,24 @@ begin
   inhibit <= r.full;
   fiforst <= rst or not uconfig.enable;
   
-  U_Interval : entity work.SynchronizerVector
+  U_Interval : entity surf.SynchronizerVector
     generic map ( WIDTH_G => config.interval'length )
     port map   ( clk     => clk,
                  dataIn  => config.interval,
                  dataOut => uconfig.interval );
 
-  U_Limit : entity work.SynchronizerVector
+  U_Limit : entity surf.SynchronizerVector
     generic map ( WIDTH_G => config.limit'length )
     port map   ( clk     => clk,
                  dataIn  => config.limit,
                  dataOut => uconfig.limit );
 
-  U_Enable : entity work.Synchronizer
+  U_Enable : entity surf.Synchronizer
     port map   ( clk     => clk,
                  dataIn  => config.enable,
                  dataOut => uconfig.enable );
 
-  U_FIFO : entity work.FifoSync
+  U_FIFO : entity surf.FifoSync
     generic map ( FWFT_EN_G => true,
                   DATA_WIDTH_G => config.interval'length,
                   ADDR_WIDTH_G => config.limit'length )

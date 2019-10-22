@@ -33,7 +33,9 @@ library UNISIM;
 use UNISIM.VCOMPONENTS.ALL;
 use work.TimingPkg.all;
 use work.TPGPkg.all;
-use work.StdRtlPkg.all;
+
+library surf;
+use surf.StdRtlPkg.all;
 
 entity SeqReset is
    generic ( TPD_G : time := 1 ns);

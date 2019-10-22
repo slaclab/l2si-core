@@ -33,7 +33,9 @@ use ieee.std_logic_unsigned.all;
 use ieee.std_logic_arith.all;
 
 -- surf
-use work.StdRtlPkg.all;
+
+library surf;
+use surf.StdRtlPkg.all;
 
 -- lcls-timing-core
 use work.TimingPkg.all;
@@ -150,7 +152,7 @@ begin
                 data      => itxData,
                 dataK     => itxDataK );
 
-  U_ScTimingFifo : entity work.FifoSync
+  U_ScTimingFifo : entity surf.FifoSync
     generic map ( FWFT_EN_G => true )
     port map ( clk     => clk,
                rst     => fifoRst (0),
@@ -162,7 +164,7 @@ begin
   fstreams(0).last   <= '1';
   fstreams(0).offset <= (others=>'0');
   
-  U_CuTimingFifo : entity work.FifoSync
+  U_CuTimingFifo : entity surf.FifoSync
     generic map ( FWFT_EN_G => true )
     port map ( clk     => clk,
                rst     => fifoRst (1),
@@ -174,7 +176,7 @@ begin
   fstreams(1).last   <= '1';
   fstreams(1).offset <= (others=>'0');
   
-  U_ExptFifo : entity work.FifoSync
+  U_ExptFifo : entity surf.FifoSync
     generic map ( FWFT_EN_G => true )
     port map ( clk     => clk,
                rst     => rst,
@@ -227,7 +229,7 @@ begin
                 stream_o   => tfifoStream    (1),
                 overflow_o => open );
 
-  U_SyncDelay : entity work.SynchronizerVector
+  U_SyncDelay : entity surf.SynchronizerVector
     generic map ( WIDTH_G => config.txDelay'length )
     port map ( clk     => clk,
                dataIn  => config.txDelay,

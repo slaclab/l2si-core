@@ -28,9 +28,11 @@ use ieee.std_logic_1164.all;
 use ieee.std_logic_unsigned.all;
 
 -- surf
-use work.StdRtlPkg.all;
-use work.AxiLitePkg.all;
-use work.AxiStreamPkg.all;
+
+library surf;
+use surf.StdRtlPkg.all;
+use surf.AxiLitePkg.all;
+use surf.AxiStreamPkg.all;
 
 -- lcls-timing-core
 use work.TimingPkg.all;
@@ -185,32 +187,32 @@ begin
   end process;
 
   GEN_SYNCBP : for i in 0 to NBpLinks-1 generate
-    U_SyncFull : entity work.SynchronizerVector
+    U_SyncFull : entity surf.SynchronizerVector
       generic map ( WIDTH_G => 16 )
       port map ( clk     => timingClk,
                  dataIn  => bpRxLinkFull(i),
                  dataOut => bpRxLinkFullS(i) );
   end generate;
   
-  U_SyncPaddrRx : entity work.SynchronizerVector
+  U_SyncPaddrRx : entity surf.SynchronizerVector
     generic map ( WIDTH_G => status.paddr'length )
     port map ( clk     => regclk,
                dataIn  => r.paddr,
                dataOut => status.paddr );
   
-  U_SyncPaddrTx : entity work.SynchronizerVector
+  U_SyncPaddrTx : entity surf.SynchronizerVector
     generic map ( WIDTH_G => config.paddr'length )
     port map ( clk     => timingClk,
                dataIn  => config.paddr,
                dataOut => paddr );
   
-  U_FullFb : entity work.SynchronizerVector
+  U_FullFb : entity surf.SynchronizerVector
     generic map ( WIDTH_G => fullfb'length )
     port map ( clk     => timingFbClk,
                dataIn  => r.fullfb,
                dataOut => fullfb );
 
-  U_GroupClear : entity work.SynchronizerOneShotVector
+  U_GroupClear : entity surf.SynchronizerOneShotVector
     generic map ( WIDTH_G => NPartitions )
     port map ( clk        => regclk,
                dataIn     => r.groupLinkClear,
@@ -328,7 +330,7 @@ begin
                  l1Feedback       => r.l1feedback       (i),
                  result        => expWord         (i) );
 
-    U_SyncMaster : entity work.Synchronizer
+    U_SyncMaster : entity surf.Synchronizer
       port map ( clk     => timingClk,
                  dataIn  => config.partition(i).master,
                  dataOut => pmaster(i) );
@@ -338,7 +340,7 @@ begin
     --
     pdepthI(i) <= config.partition(i).pipeline.depth_fids+1;
 
-    U_SyncDelay : entity work.SynchronizerVector
+    U_SyncDelay : entity surf.SynchronizerVector
       generic map ( WIDTH_G => 8 )
       port map ( clk     => timingClk,
                  dataIn  => pdepthI(i),

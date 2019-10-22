@@ -30,11 +30,13 @@ use ieee.std_logic_unsigned.all;
 library unisim;
 use unisim.vcomponents.all;
 
-use work.StdRtlPkg.all;
-use work.AxiStreamPkg.all;
-use work.AxiLitePkg.all;
+
+library surf;
+use surf.StdRtlPkg.all;
+use surf.AxiStreamPkg.all;
+use surf.AxiLitePkg.all;
 use work.DtiPkg.all;
-use work.Pgp3Pkg.all;
+use surf.Pgp3Pkg.all;
 
 entity DtiPgp3Fb is
    port (

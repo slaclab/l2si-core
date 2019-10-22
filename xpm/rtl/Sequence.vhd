@@ -46,7 +46,9 @@ use ieee.std_logic_unsigned.all;
 library UNISIM;
 use UNISIM.VCOMPONENTS.all;
 use work.TPGPkg.all;
-use work.StdRtlPkg.all;
+
+library surf;
+use surf.StdRtlPkg.all;
 
 entity Sequence is
    generic ( TPD_G : time := 1 ns; DEBUG : boolean := false );
@@ -159,7 +161,7 @@ begin
    seqNotify      <= SeqAddrType(r.notifyaddr);
    monCount       <= r.monCount;
 
-   U_Ram : entity work.DualPortRam
+   U_Ram : entity surf.DualPortRam
       generic map (
          TPD_G        => TPD_G,
          DATA_WIDTH_G => 32,

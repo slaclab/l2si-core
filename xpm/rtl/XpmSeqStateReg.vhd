@@ -26,8 +26,10 @@ use ieee.std_logic_unsigned.all;
 use ieee.std_logic_arith.all;
 use ieee.numeric_std.all;
 
-use work.StdRtlPkg.all;
-use work.AxiLitePkg.all;
+
+library surf;
+use surf.StdRtlPkg.all;
+use surf.AxiLitePkg.all;
 use work.TPGPkg.all;
 use work.XpmSeqPkg.all;
 

@@ -23,10 +23,12 @@
 library ieee;
 use ieee.std_logic_1164.all;
 
-use work.StdRtlPkg.all;
+
+library surf;
+use surf.StdRtlPkg.all;
 use work.TimingPkg.all;
 use work.XpmPkg.all;
-use work.AxiStreamPkg.all;
+use surf.AxiStreamPkg.all;
 
 package DtiPkg is
   

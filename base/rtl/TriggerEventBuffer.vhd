@@ -20,9 +20,11 @@ use ieee.std_logic_1164.all;
 use ieee.std_logic_unsigned.all;
 
 -- surf
-use work.StdRtlPkg.all;
-use work.AxiLitePkg.all;
-use work.AxiStreamPkg.all;
+
+library surf;
+use surf.StdRtlPkg.all;
+use surf.AxiLitePkg.all;
+use surf.AxiStreamPkg.all;
 
 -- lcls-timing-core
 use work.TimingPkg.all;
@@ -304,7 +306,7 @@ begin
    -- Delay triggerData according to AXI-Lite register
    -----------------------------------------------
    triggerDataSlv <= toSlv(r.triggerData);
-   U_SlvDelayFifo_1 : entity work.SlvDelayFifo
+   U_SlvDelayFifo_1 : entity surf.SlvDelayFifo
       generic map (
          TPD_G             => TPD_G,
          DATA_WIDTH_G      => 48,
@@ -324,7 +326,7 @@ begin
    -- Synchronize trigger data to trigger clock
    -----------------------------------------------
    TRIGGER_SYNC_GEN : if (not TRIGGER_CLK_IS_TIMING_RX_CLK_G) generate
-      U_SynchronizerFifo_1 : entity work.SynchronizerFifo
+      U_SynchronizerFifo_1 : entity surf.SynchronizerFifo
          generic map (
             TPD_G        => TPD_G,
             COMMON_CLK_G => false,
@@ -349,7 +351,7 @@ begin
    -----------------------------------------------
    -- Buffer event data in a fifo
    -----------------------------------------------
-   U_AxiStreamFifoV2_1 : entity work.AxiStreamFifoV2
+   U_AxiStreamFifoV2_1 : entity surf.AxiStreamFifoV2
       generic map (
          TPD_G               => TPD_G,
          INT_PIPE_STAGES_G   => 1,
@@ -381,7 +383,7 @@ begin
    -- Buffer TimingMessage that corresponds to each event placed in event fifo
    -----------------------------------------------
    alignedTimingMessageSlv <= toSlvNoBsa(alignedTimingMessage);
-   U_Fifo_1 : entity work.Fifo
+   U_Fifo_1 : entity surf.Fifo
       generic map (
          TPD_G           => TPD_G,
          GEN_SYNC_FIFO_G => EVENT_CLK_IS_TIMING_RX_CLK_G,

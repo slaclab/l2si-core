@@ -27,10 +27,12 @@ library ieee;
 use ieee.std_logic_1164.all;
 use ieee.std_logic_unsigned.all;
 
-use work.StdRtlPkg.all;
+
+library surf;
+use surf.StdRtlPkg.all;
 use work.TimingExtnPkg.all;
 use work.TimingPkg.all;
-use work.AxiLitePkg.all;
+use surf.AxiLitePkg.all;
 use work.XpmPkg.all;
 use work.XpmMiniPkg.all;
 
@@ -211,7 +213,7 @@ begin
                l1Input       => r.l1input       (0),
                result        => expWord         (0) );
 
-  U_SyncDelay : entity work.SynchronizerVector
+  U_SyncDelay : entity surf.SynchronizerVector
       generic map ( WIDTH_G => 8 )
       port map ( clk     => timingClk,
                  dataIn  => partitionConfig.pipeline.depth_fids,

@@ -21,9 +21,11 @@ use ieee.std_logic_1164.all;
 use ieee.std_logic_unsigned.all;
 
 -- surf
-use work.StdRtlPkg.all;
-use work.AxiLitePkg.all;
-use work.AxiStreamPkg.all;
+
+library surf;
+use surf.StdRtlPkg.all;
+use surf.AxiLitePkg.all;
+use surf.AxiStreamPkg.all;
 
 -- lcls-timing-core
 use work.TimingPkg.all;
@@ -182,7 +184,7 @@ begin
    -----------------------------------------------
    -- Synchronize AXI-Lite bus to timingRxClk
    -----------------------------------------------
-   U_AxiLiteAsync_1 : entity work.AxiLiteAsync
+   U_AxiLiteAsync_1 : entity surf.AxiLiteAsync
       generic map (
          TPD_G => TPD_G)
       port map (
@@ -202,7 +204,7 @@ begin
    -----------------------------------------------
    -- Fan out AXI-Lite 
    -----------------------------------------------
-   U_AxiLiteCrossbar_1 : entity work.AxiLiteCrossbar
+   U_AxiLiteCrossbar_1 : entity surf.AxiLiteCrossbar
       generic map (
          TPD_G              => TPD_G,
          NUM_SLAVE_SLOTS_G  => 1,
@@ -283,7 +285,7 @@ begin
    -----------------------------------------------
    -- Synchronize to transmit clock
    timingRxToTimingTxSyncSlvIn <= toSlv(xpmId, detectorPartitions, full, overflow);
-   U_SynchronizerFifo_xpmId : entity work.SynchronizerFifo
+   U_SynchronizerFifo_xpmId : entity surf.SynchronizerFifo
       generic map (
          TPD_G        => TPD_G,
          COMMON_CLK_G => false,
@@ -305,7 +307,7 @@ begin
    -- Synchronize l1Feedbacks from l1Clk to timingTxClk
    -----------------------------------------------
    l1_sync_gen : for i in 0 to NUM_DETECTORS_G-1 generate
-      U_Synchronizer_1 : entity work.Synchronizer
+      U_Synchronizer_1 : entity surf.Synchronizer
          generic map (
             TPD_G         => TPD_G,
             BYPASS_SYNC_G => L1_CLK_IS_TIMING_TX_CLK_G,
@@ -316,7 +318,7 @@ begin
             dataIn  => l1Feedbacks(i).valid,       -- [in]
             dataOut => l1FeedbacksSync(i).valid);  -- [out]
 
-      U_SynchronizerVector : entity work.SynchronizerVector
+      U_SynchronizerVector : entity surf.SynchronizerVector
          generic map (
             TPD_G         => TPD_G,
             BYPASS_SYNC_G => L1_CLK_IS_TIMING_TX_CLK_G,
@@ -334,7 +336,7 @@ begin
    end generate l1_sync_gen;  --
 
    -- Sync l1Acks from timingTxClk to l1Clk
-   U_SynchronizerVector_1 : entity work.SynchronizerVector
+   U_SynchronizerVector_1 : entity surf.SynchronizerVector
       generic map (
          TPD_G         => TPD_G,
          BYPASS_SYNC_G => L1_CLK_IS_TIMING_TX_CLK_G,

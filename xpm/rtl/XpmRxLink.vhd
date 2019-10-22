@@ -33,7 +33,9 @@ use ieee.std_logic_arith.all;
 use ieee.std_logic_unsigned.all;
 
 -- surf
-use work.StdRtlPkg.all;
+
+library surf;
+use surf.StdRtlPkg.all;
 
 -- lcls-timing-core
 use work.TimingPkg.all;
@@ -96,7 +98,7 @@ begin
   rxRcvs <= r.rxRcvs;
   
   U_FIFO : for i in 0 to NPartitions-1 generate
-    U_ASync : entity work.FifoAsync
+    U_ASync : entity surf.FifoAsync
       generic map ( FWFT_EN_G    => true,
                     DATA_WIDTH_G => 18,
                     ADDR_WIDTH_G =>  4 )
@@ -114,25 +116,25 @@ begin
                  dout( 3 downto  0) => l1Feedback(i).trigsrc );
   end generate;
   
-  U_Enable : entity work.Synchronizer
+  U_Enable : entity surf.Synchronizer
     port map    ( clk    => rxClk,
                   dataIn => config.enable,
                   dataOut=> uconfig.enable );
 
-  U_Full : entity work.SynchronizerVector
+  U_Full : entity surf.SynchronizerVector
     generic map ( INIT_G  => toSlv(-1,NPartitions),
                   WIDTH_G => NPartitions )
     port map    ( clk    => clk,
                   dataIn => r.pfull,
                   dataOut=> full );
 
-  U_Partition : entity work.SynchronizerVector
+  U_Partition : entity surf.SynchronizerVector
     generic map ( WIDTH_G => config.groupMask'length )
     port map   ( clk     => rxClk,
                  dataIn  => config.groupMask,
                  dataOut => uconfig.groupMask );
 
-  U_TrigSrc : entity work.SynchronizerVector
+  U_TrigSrc : entity surf.SynchronizerVector
     generic map ( WIDTH_G => config.trigsrc'length )
     port map   ( clk     => rxClk,
                  dataIn  => config.trigsrc,

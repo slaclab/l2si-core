@@ -18,7 +18,9 @@ library ieee;
 use ieee.std_logic_1164.all;
 use ieee.std_logic_unsigned.all;
 
-use work.StdRtlPkg.all;
+
+library surf;
+use surf.StdRtlPkg.all;
 use work.TimingPkg.all;
 
 use work.XpmPkg.all;
@@ -235,12 +237,12 @@ begin
   msgConfig.hdr     <= messageDout(config.message.hdr'range);
   msgConfig.payload <= messageDout(config.message.payload'left+config.message.hdr'length downto config.message.hdr'length);
 
-  U_LatchMsg : entity work.SynchronizerOneShot
+  U_LatchMsg : entity surf.SynchronizerOneShot
     port map ( clk     => regClk,
                dataIn  => config.message.insert,
                dataOut => msgWr );
   
-  U_SyncMsgPayload : entity work.FifoAsync
+  U_SyncMsgPayload : entity surf.FifoAsync
     generic map ( DATA_WIDTH_G => messageDin'length,
                   ADDR_WIDTH_G => 4,
                   FWFT_EN_G    => true )
@@ -255,7 +257,7 @@ begin
                valid   => msgConfig.insert,
                dout    => messageDout );
 
-  U_SyncReset : entity work.RstSync
+  U_SyncReset : entity surf.RstSync
     port map ( clk       => timingClk,
                asyncRst  => config.l0Select.reset,
                syncRst   => l0Reset );

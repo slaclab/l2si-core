@@ -28,9 +28,11 @@ use ieee.std_logic_unsigned.all;
 library unisim;
 use unisim.vcomponents.all;
 
-use work.StdRtlPkg.all;
-use work.AxiStreamPkg.all;
-use work.Pgp2bPkg.all;
+
+library surf;
+use surf.StdRtlPkg.all;
+use surf.AxiStreamPkg.all;
+use surf.Pgp2bPkg.all;
 
 entity MpsPgpFrontEnd is
    generic (
@@ -159,7 +161,7 @@ begin
         DIV     => "000",
         O       => txOutClk );
 
-   U_Pgp2bLane : entity work.Pgp2bLane
+   U_Pgp2bLane : entity surf.Pgp2bLane
       generic map (
          LANE_CNT_G        => 1,
 --         DEBUG_G           => DEBUG_G,

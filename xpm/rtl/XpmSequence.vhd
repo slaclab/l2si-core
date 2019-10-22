@@ -25,14 +25,16 @@ use ieee.std_logic_1164.all;
 use ieee.std_logic_unsigned.all;
 use ieee.std_logic_arith.all;
 
-use work.StdRtlPkg.all;
-use work.AxiLitePkg.all;
+
+library surf;
+use surf.StdRtlPkg.all;
+use surf.AxiLitePkg.all;
 use work.TimingPkg.all;
 use work.TPGPkg.all;
 use work.XpmSeqPkg.all;
-use work.AxiStreamPkg.all;
-use work.SsiPkg.all;
-use work.EthMacPkg.all;
+use surf.AxiStreamPkg.all;
+use surf.SsiPkg.all;
+use surf.EthMacPkg.all;
 
 entity XpmSequence is
    generic (
@@ -106,7 +108,7 @@ begin
 
   timingDataOut <= r_in.data;
 
-  U_FIFO : entity work.AxiStreamFifoV2
+  U_FIFO : entity surf.AxiStreamFifoV2
     generic map ( SLAVE_AXI_CONFIG_G  => EMAC_AXIS_CONFIG_C,
                   MASTER_AXI_CONFIG_G => EMAC_AXIS_CONFIG_C,
                   FIFO_ADDR_WIDTH_G   => 4 )

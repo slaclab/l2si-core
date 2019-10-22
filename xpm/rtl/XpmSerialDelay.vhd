@@ -24,7 +24,9 @@ use work.all;
 use ieee.std_logic_1164.all;
 use ieee.std_logic_arith.all;
 use ieee.std_logic_unsigned.all;
-use work.StdRtlPkg.all;
+
+library surf;
+use surf.StdRtlPkg.all;
 use work.TimingPkg.all;
 
 entity XpmSerialDelay is
@@ -113,7 +115,7 @@ begin
    overflow_o <= full_cnt or full_msg;
    reset_o    <= not r.running;
    
-   U_CntDelay : entity work.FifoSync
+   U_CntDelay : entity surf.FifoSync
      generic map ( TPD_G        => TPD_G,
                    FWFT_EN_G    => true,
                    DATA_WIDTH_G => DELAY_WIDTH_G+9,
@@ -133,7 +135,7 @@ begin
                 valid             => valid_cnt,
                 overflow          => full_cnt );
    
-   U_MsgDelay : entity work.FifoSync
+   U_MsgDelay : entity surf.FifoSync
      generic map ( TPD_G        => TPD_G,
                    FWFT_EN_G    => true,
                    DATA_WIDTH_G => 17,

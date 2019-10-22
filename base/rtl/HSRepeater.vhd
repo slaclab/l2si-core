@@ -25,9 +25,11 @@ use ieee.std_logic_1164.all;
 use ieee.std_logic_unsigned.all;
 use ieee.std_logic_arith.all;
 
-use work.StdRtlPkg.all;
-use work.AxiLitePkg.all;
-use work.i2cPkg.all;
+
+library surf;
+use surf.StdRtlPkg.all;
+use surf.AxiLitePkg.all;
+use surf.i2cPkg.all;
 
 entity HSRepeater is
    generic (
@@ -87,7 +89,7 @@ architecture mapping of HSRepeater is
 
 begin
 
-  U_XBAR : entity work.AxiLiteCrossbar
+  U_XBAR : entity surf.AxiLiteCrossbar
     generic map (
       DEC_ERROR_RESP_G   => AXI_ERROR_RESP_G,
       NUM_SLAVE_SLOTS_G  => 1,
@@ -107,7 +109,7 @@ begin
 
   GEN_AMC : for i in 0 to 1 generate
     GEN_I2C : for j in 0 to 2 generate
-      U_I2C : entity work.AxiI2cRegMaster
+      U_I2C : entity surf.AxiI2cRegMaster
         generic map ( DEVICE_MAP_G => DEVICE_MAP_C,
                       AXI_CLK_FREQ_G => 156.25E+6 )
         port map ( scl => hsrScl(i)(j),

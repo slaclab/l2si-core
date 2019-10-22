@@ -25,8 +25,10 @@ use ieee.std_logic_1164.all;
 use ieee.std_logic_unsigned.all;
 use ieee.std_logic_arith.all;
 
-use work.StdRtlPkg.all;
-use work.AxiLitePkg.all;
+
+library surf;
+use surf.StdRtlPkg.all;
+use surf.AxiLitePkg.all;
 use work.TPGPkg.all;
 use work.XpmSeqPkg.all;
 
@@ -72,7 +74,7 @@ architecture xbar of XpmSeqXbar is
 
 begin
 
-  U_AxiLiteAsync : entity work.AxiLiteAsync
+  U_AxiLiteAsync : entity surf.AxiLiteAsync
     generic map (
       TPD_G => TPD_G)
     port map (
@@ -92,7 +94,7 @@ begin
    --------------------------
    -- AXI-Lite: Crossbar Core
    --------------------------  
-   U_XBAR : entity work.AxiLiteCrossbar
+   U_XBAR : entity surf.AxiLiteCrossbar
       generic map (
          TPD_G              => TPD_G,
          NUM_SLAVE_SLOTS_G  => 1,

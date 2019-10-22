@@ -25,8 +25,10 @@ use ieee.std_logic_1164.all;
 use ieee.std_logic_unsigned.all;
 
 -- SURF
-use work.StdRtlPkg.all;
-use work.AxiLitePkg.all;
+
+library surf;
+use surf.StdRtlPkg.all;
+use surf.AxiLitePkg.all;
 
 -- lcls-timing-core
 use work.TimingPkg.all;
@@ -97,7 +99,7 @@ begin
    -----------------------------------------------
    promptTimingMessageSlv <= toSlvNoBsa(promptTimingMessage);
 
-   U_SlvDelayRam_1 : entity work.SlvDelayRam
+   U_SlvDelayRam_1 : entity surf.SlvDelayRam
       generic map (
          TPD_G            => TPD_G,
          VECTOR_WIDTH_G   => TIMING_MESSAGE_BITS_NO_BSA_C,
@@ -125,7 +127,7 @@ begin
    -- them back into alignment
    -----------------------------------------------
    GEN_PART : for i in 0 to XPM_PARTITIONS_C-1 generate
-      U_SlvDelayRam_2 : entity work.SlvDelayRam
+      U_SlvDelayRam_2 : entity surf.SlvDelayRam
          generic map (
             TPD_G            => TPD_G,
             VECTOR_WIDTH_G   => 49,

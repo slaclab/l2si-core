@@ -26,9 +26,11 @@ use ieee.std_logic_unsigned.all;
 use ieee.std_logic_arith.all;
 use ieee.numeric_std.all;
 
-use work.StdRtlPkg.all;
-use work.AxiLitePkg.all;
-use work.AxiStreamPkg.all;
+
+library surf;
+use surf.StdRtlPkg.all;
+use surf.AxiLitePkg.all;
+use surf.AxiStreamPkg.all;
 use work.XpmPkg.all;
 use work.XpmMiniPkg.all;
 
@@ -86,32 +88,32 @@ begin
   axilWriteSlave <= r.axilWriteSlave;
   axilUpdate     <= r.axilRdEn;
 
-  U_Sync64_ena : entity work.SynchronizerFifo
+  U_Sync64_ena : entity surf.SynchronizerFifo
     generic map ( DATA_WIDTH_G => LCtrDepth )
     port map ( wr_clk => staClk, wr_en => staUpdate,
                rd_clk => axilClk, rd_en=> r.axilRdEn,
                din  => status.partition.l0Select.enabled  ,
                dout => s.partition.l0Select.enabled);
-  U_Sync64_inh : entity work.SynchronizerFifo
+  U_Sync64_inh : entity surf.SynchronizerFifo
     generic map ( DATA_WIDTH_G => LCtrDepth )
     port map ( wr_clk => staClk, wr_en => staUpdate,
                rd_clk => axilClk, rd_en=> r.axilRdEn,
                din  => status.partition.l0Select.inhibited  ,
                valid => pInhV,
                dout => s.partition.l0Select.inhibited);
-  U_Sync64_num : entity work.SynchronizerFifo
+  U_Sync64_num : entity surf.SynchronizerFifo
     generic map ( DATA_WIDTH_G => LCtrDepth )
     port map ( wr_clk => staClk, wr_en => staUpdate,
                rd_clk => axilClk, rd_en=> r.axilRdEn,
                din  => status.partition.l0Select.num  ,
                dout => s.partition.l0Select.num);
-  U_Sync64_nin : entity work.SynchronizerFifo
+  U_Sync64_nin : entity surf.SynchronizerFifo
     generic map ( DATA_WIDTH_G => LCtrDepth )
     port map ( wr_clk => staClk, wr_en => staUpdate,
                rd_clk => axilClk, rd_en=> r.axilRdEn,
                din  => status.partition.l0Select.numInh  ,
                dout => s.partition.l0Select.numInh);
-  U_Sync64_nac : entity work.SynchronizerFifo
+  U_Sync64_nac : entity surf.SynchronizerFifo
     generic map ( DATA_WIDTH_G => LCtrDepth )
     port map ( wr_clk => staClk, wr_en => staUpdate,
                rd_clk => axilClk, rd_en=> r.axilRdEn,

@@ -31,10 +31,12 @@ use ieee.std_logic_arith.all;
 library unisim;
 use unisim.vcomponents.all;
 
-use work.StdRtlPkg.all;
-use work.AxiStreamPkg.all;
-use work.SsiPkg.all;
-use work.AxiLitePkg.all;
+
+library surf;
+use surf.StdRtlPkg.all;
+use surf.AxiStreamPkg.all;
+use surf.SsiPkg.all;
+use surf.AxiLitePkg.all;
 use work.TimingPkg.all;
 use work.TPGPkg.all;
 use work.XpmPkg.all;
@@ -87,7 +89,7 @@ architecture top_level of XpmMiniWrapper is
    
 begin
 
-   U_XBAR : entity work.AxiLiteCrossbar
+   U_XBAR : entity surf.AxiLiteCrossbar
       generic map (
          NUM_SLAVE_SLOTS_G  => 1,
          NUM_MASTER_SLOTS_G => NUM_AXI_MASTERS_C,

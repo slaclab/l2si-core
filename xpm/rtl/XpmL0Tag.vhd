@@ -31,7 +31,9 @@ use ieee.std_logic_1164.all;
 use ieee.std_logic_unsigned.all;
 use ieee.std_logic_arith.all;
 
-use work.StdRtlPkg.all;
+
+library surf;
+use surf.StdRtlPkg.all;
 use work.TimingPkg.all;
 use work.XpmPkg.all;
 
@@ -66,7 +68,7 @@ begin
    push_tag  <= r.tag;
    pop_frame <= XPM_ACCEPT_FRAME_INIT_C;
 
-   U_SYNC: entity work.SynchronizerVector
+   U_SYNC: entity surf.SynchronizerVector
       generic map ( WIDTH_G  => 1 )
       port map ( clk                   => clk,
                  dataIn (0)            => clear,

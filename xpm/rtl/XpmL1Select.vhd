@@ -31,7 +31,9 @@
 library ieee;
 use ieee.std_logic_1164.all;
 
-use work.StdRtlPkg.all;
+
+library surf;
+use surf.StdRtlPkg.all;
 use work.TimingPkg.all;
 use work.XpmPkg.all;
 
@@ -100,11 +102,11 @@ begin
    linkrd  <= r.rd_en;
    
    GEN_RAM : for i in 0 to NLTriggers-1 generate
-     U_CLEAR : entity work.RstSync
+     U_CLEAR : entity surf.RstSync
        port map ( clk      => clk,
                   asyncRst => config.clear(i),
                   syncRst  => uconfig.clear(i) );
-     U_L1TAG : entity work.FifoSync
+     U_L1TAG : entity surf.FifoSync
        generic map ( DATA_WIDTH_G => 5,
                      ADDR_WIDTH_G => 4,
                      FWFT_EN_G    => true )
@@ -115,22 +117,22 @@ begin
                   din    => r.push(i).tag,
                   dout   => dout_tag(i) );
    end generate;
-   U_ENABLE : entity work.SynchronizerVector
+   U_ENABLE : entity surf.SynchronizerVector
      generic map ( WIDTH_G => config.enable'length )
      port map ( clk      => clk,
                 dataIn   => config.enable,
                 dataOut  => uconfig.enable );
-   U_TRIGSRC : entity work.SynchronizerVector
+   U_TRIGSRC : entity surf.SynchronizerVector
      generic map ( WIDTH_G => config.trigsrc'length )
      port map ( clk      => clk,
                 dataIn   => config.trigsrc,
                 dataOut  => uconfig.trigsrc );
-   U_TRIGWORD : entity work.SynchronizerVector
+   U_TRIGWORD : entity surf.SynchronizerVector
      generic map ( WIDTH_G => config.trigword'length )
      port map ( clk      => clk,
                 dataIn   => config.trigword,
                 dataOut  => uconfig.trigword );
-   U_TRIGWR : entity work.SynchronizerVector
+   U_TRIGWR : entity surf.SynchronizerVector
      generic map ( WIDTH_G => config.trigwr'length )
      port map ( clk      => clk,
                 dataIn   => config.trigwr,

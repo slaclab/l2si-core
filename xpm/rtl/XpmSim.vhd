@@ -30,14 +30,16 @@ use ieee.std_logic_unsigned.all;
 use STD.textio.all;
 use ieee.std_logic_textio.all;
 
-use work.StdRtlPkg.all;
+
+library surf;
+use surf.StdRtlPkg.all;
 use work.TimingExtnPkg.all;
 use work.TimingPkg.all;
 use work.TPGPkg.all;
 use work.XpmPkg.all;
 use work.XpmMiniPkg.all;
-use work.AxiLitePkg.all;
-use work.AxiStreamPkg.all;
+use surf.AxiLitePkg.all;
+use surf.AxiStreamPkg.all;
  
 library unisim;
 use unisim.vcomponents.all;

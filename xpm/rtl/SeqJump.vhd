@@ -32,7 +32,9 @@ use ieee.std_logic_unsigned.all;
 library UNISIM;
 use UNISIM.VCOMPONENTS.ALL;
 use work.TPGPkg.all;
-use work.StdRtlPkg.all;
+
+library surf;
+use surf.StdRtlPkg.all;
 
 entity SeqJump is
   generic ( TPD_G : time := 1 ns; MPSCHANS : integer := 5 );

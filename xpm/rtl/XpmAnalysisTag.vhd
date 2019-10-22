@@ -34,7 +34,9 @@
 library ieee;
 use ieee.std_logic_1164.all;
 
-use work.StdRtlPkg.all;
+
+library surf;
+use surf.StdRtlPkg.all;
 use work.TimingPkg.all;
 use work.XpmPkg.all;
 
@@ -77,7 +79,7 @@ begin
   rdvalid <= r.rdvalid;
 
   GEN_FIFOS : for i in 0 to NTagBytes-1 generate
-    U_TagFifo : entity work.FifoAsync
+    U_TagFifo : entity surf.FifoAsync
       generic map ( FWFT_EN_G    => false,
                     DATA_WIDTH_G => 8,
                     ADDR_WIDTH_G => 14,
