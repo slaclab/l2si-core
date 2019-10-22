@@ -37,8 +37,10 @@ use surf.StdRtlPkg.all;
 use surf.AxiStreamPkg.all;
 use surf.SsiPkg.all;
 use surf.AxiLitePkg.all;
-use work.TimingPkg.all;
-use work.TPGPkg.all;
+
+library lcls_timing_core;
+use lcls_timing_core.TimingPkg.all;
+use lcls_timing_core.TPGPkg.all;
 
 library l2si_core;
 use l2si_core.XpmPkg.all;
@@ -108,7 +110,7 @@ begin
          mAxiReadMasters     => mAxilReadMasters,
          mAxiReadSlaves      => mAxilReadSlaves);
 
-   U_TPGReg : entity work.TPGMiniReg
+   U_TPGReg : entity lcls_timing_core.TPGMiniReg
      port map ( axiClk         => axilClk,
                 axiRst         => axilRst,
                 axiReadMaster  => mAxilReadMasters (TPG_MINI_INDEX_C),
@@ -119,7 +121,7 @@ begin
                 status         => tpgStatus,
                 config         => tpgConfig );
                 
-   U_TPG : entity work.TPGMini
+   U_TPG : entity lcls_timing_core.TPGMini
       generic map (
          NARRAYSBSA     => 1,
          STREAM_INTF    => true )

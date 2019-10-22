@@ -31,7 +31,9 @@ library surf;
 use surf.StdRtlPkg.all;
 
 -- lcls-timing-core
-use work.TimingPkg.all;
+
+library lcls_timing_core;
+use lcls_timing_core.TimingPkg.all;
 
 -- L2si-core
 

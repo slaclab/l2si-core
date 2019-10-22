@@ -30,8 +30,10 @@ use ieee.std_logic_unsigned.all;
 
 library surf;
 use surf.StdRtlPkg.all;
-use work.TimingExtnPkg.all;
-use work.TimingPkg.all;
+
+library lcls_timing_core;
+use lcls_timing_core.TimingExtnPkg.all;
+use lcls_timing_core.TimingPkg.all;
 use surf.AxiLitePkg.all;
 
 library l2si_core;

@@ -33,9 +33,11 @@ use ieee.std_logic_textio.all;
 
 library surf;
 use surf.StdRtlPkg.all;
-use work.TimingExtnPkg.all;
-use work.TimingPkg.all;
-use work.TPGPkg.all;
+
+library lcls_timing_core;
+use lcls_timing_core.TimingExtnPkg.all;
+use lcls_timing_core.TimingPkg.all;
+use lcls_timing_core.TPGPkg.all;
 
 library l2si_core;
 use l2si_core.XpmPkg.all;
@@ -137,7 +139,7 @@ begin
   dsTxRst <= (others=>recTimingRst);
   bpTxClk <= recTimingClk;
   
-  U_TPG : entity work.TPGMini
+  U_TPG : entity lcls_timing_core.TPGMini
     port map ( txClk    => recTimingClk,
                txRst    => recTimingRst,
                txRdy    => '1',
@@ -265,7 +267,7 @@ begin
      wait;
    end process;
 
-   U_SimSerializer : entity work.TimingSerializer
+   U_SimSerializer : entity lcls_timing_core.TimingSerializer
      generic map ( STREAMS_C => xData.streams'length )
      port map ( clk       => recTimingClk,
                 rst       => recTimingRst,

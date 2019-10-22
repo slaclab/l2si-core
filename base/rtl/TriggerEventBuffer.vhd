@@ -27,7 +27,9 @@ use surf.AxiLitePkg.all;
 use surf.AxiStreamPkg.all;
 
 -- lcls-timing-core
-use work.TimingPkg.all;
+
+library lcls_timing_core;
+use lcls_timing_core.TimingPkg.all;
 
 -- l2si
 

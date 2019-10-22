@@ -35,7 +35,9 @@ use surf.AxiLitePkg.all;
 use surf.AxiStreamPkg.all;
 
 -- lcls-timing-core
-use work.TimingPkg.all;
+
+library lcls_timing_core;
+use lcls_timing_core.TimingPkg.all;
 
 -- l2si-core
 
@@ -275,7 +277,7 @@ begin
                txData          => bpTxData ,
                txDataK         => bpTxDataK );
 
-  --U_Deserializer : entity work.TimingDeserializer
+  --U_Deserializer : entity lcls_timing_core.TimingDeserializer
   --  generic map ( STREAMS_C => 3,
   --                DEBUG_G   => true )
   --  port map ( clk       => timingClk,

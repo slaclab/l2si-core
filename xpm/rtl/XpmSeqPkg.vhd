@@ -26,7 +26,9 @@ use ieee.math_real.all;
 
 library surf;
 use surf.StdRtlPkg.all;
-use work.TPGPkg.all;
+
+library lcls_timing_core;
+use lcls_timing_core.TPGPkg.all;
 
 package XpmSeqPkg is
 

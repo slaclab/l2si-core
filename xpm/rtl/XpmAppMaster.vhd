@@ -21,7 +21,9 @@ use ieee.std_logic_unsigned.all;
 
 library surf;
 use surf.StdRtlPkg.all;
-use work.TimingPkg.all;
+
+library lcls_timing_core;
+use lcls_timing_core.TimingPkg.all;
 
 
 library l2si_core;
@@ -142,7 +144,7 @@ begin
   result <= r.result;
   status.l1Select <= XPM_L1_SELECT_STATUS_INIT_C;
   
-  U_TimingDelay : entity work.TimingSerialDelay
+  U_TimingDelay : entity lcls_timing_core.TimingSerialDelay
     generic map ( NWORDS_G => TIMING_MESSAGE_WORDS_C,
                   FDEPTH_G => 100 )
     port map ( clk            => timingClk,
@@ -156,7 +158,7 @@ begin
                valid_o        => timingBus_valid,
                overflow_o     => delayOverflow );
 
-  U_CuRx : entity work.TimingSerialDelay
+  U_CuRx : entity lcls_timing_core.TimingSerialDelay
     generic map ( NWORDS_G => CU_TIMING_WORDS_C,
                   FDEPTH_G => 100 )
     port map ( clk            => timingClk,

@@ -31,7 +31,9 @@ use ieee.std_logic_arith.all;
 use ieee.std_logic_unsigned.all;
 library UNISIM;
 use UNISIM.VCOMPONENTS.ALL;
-use work.TPGPkg.all;
+
+library lcls_timing_core;
+use lcls_timing_core.TPGPkg.all;
 
 library surf;
 use surf.StdRtlPkg.all;

@@ -38,7 +38,9 @@ library surf;
 use surf.StdRtlPkg.all;
 
 -- lcls-timing-core
-use work.TimingPkg.all;
+
+library lcls_timing_core;
+use lcls_timing_core.TimingPkg.all;
 
 -- l2si-core
 
@@ -143,7 +145,7 @@ begin
   txData  <= itxData;
   txDataK <= itxDataK;
   
-  U_Serializer : entity work.TimingSerializer
+  U_Serializer : entity lcls_timing_core.TimingSerializer
      generic map ( STREAMS_C => STREAMS_G )
      port map ( clk       => clk,
                 rst       => rst,

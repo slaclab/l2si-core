@@ -29,7 +29,9 @@ use ieee.std_logic_arith.all;
 library surf;
 use surf.StdRtlPkg.all;
 use surf.AxiLitePkg.all;
-use work.TPGPkg.all;
+
+library lcls_timing_core;
+use lcls_timing_core.TPGPkg.all;
 
 library l2si_core;
 use l2si_core.XpmSeqPkg.all;

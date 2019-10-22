@@ -30,10 +30,12 @@ use ieee.std_logic_unsigned.all;
 
 library surf;
 use surf.StdRtlPkg.all;
-use work.TimingExtnPkg.all;
-use work.TimingPkg.all;
+
+library lcls_timing_core;
+use lcls_timing_core.TimingExtnPkg.all;
+use lcls_timing_core.TimingPkg.all;
 use surf.AxiLitePkg.all;
-use work.TPGPkg.all;
+use lcls_timing_core.TPGPkg.all;
 
 library l2si_core;
 use l2si_core.XpmPkg.all;
@@ -90,7 +92,7 @@ begin
     wait;
   end process;
   
-  U_TPG : entity work.TPGMini
+  U_TPG : entity lcls_timing_core.TPGMini
     generic map (
       NARRAYSBSA     => 1,
       STREAM_INTF    => true )
