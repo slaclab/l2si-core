@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-07-10
--- Last update: 2019-10-16
+-- Last update: 2019-10-28
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -22,10 +22,10 @@
 
 library ieee;
 use ieee.std_logic_1164.all;
+use ieee.std_logic_arith.all;
 use ieee.std_logic_unsigned.all;
 
 -- SURF
-
 library surf;
 use surf.StdRtlPkg.all;
 use surf.AxiLitePkg.all;
@@ -175,7 +175,7 @@ begin
       axiSlaveWaitTxn(axilEp, axilWriteMaster, axilReadMaster, v.axilWriteSlave, v.axilReadSlave);
 
       for i in 0 to XPM_PARTITIONS_C-1 loop
-         axiSlaveRegisterR(axilEp, X"00"+ i*4, 0, r.partitionDelays(i));
+         axiSlaveRegisterR(axilEp, X"00"+ toSlv(i*4, 8), 0, r.partitionDelays(i));
       end loop;
 
       axiSlaveRegister(axilEp, X"20", 0, v.xpmId);
