@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-07-10
--- Last update: 2019-10-28
+-- Last update: 2019-11-05
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -25,19 +25,15 @@ use ieee.std_logic_1164.all;
 use ieee.std_logic_arith.all;
 use ieee.std_logic_unsigned.all;
 
--- SURF
 library surf;
 use surf.StdRtlPkg.all;
 use surf.AxiLitePkg.all;
 
--- lcls-timing-core
-
 library lcls_timing_core;
 use lcls_timing_core.TimingPkg.all;
 
--- L2Si
-
 library l2si_core;
+use l2si_core.XpmPkg.all;
 use l2si_core.XpmExtensionPkg.all;
 
 library unisim;

@@ -20,23 +20,18 @@ library ieee;
 use ieee.std_logic_1164.all;
 use ieee.std_logic_unsigned.all;
 
--- surf
-
 library surf;
 use surf.StdRtlPkg.all;
-
--- lcls-timing-core
 
 library lcls_timing_core;
 use lcls_timing_core.TimingPkg.all;
 
+library l2si_core;
+use l2si_core.XpmPkg.all;
+
 package XpmExtensionPkg is
 
    constant XPM_STREAM_ID_C : integer := 1;
-
-   constant XPM_PARTITIONS_C            : integer := 8;
-   constant XPM_PARTITION_ADDR_LENGTH_C : integer := 32;
-   constant XPM_PARTITION_WORD_LENGTH_C : integer := 48;
    constant XPM_MESSAGE_BITS_C          : integer := 32 + 8 * 48;
    constant XPM_MESSAGE_WORDS_C : integer := XPM_MESSAGE_BITS_C / 16;
 

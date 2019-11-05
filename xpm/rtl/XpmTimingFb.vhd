@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-07-08
--- Last update: 2019-10-17
+-- Last update: 2019-11-05
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -25,19 +25,14 @@ use ieee.std_logic_1164.all;
 use ieee.std_logic_unsigned.all;
 use ieee.std_logic_arith.all;
 
--- Surf
-
 library surf;
 use surf.StdRtlPkg.all;
-
--- lcls-timing-core
 
 library lcls_timing_core;
 use lcls_timing_core.TimingPkg.all;
 
--- L2si-core
-
 library l2si_core;
+use l2si_core.XpmPkg.all;
 use l2si_core.XpmExtensionPkg.all;
 
 entity XpmTimingFb is

@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-12-14
--- Last update: 2019-03-15
+-- Last update: 2019-11-05
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -47,16 +47,16 @@ use l2si_core.XpmPkg.all;
 use l2si_core.XpmMiniPkg.all;
 
 entity XpmMiniWrapper is
-   generic ( NDsLinks        : integer := 1;
+   generic ( NUM_DS_LINKS_G        : integer := 1;
              AXIL_BASEADDR_G : slv(31 downto 0) := (others=>'0') );
    port (
       --
       timingClk       : in    sl;
       timingRst       : in    sl;
-      dsRxClk         : in    slv           (NDsLinks-1 downto 0);
-      dsRxRst         : in    slv           (NDsLinks-1 downto 0);
-      dsRx            : in    TimingRxArray (NDsLinks-1 downto 0);
-      dsTx            : out   TimingPhyArray(NDsLinks-1 downto 0);
+      dsRxClk         : in    slv           (NUM_DS_LINKS_G-1 downto 0);
+      dsRxRst         : in    slv           (NUM_DS_LINKS_G-1 downto 0);
+      dsRx            : in    TimingRxArray (NUM_DS_LINKS_G-1 downto 0);
+      dsTx            : out   TimingPhyArray(NUM_DS_LINKS_G-1 downto 0);
       timingBus       : out   TimingBusType;
       --
       axilClk         : in    sl;
@@ -156,7 +156,7 @@ begin
    tpgAdvance <= tpgStream.ready;
    
    U_Xpm : entity l2si_core.XpmMini
-     generic map ( NDsLinks => NDsLinks )
+     generic map ( NUM_DS_LINKS_G => NUM_DS_LINKS_G )
      port map ( regclk       => axilClk,
                 regrst       => axilRst,
                 update       => update,

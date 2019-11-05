@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-12-14
--- Last update: 2016-09-09
+-- Last update: 2019-11-05
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -45,93 +45,98 @@ library l2si_core;
 use l2si_core.XpmPkg.all;
 
 entity XpmAnalysisTag is
+   generic (
+      TPD_G : time := 1 ns);
    port (
-      wrclk            : in  sl;
-      config           : in  XpmAnalysisConfigType;
-      rdclk            : in  sl;
-      rden             : in  sl;
-      rddone           : in  sl;
-      rdvalid          : out slv(  NTagBytes-1 downto 0);
-      tag              : out slv(8*NTagBytes-1 downto 0) );
+      wrclk   : in  sl;
+      config  : in  XpmAnalysisConfigType;
+      rdclk   : in  sl;
+      rden    : in  sl;
+      rddone  : in  sl;
+      rdvalid : out slv(XPM_NUM_TAG_BYTES_C-1 downto 0);
+      tag     : out slv(8*XPM_NUM_TAG_BYTES_C-1 downto 0));
 end XpmAnalysisTag;
 
 architecture rtl of XpmAnalysisTag is
 
-  signal dout   : slv(8*NTagBytes-1 downto 0);
-  signal dvalid : slv(  NTagBytes-1 downto 0);
+   signal dout   : slv(8*XPM_NUM_TAG_BYTES_C-1 downto 0);
+   signal dvalid : slv(XPM_NUM_TAG_BYTES_C-1 downto 0);
 
-  type RegType is record
-    advance : slv(2*NTagBytes-1 downto 0);
-    dvalid  : slv(  NTagBytes-1 downto 0);
-    rdvalid : slv(  NTagBytes-1 downto 0);
-    rden    : sl;
-  end record;
-  constant REG_INIT_C : RegType := (
-    advance => (others=>'0'),
-    dvalid  => (others=>'0'),
-    rdvalid => (others=>'0'),
-    rden    => '0' );
-  
-  signal r    : RegType := REG_INIT_C;
-  signal rin  : RegType;
+   type RegType is record
+      advance : slv(2*XPM_NUM_TAG_BYTES_C-1 downto 0);
+      dvalid  : slv(XPM_NUM_TAG_BYTES_C-1 downto 0);
+      rdvalid : slv(XPM_NUM_TAG_BYTES_C-1 downto 0);
+      rden    : sl;
+   end record;
+   constant REG_INIT_C : RegType := (
+      advance => (others => '0'),
+      dvalid  => (others => '0'),
+      rdvalid => (others => '0'),
+      rden    => '0');
 
-  signal tagb : slv(8*NTagBytes-1 downto 0);
+   signal r   : RegType := REG_INIT_C;
+   signal rin : RegType;
+
+   signal tagb : slv(8*XPM_NUM_TAG_BYTES_C-1 downto 0);
 
 begin
 
-  tag     <= tagb;
-  rdvalid <= r.rdvalid;
+   tag     <= tagb;
+   rdvalid <= r.rdvalid;
 
-  GEN_FIFOS : for i in 0 to NTagBytes-1 generate
-    U_TagFifo : entity surf.FifoAsync
-      generic map ( FWFT_EN_G    => false,
-                    DATA_WIDTH_G => 8,
-                    ADDR_WIDTH_G => 14,
-                    INIT_G       => x"FF" )
-      port map ( rst    => config.rst (i),
-                 wr_clk => wrclk,
-                 wr_en  => config.push(i),
-                 din    => config.tag (8*i+7 downto 8*i),
-                 rd_clk => rdclk,
-                 rd_en  => r.advance(i+NTagBytes),
-                 dout   => dout(8*i+7 downto 8*i),
-                 valid  => dvalid(i) );
-    tagb (8*i+7 downto 8*i) <= dout(8*i+7 downto 8*i) when r.dvalid(i)='1' else (others=>'1');
-  end generate;
-    
-  process (r, rden, rddone, dvalid) is
-    variable v : RegType;
-    variable b : sl;
-  begin
-    v := r;
-    v.advance(2*NTagBytes-1 downto NTagBytes) := (others=>'0');
-    v.advance(NTagBytes-1 downto 0) := r.advance(2*NTagBytes-1 downto NTagBytes);
-    v.rdvalid := (others=>'0');
-    v.rden    := rddone;
+   GEN_FIFOS : for i in 0 to XPM_NUM_TAG_BYTES_C-1 generate
+      U_TagFifo : entity surf.FifoAsync
+         generic map (
+            TPD_G        => TPD_G,
+            FWFT_EN_G    => false,
+            DATA_WIDTH_G => 8,
+            ADDR_WIDTH_G => 14,
+            INIT_G       => x"FF")
+         port map (
+            rst    => config.rst (i),
+            wr_clk => wrclk,
+            wr_en  => config.push(i),
+            din    => config.tag (8*i+7 downto 8*i),
+            rd_clk => rdclk,
+            rd_en  => r.advance(i+XPM_NUM_TAG_BYTES_C),
+            dout   => dout(8*i+7 downto 8*i),
+            valid  => dvalid(i));
+      tagb (8*i+7 downto 8*i) <= dout(8*i+7 downto 8*i) when r.dvalid(i) = '1' else (others => '1');
+   end generate;
 
-    if r.rden='1' then
-      if rden='1' then
-        v.advance(2*NTagBytes-1 downto NTagBytes) := (others=>'1');
-        v.rdvalid    := r.dvalid;
-      else
-        v.advance(2*NTagBytes-1 downto NTagBytes) := r.dvalid;
+   process (r, rden, rddone, dvalid) is
+      variable v : RegType;
+      variable b : sl;
+   begin
+      v                                                             := r;
+      v.advance(2*XPM_NUM_TAG_BYTES_C-1 downto XPM_NUM_TAG_BYTES_C) := (others => '0');
+      v.advance(XPM_NUM_TAG_BYTES_C-1 downto 0)                     := r.advance(2*XPM_NUM_TAG_BYTES_C-1 downto XPM_NUM_TAG_BYTES_C);
+      v.rdvalid                                                     := (others => '0');
+      v.rden                                                        := rddone;
+
+      if r.rden = '1' then
+         if rden = '1' then
+            v.advance(2*XPM_NUM_TAG_BYTES_C-1 downto XPM_NUM_TAG_BYTES_C) := (others => '1');
+            v.rdvalid                                                     := r.dvalid;
+         else
+            v.advance(2*XPM_NUM_TAG_BYTES_C-1 downto XPM_NUM_TAG_BYTES_C) := r.dvalid;
+         end if;
       end if;
-    end if;
 
-    for i in 0 to NTagBytes-1 loop
-      if r.advance(i)='1' then
-        v.dvalid(i) := dvalid(i);
+      for i in 0 to XPM_NUM_TAG_BYTES_C-1 loop
+         if r.advance(i) = '1' then
+            v.dvalid(i) := dvalid(i);
+         end if;
+      end loop;
+
+      rin <= v;
+   end process;
+
+   process (rdclk) is
+   begin
+      if rising_edge(rdclk) then
+         r <= rin after TPD_G;
       end if;
-    end loop;
-    
-    rin <= v;
-  end process;
-
-  process (rdclk) is
-  begin
-    if rising_edge(rdclk) then
-      r <= rin;
-    end if;
-  end process;
+   end process;
 
 end rtl;
