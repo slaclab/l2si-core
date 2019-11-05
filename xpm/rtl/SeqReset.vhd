@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver  <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-09-15
--- Last update: 2016-04-13
+-- Last update: 2019-11-05
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -24,11 +24,10 @@
 -- the terms contained in the LICENSE.txt file.
 -------------------------------------------------------------------------------
 LIBRARY ieee;
-use work.all;
-
 USE ieee.std_logic_1164.ALL;
 use ieee.std_logic_arith.all;
 use ieee.std_logic_unsigned.all;
+
 library UNISIM;
 use UNISIM.VCOMPONENTS.ALL;
 
@@ -40,7 +39,8 @@ library surf;
 use surf.StdRtlPkg.all;
 
 entity SeqReset is
-   generic ( TPD_G : time := 1 ns);
+   generic (
+      TPD_G : time := 1 ns);
    port ( 
       -- Clock and reset
       clk                : in  sl;
@@ -73,7 +73,7 @@ begin
 
   resetO <= rin.resetO;
   
-  comb: process (r, config, resetReq, strobe, frame)
+  comb: process (config, frame, r, resetReq, strobe)
      variable v : RegType;
      variable rateSel : sl;
   begin  -- process

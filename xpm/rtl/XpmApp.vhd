@@ -118,7 +118,7 @@ architecture top_level_app of XpmApp is
       eword          : integer range 0 to (XPM_NUM_TAG_BYTES_C+1)/2;
       ipart          : integer range 0 to XPM_PARTITIONS_C-1;
       bcastCount     : integer range 0 to 8;
-      msg            : slv(PWORD_LEN-1 downto 0);
+      msg            : slv(XPM_PARTITION_WORD_LENGTH_C-1 downto 0);
       msgComplete    : sl;
       msgGroup       : integer range 0 to XPM_PARTITIONS_C-1;
       groupLinkClear : slv(XPM_PARTITIONS_C-1 downto 0);
@@ -251,7 +251,9 @@ begin
       U_TxLink : entity l2si_core.XpmTxLink
          generic map (
             TPD_G  => TPD_G,
-            ADDR_G => i, STREAMS_G => 3, DEBUG_G => false)
+            ADDR_G => i,
+            STREAMS_G => 3,
+            DEBUG_G => false)
          port map (
             clk       => timingClk,
             rst       => timingRst,
@@ -264,6 +266,7 @@ begin
             fiducial  => r.fiducial,
             txData    => dsTxData (i),
             txDataK   => dsTxDataK(i));
+      
       U_RxLink : entity l2si_core.XpmRxLink
          generic map (
             TPD_G => TPD_G)
