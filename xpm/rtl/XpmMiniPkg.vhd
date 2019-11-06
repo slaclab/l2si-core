@@ -41,6 +41,7 @@ package XpmMiniPkg is
    -- Application: Configurations, Constants and Records Types
    -----------------------------------------------------------
 
+   -- This doesn't belong here but not sure where to move it
    constant NSTREAMS_C : integer := 3;
 
    type XpmStreamType is record

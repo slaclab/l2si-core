@@ -118,7 +118,7 @@ architecture top_level_app of XpmApp is
       eword          : integer range 0 to (XPM_NUM_TAG_BYTES_C+1)/2;
       ipart          : integer range 0 to XPM_PARTITIONS_C-1;
       bcastCount     : integer range 0 to 8;
-      msg            : slv(PWORD_LEN-1 downto 0);
+      msg            : slv(XPM_PARTITION_WORD_LENGTH_C-1 downto 0);
       msgComplete    : sl;
       msgGroup       : integer range 0 to XPM_PARTITIONS_C-1;
       groupLinkClear : slv(XPM_PARTITIONS_C-1 downto 0);
