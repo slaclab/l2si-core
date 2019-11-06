@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver  <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-09-15
--- Last update: 2019-05-16
+-- Last update: 2019-11-05
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -32,58 +32,58 @@ use lcls_timing_core.TPGPkg.all;
 
 package XpmSeqPkg is
 
-  constant XPMSEQDEPTH : integer := 1;
-  
-  type XpmSeqStatusType is record
-                          -- implemented resources
-                          nexptseq      : slv (7 downto 0);
-                          seqaddrlen    : slv (3 downto 0);
-                          --
-                          countRequest  : Slv32Array(XPMSEQDEPTH-1 downto 0);
-                          countInvalid  : Slv32Array(XPMSEQDEPTH-1 downto 0);
-                          countUpdate   : sl;  -- single sysclk pulse
-                          seqRdData     : Slv32Array(XPMSEQDEPTH-1 downto 0);
-                          seqState      : SequencerStateArray(XPMSEQDEPTH-1 downto 0);
-                        end record;
+   constant XPM_SEQ_DEPTH_C : integer := 1;
 
-  constant XPM_SEQ_STATUS_INIT_C : XpmSeqStatusType := (
-    nexptseq      => (others=>'0'),
-    seqaddrlen    => (others=>'0'),
-    countRequest  => (others=>(others=>'0')),
-    countInvalid  => (others=>(others=>'0')),
-    countUpdate   => '0',
-    seqRdData     => (others=>(others=>'0')),
-    seqState      => (others=>SEQUENCER_STATE_INIT_C) );
+   type XpmSeqStatusType is record
+      -- implemented resources
+      nexptseq     : slv (7 downto 0);
+      seqaddrlen   : slv (3 downto 0);
+      --
+      countRequest : Slv32Array(XPM_SEQ_DEPTH_C-1 downto 0);
+      countInvalid : Slv32Array(XPM_SEQ_DEPTH_C-1 downto 0);
+      countUpdate  : sl;                -- single sysclk pulse
+      seqRdData    : Slv32Array(XPM_SEQ_DEPTH_C-1 downto 0);
+      seqState     : SequencerStateArray(XPM_SEQ_DEPTH_C-1 downto 0);
+   end record;
 
-  type XpmSeqConfigType is record
-                          seqEnable     : slv(XPMSEQDEPTH-1 downto 0);
-                          seqRestart    : slv(XPMSEQDEPTH-1 downto 0);
-                          diagSeq       : slv( 6 downto 0);
-                          seqAddr       : SeqAddrType;
-                          seqWrData     : slv(31 downto 0);
-                          seqWrEn       : slv(XPMSEQDEPTH-1 downto 0);
-                          seqJumpConfig : TPGJumpConfigArray(XPMSEQDEPTH-1 downto 0);
-                        end record;
+   constant XPM_SEQ_STATUS_INIT_C : XpmSeqStatusType := (
+      nexptseq     => (others => '0'),
+      seqaddrlen   => (others => '0'),
+      countRequest => (others => (others => '0')),
+      countInvalid => (others => (others => '0')),
+      countUpdate  => '0',
+      seqRdData    => (others => (others => '0')),
+      seqState     => (others => SEQUENCER_STATE_INIT_C));
 
-  constant XPM_SEQ_CONFIG_INIT_C : XpmSeqConfigType := (
-    seqEnable         => (others=>'0'),
-    seqRestart        => (others=>'0'),
-    diagSeq           => (others=>'1'),
-    seqAddr           => (others=>'0'),
-    seqWrData         => (others=>'0'),
-    seqWrEn           => (others=>'0'),
-    seqJumpConfig     => (others=>TPG_JUMPCONFIG_INIT_C)
-    );
+   type XpmSeqConfigType is record
+      seqEnable     : slv(XPM_SEQ_DEPTH_C-1 downto 0);
+      seqRestart    : slv(XPM_SEQ_DEPTH_C-1 downto 0);
+      diagSeq       : slv(6 downto 0);
+      seqAddr       : SeqAddrType;
+      seqWrData     : slv(31 downto 0);
+      seqWrEn       : slv(XPM_SEQ_DEPTH_C-1 downto 0);
+      seqJumpConfig : TPGJumpConfigArray(XPM_SEQ_DEPTH_C-1 downto 0);
+   end record;
 
-  type XpmSeqConfigArray is array(natural range<>) of XpmSeqConfigType;
+   constant XPM_SEQ_CONFIG_INIT_C : XpmSeqConfigType := (
+      seqEnable     => (others => '0'),
+      seqRestart    => (others => '0'),
+      diagSeq       => (others => '1'),
+      seqAddr       => (others => '0'),
+      seqWrData     => (others => '0'),
+      seqWrEn       => (others => '0'),
+      seqJumpConfig => (others => TPG_JUMPCONFIG_INIT_C)
+      );
 
-  type XpmSeqNotifyType is record
-    valid : sl;
-    addr  : SeqAddrType;
-  end record;
+   type XpmSeqConfigArray is array(natural range<>) of XpmSeqConfigType;
 
-  type XpmSeqNotifyArray is array(natural range<>) of XpmSeqNotifyType;
-  
+   type XpmSeqNotifyType is record
+      valid : sl;
+      addr  : SeqAddrType;
+   end record;
+
+   type XpmSeqNotifyArray is array(natural range<>) of XpmSeqNotifyType;
+
 end XpmSeqPkg;
 
 package body XpmSeqPkg is

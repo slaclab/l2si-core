@@ -251,7 +251,9 @@ begin
       U_TxLink : entity l2si_core.XpmTxLink
          generic map (
             TPD_G  => TPD_G,
-            ADDR_G => i, STREAMS_G => 3, DEBUG_G => false)
+            ADDR_G => i,
+            STREAMS_G => 3,
+            DEBUG_G => false)
          port map (
             clk       => timingClk,
             rst       => timingRst,
@@ -264,6 +266,7 @@ begin
             fiducial  => r.fiducial,
             txData    => dsTxData (i),
             txDataK   => dsTxDataK(i));
+      
       U_RxLink : entity l2si_core.XpmRxLink
          generic map (
             TPD_G => TPD_G)

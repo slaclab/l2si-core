@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-12-14
--- Last update: 2018-03-12
+-- Last update: 2019-11-05
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -42,60 +42,66 @@ library l2si_core;
 use l2si_core.XpmPkg.all;
 
 entity XpmL0Tag is
-   generic ( TAG_WIDTH_G : integer := 32 );
+   generic (
+      TPD_G       : time    := 1 ns;
+      TAG_WIDTH_G : integer := 32);
    port (
-      clk              : in  sl;
-      rst              : in  sl;
-      config           : in  XpmL0TagConfigType;
-      clear            : in  sl;
-      timingBus        : in  TimingBusType;
-      push             : in  sl;
-      skip             : in  sl;
-      push_tag         : out slv(TAG_WIDTH_G-1 downto 0);
-      pop              : in  sl;
-      pop_tag          : in  slv(7 downto 0);
-      pop_frame        : out XpmAcceptFrameType );
+      clk       : in  sl;
+      rst       : in  sl;
+      config    : in  XpmL0TagConfigType;
+      clear     : in  sl;
+      timingBus : in  TimingBusType;
+      push      : in  sl;
+      skip      : in  sl;
+      push_tag  : out slv(TAG_WIDTH_G-1 downto 0);
+      pop       : in  sl;
+      pop_tag   : in  slv(7 downto 0);
+      pop_frame : out XpmAcceptFrameType);
 end XpmL0Tag;
 
 architecture rtl of XpmL0Tag is
    type RegType is record
-      tag    : slv(TAG_WIDTH_G-1 downto 0);
+      tag : slv(TAG_WIDTH_G-1 downto 0);
    end record;
    constant REG_INIT_C : RegType := (
-      tag    => (others=>'0'));
+      tag => (others => '0'));
 
-   signal r    : RegType := REG_INIT_C;
-   signal rin  : RegType;
+   signal r   : RegType := REG_INIT_C;
+   signal rin : RegType;
 
    signal uclear : sl;
 begin
    push_tag  <= r.tag;
    pop_frame <= XPM_ACCEPT_FRAME_INIT_C;
 
-   U_SYNC: entity surf.SynchronizerVector
-      generic map ( WIDTH_G  => 1 )
-      port map ( clk                   => clk,
-                 dataIn (0)            => clear,
-                 dataOut(0)            => uclear );
-   
-   comb: process (r, push, skip, uclear) is
+   U_SYNC : entity surf.SynchronizerVector
+      generic map (
+         TPD_G   => TPD_G,
+         WIDTH_G => 1)
+      port map (
+         clk        => clk,
+         dataIn(0)  => clear,
+         dataOut(0) => uclear);
+
+   comb : process (push, r, skip, uclear) is
       variable v : RegType;
    begin
       v := r;
-      if (push='1' or skip='1') then
+      if (push = '1' or skip = '1') then
          v.tag := r.tag+1;
       end if;
 
-      if (uclear='1') then
+      if (uclear = '1') then
          v := REG_INIT_C;
       end if;
-      
+
       rin <= v;
    end process comb;
-   seq: process (clk) is
+   
+   seq : process (clk) is
    begin
       if rising_edge(clk) then
-         r <= rin;
+         r <= rin after TPD_G;
       end if;
    end process seq;
 end rtl;
