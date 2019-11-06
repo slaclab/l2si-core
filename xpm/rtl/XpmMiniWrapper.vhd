@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-12-14
--- Last update: 2019-11-05
+-- Last update: 2019-11-06
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -89,7 +89,7 @@ architecture top_level of XpmMiniWrapper is
 
    signal xpmStatus : XpmMiniStatusType;
    signal xpmConfig : XpmMiniConfigType;
-   signal xpmStream : XpmStreamType;
+   signal xpmStream : XpmMiniStreamType;
 
    signal update : sl;
 

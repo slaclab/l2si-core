@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2016-03-25
--- Last update: 2019-11-05
+-- Last update: 2019-11-06
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -44,13 +44,13 @@ package XpmMiniPkg is
    -- This doesn't belong here but not sure where to move it
    constant NSTREAMS_C : integer := 3;
 
-   type XpmStreamType is record
+   type XpmMiniStreamType is record
       fiducial : sl;
       streams  : TimingSerialArray(NSTREAMS_C-1 downto 0);
       advance  : slv (NSTREAMS_C-1 downto 0);
    end record;
 
-   constant XPM_STREAM_INIT_C : XpmStreamType := (
+   constant XPM_MINI_STREAM_INIT_C : XpmStreamType := (
       fiducial => '0',
       streams  => (others => TIMING_SERIAL_INIT_C),
       advance  => (others => '0'));

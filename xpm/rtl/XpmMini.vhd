@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-07-10
--- Last update: 2019-11-05
+-- Last update: 2019-11-06
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -175,8 +175,8 @@ begin
             paddr     => r.bcastf,
             advance_i => r.advance,
             fiducial  => r.fiducial,
-            txData    => dsTx (i).data,
-            txDataK   => dsTx (i).dataK);
+            txData    => dsTx(i).data,
+            txDataK   => dsTx(i).dataK);
 
       dsTx(i).control <= TIMING_PHY_CONTROL_INIT_C;
       rxErr(i)        <= '0' when (dsRx(i).dspErr = "00" and dsRx(i).decErr = "00") else '1';
@@ -188,16 +188,16 @@ begin
             clk     => timingClk,
             rst     => timingRst,
             config  => linkConfig(i),
-            rxData  => dsRx (i).data,
-            rxDataK => dsRx (i).dataK,
-            rxErr   => rxErr (i),
-            rxClk   => dsRxClk (i),
-            rxRst   => dsRxRst (i),
-            isXpm   => isXpm (i),
-            id      => dsId (i),
-            rxRcvs  => dsRxRcvs (i),
-            full    => dsFull (i),
-            l1Input => l1Input (i));
+            rxData  => dsRx(i).data,
+            rxDataK => dsRx(i).dataK,
+            rxErr   => rxErr(i),
+            rxClk   => dsRxClk(i),
+            rxRst   => dsRxRst(i),
+            isXpm   => isXpm(i),
+            id      => dsId(i),
+            rxRcvs  => dsRxRcvs(i),
+            full    => dsFull(i),
+            l1Input => l1Input(i));
    end generate GEN_DSLINK;
 
    --  Form the full partition configuration
@@ -226,9 +226,9 @@ begin
          streams   => timingStream.streams,
          advance   => timingStream.advance,
          fiducial  => timingStream.fiducial,
-         full      => r.full (0),
-         l1Input   => r.l1input (0),
-         result    => expWord (0));
+         full      => r.full(0),
+         l1Input   => r.l1input(0),
+         result    => expWord(0));
 
    U_SyncDelay : entity surf.SynchronizerVector
       generic map (
