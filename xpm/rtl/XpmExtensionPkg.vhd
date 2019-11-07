@@ -121,24 +121,6 @@ package XpmExtensionPkg is
    function toXpmPartitionAddress (broadcast : XpmBroadcastType) return slv;
 
 
-   -----------------------------------------------
-   -- XPM L1 Feedbacks
-   -----------------------------------------------
-   type XpmL1FeedbackType is record
-      valid    : sl;
-      trigsrc  : slv(3 downto 0);
-      tag      : slv(4 downto 0);
-      trigword : slv(8 downto 0);
-   end record;
-
-   type XpmL1FeedbackArray is array (natural range <>) of XpmL1FeedbackType;
-
-   constant XPM_L1_FEEDBACK_INIT_C : XpmL1FeedbackType := (
-      valid    => '0',
-      trigsrc  => (others => '0'),
-      tag      => (others => '0'),
-      trigword => (others => '0'));
-
 end package XpmExtensionPkg;
 package body XpmExtensionPkg is
 

@@ -30,14 +30,14 @@ use ieee.std_logic_unsigned.all;
 
 library surf;
 use surf.StdRtlPkg.all;
+use surf.AxiLitePkg.all;
 
 library lcls_timing_core;
-use lcls_timing_core.TimingExtnPkg.all;
 use lcls_timing_core.TimingPkg.all;
-use surf.AxiLitePkg.all;
 
 library l2si_core;
 use l2si_core.XpmPkg.all;
+use l2si_core.XpmExtensionPkg.all;
 use l2si_core.XpmMiniPkg.all;
 
 library unisim;
@@ -65,18 +65,18 @@ entity XpmMini is
       -- Timing Interface (timingClk domain) 
       timingClk    : in  sl;
       timingRst    : in  sl;
-      timingStream : in  XpmStreamType);
+      timingStream : in  XpmMiniStreamType);
 end XpmMini;
 
 architecture top_level_app of XpmMini is
 
    type LinkFullArray is array (natural range<>) of slv(26 downto 0);
-   type LinkL1InpArray is array (natural range<>) of XpmL1InputArray(NUM_DS_LINKS_G-1 downto 0);
+   type LinkL1InpArray is array (natural range<>) of XpmL1FeedbackArray(NUM_DS_LINKS_G-1 downto 0);
 
    type StateType is (INIT_S, PADDR_S, EWORD_S, EOS_S);
    type RegType is record
       full       : LinkFullArray (XPM_PARTITIONS_C-1 downto 0);
-      l1input    : LinkL1InpArray(XPM_PARTITIONS_C-1 downto 0);
+      l1feedback : LinkL1InpArray(XPM_PARTITIONS_C-1 downto 0);
       fiducial   : sl;
       source     : sl;
       paddr      : slv(XPM_PARTITION_ADDR_LENGTH_C-1 downto 0);  -- platform address
@@ -92,7 +92,7 @@ architecture top_level_app of XpmMini is
    end record;
    constant REG_INIT_C : RegType := (
       full       => (others => (others => '0')),
-      l1input    => (others => (others => XPM_L1_INPUT_INIT_C)),
+      l1feedback => (others => (others => XPM_L1_FEEDBACK_INIT_C)),
       fiducial   => '0',
       source     => '1',
       paddr      => (others => '1'),
@@ -112,11 +112,11 @@ architecture top_level_app of XpmMini is
    signal partitionConfig : XpmPartitionConfigType;
    signal partitionStatus : XpmPartitionStatusType;
 
-   --  input data from sensor links
-   type L1InputArray is array (natural range<>) of XpmL1InputArray(XPM_PARTITIONS_C-1 downto 0);
+   --  feedback data from sensor links
+   type L1FeedbackArray is array (natural range<>) of XpmL1FeedbackArray(XPM_PARTITIONS_C-1 downto 0);
    type FullArray is array (natural range<>) of slv (XPM_PARTITIONS_C-1 downto 0);
 
-   signal l1Input       : L1InputArray(NUM_DS_LINKS_G-1 downto 0);
+   signal l1Feedback    : L1FeedbackArray(NUM_DS_LINKS_G-1 downto 0);
    signal isXpm         : slv (NUM_DS_LINKS_G-1 downto 0);
    signal rxErr         : slv (NUM_DS_LINKS_G-1 downto 0);
    signal dsFull        : FullArray (NUM_DS_LINKS_G-1 downto 0);
@@ -131,7 +131,7 @@ architecture top_level_app of XpmMini is
 
    signal r_streamIds  : Slv4Array (NSTREAMS_C-1 downto 0)       := (x"1", x"2", x"0");
    signal pdepth       : Slv8Array (XPM_PARTITIONS_C-1 downto 0);
-   signal expWord      : Slv48Array(XPM_PARTITIONS_C-1 downto 0) := (others => toSlv(XPM_PARTITION_DATA_INIT_C));
+   signal expWord      : Slv48Array(XPM_PARTITIONS_C-1 downto 0) := (others => (others => '0'));
    signal stream0_data : slv(15 downto 0);
 
 begin
@@ -163,7 +163,7 @@ begin
       U_TxLink : entity l2si_core.XpmTxLink
          generic map (
             TPD_G     => TPD_G,
-            ADDR      => i,
+            ADDR_G    => i,
             STREAMS_G => 3)
          port map (
             clk       => timingClk,
@@ -185,19 +185,19 @@ begin
          generic map (
             TPD_G => TPD_G)
          port map (
-            clk     => timingClk,
-            rst     => timingRst,
-            config  => linkConfig(i),
-            rxData  => dsRx(i).data,
-            rxDataK => dsRx(i).dataK,
-            rxErr   => rxErr(i),
-            rxClk   => dsRxClk(i),
-            rxRst   => dsRxRst(i),
-            isXpm   => isXpm(i),
-            id      => dsId(i),
-            rxRcvs  => dsRxRcvs(i),
-            full    => dsFull(i),
-            l1Input => l1Input(i));
+            clk        => timingClk,
+            rst        => timingRst,
+            config     => linkConfig(i),
+            rxData     => dsRx(i).data,
+            rxDataK    => dsRx(i).dataK,
+            rxErr      => rxErr(i),
+            rxClk      => dsRxClk(i),
+            rxRst      => dsRxRst(i),
+            isXpm      => isXpm(i),
+            id         => dsId(i),
+            rxRcvs     => dsRxRcvs(i),
+            full       => dsFull(i),
+            l1Feedback => l1Feedback(i));
    end generate GEN_DSLINK;
 
    --  Form the full partition configuration
@@ -217,18 +217,18 @@ begin
          TPD_G          => TPD_G,
          NUM_DS_LINKS_G => NUM_DS_LINKS_G)
       port map (
-         regclk    => regclk,
-         update    => update,
-         config    => partitionConfig,
-         status    => partitionStatus,
-         timingClk => timingClk,
-         timingRst => timingRst,
-         streams   => timingStream.streams,
-         advance   => timingStream.advance,
-         fiducial  => timingStream.fiducial,
-         full      => r.full(0),
-         l1Input   => r.l1input(0),
-         result    => expWord(0));
+         regclk     => regclk,
+         update     => update,
+         config     => partitionConfig,
+         status     => partitionStatus,
+         timingClk  => timingClk,
+         timingRst  => timingRst,
+         streams    => timingStream.streams,
+         advance    => timingStream.advance,
+         fiducial   => timingStream.fiducial,
+         full       => r.full(0),
+         l1Feedback => r.l1feedback(0),
+         result     => expWord(0));
 
    U_SyncDelay : entity surf.SynchronizerVector
       generic map (
@@ -239,10 +239,10 @@ begin
          dataIn  => partitionConfig.pipeline.depth_fids,
          dataOut => pdepth(0));
 
-   comb : process (dsFull, expWord, l1Input, pdepth, r, timingRst, timingStream) is
+   comb : process (dsFull, expWord, l1Feedback, pdepth, r, timingRst, timingStream) is
       variable v    : RegType;
       variable tidx : integer;
-      constant pd   : XpmBroadcastType := PDELAY;
+--      constant pd   : XpmBroadcastType := PDELAY;
    begin
       v                  := r;
       v.streams          := timingStream.streams;
@@ -290,13 +290,13 @@ begin
          when EOS_S =>
             v.streams(2).ready := '0';
             v.bcastf           := r.bcastr;
-            tidx               := toIndex(r.bcastr);
+            tidx               := toXpmBroadcastType(r.bcastr).index;
             -- master of all : compose the word
             if r.bcastCount = 8 then
                v.bcastf     := r.paddr;
                v.bcastCount := 0;
             else
-               v.bcastf     := toPaddr(pd, r.bcastCount, pdepth(r.bcastCount));
+               v.bcastf     := toXpmPartitionAddress((btype => XPM_BROADCAST_PDELAY_C, index => r.bcastCount, value => pdepth(r.bcastCount)(6 downto 0)));
                v.bcastCount := r.bcastCount + 1;
             end if;
             v.aword := 0;
@@ -306,8 +306,8 @@ begin
 
       for i in 0 to XPM_PARTITIONS_C-1 loop
          for j in 0 to NUM_DS_LINKS_G-1 loop
-            v.full (i)(j)   := dsFull (j)(i);
-            v.l1input(i)(j) := l1Input(j)(i);
+            v.full (i)(j)      := dsFull (j)(i);
+            v.l1feedback(i)(j) := l1Feedback(j)(i);
          end loop;
       end loop;
 

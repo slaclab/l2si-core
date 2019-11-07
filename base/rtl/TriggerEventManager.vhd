@@ -36,6 +36,7 @@ use lcls_timing_core.TimingPkg.all;
 
 library l2si_core;
 use l2si_core.L2SiPkg.all;
+use l2si_core.XpmPkg.all;
 use l2si_core.XpmExtensionPkg.all;
 
 entity TriggerEventManager is

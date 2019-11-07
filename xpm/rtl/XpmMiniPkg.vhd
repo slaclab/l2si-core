@@ -50,7 +50,7 @@ package XpmMiniPkg is
       advance  : slv (NSTREAMS_C-1 downto 0);
    end record;
 
-   constant XPM_MINI_STREAM_INIT_C : XpmStreamType := (
+   constant XPM_MINI_STREAM_INIT_C : XpmMiniStreamType := (
       fiducial => '0',
       streams  => (others => TIMING_SERIAL_INIT_C),
       advance  => (others => '0'));

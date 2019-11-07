@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-12-14
--- Last update: 2019-11-06
+-- Last update: 2019-11-07
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -59,7 +59,7 @@ entity XpmMiniWrapper is
       dsRxRst         : in  slv (NUM_DS_LINKS_G-1 downto 0);
       dsRx            : in  TimingRxArray (NUM_DS_LINKS_G-1 downto 0);
       dsTx            : out TimingPhyArray(NUM_DS_LINKS_G-1 downto 0);
-      timingBus       : out TimingBusType;
+--      timingBus       : out TimingBusType;
       --
       axilClk         : in  sl;
       axilRst         : in  sl;
@@ -71,10 +71,12 @@ end XpmMiniWrapper;
 
 architecture top_level of XpmMiniWrapper is
 
-   constant TPG_MINI_INDEX_C              : integer                                                        := 0;
-   constant XPM_MINI_INDEX_C              : integer                                                        := 1;
-   constant NUM_AXI_MASTERS_C             : integer                                                        := 2;
-   constant AXI_CROSSBAR_MASTERS_CONFIG_C : AxiLiteCrossbarMasterConfigArray(NUM_AXI_MASTERS_C-1 downto 0) := genAxiLiteConfig(NUM_AXI_MASTERS_C, AXIL_BASEADDR_G, 16, 12);
+   constant TPG_MINI_INDEX_C  : integer := 0;
+   constant XPM_MINI_INDEX_C  : integer := 1;
+   constant NUM_AXI_MASTERS_C : integer := 2;
+
+   constant AXI_CROSSBAR_MASTERS_CONFIG_C : AxiLiteCrossbarMasterConfigArray(NUM_AXI_MASTERS_C-1 downto 0) :=
+      genAxiLiteConfig(NUM_AXI_MASTERS_C, AXIL_BASEADDR_G, 16, 12);
 
    signal mAxilWriteMasters : AxiLiteWriteMasterArray(NUM_AXI_MASTERS_C-1 downto 0);
    signal mAxilWriteSlaves  : AxiLiteWriteSlaveArray (NUM_AXI_MASTERS_C-1 downto 0);
@@ -148,7 +150,7 @@ begin
 
    U_XpmReg : entity l2si_core.XpmMiniReg
       generic map (
-         TPD_G => TPG_G)
+         TPD_G => TPD_G)
       port map (
          axilClk         => axilClk,
          axilRst         => axilRst,
@@ -172,7 +174,7 @@ begin
          TPD_G          => TPD_G,
          NUM_DS_LINKS_G => NUM_DS_LINKS_G)
       port map (
-         regclk       => axilClk,
+         regclk       => axilClk, 
          regrst       => axilRst,
          update       => update,
          config       => xpmConfig,
