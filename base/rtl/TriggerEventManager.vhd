@@ -92,7 +92,7 @@ architecture rtl of TriggerEventManager is
 
    constant AXIL_MASTERS_C : integer                              := 9;
    constant AXIL_ALIGNER_C : integer                              := 0;
-   constant AXIL_EHC_C     : IntegerArray(0 to NUM_DETECTORS_G-1) := list(1, NUM_DETECTORS_G, 1);
+   constant AXIL_TEB_C     : IntegerArray(0 to NUM_DETECTORS_G-1) := list(1, NUM_DETECTORS_G, 1);
 
    constant AXIL_XBAR_CONFIG_C : AxiLiteCrossbarMasterConfigArray(AXIL_MASTERS_C-1 downto 0) := genAxiLiteConfig(AXIL_MASTERS_C, AXIL_BASE_ADDR_G, 12, 8);
 
@@ -260,10 +260,10 @@ begin
          port map (
             timingRxClk          => timingRxClk,                         -- [in]
             timingRxRst          => timingRxRst,                         -- [in]
-            axilReadMaster       => locAxilReadMasters(AXIL_EHC_C(i)),   -- [in]
-            axilReadSlave        => locAxilReadSlaves(AXIL_EHC_C(i)),    -- [out]
-            axilWriteMaster      => locAxilWriteMasters(AXIL_EHC_C(i)),  -- [in]
-            axilWriteSlave       => locAxilWriteSlaves(AXIL_EHC_C(i)),   -- [out]
+            axilReadMaster       => locAxilReadMasters(AXIL_TEB_C(i)),   -- [in]
+            axilReadSlave        => locAxilReadSlaves(AXIL_TEB_C(i)),    -- [out]
+            axilWriteMaster      => locAxilWriteMasters(AXIL_TEB_C(i)),  -- [in]
+            axilWriteSlave       => locAxilWriteSlaves(AXIL_TEB_C(i)),   -- [out]
             promptTimingStrobe   => timingBus.strobe,                    -- [in]            
             promptTimingMessage  => timingBus.message,                   -- [in]
             promptXpmMessage     => xpmMessage,                          -- [in]

@@ -19,19 +19,13 @@ library ieee;
 use ieee.std_logic_1164.all;
 use ieee.std_logic_unsigned.all;
 
--- surf
-
 library surf;
 use surf.StdRtlPkg.all;
 use surf.AxiLitePkg.all;
 use surf.AxiStreamPkg.all;
 
--- lcls-timing-core
-
 library lcls_timing_core;
 use lcls_timing_core.TimingPkg.all;
-
--- l2si
 
 library l2si_core;
 use l2si_core.L2SiPkg.all;
@@ -91,7 +85,7 @@ architecture rtl of TriggerEventBuffer is
 
    type RegType is record
       enable          : sl;
-      enableCache     : sl;
+      enableEventBuffer     : sl;
       partition       : slv(2 downto 0);
       fifoPauseThresh : slv(FIFO_ADDR_WIDTH_C-1 downto 0);
       triggerDelay    : slv(31 downto 0);
@@ -113,7 +107,7 @@ architecture rtl of TriggerEventBuffer is
 
    constant REG_INIT_C : RegType := (
       enable          => '0',
-      enableCache     => '0',
+      enableEventBuffer     => '0',
       partition       => (others => '0'),
       fifoPauseThresh => (others => '0'),
       triggerDelay    => (others => '0'),
@@ -206,7 +200,7 @@ begin
          streamValid := (eventData.valid and eventData.l0Accept) or transitionData.valid;
 
          -- Don't pass data through when disabled
-         if (r.enable = '0' or r.enableCache = '0') then
+         if (r.enable = '0' or r.enableEventBuffer = '0') then
             streamValid := '0';
          end if;
 
@@ -272,7 +266,7 @@ begin
       axiSlaveWaitTxn(axilEp, axilWriteMaster, axilReadMaster, v.axilWriteSlave, v.axilReadSlave);
 
       axiSlaveRegister(axilEp, x"00", 0, v.enable);
-      axiSlaveRegister(axilEp, x"00", 1, v.enableCache);
+      axiSlaveRegister(axilEp, x"00", 1, v.enableEventBuffer);
       axiSlaveRegister(axilEp, x"04", 0, v.partition);
       axiSlaveRegisterR(axilEp, x"08", 0, r.overflow);
       axiSlaveRegisterR(axilEp, X"08", 1, fifoAxisCtrl.pause);

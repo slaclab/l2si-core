@@ -31,8 +31,8 @@ use l2si_core.XpmPkg.all;
 
 package XpmExtensionPkg is
 
-   constant XPM_STREAM_ID_C : integer := 1;
-   constant XPM_MESSAGE_BITS_C          : integer := 32 + 8 * 48;
+   constant XPM_STREAM_ID_C     : integer := 1;
+   constant XPM_MESSAGE_BITS_C  : integer := 32 + 8 * 48;
    constant XPM_MESSAGE_WORDS_C : integer := XPM_MESSAGE_BITS_C / 16;
 
    type XpmMessageType is record
@@ -109,8 +109,8 @@ package XpmExtensionPkg is
    -- Decode broadcasts on partitionAddr
    -----------------------------------------------
    constant XPM_BROADCAST_PDELAY_C : slv(3 downto 0) := X"E";
-   constant XPM_BROADCAST_XADDR_C : slv(3 downto 0) := X"F";
-   
+   constant XPM_BROADCAST_XADDR_C  : slv(3 downto 0) := X"F";
+
    type XpmBroadcastType is record
       btype : slv(3 downto 0);
       index : integer;
@@ -118,7 +118,7 @@ package XpmExtensionPkg is
    end record XpmAddressDataType;
 
    function toXpmBroadcastType (partitionAddr : slv(31 downto 0)) return XpmBroadcastType;
-   function toXpmPartitionAddress (broadcast : XpmBroadcastType) return slv;
+   function toXpmPartitionAddress (broadcast  : XpmBroadcastType) return slv;
 
 
 end package XpmExtensionPkg;
@@ -212,31 +212,31 @@ package body XpmExtensionPkg is
    end function;
 
    function toXpmBroadcastType (partitionAddr : slv(31 downto 0)) return XpmBroadcastType is
-      variable i : integer;
+      variable i         : integer;
       variable broadcast : XpmBroadcastType;
-      variable tmpIndex : slv(2 downto 0);
+      variable tmpIndex  : slv(2 downto 0);
    begin
-      i := 0;
+      i               := 0;
       assignRecord(i, partitionAddr, broadcast.value);
-      i := 24;
+      i               := 24;
       assignRecord(i, partitionAddr, tmpIndex);
       broadcast.index := conv_integer(tmpIndex);
-      i := 28;
+      i               := 28;
       assignRecord(i, partitionAddr, broadcast.btype);
       return broadcast;
    end function;
-   
+
    function toXpmPartitionAddress (broadcast : XpmBroadcastType) return slv is
-      variable i : integer;
+      variable i             : integer;
       variable partitionAddr : slv(31 downto 0);
-      variable indexTmp : slv(2 downto 0);
+      variable indexTmp      : slv(2 downto 0);
    begin
-      i := 0;
+      i             := 0;
       partitionAddr := (others => '0');
       assignSlv(i, partitionAddr, broadcast.value);
-      i := 24;
-      indexTmp := toSlv(broadcast.index, 3);
-      i := 28;
+      i             := 24;
+      indexTmp      := toSlv(broadcast.index, 3);
+      i             := 28;
       assignSlv(i, partitionAddr, broadcast.btype);
       return partitionAddr;
    end function;
