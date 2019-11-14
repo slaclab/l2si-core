@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-07-10
--- Last update: 2019-11-05
+-- Last update: 2019-11-13
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -118,6 +118,8 @@ architecture rtl of XpmAppMaster is
    signal cuRx_valid         : sl;
    signal cuRx_delayOverflow : sl;
 
+   signal depth_clks_20 : slv(19 downto 0);
+
    component ila_0
       port (clk    : in sl;
             probe0 : in slv(255 downto 0));
@@ -145,6 +147,7 @@ begin
    result          <= r.result;
    status.l1Select <= XPM_L1_SELECT_STATUS_INIT_C;
 
+   depth_clks_20 <= resize(config.pipeline.depth_clks, 20);
    U_TimingDelay : entity lcls_timing_core.TimingSerialDelay
       generic map (
          TPD_G    => TPD_G,
@@ -153,7 +156,7 @@ begin
       port map (
          clk        => timingClk,
          rst        => l0Reset,
-         delay      => resize(config.pipeline.depth_clks, 20),
+         delay      => depth_clks_20,
          fiducial_i => fiducial,
          advance_i  => advance(0),
          stream_i   => streams(0),
@@ -170,7 +173,7 @@ begin
       port map (
          clk        => timingClk,
          rst        => l0Reset,
-         delay      => resize(config.pipeline.depth_clks, 20),
+         delay      => depth_clks_20,
          fiducial_i => fiducial,
          advance_i  => advance(1),
          stream_i   => streams(1),

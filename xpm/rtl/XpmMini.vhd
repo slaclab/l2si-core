@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-07-10
--- Last update: 2019-11-06
+-- Last update: 2019-11-13
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -85,7 +85,7 @@ architecture top_level_app of XpmMini is
       streams    : TimingSerialArray(NSTREAMS_C-1 downto 0);
       advance    : slv (NSTREAMS_C-1 downto 0);
       state      : StateType;
-      aword      : integer range 0 to paddr'left/16;
+      aword      : integer range 0 to (XPM_PARTITION_ADDR_LENGTH_C-1)/16;
       eword      : integer range 0 to (XPM_NUM_TAG_BYTES_C+1)/2;
       ipart      : integer range 0 to 2*XPM_PARTITIONS_C-1;
       bcastCount : integer range 0 to 8;

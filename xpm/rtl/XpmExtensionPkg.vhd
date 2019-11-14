@@ -115,7 +115,7 @@ package XpmExtensionPkg is
       btype : slv(3 downto 0);
       index : integer;
       value : slv(6 downto 0);
-   end record XpmAddressDataType;
+   end record;
 
    function toXpmBroadcastType (partitionAddr : slv(31 downto 0)) return XpmBroadcastType;
    function toXpmPartitionAddress (broadcast  : XpmBroadcastType) return slv;
