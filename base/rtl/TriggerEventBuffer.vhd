@@ -50,14 +50,14 @@ entity TriggerEventBuffer is
 
 
       -- Prompt header and event bus
-      promptTimingStrobe      : in sl;
-      promptTimingMessage     : in TimingMessageType;
-      promptXpmMessage : in XpmMessageType;
+      promptTimingStrobe  : in sl;
+      promptTimingMessage : in TimingMessageType;
+      promptXpmMessage    : in XpmMessageType;
 
       -- Aligned header and event bus
-      alignedTimingStrobe      : in sl;
-      alignedTimingMessage     : in TimingMessageType;
-      alignedXpmMessage : in XpmMessageType;
+      alignedTimingStrobe  : in sl;
+      alignedTimingMessage : in TimingMessageType;
+      alignedXpmMessage    : in XpmMessageType;
 
       -- Feedback
       partition : out slv(2 downto 0);
@@ -84,17 +84,17 @@ architecture rtl of TriggerEventBuffer is
    constant FIFO_ADDR_WIDTH_C : integer := 5;
 
    type RegType is record
-      enable          : sl;
-      enableEventBuffer     : sl;
-      partition       : slv(2 downto 0);
-      fifoPauseThresh : slv(FIFO_ADDR_WIDTH_C-1 downto 0);
-      triggerDelay    : slv(31 downto 0);
-      overflow        : sl;
-      fifoRst         : sl;
-      messageDelay    : slv8Array(1 downto 0);
-      l0Count         : slv(31 downto 0);
-      l1AcceptCount   : slv(31 downto 0);
-      l1RejectCount   : slv(31 downto 0);
+      enable            : sl;
+      enableEventBuffer : sl;
+      partition         : slv(2 downto 0);
+      fifoPauseThresh   : slv(FIFO_ADDR_WIDTH_C-1 downto 0);
+      triggerDelay      : slv(31 downto 0);
+      overflow          : sl;
+      fifoRst           : sl;
+      messageDelay      : slv8Array(1 downto 0);
+      l0Count           : slv(31 downto 0);
+      l1AcceptCount     : slv(31 downto 0);
+      l1RejectCount     : slv(31 downto 0);
 
       fifoAxisMaster : AxiStreamMasterType;
 
@@ -106,17 +106,17 @@ architecture rtl of TriggerEventBuffer is
    end record RegType;
 
    constant REG_INIT_C : RegType := (
-      enable          => '0',
-      enableEventBuffer     => '0',
-      partition       => (others => '0'),
-      fifoPauseThresh => (others => '0'),
-      triggerDelay    => (others => '0'),
-      overflow        => '0',
-      fifoRst         => '0',
-      messageDelay    => (others => (others => '0')),
-      l0Count         => (others => '0'),
-      l1AcceptCount   => (others => '0'),
-      l1RejectCount   => (others => '0'),
+      enable            => '0',
+      enableEventBuffer => '0',
+      partition         => (others => '0'),
+      fifoPauseThresh   => (others => '0'),
+      triggerDelay      => (others => '0'),
+      overflow          => '0',
+      fifoRst           => '0',
+      messageDelay      => (others => (others => '0')),
+      l0Count           => (others => '0'),
+      l1AcceptCount     => (others => '0'),
+      l1RejectCount     => (others => '0'),
 
       fifoAxisMaster => axiStreamMasterInit(EVENT_AXIS_CONFIG_C),
       -- outputs     =>
@@ -169,7 +169,7 @@ begin
       -- Output on triggerData interface
       --------------------------------------------
       v.triggerData.valid := '0';
-      If (promptTimingStrobe = '1' and promptXpmMessage.valid = '1') then
+      if (promptTimingStrobe = '1' and promptXpmMessage.valid = '1') then
          v.triggerData := toXpmEventDataType(promptXpmMessage.partitionWord(partitionV));
 
          -- Count time since last event
@@ -306,11 +306,11 @@ begin
    triggerDataSlv <= toSlv(r.triggerData);
    U_SlvDelayFifo_1 : entity surf.SlvDelayFifo
       generic map (
-         TPD_G             => TPD_G,
-         DATA_WIDTH_G      => 48,
-         DELAY_BITS_G      => 32,
-         FIFO_ADDR_WIDTH_G => FIFO_ADDR_WIDTH_C,
-         FIFO_BRAM_EN_G    => true)
+         TPD_G              => TPD_G,
+         DATA_WIDTH_G       => 48,
+         DELAY_BITS_G       => 32,
+         FIFO_ADDR_WIDTH_G  => FIFO_ADDR_WIDTH_C,
+         FIFO_MEMORY_TYPE_G => "block")
       port map (
          clk         => timingRxClk,               -- [in]
          rst         => timingRxRst,               -- [in]
@@ -328,7 +328,6 @@ begin
          generic map (
             TPD_G        => TPD_G,
             COMMON_CLK_G => false,
---         BRAM_EN_G     => BRAM_EN_G,
             DATA_WIDTH_G => 48)
          port map (
             rst    => timingRxRst,              -- [in]
@@ -355,7 +354,7 @@ begin
          INT_PIPE_STAGES_G   => 1,
          PIPE_STAGES_G       => 1,
          SLAVE_READY_EN_G    => false,
-         BRAM_EN_G           => true,
+         MEMORY_TYPE_G       => "block",
          GEN_SYNC_FIFO_G     => EVENT_CLK_IS_TIMING_RX_CLK_G,
          FIFO_ADDR_WIDTH_G   => FIFO_ADDR_WIDTH_C,
          FIFO_FIXED_THRESH_G => false,
@@ -385,7 +384,7 @@ begin
       generic map (
          TPD_G           => TPD_G,
          GEN_SYNC_FIFO_G => EVENT_CLK_IS_TIMING_RX_CLK_G,
-         BRAM_EN_G       => true,
+         MEMORY_TYPE_G   => "block",
          FWFT_EN_G       => true,
          USE_BUILT_IN_G  => false,
          PIPE_STAGES_G   => 1,               -- make sure this lines up right with event fifo

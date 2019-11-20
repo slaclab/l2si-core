@@ -294,7 +294,6 @@ begin
       generic map (
          TPD_G        => TPD_G,
          COMMON_CLK_G => false,
---         BRAM_EN_G     => BRAM_EN_G,
          DATA_WIDTH_G => FB_SYNC_VECTOR_BITS_C)
       port map (
          rst    => timingRxRst,                    -- [in]

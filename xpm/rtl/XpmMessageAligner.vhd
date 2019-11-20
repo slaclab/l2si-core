@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-07-10
--- Last update: 2019-11-05
+-- Last update: 2019-11-20
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -105,7 +105,7 @@ begin
          VECTOR_WIDTH_G   => TIMING_MESSAGE_BITS_NO_BSA_C,
          BASE_DELAY_G     => TF_DELAY_G,
          RAM_ADDR_WIDTH_G => 7,
-         BRAM_EN_G        => true)
+         MEMORY_TYPE_G    => "block")
       port map (
          rst          => rst,                                      -- [in]
          clk          => clk,                                      -- [in]
@@ -133,16 +133,16 @@ begin
             VECTOR_WIDTH_G   => 49,
             BASE_DELAY_G     => TF_DELAY_G,
             RAM_ADDR_WIDTH_G => 7,
-            BRAM_EN_G        => true)
+            MEMORY_TYPE_G    => "block")
          port map (
-            rst                       => rst,                                      -- [in]
-            clk                       => clk,                                      -- [in]
-            delay                     => r.partitionDelays(i),                     -- [in]
-            inputValid                => promptTimingStrobe,                       -- [in]
+            rst                       => rst,   -- [in]
+            clk                       => clk,   -- [in]
+            delay                     => r.partitionDelays(i),    -- [in]
+            inputValid                => promptTimingStrobe,      -- [in]
             inputVector(47 downto 0)  => promptXpmMessage.partitionWord(i),        -- [in]
-            inputVector(48)           => promptXpmMessage.valid,                   -- [in]            
+            inputVector(48)           => promptXpmMessage.valid,  -- [in]            
             inputAddr                 => promptTimingMessage.pulseId(6 downto 0),  -- [in]
-            outputValid               => open,                                     -- [in] (in theory will always be the same as alignedTimingStrobe
+            outputValid               => open,  -- [in] (in theory will always be the same as alignedTimingStrobe
             outputVector(47 downto 0) => alignedXpmMessage.partitionWord(i),       -- [out]
             outputVector(48)          => alignedXpmMessageValid(i));               -- [out]
    end generate;
@@ -154,8 +154,8 @@ begin
    alignedXpmMessage.valid <= uAnd(alignedXpmMessageValid);
 
    comb : process(axilReadMaster, axilWriteMaster, promptXpmMessage, promptTimingStrobe, r, rst) is
-      variable v            : RegType;
-      variable axilEp       : AxiLiteEndpointType;
+      variable v                : RegType;
+      variable axilEp           : AxiLiteEndpointType;
       variable broadcastMessage : XpmBroadcastType;
    begin
       v := r;
