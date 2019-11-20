@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-07-10
--- Last update: 2019-11-05
+-- Last update: 2019-11-20
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -89,7 +89,7 @@ entity XpmApp is
       timingClk       : in  sl;
       timingRst       : in  sl;
 --      timingIn          : in  TimingRxType;
-      timingStream    : in  XpmStreamType;
+      timingStream    : in  XpmMiniStreamType;
       timingFbClk     : in  sl;
       timingFbRst     : in  sl;
       timingFbId      : in  slv(31 downto 0);
