@@ -1,6 +1,6 @@
 import pyrogue as pr
 
-class XpmMiniCore(pr.Device):
+class XpmMini(pr.Device):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
 
@@ -126,7 +126,7 @@ class XpmMiniCore(pr.Device):
         )) 
         
         self.add(pr.RemoteVariable( 
-            name         = "L0Select_Reset",
+            name         = "Config_L0Select_Reset",
             offset       = 0x14,
             bitSize      = 1,
             bitOffset    = 0,
@@ -134,7 +134,7 @@ class XpmMiniCore(pr.Device):
         )) 
         
         self.add(pr.RemoteVariable( 
-            name         = "L0Select_Enabled",
+            name         = "Config_L0Select_Enabled",
             offset       = 0x14,
             bitSize      = 1,
             bitOffset    = 16,
@@ -151,7 +151,7 @@ class XpmMiniCore(pr.Device):
         )) 
         
         self.add(pr.RemoteVariable( 
-            name         = "L0Select_RateSel",
+            name         = "Config_L0Select_RateSel",
             offset       = 0x18,
             bitSize      = 16,
             bitOffset    = 0,
@@ -159,7 +159,7 @@ class XpmMiniCore(pr.Device):
         )) 
         
         self.add(pr.RemoteVariable( 
-            name         = "L0Select_DestSel",
+            name         = "Config_L0Select_DestSel",
             offset       = 0x18,
             bitSize      = 16,
             bitOffset    = 16,
@@ -167,7 +167,7 @@ class XpmMiniCore(pr.Device):
         )) 
         
         self.add(pr.RemoteVariable( 
-            name         = "L0Select_Enabled",
+            name         = "Status_L0Select_Enabled",
             offset       = 0x20,
             bitSize      = 64,
             bitOffset    = 0,
@@ -176,7 +176,7 @@ class XpmMiniCore(pr.Device):
         )) 
         
         self.add(pr.RemoteVariable( 
-            name         = "L0Select_Inhibited",
+            name         = "Status_L0Select_Inhibited",
             offset       = 0x28,
             bitSize      = 64,
             bitOffset    = 0,
@@ -185,7 +185,7 @@ class XpmMiniCore(pr.Device):
         )) 
         
         self.add(pr.RemoteVariable( 
-            name         = "L0Select_Num",
+            name         = "Status_L0Select_Num",
             offset       = 0x30,
             bitSize      = 64,
             bitOffset    = 0,
@@ -193,7 +193,7 @@ class XpmMiniCore(pr.Device):
             mode         = 'RO',
         )) 
         self.add(pr.RemoteVariable( 
-            name         = "L0Select_NumInh",
+            name         = "Status_L0Select_NumInh",
             offset       = 0x38,
             bitSize      = 64,
             bitOffset    = 0,
@@ -201,7 +201,7 @@ class XpmMiniCore(pr.Device):
             mode         = 'RO',
         )) 
         self.add(pr.RemoteVariable( 
-            name         = "L0Select_NumAcc",
+            name         = "Status_L0Select_NumAcc",
             offset       = 0x40,
             bitSize      = 64,
             bitOffset    = 0,

@@ -1,7 +1,9 @@
 import pyrogue as pr
 
-class TriggerEventBuffer(pr.Device):
-    def __init__(self, numDetectors, **kwargs):
+import l2si_core
+
+class TriggerEventManager(pr.Device):
+    def __init__(self, numDetectors=1, **kwargs):
         super().__init__(**kwargs)
 
         self.add(l2si_core.XpmMessageAligner(

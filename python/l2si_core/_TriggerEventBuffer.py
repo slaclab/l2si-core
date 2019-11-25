@@ -30,7 +30,7 @@ class TriggerEventBuffer(pr.Device):
             offset      = 0x04,
             bitSize     = 3,
             bitOffset   = 0,
-            base        = pr.UInt
+            base        = pr.UInt,
             mode        = 'RW',
             disp        = '{:d}',
         ))
@@ -103,10 +103,10 @@ class TriggerEventBuffer(pr.Device):
             name        = 'L1RejectCount',
             description = 'Number of L1 Triggers Rejected',
             offset      = 0x1C,
-            bitSize     = ,
+            bitSize     = 32,
             bitOffset   = 0,
-            base        = ,
-            mode        = ,
+            base        = pr.UInt,
+            mode        = 'RO',
             disp        = '{:d}'            
         ))
         
