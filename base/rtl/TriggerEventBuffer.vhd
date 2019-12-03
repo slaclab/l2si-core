@@ -386,7 +386,6 @@ begin
          GEN_SYNC_FIFO_G => EVENT_CLK_IS_TIMING_RX_CLK_G,
          MEMORY_TYPE_G   => "block",
          FWFT_EN_G       => true,
-         USE_BUILT_IN_G  => false,
          PIPE_STAGES_G   => 1,               -- make sure this lines up right with event fifo
          DATA_WIDTH_G    => TIMING_MESSAGE_BITS_NO_BSA_C,
          ADDR_WIDTH_G    => FIFO_ADDR_WIDTH_C)
