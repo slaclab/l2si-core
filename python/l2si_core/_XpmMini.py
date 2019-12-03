@@ -169,7 +169,7 @@ class XpmMini(pr.Device):
         self.add(pr.RemoteVariable( 
             name         = "Status_L0Select_Enabled",
             offset       = 0x20,
-            bitSize      = 64,
+            bitSize      = 40,
             bitOffset    = 0,
             disp         = '{:d}',
             mode         = 'RO',
@@ -178,7 +178,7 @@ class XpmMini(pr.Device):
         self.add(pr.RemoteVariable( 
             name         = "Status_L0Select_Inhibited",
             offset       = 0x28,
-            bitSize      = 64,
+            bitSize      = 40,
             bitOffset    = 0,
             disp         = '{:d}',
             mode         = 'RO',
@@ -187,7 +187,7 @@ class XpmMini(pr.Device):
         self.add(pr.RemoteVariable( 
             name         = "Status_L0Select_Num",
             offset       = 0x30,
-            bitSize      = 64,
+            bitSize      = 40,
             bitOffset    = 0,
             disp         = '{:d}',
             mode         = 'RO',
@@ -195,7 +195,7 @@ class XpmMini(pr.Device):
         self.add(pr.RemoteVariable( 
             name         = "Status_L0Select_NumInh",
             offset       = 0x38,
-            bitSize      = 64,
+            bitSize      = 40,
             bitOffset    = 0,
             disp         = '{:d}',
             mode         = 'RO',
@@ -203,7 +203,7 @@ class XpmMini(pr.Device):
         self.add(pr.RemoteVariable( 
             name         = "Status_L0Select_NumAcc",
             offset       = 0x40,
-            bitSize      = 64,
+            bitSize      = 40,
             bitOffset    = 0,
             disp         = '{:d}',
             mode         = 'RO',
