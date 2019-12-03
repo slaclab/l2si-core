@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver  <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2016-07-07
--- Last update: 2019-11-13
+-- Last update: 2019-11-26
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -194,7 +194,7 @@ begin
       case (r.state) is
          when ERR_S =>
             v.fifoRst := advance_i;
-            if fiducial_i = '1' then
+            if advance_i = '0' then
                v.running := '1';
                v.state   := ARMED_S;
             end if;
@@ -203,6 +203,8 @@ begin
                v.stream.data := dout_msg;
                v.rd_msg      := '1';
                v.state       := SHIFT_S;
+            elsif (valid_msg = '1') then
+               v.rd_msg := '1';
             end if;
          when SHIFT_S =>
             if (valid_msg = '0' or firstW = '1') then
