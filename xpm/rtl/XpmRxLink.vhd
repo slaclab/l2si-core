@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-12-14
--- Last update: 2019-11-05
+-- Last update: 2019-12-02
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -205,7 +205,7 @@ begin
                v.strobe(r.partition) := rxData(14);
                v.l1feedback.trigword := rxData(13 downto 5);
                v.l1feedback.tag      := rxData(4 downto 0);
-               v.state               := PFULL_S;
+               v.state               := PDATA1_S;
             end if;
 
          when DDATA_S =>
