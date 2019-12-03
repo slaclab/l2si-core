@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-07-10
--- Last update: 2019-11-13
+-- Last update: 2019-11-27
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -125,14 +125,9 @@ architecture top_level_app of XpmMini is
    signal bpRxLinkFullS : Slv16Array (NUM_BP_LINKS_G-1 downto 0);
    signal linkConfig    : XpmLinkConfigArray(NUM_DS_LINKS_G-1 downto 0);
 
-   --  Serialized data to sensor links
-   signal txData  : slv(15 downto 0);
-   signal txDataK : slv(1 downto 0);
-
    signal r_streamIds  : Slv4Array (NSTREAMS_C-1 downto 0)       := (x"1", x"2", x"0");
-   signal pdepth       : Slv8Array (XPM_PARTITIONS_C-1 downto 0);
+   signal pdepth       : Slv8Array (XPM_PARTITIONS_C-1 downto 0) := (others => (others => '0'));
    signal expWord      : Slv48Array(XPM_PARTITIONS_C-1 downto 0) := (others => (others => '0'));
-   signal stream0_data : slv(15 downto 0);
 
 begin
 
@@ -155,7 +150,7 @@ begin
       linkConfig(i).rxReset    <= config.dsLink(i).rxReset;
       linkConfig(i).txPllReset <= config.dsLink(i).txPllReset;
       linkConfig(i).rxPllReset <= config.dsLink(i).rxPllReset;
-      linkConfig(i).txDelayRst <= '0';
+      linkConfig(i).txDelayRst <= config.dsLink(i).txReset;
       linkConfig(i).txDelay    <= (others => '0');
       linkConfig(i).groupMask  <= toSlv(1, XPM_PARTITIONS_C);
       linkConfig(i).trigsrc    <= (others => '0');
@@ -238,6 +233,14 @@ begin
          clk     => timingClk,
          dataIn  => partitionConfig.pipeline.depth_fids,
          dataOut => pdepth(0));
+
+   pdepth(7) <= pdepth(0);
+   pdepth(6) <= pdepth(0);
+   pdepth(5) <= pdepth(0);   
+   pdepth(4) <= pdepth(0);
+   pdepth(3) <= pdepth(0);
+   pdepth(2) <= pdepth(0);
+   pdepth(1) <= pdepth(0);
 
    comb : process (dsFull, expWord, l1Feedback, pdepth, r, timingRst, timingStream) is
       variable v    : RegType;
