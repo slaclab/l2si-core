@@ -119,8 +119,8 @@ architecture rtl of TriggerEventManager is
 
    -- Event header cache outputs
    signal detectorPartitions : slv3array(NUM_DETECTORS_G-1 downto 0);
-   signal full               : slv(NUM_DETECTORS_G-1 downto 0);
-   signal overflow           : slv(NUM_DETECTORS_G-1 downto 0);
+   signal full               : slv(NUM_DETECTORS_G-1 downto 0) := (others => '0');
+   signal overflow           : slv(NUM_DETECTORS_G-1 downto 0) := (others => '0');
 
 
    -----------------------------------------------
