@@ -103,6 +103,15 @@ architecture rtl of TriggerEventBuffer is
       axilReadSlave  : AxiLiteReadSlaveType;
       axilWriteSlave : AxiLiteWriteSlaveType;
 
+      -- debug
+      partitionV     : integer;
+      eventData      : XpmEventDataType;
+      transitionData : XpmTransitionDataType;
+      tmpEventData   : XpmEventDataType;
+      eventHeader    : EventHeaderType;
+      streamValid    : sl;
+
+
    end record RegType;
 
    constant REG_INIT_C : RegType := (
@@ -122,7 +131,14 @@ architecture rtl of TriggerEventBuffer is
       -- outputs     =>
       triggerData    => XPM_EVENT_DATA_INIT_C,
       axilReadSlave  => AXI_LITE_READ_SLAVE_INIT_C,
-      axilWriteSlave => AXI_LITE_WRITE_SLAVE_INIT_C);
+      axilWriteSlave => AXI_LITE_WRITE_SLAVE_INIT_C,
+
+      partitionV     => 0,
+      eventData      => XPM_EVENT_DATA_INIT_C,
+      transitionData => XPM_TRANSITION_DATA_INIT_C,
+      tmpEventData   => XPM_EVENT_DATA_INIT_C,
+      eventHeader    => EVENT_HEADER_INIT_C,
+      streamValid    => '0');
 
    signal r   : RegType := REG_INIT_C;
    signal rin : RegType;
@@ -146,18 +162,12 @@ begin
    comb : process (alignedXpmMessage, alignedTimingMessage, alignedTimingStrobe,
                    axilReadMaster, axilWriteMaster, fifoAxisCtrl,
                    promptXpmMessage, promptTimingStrobe, r, timingRxRst) is
-      variable v              : RegType;
-      variable axilEp         : AxiLiteEndpointType;
-      variable partitionV     : integer;
-      variable eventData      : XpmEventDataType;
-      variable transitionData : XpmTransitionDataType;
-      variable tmpEventData   : XpmEventDataType;
-      variable eventHeader    : EventHeaderType;
-      variable streamValid    : sl;
+      variable v      : RegType;
+      variable axilEp : AxiLiteEndpointType;
    begin
       v := r;
 
-      partitionV := conv_integer(r.partition);
+      v.partitionV := conv_integer(r.partition);
 
       v.fifoRst := '0';
 
@@ -170,11 +180,11 @@ begin
       --------------------------------------------
       v.triggerData.valid := '0';
       if (promptTimingStrobe = '1' and promptXpmMessage.valid = '1') then
-         v.triggerData := toXpmEventDataType(promptXpmMessage.partitionWord(partitionV));
+         v.triggerData := toXpmEventDataType(promptXpmMessage.partitionWord(v.partitionV));
 
          -- Count time since last event
          v.messageDelay(0) := r.messageDelay(0) + 1;
-         if (v.triggerData.valid = '1') then
+         if (v.triggerData.valid = '1' and v.triggerData.l0Accept = '1') then
             v.messageDelay(0) := (others => '0');
          end if;
 
@@ -192,41 +202,41 @@ begin
       if (alignedTimingStrobe = '1' and alignedXpmMessage.valid = '1') then
          -- Decode event data from configured partitionWord
          -- Decode as both event and transition and use the .valid field to determine which one to use
-         eventData      := toXpmEventDataType(alignedXpmMessage.partitionWord(partitionV));
-         transitionData := toXpmTransitionDataType(alignedXpmMessage.partitionWord(partitionV));
+         v.eventData      := toXpmEventDataType(alignedXpmMessage.partitionWord(v.partitionV));
+         v.transitionData := toXpmTransitionDataType(alignedXpmMessage.partitionWord(v.partitionV));
 
          -- Pass on events with l0Accept
          -- Pass on transitions
-         streamValid := (eventData.valid and eventData.l0Accept) or transitionData.valid;
+         v.streamValid := (v.eventData.valid and v.eventData.l0Accept) or v.transitionData.valid;
 
          -- Don't pass data through when disabled
          if (r.enable = '0' or r.enableEventBuffer = '0') then
-            streamValid := '0';
+            v.streamValid := '0';
          end if;
 
          -- Latch delay between prompt and aligned (should match the configured delay)
-         if (eventData.valid = '1') then
+         if (v.eventData.valid = '1' and v.eventData.l0Accept = '1') then
             v.messageDelay(1) := r.messageDelay(0);
          end if;
 
          -- Create the EventHeader from timing and event data
-         eventHeader.pulseId     := alignedTimingMessage.pulseId;
-         eventHeader.timeStamp   := alignedTimingMessage.timeStamp;
-         eventHeader.count       := eventData.count;
-         eventHeader.payload     := eventData.payload;
-         eventHeader.triggerInfo := alignedXpmMessage.partitionWord(partitionV)(15 downto 0);  -- Fix this uglyness later
-         eventHeader.partitions  := (others => '0');
+         v.eventHeader.pulseId     := alignedTimingMessage.pulseId;
+         v.eventHeader.timeStamp   := alignedTimingMessage.timeStamp;
+         v.eventHeader.count       := v.eventData.count;
+         v.eventHeader.payload     := v.eventData.payload;
+         v.eventHeader.triggerInfo := alignedXpmMessage.partitionWord(v.partitionV)(15 downto 0);  -- Fix this uglyness later
+         v.eventHeader.partitions  := (others => '0');
          for i in 0 to 7 loop
-            tmpEventData              := toXpmEventDataType(alignedXpmMessage.partitionWord(i));
-            eventHeader.partitions(i) := tmpEventData.l0Accept or not tmpEventData.valid;
+            v.tmpEventData              := toXpmEventDataType(alignedXpmMessage.partitionWord(i));
+            v.eventHeader.partitions(i) := v.tmpEventData.l0Accept or not v.tmpEventData.valid;
          end loop;
 
          -- Place the EventHeader into an AXI-Stream transaction
-         if (streamValid = '1') then
+         if (v.streamValid = '1') then
             if (fifoAxisCtrl.pause = '0') then
                v.fifoAxisMaster.tValid                                := '1';
-               v.fifoAxisMaster.tdata(EVENT_HEADER_BITS_C-1 downto 0) := toSlv(eventHeader);
-               v.fifoAxisMaster.tDest(0)                              := transitionData.valid;
+               v.fifoAxisMaster.tdata(EVENT_HEADER_BITS_C-1 downto 0) := toSlv(v.eventHeader);
+               v.fifoAxisMaster.tDest(0)                              := v.transitionData.valid;
                v.fifoAxisMaster.tLast                                 := '1';
             else
                v.overflow := '1';
@@ -234,7 +244,7 @@ begin
          end if;
 
          -- Special case - reset fifo, mask any tValid
-         if (transitionData.valid = '1' and transitionData.header = MSG_CLEAR_FIFO_C) then
+         if (v.transitionData.valid = '1' and v.transitionData.header = MSG_CLEAR_FIFO_C) then
             v.overflow              := '0';
             v.fifoRst               := '1';
             v.fifoAxisMaster.tValid := '0';
@@ -242,13 +252,13 @@ begin
 
          -- Count stuff
          -- Could maybe do this with registered data?
-         if (streamValid = '1' and eventData.valid = '1') then
-            if(eventData.l0Accept = '1') then
+         if (v.streamValid = '1' and v.eventData.valid = '1') then
+            if(v.eventData.l0Accept = '1') then
                v.l0Count := r.l0Count + 1;
             end if;
 
-            if (eventData.l1Expect = '1') then
-               if (eventData.l1Accept = '1') then
+            if (v.eventData.l1Expect = '1') then
+               if (v.eventData.l1Accept = '1') then
                   v.l1AcceptCount := r.l1AcceptCount + 1;
                else
                   v.l1RejectCount := r.l1RejectCount + 1;
