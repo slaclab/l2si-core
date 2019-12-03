@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-12-14
--- Last update: 2019-11-07
+-- Last update: 2019-11-26
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -91,7 +91,7 @@ architecture top_level of XpmMiniWrapper is
 
    signal xpmStatus : XpmMiniStatusType;
    signal xpmConfig : XpmMiniConfigType;
-   signal xpmStream : XpmMiniStreamType;
+   signal xpmStream : XpmMiniStreamType := XPM_MINI_STREAM_INIT_C;
 
    signal update : sl;
 
@@ -138,15 +138,15 @@ begin
          STREAM_INTF => true)
       port map (
          -- Register Interface
-         statusO     => tpgStatus,
-         configI     => tpgConfig,
+         statusO    => tpgStatus,
+         configI    => tpgConfig,
          -- TPG Interface
-         txClk       => timingClk,
-         txRst       => timingRst,
-         txRdy       => '1',
-         streams (0) => tpgStream,
-         advance (0) => tpgAdvance,
-         fiducial    => tpgFiducial);
+         txClk      => timingClk,
+         txRst      => timingRst,
+         txRdy      => '1',
+         streams(0) => tpgStream,
+         advance(0) => tpgAdvance,
+         fiducial   => tpgFiducial);
 
    U_XpmReg : entity l2si_core.XpmMiniReg
       generic map (
@@ -174,7 +174,7 @@ begin
          TPD_G          => TPD_G,
          NUM_DS_LINKS_G => NUM_DS_LINKS_G)
       port map (
-         regclk       => axilClk, 
+         regclk       => axilClk,
          regrst       => axilRst,
          update       => update,
          config       => xpmConfig,
