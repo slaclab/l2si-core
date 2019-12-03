@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-07-10
--- Last update: 2019-11-13
+-- Last update: 2019-12-03
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -302,8 +302,8 @@ begin
                    timingBus_strobe, timingBus_valid, msgConfig,
                    l0Tag, l0Accept, l0Reject) is
       variable v     : RegType;
-      variable pword : XpmEventDataType;
-      variable msg   : XpmTransitionDataType;
+      variable pword : XpmEventDataType      := XPM_EVENT_DATA_INIT_C;
+      variable msg   : XpmTransitionDataType := XPM_TRANSITION_DATA_INIT_C;
    begin
       v := r;
 
@@ -319,12 +319,14 @@ begin
          if r.insertMsg = '1' then
             v.insertMsg := '0';
             v.strobeMsg := '1';
+            msg.valid   := '1';
             msg.l0tag   := l0Tag(msg.l0tag'range);
             msg.header  := msgConfig.hdr;
             msg.payload := msgConfig.payload;
             msg.count   := l0Tag(msg.count'range);
             v.result    := toSlv(msg);
          else
+            pword.valid    := '1';
             pword.l0Accept := l0Accept;
             pword.l0Reject := l0Reject;
             pword.l1Accept := l0Accept;
