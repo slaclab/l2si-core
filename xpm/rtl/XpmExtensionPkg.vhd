@@ -128,11 +128,13 @@ package body XpmExtensionPkg is
    is
       variable xpm : XpmMessageType;
       variable i   : integer := 0;
+      variable data : slv(XPM_MESSAGE_BITS_C-1 downto 0);
    begin
+      data := timing.data(511 downto 512-XPM_MESSAGE_BITS_C);
       xpm.valid := timing.valid;
-      assignRecord(i, timing.data, xpm.partitionAddr);
+      assignRecord(i, data, xpm.partitionAddr);
       for j in 0 to XPM_PARTITIONS_C-1 loop
-         assignRecord(i, timing.data, xpm.partitionWord(j));
+         assignRecord(i, data, xpm.partitionWord(j));
       end loop;
       return xpm;
    end function;
