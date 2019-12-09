@@ -25,11 +25,14 @@ use ieee.std_logic_arith.all;
 library surf;
 use surf.StdRtlPkg.all;
 
+library lcls_timing_core;
+use lcls_timing_core.TimingPkg.all;
+
 package CuTimingPkg is
 
    constant CU_TIMING_STREAM_ID_C : integer := 2;
-   
-   constant CU_TIMING_BITS_C : integer := 256+64+80;
+
+   constant CU_TIMING_BITS_C  : integer := 256+64+80;
    constant CU_TIMING_WORDS_C : integer := CU_TIMING_BITS_C / 16;
 
    -- Cu Accelerator Timing System
@@ -54,6 +57,7 @@ package CuTimingPkg is
 
    function toSlv(message          : CuTimingType) return slv;
    function toCuTimingType (vector : slv(CU_TIMING_BITS_C-1 downto 0)) return CuTimingType;
+   function toCuTimingType (timing : TimingExtensionMessageType) return CuTimingType;
 
 
 end package CuTimingPkg;
@@ -90,5 +94,14 @@ package body CuTimingPkg is
       return message;
    end function;
 
+   function toCuTimingType (timing : TimingExtensionMessageType) return CuTimingType
+   is
+      variable message : CuTimingType;
+      variable i       : integer := 0;
+      variable data    : slv(CU_TIMING_BITS_C-1 downto 0);
+   begin
+      data := timing.data(511 downto 512-CU_TIMING_BITS_C);
+      return toCuTimingType(data);
+   end function;
 
 end package body CuTimingPkg;
