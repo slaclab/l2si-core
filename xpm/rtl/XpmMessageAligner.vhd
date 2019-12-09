@@ -1,15 +1,9 @@
 -------------------------------------------------------------------------------
 -- Title      : 
 -------------------------------------------------------------------------------
--- File       : EventRealign.vhd
--- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
--- Created    : 2015-07-10
--- Last update: 2019-11-20
--- Platform   : 
--- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
--- This module produces a realigned timing header and expt bus.
+-- This module produces a realigned timing bus and XPM partition words
 -------------------------------------------------------------------------------
 -- This file is part of 'LCLS2 DAQ Software'.
 -- It is subject to the license terms in the LICENSE.txt file found in the 
