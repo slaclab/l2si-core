@@ -172,7 +172,7 @@ begin
             v.txData              := (others => '0');
             v.txData(13 downto 5) := l1Feedbacks(r.detector).trigword;
             v.txData(4 downto 0)  := l1Feedbacks(r.detector).tag;
-            v.l1Acks(r.detector)  := '1';  -- Ack the feedback message
+            v.l1Acks(r.detector)  := l1Feedbacks(r.detector).valid;  -- Ack the feedback message
 
             -- Done after iterating through all detectors
             if (r.detector = NUM_DETECTORS_G-1) then
