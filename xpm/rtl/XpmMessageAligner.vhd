@@ -63,6 +63,7 @@ end XpmMessageAligner;
 
 architecture rtl of XpmMessageAligner is
 
+   constant TF_DELAY_SLV_C : slv(6 downto 0) := toSlv(TF_DELAY_G, 7);
 
    type RegType is record
       xpmId           : slv(31 downto 0);
@@ -84,6 +85,9 @@ architecture rtl of XpmMessageAligner is
    signal alignedTimingMessageSlv : slv(TIMING_MESSAGE_BITS_NO_BSA_C-1 downto 0);
    signal alignedXpmMessageValid  : slv(XPM_PARTITIONS_C-1 downto 0);
 
+   -- partition delay with TF_DELAY_G offset applied
+   signal partitionDelays : Slv7Array(XPM_PARTITIONS_C-1 downto 0);
+
 begin
 
 
@@ -93,22 +97,44 @@ begin
    -----------------------------------------------
    promptTimingMessageSlv <= toSlvNoBsa(promptTimingMessage);
 
-   U_SlvDelayRam_1 : entity surf.SlvDelayRam
+--    U_SlvDelayRam_1 : entity surf.SlvDelayRam
+--       generic map (
+--          TPD_G            => TPD_G,
+--          VECTOR_WIDTH_G   => TIMING_MESSAGE_BITS_NO_BSA_C,
+--          RAM_ADDR_WIDTH_G => 7,
+--          MEMORY_TYPE_G    => "block")
+--       port map (
+--          rst          => rst,                                      -- [in]
+--          clk          => clk,                                      -- [in]
+--          delay        => TF_DELAY_SLV_C,                           -- [in]
+--          inputValid   => promptTimingStrobe,                       -- [in]
+--          inputVector  => promptTimingMessageSlv,                   -- [in]         
+--          inputAddr    => promptTimingMessage.pulseId(6 downto 0),  -- [in]
+--          outputValid  => alignedTimingStrobe,                      -- [out]
+--          outputVector => alignedTimingMessageSlv);                 -- [out]
+
+   U_SlvDelay_1 : entity surf.SlvDelay
       generic map (
-         TPD_G            => TPD_G,
-         VECTOR_WIDTH_G   => TIMING_MESSAGE_BITS_NO_BSA_C,
-         BASE_DELAY_G     => TF_DELAY_G,
-         RAM_ADDR_WIDTH_G => 7,
-         MEMORY_TYPE_G    => "block")
+         TPD_G        => TPD_G,
+         SRL_EN_G     => true,
+         DELAY_G      => TF_DELAY_G+1,
+         REG_OUTPUT_G => false,
+         WIDTH_G      => TIMING_MESSAGE_BITS_NO_BSA_C)
       port map (
-         rst          => rst,                                      -- [in]
-         clk          => clk,                                      -- [in]
-         delay        => (others => '0'),                          -- [in]
-         inputValid   => promptTimingStrobe,                       -- [in]
-         inputVector  => promptTimingMessageSlv,                   -- [in]         
-         inputAddr    => promptTimingMessage.pulseId(6 downto 0),  -- [in]
-         outputValid  => alignedTimingStrobe,                      -- [out]
-         outputVector => alignedTimingMessageSlv);                 -- [out]
+         clk  => clk,                       -- [in]
+         en   => promptTimingStrobe,        -- [in]
+--         delay => delay,                -- [in]
+         din  => promptTimingMessageSlv,    -- [in]
+         dout => alignedTimingMessageSlv);  -- [out]
+
+   U_RegisterVector_1 : entity surf.RegisterVector
+      generic map (
+         TPD_G   => TPD_G,
+         WIDTH_G => 1)
+      port map (
+         clk      => clk,                   -- [in]
+         sig_i(0) => promptTimingStrobe,    -- [in]
+         reg_o(0) => alignedTimingStrobe);  -- [out]
 
    alignedTimingMessage <= toTimingMessageType(alignedTimingMessageSlv);
 
@@ -120,25 +146,47 @@ begin
    -- corresponding timing message so this gets
    -- them back into alignment
    -----------------------------------------------
+
    GEN_PART : for i in 0 to XPM_PARTITIONS_C-1 generate
-      U_SlvDelayRam_2 : entity surf.SlvDelayRam
+--       partitionDelays(i) <= ite(r.partitionDelays(i) = 0,
+--                                 (TF_DELAY_SLV_C -1),
+--                                 TF_DELAY_SLV_C -1 - (r.partitionDelays(i) -1));
+
+      partitionDelays(i) <= TF_DELAY_SLV_C - r.partitionDelays(i);
+
+--       U_SlvDelayRam_2 : entity surf.SlvDelayRam
+--          generic map (
+--             TPD_G            => TPD_G,
+--             VECTOR_WIDTH_G   => 49,
+--             RAM_ADDR_WIDTH_G => 7,
+--             MEMORY_TYPE_G    => "block")
+--          port map (
+--             rst                       => rst,   -- [in]
+--             clk                       => clk,   -- [in]
+--             delay                     => partitionDelays(i),      -- [in]
+--             inputValid                => promptTimingStrobe,      -- [in]
+--             inputVector(47 downto 0)  => promptXpmMessage.partitionWord(i),        -- [in]
+--             inputVector(48)           => promptXpmMessage.valid,  -- [in]            
+--             inputAddr                 => promptTimingMessage.pulseId(6 downto 0),  -- [in]
+--             outputValid               => open,  -- [in] (in theory will always be the same as alignedTimingStrobe
+--             outputVector(47 downto 0) => alignedXpmMessage.partitionWord(i),       -- [out]
+--             outputVector(48)          => alignedXpmMessageValid(i));               -- [out]
+
+      U_SlvDelay_2 : entity surf.SlvDelay
          generic map (
-            TPD_G            => TPD_G,
-            VECTOR_WIDTH_G   => 49,
-            BASE_DELAY_G     => TF_DELAY_G,
-            RAM_ADDR_WIDTH_G => 7,
-            MEMORY_TYPE_G    => "block")
+            TPD_G        => TPD_G,
+            SRL_EN_G     => true,
+            DELAY_G      => TF_DELAY_G+1,
+            REG_OUTPUT_G => false,
+            WIDTH_G      => 49)
          port map (
-            rst                       => rst,   -- [in]
-            clk                       => clk,   -- [in]
-            delay                     => r.partitionDelays(i),    -- [in]
-            inputValid                => promptTimingStrobe,      -- [in]
-            inputVector(47 downto 0)  => promptXpmMessage.partitionWord(i),        -- [in]
-            inputVector(48)           => promptXpmMessage.valid,  -- [in]            
-            inputAddr                 => promptTimingMessage.pulseId(6 downto 0),  -- [in]
-            outputValid               => open,  -- [in] (in theory will always be the same as alignedTimingStrobe
-            outputVector(47 downto 0) => alignedXpmMessage.partitionWord(i),       -- [out]
-            outputVector(48)          => alignedXpmMessageValid(i));               -- [out]
+            clk               => clk,                                 -- [in]
+            en                => promptTimingStrobe,                  -- [in]
+            delay             => partitionDelays(i),                  -- [in]
+            din(47 downto 0)  => promptXpmMessage.partitionWord(i),   -- [in]
+            din(48)           => promptXpmMessage.valid,              -- [in]
+            dout(47 downto 0) => alignedXpmMessage.partitionWord(i),  -- [out]
+            dout(48)          => alignedXpmMessageValid(i));          -- [out]
    end generate;
 
    -- Maybe zero this out?
