@@ -1,13 +1,7 @@
 -------------------------------------------------------------------------------
 -- Title      : 
 -------------------------------------------------------------------------------
--- File       : XpmApp.vhd
--- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
--- Created    : 2015-07-10
--- Last update: 2019-11-20
--- Platform   : 
--- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
 -- Description: XpmApp's Top Level
 -- 
@@ -27,19 +21,13 @@ library ieee;
 use ieee.std_logic_1164.all;
 use ieee.std_logic_unsigned.all;
 
--- surf
-
 library surf;
 use surf.StdRtlPkg.all;
 use surf.AxiLitePkg.all;
 use surf.AxiStreamPkg.all;
 
--- lcls-timing-core
-
 library lcls_timing_core;
 use lcls_timing_core.TimingPkg.all;
-
--- l2si-core
 
 library l2si_core;
 use l2si_core.XpmPkg.all;
@@ -250,10 +238,10 @@ begin
    GEN_DSLINK : for i in 0 to NUM_DS_LINKS_G-1 generate
       U_TxLink : entity l2si_core.XpmTxLink
          generic map (
-            TPD_G  => TPD_G,
-            ADDR_G => i,
+            TPD_G     => TPD_G,
+            ADDR_G    => i,
             STREAMS_G => 3,
-            DEBUG_G => false)
+            DEBUG_G   => false)
          port map (
             clk       => timingClk,
             rst       => timingRst,
@@ -266,7 +254,7 @@ begin
             fiducial  => r.fiducial,
             txData    => dsTxData (i),
             txDataK   => dsTxDataK(i));
-      
+
       U_RxLink : entity l2si_core.XpmRxLink
          generic map (
             TPD_G => TPD_G)

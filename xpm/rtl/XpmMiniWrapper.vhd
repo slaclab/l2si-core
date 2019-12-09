@@ -1,13 +1,7 @@
 -------------------------------------------------------------------------------
 -- Title      : 
 -------------------------------------------------------------------------------
--- File       : XpmMiniWrapper.vhd
--- Author     : Matt Weaver
 -- Company    : SLAC National Accelerator Laboratory
--- Created    : 2015-12-14
--- Last update: 2019-11-26
--- Platform   : 
--- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
 -- Description: Firmware Target's Top Level
 -- 
@@ -30,7 +24,6 @@ use ieee.std_logic_arith.all;
 
 library unisim;
 use unisim.vcomponents.all;
-
 
 library surf;
 use surf.StdRtlPkg.all;
@@ -59,7 +52,6 @@ entity XpmMiniWrapper is
       dsRxRst         : in  slv (NUM_DS_LINKS_G-1 downto 0);
       dsRx            : in  TimingRxArray (NUM_DS_LINKS_G-1 downto 0);
       dsTx            : out TimingPhyArray(NUM_DS_LINKS_G-1 downto 0);
---      timingBus       : out TimingBusType;
       --
       axilClk         : in  sl;
       axilRst         : in  sl;

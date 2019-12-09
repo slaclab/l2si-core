@@ -36,12 +36,12 @@ entity XpmTimingFb is
    port (
       clk                : in  sl;
       rst                : in  sl;
-      pllReset           : in  sl               := '0';
-      phyReset           : in  sl               := '0';
-      id                 : in  slv(31 downto 0) := (others => '1');
+      pllReset           : in  sl                                    := '0';
+      phyReset           : in  sl                                    := '0';
+      id                 : in  slv(31 downto 0)                      := (others => '1');
       detectorPartitions : in  slv3Array(NUM_DETECTORS_G-1 downto 0) := (others => (others => '0'));
-      full               : in  slv(NUM_DETECTORS_G-1 downto 0) := (others => '0');
-      overflow           : in  slv(NUM_DETECTORS_G-1 downto 0) := (others => '0');
+      full               : in  slv(NUM_DETECTORS_G-1 downto 0)       := (others => '0');
+      overflow           : in  slv(NUM_DETECTORS_G-1 downto 0)       := (others => '0');
       l1Feedbacks        : in  XpmL1FeedbackArray(NUM_DETECTORS_G-1 downto 0);
       l1Acks             : out slv(NUM_DETECTORS_G-1 downto 0);
       phy                : out TimingPhyType);
