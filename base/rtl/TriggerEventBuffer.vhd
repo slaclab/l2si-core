@@ -96,6 +96,10 @@ architecture rtl of TriggerEventBuffer is
       l1AcceptCount     : slv(31 downto 0);
       l1RejectCount     : slv(31 downto 0);
 
+      readDelayWr    : sl;
+      readDelayRd    : sl;
+      readDelayValue : slv(63 downto 0);
+
       fifoAxisMaster : AxiStreamMasterType;
 
       -- outputs
@@ -127,6 +131,10 @@ architecture rtl of TriggerEventBuffer is
       l1AcceptCount     => (others => '0'),
       l1RejectCount     => (others => '0'),
 
+      readDelayWr    => '0',
+      readDelayRd    => '0',
+      readDelayValue => (others => '0'),
+
       fifoAxisMaster => axiStreamMasterInit(EVENT_AXIS_CONFIG_C),
       -- outputs     =>
       triggerData    => XPM_EVENT_DATA_INIT_C,
@@ -156,12 +164,14 @@ architecture rtl of TriggerEventBuffer is
    signal syncTriggerDataValid    : sl;
    signal syncTriggerDataSlv      : slv(47 downto 0);
 
+   signal readDelayout : slv(63 downto 0);
+
 begin
 
 
-   comb : process (alignedXpmMessage, alignedTimingMessage, alignedTimingStrobe,
-                   axilReadMaster, axilWriteMaster, fifoAxisCtrl,
-                   promptXpmMessage, promptTimingStrobe, r, timingRxRst) is
+   comb : process (alignedTimingMessage, alignedTimingStrobe, alignedXpmMessage, axilReadMaster,
+                   axilWriteMaster, fifoAxisCtrl, promptTimingMessage, promptTimingStrobe,
+                   promptXpmMessage, r, readDelayOut, timingRxRst) is
       variable v      : RegType;
       variable axilEp : AxiLiteEndpointType;
    begin
@@ -173,6 +183,9 @@ begin
 
       v.fifoAxisMaster.tValid := '0';
 
+      v.readDelayWr := '0';
+      v.readDelayRd := '0';
+
       --------------------------------------------
       -- Trigger output logic
       -- Watch for and decode triggers on prompt interface
@@ -183,9 +196,8 @@ begin
          v.triggerData := toXpmEventDataType(promptXpmMessage.partitionWord(v.partitionV));
 
          -- Count time since last event
-         v.messageDelay(0) := r.messageDelay(0) + 1;
-         if (v.triggerData.valid = '1' and v.triggerData.l0Accept = '1') then
-            v.messageDelay(0) := (others => '0');
+         if (v.triggerData.valid = '1') then
+            v.readDelayWr := '1';
          end if;
 
          -- Gate output valid if disabled by configuration
@@ -215,8 +227,9 @@ begin
          end if;
 
          -- Latch delay between prompt and aligned (should match the configured delay)
-         if (v.eventData.valid = '1' and v.eventData.l0Accept = '1') then
-            v.messageDelay(1) := r.messageDelay(0);
+         if (v.eventData.valid = '1') then
+            v.readDelayRd    := '1';
+            v.readDelayValue := promptTimingMessage.timeStamp - readDelayOut;
          end if;
 
          -- Create the EventHeader from timing and event data
@@ -286,6 +299,7 @@ begin
       axiSlaveRegisterR(axilEp, x"14", 0, r.l1AcceptCount);
       axiSlaveRegisterR(axilEp, x"1C", 0, r.l1RejectCount);
       axiSlaveRegister(axilEp, X"20", 0, v.triggerDelay);
+      axiSlaveRegisterR(axilEp, X"28", 0, r.readDelayValue);
 
       axiSlaveDefault(axilEp, v.axilWriteSlave, v.axilReadSlave, AXI_RESP_DECERR_C);
 
@@ -409,5 +423,22 @@ begin
          dout   => eventTimingMessageSlv);   -- [out]
    eventTimingMessage <= toTimingMessageType(eventTimingMessageSlv);
 
+   U_Fifo_Delay_Check : entity surf.Fifo
+      generic map (
+         TPD_G           => TPD_G,
+         GEN_SYNC_FIFO_G => true,
+         MEMORY_TYPE_G   => "block",
+         FWFT_EN_G       => true,
+         PIPE_STAGES_G   => 0,                     -- make sure this lines up right with event fifo
+         DATA_WIDTH_G    => 64, 
+         ADDR_WIDTH_G    => 9)
+      port map (
+         rst    => r.fifoRst,                      -- [in]
+         wr_clk => timingRxClk,                    -- [in]
+         wr_en  => r.readDelayWr,                  -- [in]
+         din    => promptTimingMessage.timeStamp,  -- [in]
+         rd_clk => timingRxClk,                    -- [in]
+         rd_en  => r.readDelayRd,                  -- [in]
+         dout   => readDelayOut);                  -- [out]
 end architecture rtl;
 

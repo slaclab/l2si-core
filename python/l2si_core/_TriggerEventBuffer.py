@@ -120,4 +120,11 @@ class TriggerEventBuffer(pr.Device):
             mode        = 'RW',
             disp        = '{:d}'            
         ))
+
+        self.add(pr.RemoteVariable(
+            name = "MessageDelay2",
+            offset = 0x28,
+            bitSize = 64,
+            mode = "RO",
+            disp = '{:d}'))
         
