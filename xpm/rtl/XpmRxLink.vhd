@@ -43,16 +43,18 @@ entity XpmRxLink is
       clk        : in  sl;
       rst        : in  sl;
       config     : in  XpmLinkConfigType;
-      rxData     : in  slv(15 downto 0);
-      rxDataK    : in  slv(1 downto 0);
-      rxClk      : in  sl;
-      rxRst      : in  sl;
-      rxErr      : in  sl;
-      isXpm      : out sl;
-      id         : out slv(31 downto 0);
-      rxRcvs     : out slv(31 downto 0);
       full       : out slv (XPM_PARTITIONS_C-1 downto 0);
-      l1Feedback : out XpmL1FeedbackArray(XPM_PARTITIONS_C-1 downto 0));
+      overflow   : out slv(XPM_PARTITIONS_C-1 downto 0);
+      l1Feedback : out XpmL1FeedbackArray(XPM_PARTITIONS_C-1 downto 0);
+
+      rxClk   : in  sl;
+      rxRst   : in  sl;
+      rxData  : in  slv(15 downto 0);
+      rxDataK : in  slv(1 downto 0);
+      rxErr   : in  sl;
+      isXpm   : out sl;
+      id      : out slv(31 downto 0);
+      rxRcvs  : out slv(31 downto 0));
 end XpmRxLink;
 
 architecture rtl of XpmRxLink is
@@ -65,6 +67,7 @@ architecture rtl of XpmRxLink is
       id         : slv(31 downto 0);
       rxRcvs     : slv(31 downto 0);
       pfull      : slv(XPM_PARTITIONS_C-1 downto 0);
+      overflow   : slv(XPM_PARTITIONS_C-1 downto 0);
       l1feedback : XpmL1FeedbackType;
       strobe     : slv(XPM_PARTITIONS_C-1 downto 0);
       timeout    : slv(8 downto 0);
@@ -76,6 +79,7 @@ architecture rtl of XpmRxLink is
       id         => (others => '0'),
       rxRcvs     => (others => '0'),
       pfull      => (others => '1'),
+      overflow   => (others => '0'),
       l1feedback => XPM_L1_FEEDBACK_INIT_C,
       strobe     => (others => '0'),
       timeout    => (others => '0'));
@@ -131,6 +135,15 @@ begin
          dataIn  => r.pfull,
          dataOut => full);
 
+   U_Overflow : entity surf.SynchronizerVector
+      generic map (
+         TPD_G   => TPD_G,
+         WIDTH_G => XPM_PARTITIONS_C)
+      port map (
+         clk     => clk,
+         dataIn  => r.overflow,
+         dataOut => overflow);
+
    U_Partition : entity surf.SynchronizerVector
       generic map (
          TPD_G   => TPD_G,
@@ -153,14 +166,14 @@ begin
       variable v : RegType;
       variable p : integer range 0 to XPM_PARTITIONS_C-1;
    begin
-      v := r;
+      v        := r;
       v.strobe := (others => '0');
 
       v.isXpm := uAnd(r.id(31 downto 24));
 
       case (r.state) is
          when IDLE_S =>
-            v.timeout      := r.timeout+1;
+            v.timeout := r.timeout+1;
             if (rxDataK = "01") then
                if (rxData = (D_215_C & K_EOS_C)) then
                   v.rxRcvs := r.rxRcvs+1;
@@ -171,9 +184,10 @@ begin
                end if;
             end if;
          when PFULL_S =>
-            v.timeout      := (others => '0');
-            v.pfull := rxData(r.pfull'range) and uconfig.groupMask;
-            v.state := ID1_S;
+            v.timeout  := (others => '0');
+            v.pfull    := rxData(7 downto 0) and uconfig.groupMask;
+            v.overflow := rxData(15 downto 8) and uconfig.groupMask;
+            v.state    := ID1_S;
          when ID1_S =>
             if (rxDataK = "01" and rxData = (D_215_C & K_EOF_C)) then
                v.state := IDLE_S;
@@ -189,7 +203,7 @@ begin
                v.state := IDLE_S;
             else
                v.l1feedback.trigsrc := rxData(7 downto 4);
-               v.partition          := conv_integer(rxData(3 downto 0));
+               v.partition          := conv_integer(rxData(3 downto 1));
                v.state              := PDATA2_S;
             end if;
          when PDATA2_S =>

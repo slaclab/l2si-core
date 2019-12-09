@@ -165,11 +165,12 @@ begin
             v.txData             := (others => '0');
             v.txData(7 downto 4) := l1Feedbacks(r.detector).trigsrc;
             v.txData(3 downto 1) := detectorPartitions(r.detector);
-            v.txData(0)          := l1Feedbacks(r.detector).valid;
+            v.txData(0)          := l1Feedbacks(r.detector).valid;   -- Redundant
             v.state              := PDATA2_S;
          when PDATA2_S =>
             v.txDataK             := "00";
             v.txData              := (others => '0');
+            v.txData(14)          := l1Feedbacks(r.detector).valid;
             v.txData(13 downto 5) := l1Feedbacks(r.detector).trigword;
             v.txData(4 downto 0)  := l1Feedbacks(r.detector).tag;
             v.l1Acks(r.detector)  := l1Feedbacks(r.detector).valid;  -- Ack the feedback message

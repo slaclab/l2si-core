@@ -262,16 +262,17 @@ begin
             clk        => timingClk,
             rst        => timingRst,
             config     => config.dsLink(i),
+            full       => dsFull (i),
+            overflow   => open,
+            l1Feedback => l1Feedback (i);
+            rxClk      => dsRxClk (i),
+            rxRst      => dsRxRst (i),
             rxData     => dsRxData (i),
             rxDataK    => dsRxDataK(i),
             rxErr      => dsRxErr (i),
-            rxClk      => dsRxClk (i),
-            rxRst      => dsRxRst (i),
             isXpm      => isXpm (i),
             id         => dsId (i),
-            rxRcvs     => dsRxRcvs (i),
-            full       => dsFull (i),
-            l1Feedback => l1Feedback (i));
+            rxRcvs     => dsRxRcvs (i));
    end generate GEN_DSLINK;
 
    U_BpTx : entity l2si_core.XpmTxLink
