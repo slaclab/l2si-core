@@ -264,7 +264,7 @@ begin
             config     => config.dsLink(i),
             full       => dsFull (i),
             overflow   => open,
-            l1Feedback => l1Feedback (i);
+            l1Feedback => l1Feedback (i),
             rxClk      => dsRxClk (i),
             rxRst      => dsRxRst (i),
             rxData     => dsRxData (i),
