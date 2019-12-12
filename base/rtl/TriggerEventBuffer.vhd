@@ -34,9 +34,10 @@ use l2si_core.XpmExtensionPkg.all;
 entity TriggerEventBuffer is
 
    generic (
-      TPD_G                          : time    := 1 ns;
-      TRIGGER_CLK_IS_TIMING_RX_CLK_G : boolean := false;
-      EVENT_CLK_IS_TIMING_RX_CLK_G   : boolean := false);
+      TPD_G                          : time                := 1 ns;
+      EVENT_AXIS_CONFIG_G            : AxiStreamConfigType := EVENT_AXIS_CONFIG_C;
+      TRIGGER_CLK_IS_TIMING_RX_CLK_G : boolean             := false;
+      EVENT_CLK_IS_TIMING_RX_CLK_G   : boolean             := false);
    port (
       timingRxClk : in sl;
       timingRxRst : in sl;
@@ -384,7 +385,7 @@ begin
          FIFO_FIXED_THRESH_G => false,
          FIFO_PAUSE_THRESH_G => 16,
          SLAVE_AXI_CONFIG_G  => EVENT_AXIS_CONFIG_C,
-         MASTER_AXI_CONFIG_G => EVENT_AXIS_CONFIG_C)
+         MASTER_AXI_CONFIG_G => EVENT_AXIS_CONFIG_G)
       port map (
          sAxisClk        => timingRxClk,        -- [in]
          sAxisRst        => r.fifoRst,          -- [in]
@@ -430,7 +431,7 @@ begin
          MEMORY_TYPE_G   => "block",
          FWFT_EN_G       => true,
          PIPE_STAGES_G   => 0,                     -- make sure this lines up right with event fifo
-         DATA_WIDTH_G    => 64, 
+         DATA_WIDTH_G    => 64,
          ADDR_WIDTH_G    => 9)
       port map (
          rst    => r.fifoRst,                      -- [in]

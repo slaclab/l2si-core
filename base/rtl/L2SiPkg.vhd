@@ -73,14 +73,14 @@ package L2SiPkg is
       triggerInfo => (others => '0'));
 
 
-   constant EVENT_HEADER_BITS_C : integer := 192;
+   constant EVENT_HEADER_BITS_C : integer := 256;
 
    function toSlv(eventHeader     : EventHeaderType) return slv;
    function toEventHeader (vector : slv) return EventHeaderType;
 
    constant EVENT_AXIS_CONFIG_C : AxiStreamConfigType := (
       TSTRB_EN_C    => false,
-      TDATA_BYTES_C => 24,              -- 192 bits
+      TDATA_BYTES_C => 32,              -- 192 bits
       TDEST_BITS_C  => 1,
       TID_BITS_C    => 0,
       TKEEP_MODE_C  => TKEEP_FIXED_C,
@@ -97,7 +97,7 @@ package body L2SiPkg is
    -- Timing Header decode
    --------------------------------------------------------
    function toSlv(eventHeader : EventHeaderType) return slv is
-      variable vector : slv(191 downto 0) := (others => '0');
+      variable vector : slv(255 downto 0) := (others => '0');
       variable i      : integer           := 0;
    begin
       assignSlv(i, vector, eventHeader.pulseId(55 downto 0));

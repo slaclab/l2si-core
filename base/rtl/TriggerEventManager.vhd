@@ -45,6 +45,7 @@ entity TriggerEventManager is
       TPD_G                          : time                 := 1 ns;
       NUM_DETECTORS_G                : integer range 1 to 8 := 8;
       AXIL_BASE_ADDR_G               : slv(31 downto 0)     := (others => '0');
+      EVENT_AXIS_CONFIG_G            : AxiStreamConfigType  := EVENT_AXIS_CONFIG_C;
       L1_CLK_IS_TIMING_TX_CLK_G      : boolean              := false;
       TRIGGER_CLK_IS_TIMING_RX_CLK_G : boolean              := false;
       EVENT_CLK_IS_TIMING_RX_CLK_G   : boolean              := false);
@@ -255,6 +256,7 @@ begin
       U_TriggerEventBuffer_1 : entity l2si_core.TriggerEventBuffer
          generic map (
             TPD_G                          => TPD_G,
+            EVENT_AXIS_CONFIG_G            => EVENT_AXIS_CONFIG_G,
             TRIGGER_CLK_IS_TIMING_RX_CLK_G => TRIGGER_CLK_IS_TIMING_RX_CLK_G,
             EVENT_CLK_IS_TIMING_RX_CLK_G   => EVENT_CLK_IS_TIMING_RX_CLK_G)
          port map (
@@ -329,13 +331,13 @@ begin
             STAGES_G      => 2,
             WIDTH_G       => 18)
          port map (
-            clk                  => timingTxClk,                   -- [in]
-            rst                  => timingTxRst,                   -- [in]
-            dataIn(3 downto 0)   => l1Feedbacks(i).trigsrc,        -- [in]
-            dataIn(8 downto 4)   => l1Feedbacks(i).tag,            -- [in]
-            dataIn(17 downto 9)  => l1Feedbacks(i).trigword,       -- [in]                                                            -- 
+            clk                  => timingTxClk,              -- [in]
+            rst                  => timingTxRst,              -- [in]
+            dataIn(3 downto 0)   => l1Feedbacks(i).trigsrc,   -- [in]
+            dataIn(8 downto 4)   => l1Feedbacks(i).tag,       -- [in]
+            dataIn(17 downto 9)  => l1Feedbacks(i).trigword,  -- [in]                                                            -- 
             dataOut(3 downto 0)  => l1FeedbacksSync(i).trigsrc,    -- [out]
-            dataOut(8 downto 4)  => l1FeedbacksSync(i).tag,        -- [out]
+            dataOut(8 downto 4)  => l1FeedbacksSync(i).tag,   -- [out]
             dataOut(17 downto 9) => l1FeedbacksSync(i).trigword);  -- [out]
    end generate l1_sync_gen;  --
 
