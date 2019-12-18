@@ -46,13 +46,14 @@ entity XpmMiniWrapper is
       AXIL_BASEADDR_G : slv(31 downto 0) := (others => '0'));
    port (
       --
-      timingClk       : in  sl;
-      timingRst       : in  sl;
-      dsRxClk         : in  slv (NUM_DS_LINKS_G-1 downto 0);
-      dsRxRst         : in  slv (NUM_DS_LINKS_G-1 downto 0);
-      dsRx            : in  TimingRxArray (NUM_DS_LINKS_G-1 downto 0);
-      dsTx            : out TimingPhyArray(NUM_DS_LINKS_G-1 downto 0);
-      --
+      timingClk : in  sl;
+      timingRst : in  sl;
+      dsTx      : out TimingPhyArray(NUM_DS_LINKS_G-1 downto 0);
+
+      dsRxClk : in slv (NUM_DS_LINKS_G-1 downto 0);
+      dsRxRst : in slv (NUM_DS_LINKS_G-1 downto 0);
+      dsRx    : in TimingRxArray (NUM_DS_LINKS_G-1 downto 0);
+
       axilClk         : in  sl;
       axilRst         : in  sl;
       axilReadMaster  : in  AxiLiteReadMasterType;
@@ -174,9 +175,9 @@ begin
          dsRxClk      => dsRxClk,
          dsRxRst      => dsRxRst,
          dsRx         => dsRx,
-         dsTx         => dsTx,
          timingClk    => timingClk,
          timingRst    => timingRst,
+         dsTx         => dsTx,
          timingStream => xpmStream);
 
 end top_level;
