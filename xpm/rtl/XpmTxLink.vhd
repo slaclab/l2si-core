@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-12-14
--- Last update: 2019-12-13
+-- Last update: 2019-12-17
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -74,6 +74,7 @@ architecture rtl of XpmTxLink is
   signal fstreams  : TimingSerialArray(STREAMS_G-1 downto 0);
   signal itxData   : slv(15 downto 0);
   signal itxDataK  : slv( 1 downto 0);
+  signal advance   : slv              (STREAMS_G-1 downto 0);
   
   component ila_0
     port ( clk    : in sl;
@@ -92,7 +93,8 @@ begin
 
   txData  <= itxData;
   txDataK <= itxDataK;
-
+  advance_o <= advance;
+  
   streams_p : process (streams, rin) is
   begin
     fstreams         <= streams;
@@ -106,11 +108,11 @@ begin
                 fiducial  => fiducial,
                 streams   => fstreams,
                 streamIds => streamIds,
-                advance   => advance_o,
+                advance   => advance,
                 data      => itxData,
                 dataK     => itxDataK );
 
-  comb : process ( rst, r, paddrStrobe, paddr, streams ) is
+  comb : process ( rst, r, paddrStrobe, advance, paddr, streams ) is
     variable v : RegType;
   begin
     v := r;
@@ -118,9 +120,11 @@ begin
     v.paddr  := paddr(paddr'left-4 downto 0) & toSlv(ADDR,4);
     v.strobe := paddrStrobe;
     if paddrStrobe = '1' then
-      v.word := r.paddr(15 downto 0);
-    elsif r.strobe = '1' then
-      v.word := r.paddr(31 downto 16);
+      v.strobe := '1';
+      v.word   := r.paddr(15 downto 0);
+    elsif r.strobe = '1' and advance(2) = '1' then
+      v.word   := r.paddr(31 downto 16);
+      v.strobe := '0';
     else
       v.word := streams(2).data;
     end if;

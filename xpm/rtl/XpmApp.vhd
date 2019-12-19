@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-07-10
--- Last update: 2019-12-13
+-- Last update: 2019-12-17
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -372,7 +372,6 @@ begin
     
     case r.state is
       when IDLE_S =>
-        v.stream.ready := '0';
         v.streamReset  := '1';
         if timingStream.fiducial = '1' then
           v.stream.ready := '1';
@@ -380,33 +379,29 @@ begin
           v.state        := INIT_S;
         end if;
       when INIT_S =>
-        v.source      := '1';
         v.stream.data := r.bcastf(15 downto 0);
         if fstreams(2).ready = '1' then
-          v.source  := '0';
-          v.bcastr  := fstreams(2).data & r.bcastr(r.bcastr'left downto r.bcastr'left-15);
-          v.stream.data := fstreams(2).data;
-          v.advance := '1';
-          v.state   := SLAVE_S;
+          v.source      := '0';
+          v.bcastr      := fstreams(2).data & r.bcastr(r.bcastr'left downto r.bcastr'left-15);
+          v.advance     := '1';
+          v.state       := SLAVE_S;
         elsif advance(2) = '1' then
+          v.source      := '1';
           v.paddrStrobe := '0';
-          v.state := PADDR_S;
+          v.stream.data := r.bcastf(31 downto 16);
+          v.ipart       := 0;
+          v.eword       := 0;
+          v.state       := EWORD_S;
         end if;
       when SLAVE_S =>
         if advance(2) = '1' then
           v.paddrStrobe := '0';
-          v.state := PADDR_S;
-        end if;
-      when PADDR_S =>
-        if r.source = '1' then
+          v.bcastr      := fstreams(2).data & r.bcastr(r.bcastr'left downto r.bcastr'left-15);
           v.stream.data := r.bcastf(31 downto 16);
-        else
-          v.stream.data := fstreams(2).data;
-          v.bcastr      := fstreams(2).data & r.bcastr(r.bcastr'left downto 16);
+          v.ipart       := 0;
+          v.eword       := 0;
+          v.state       := EWORD_S;
         end if;
-        v.ipart := 0;
-        v.eword := 0;
-        v.state := EWORD_S;
       when EWORD_S =>
         if r.source='1' or pmaster(r.ipart)='1' then
           v.stream.data := expWord(r.ipart)(r.eword*16+15 downto r.eword*16);
@@ -430,7 +425,7 @@ begin
           v.eword := r.eword+1;
         end if;
       when EOS_S =>
-        v.stream.ready := '0';
+        v.stream.ready  := '0';
         v.bcastf := r.bcastr;
         tidx := toIndex(r.bcastr);
         if r.source='1' then
@@ -503,7 +498,7 @@ begin
     rin <= v;
 
     ostreams           <= fstreams;
-    ostreams(2)        <= v.stream;
+    ostreams(2)        <= r.stream;
     ostreams(2).offset <= fstreams(2).offset;
     ostreams(2).last   <= fstreams(2).last;
 
