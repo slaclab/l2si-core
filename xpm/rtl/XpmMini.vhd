@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-07-10
--- Last update: 2019-10-11
+-- Last update: 2019-12-19
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -64,19 +64,19 @@ architecture top_level_app of XpmMini is
   type LinkFullArray  is array (natural range<>) of slv(26 downto 0);
   type LinkL1InpArray is array (natural range<>) of XpmL1InputArray(NDsLinks-1 downto 0);
 
-  type StateType is (INIT_S, PADDR_S, EWORD_S, EOS_S);
+  type StateType is (IDLE_S, INIT_S, SLAVE_S, PADDR_S, EWORD_S, EOS_S);
   type RegType is record
     full       : LinkFullArray (NPartitions-1 downto 0);
     l1input    : LinkL1InpArray(NPartitions-1 downto 0);
-    fiducial   : sl;
-    source     : sl;
+    fiducial   : slv(3 downto 0);
     paddr      : slv(PADDR_LEN-1 downto 0); -- platform address
+    paddrStrobe: sl;
     bcastr     : slv(PADDR_LEN-1 downto 0); -- received Xpm Broadcast
     bcastf     : slv(PADDR_LEN-1 downto 0); -- Xpm Broadcast to forward
-    streams    : TimingSerialArray(NSTREAMS_C-1 downto 0);
-    advance    : slv              (NSTREAMS_C-1 downto 0);
+    streamReset: sl;
+    advance    : sl;
+    stream     : TimingSerialType;
     state      : StateType;
-    aword      : integer range 0 to paddr'left/16;
     eword      : integer range 0 to (NTagBytes+1)/2;
     ipart      : integer range 0 to 2*NPartitions-1;
     bcastCount : integer range 0 to 8;
@@ -84,15 +84,15 @@ architecture top_level_app of XpmMini is
   constant REG_INIT_C : RegType := (
     full       => (others=>(others=>'0')),
     l1input    => (others=>(others=>XPM_L1_INPUT_INIT_C)),
-    fiducial   => '0',
-    source     => '1',
+    fiducial   => (others=>'0'),
     paddr      => (others=>'1'),
+    paddrStrobe=> '0',
     bcastr     => (others=>'1'),
     bcastf     => (others=>'1'),
-    streams    => (others=>TIMING_SERIAL_INIT_C),
-    advance    => (others=>'0'),
+    streamReset=> '1',
+    advance    => '0',
+    stream     => TIMING_SERIAL_INIT_C,
     state      => INIT_S,
-    aword      => 0,
     eword      => 0,
     ipart      => 0,
     bcastCount => 0 );
@@ -120,10 +120,15 @@ architecture top_level_app of XpmMini is
   signal txData         : slv(15 downto 0);
   signal txDataK        : slv( 1 downto 0);
 
-  signal r_streamIds : Slv4Array      (NSTREAMS_C-1 downto 0) := (x"1",x"2",x"0");
+  signal timingStream_streams : TimingSerialArray(NSTREAMS_C-1 downto 0);
+  signal fstreams             : TimingSerialArray(NSTREAMS_C-1 downto 0);
+  signal ostreams             : TimingSerialArray(NSTREAMS_C-1 downto 0);
+  signal stream0_data: slv(15 downto 0);
+  signal streamIds   : Slv4Array        (NSTREAMS_C-1 downto 0) := (x"1",x"2",x"0");
+  signal advance     : slv              (NSTREAMS_C-1 downto 0);
+  signal fadvance    : slv              (NSTREAMS_C-1 downto 0);
   signal pdepth      : Slv8Array (NPartitions-1 downto 0);
   signal expWord     : Slv48Array(NPartitions-1 downto 0) := (others=>toSlv(XPM_PARTITION_DATA_INIT_C));
-  signal stream0_data: slv(15 downto 0);
 
 begin
 
@@ -155,13 +160,12 @@ begin
       generic map ( ADDR => i, STREAMS_G => 3 )
       port map ( clk             => timingClk,
                  rst             => timingRst,
-                 config          => linkConfig(i),
-                 isXpm           => isXpm(i),
-                 streams         => r.streams,
-                 streamIds       => r_streamIds,
-                 paddr           => r.bcastf,
-                 advance_i       => r.advance,
-                 fiducial        => r.fiducial,
+                 streams         => ostreams,
+                 streamIds       => streamIds,
+                 paddr           => r.paddr,
+                 paddrStrobe     => r.paddrStrobe,
+                 fiducial        => r.fiducial(0),
+                 advance_o       => advance,
                  txData          => dsTx (i).data,
                  txDataK         => dsTx (i).dataK );
 
@@ -195,6 +199,23 @@ begin
   partitionConfig.message  <= config.partition.message;
 
   status.partition.l0Select <= partitionStatus.l0Select;
+
+  GEN_STR : for i in 0 to NSTREAMS_C-1 generate
+    U_FIFO : entity work.FifoSync
+      generic map ( ADDR_WIDTH_G => 4,
+                    DATA_WIDTH_G => 16,
+                    FWFT_EN_G    => true )
+      port map ( clk     => timingClk,
+                 rst     => rin.streamReset,
+                 wr_en   => timingStream.advance(i),
+                 din     => timingStream_streams(i).data,
+                 rd_en   => fadvance(i),
+                 dout    => fstreams(i).data,
+                 valid   => fstreams(i).ready,
+                 full    => open );
+    fstreams(i).offset <= timingStream.streams(i).offset;
+    fstreams(i).last   <= timingStream.streams(i).last;
+  end generate;
   
   U_Master : entity work.XpmAppMaster
     generic map ( NDsLinks   => NDsLinks )
@@ -204,7 +225,8 @@ begin
                status        => partitionStatus,
                timingClk     => timingClk,
                timingRst     => timingRst,
-               streams       => timingStream.streams,
+               streams       => timingStream_streams,
+               streamIds     => streamIds,
                advance       => timingStream.advance,
                fiducial      => timingStream.fiducial,
                full          => r.full          (0),
@@ -218,69 +240,60 @@ begin
                  dataOut => pdepth(0) );
 
   comb : process ( r, timingRst, dsFull, l1Input,
-                   timingStream,
+                   timingStream, fstreams, advance,
                    expWord, pdepth ) is
     variable v    : RegType;
     variable tidx : integer;
     constant pd   : XpmBroadcastType := PDELAY;
   begin
-    v := r;
-    v.streams := timingStream.streams;
-    --v.streams(0).ready := '1';
-    v.streams(1).ready := '1';
-    --v.streams(2).ready := '1';
-    v.advance    := timingStream.advance;
-    v.fiducial   := timingStream.fiducial;
-    
-    --if (timingStream.advance(0)='0' and r.advance(0)='1') then
-    --  v.streams(0).ready := '0';
-    --end if;
+    v            := r;
+    v.advance    := advance(2);
+    v.fiducial   := timingStream.fiducial & r.fiducial(r.fiducial'left downto 1);
     
     case r.state is
-      when INIT_S =>
-        v.aword := 0;
-        if (timingStream.advance(0)='0' and r.advance(0)='1') then
-          v.advance(2)      := '1';
-          v.streams(2).data := r.bcastf(15 downto 0);
-          v.aword           := r.aword+1;
-          v.state           := PADDR_S;
+      when IDLE_S =>
+        v.streamReset  := '1';
+        if timingStream.fiducial = '1' then
+          v.stream.ready := '1';
+          v.streamReset  := '0';
+          v.state        := INIT_S;
         end if;
-      when PADDR_S =>
-        v.advance(2)      := '1';
-        v.streams(2).data := r.bcastf(r.aword*16+15 downto r.aword*16);
-        if (r.aword=r.bcastf'left/16) then
-          v.ipart := 0;
-          v.eword := 0;
-          v.state := EWORD_S;
-        else
-          v.aword := r.aword+1;
+       when INIT_S =>
+        v.stream.data := r.bcastf(15 downto 0);
+        if advance(2) = '1' then
+          v.paddrStrobe := '0';
+          v.stream.data := r.bcastf(31 downto 16);
+          v.ipart       := 0;
+          v.eword       := 0;
+          v.state       := EWORD_S;
         end if;
       when EWORD_S =>
-        v.eword      := r.eword+1;
-        v.advance(2) := '1';
-        v.streams(2).data := expWord(r.ipart)(r.eword*16+15 downto r.eword*16);
+        v.stream.data := expWord(r.ipart)(r.eword*16+15 downto r.eword*16);
+
         if (r.eword=(NTagBytes+1)/2) then
+          v.eword := 0;
           if (r.ipart=NPartitions-1) then
             v.state := EOS_S;
           else
             v.ipart := r.ipart+1;
-            v.eword := 0;
           end if;
+        else
+          v.eword := r.eword+1;
         end if;
       when EOS_S =>
-        v.streams(2).ready := '0';
+        v.stream.ready  := '0';
         v.bcastf := r.bcastr;
         tidx := toIndex(r.bcastr);
         -- master of all : compose the word
         if r.bcastCount = 8 then
           v.bcastf := r.paddr;
           v.bcastCount := 0;
+          v.paddrStrobe := '1';
         else
           v.bcastf := toPaddr(pd,r.bcastCount,pdepth(r.bcastCount));
           v.bcastCount := r.bcastCount + 1;
         end if;
-        v.aword := 0;
-        v.state := INIT_S;
+        v.state := IDLE_S;
       when others => NULL;
     end case;
 
@@ -296,6 +309,12 @@ begin
     end if;
     
     rin <= v;
+
+    ostreams           <= fstreams;
+    ostreams(2)        <= r.stream;
+    ostreams(2).offset <= fstreams(2).offset;
+    ostreams(2).last   <= fstreams(2).last;
+
   end process;
 
   seq : process ( timingClk) is
