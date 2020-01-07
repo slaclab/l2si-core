@@ -119,7 +119,7 @@ begin
       end loop;
 
 
-      if (r.lastFull /= partitionOverflow) or (r.lastOverflow /= partitionOverflow) then
+      if (r.lastFull /= partitionFull) or (r.lastOverflow /= partitionOverflow) then
          v.ready := '1';
       end if;
       if (r.idleCnt = MAX_IDLE_C) then
