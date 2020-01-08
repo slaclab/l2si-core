@@ -38,12 +38,12 @@ package L2SiPkg is
 
 
    subtype TriggerEventDataType is XpmEventDataType;
-   subtype TriggerEventDataArray is XpmEventDataArray;   
+   subtype TriggerEventDataArray is XpmEventDataArray;
 
    subtype TriggerL1FeedbackType is XpmL1FeedbackType;
-   subtype TriggerL1FeedbackArray is XpmL1FeedbackArray;   
-   constant TRIGGER_L1_FEEDBACK_INIT_C : TriggerL1FeedbackType := XPM_L1_FEEDBACK_INIT_C;   
-   
+   subtype TriggerL1FeedbackArray is XpmL1FeedbackArray;
+   constant TRIGGER_L1_FEEDBACK_INIT_C : TriggerL1FeedbackType := XPM_L1_FEEDBACK_INIT_C;
+
    ----------------------------------------------------
    -- Event and Timing Header interface
    ----------------------------------------------------
@@ -100,17 +100,18 @@ package body L2SiPkg is
       variable vector : slv(255 downto 0) := (others => '0');
       variable i      : integer           := 0;
    begin
-      assignSlv(i, vector, eventHeader.pulseId(55 downto 0));
+      assignSlv(i, vector, eventHeader.pulseId(55 downto 0));  -- 55:0 - 56
       -- Steal the top 8 bits of puslseId
       -- It is redundant to have these triggerInfo bits here
       -- but software expects it this way
       assignSlv(i, vector, ite(eventHeader.triggerInfo(15) = '1', L1A_INFO_C, eventHeader.triggerInfo(12 downto 6)));
-      i := i+1;
-      assignSlv(i, vector, eventHeader.timeStamp);
-      assignSlv(i, vector, eventHeader.partitions);
-      assignSlv(i, vector, eventHeader.triggerInfo);
-      assignSlv(i, vector, eventHeader.count);
-      assignSlv(i, vector, eventHeader.version);
+      i := i+1;                                                -- 63 - 8
+      assignSlv(i, vector, eventHeader.timeStamp);             -- 127:64 - 64
+      assignSlv(i, vector, eventHeader.partitions);            -- 135:128 - 8
+      assignSlv(i, vector, eventHeader.triggerInfo);           -- 151:136 - 16
+      assignSlv(i, vector, eventHeader.count);                 -- 175:152 - 24
+      assignSlv(i, vector, eventHeader.version);               -- 183:176 - 8
+      assignSlv(i, vector, eventHeader.payload);               -- 191:184 - 8
       return vector;
    end function;
 
@@ -125,6 +126,7 @@ package body L2SiPkg is
       assignRecord(i, vector, eventHeader.triggerInfo);
       assignRecord(i, vector, eventHeader.count);
       assignRecord(i, vector, eventHeader.version);
+      assignRecord(i, vector, eventHeader.payload);
       return eventHeader;
    end function;
 
