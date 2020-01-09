@@ -93,6 +93,9 @@ architecture rtl of TriggerEventBuffer is
       overflow          : sl;
       fifoRst           : sl;
       messageDelay      : slv8Array(1 downto 0);
+      eventCount        : slv(31 downto 0);
+      transitionCount   : slv(31 downto 0);
+      validCount        : slv(31 downto 0);
       l0Count           : slv(31 downto 0);
       l1AcceptCount     : slv(31 downto 0);
       l1RejectCount     : slv(31 downto 0);
@@ -128,6 +131,9 @@ architecture rtl of TriggerEventBuffer is
       overflow          => '0',
       fifoRst           => '0',
       messageDelay      => (others => (others => '0')),
+      eventCount        => (others => '0'),
+      transitionCount   => (others => '0'),
+      validCount        => (others => '0'),
       l0Count           => (others => '0'),
       l1AcceptCount     => (others => '0'),
       l1RejectCount     => (others => '0'),
@@ -266,10 +272,17 @@ begin
 
          -- Count stuff
          -- Could maybe do this with registered data?
-         if (v.streamValid = '1' and v.eventData.valid = '1') then
+
+         if (r.enable = '1') then
+            v.validCount := r.validCount + 1;
+         end if;
+
+         if (v.streamValid = '1') and (v.eventData.valid = '1') then
             if(v.eventData.l0Accept = '1') then
                v.l0Count := r.l0Count + 1;
             end if;
+
+            v.eventCount := r.eventCount + 1;
 
             if (v.eventData.l1Expect = '1') then
                if (v.eventData.l1Accept = '1') then
@@ -278,6 +291,9 @@ begin
                   v.l1RejectCount := r.l1RejectCount + 1;
                end if;
             end if;
+         end if;
+         if (v.transitionData.valid = '1') then
+            v.transitionCount := r.transitionCount + 1;
          end if;
 
       end if;
@@ -301,6 +317,11 @@ begin
       axiSlaveRegisterR(axilEp, x"1C", 0, r.l1RejectCount);
       axiSlaveRegister(axilEp, X"20", 0, v.triggerDelay);
       axiSlaveRegisterR(axilEp, X"28", 0, r.readDelayValue);
+      axiSlaveRegisterR(axilEp, X"30", 0, r.eventCount);
+      axiSlaveRegisterR(axilEp, X"34", 0, r.transitionCount);
+      axiSlaveRegisterR(axilEp, X"38", 0, r.validCount);
+      axiSlaveRegisterR(axilEp, X"40", 0, alignedXpmMessage.partitionAddr);
+      axiSlaveRegisterR(axilEp, X"44", 0, alignedXpmMessage.partitionWord(0));
 
       axiSlaveDefault(axilEp, v.axilWriteSlave, v.axilReadSlave, AXI_RESP_DECERR_C);
 

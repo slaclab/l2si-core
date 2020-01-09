@@ -76,6 +76,42 @@ class TriggerEventBuffer(pr.Device):
             mode        = 'RO',
             disp        = '{:d}'            
         ))
+
+        self.add(pr.RemoteVariable(
+            name        = 'EventCount',
+            description = '',
+            offset      = 0x30,
+            bitSize     = 32,
+            bitOffset   = 0,
+            base        = pr.UInt,
+            mode        = 'RO',
+            disp        = '{:d}'
+        ))
+
+        self.add(pr.RemoteVariable(
+            name        = 'TransitionCount',
+            description = '',
+            offset      = 0x34,
+            bitSize     = 32,
+            bitOffset   = 0,
+            base        = pr.UInt,
+            mode        = 'RO',
+            disp        = '{:d}'
+        ))
+
+
+        self.add(pr.RemoteVariable(
+            name        = 'XpmMessageCount',
+            description = '',
+            offset      = 0x38,
+            bitSize     = 32,
+            bitOffset   = 0,
+            base        = pr.UInt,
+            mode        = 'RO',
+            disp        = '{:d}'
+        ))
+        
+        
         
         self.add(pr.RemoteVariable(
             name        = 'L0Count',
@@ -122,9 +158,28 @@ class TriggerEventBuffer(pr.Device):
         ))
 
         self.add(pr.RemoteVariable(
+            name        = 'LastPartitionAddr',
+            offset      = 0x40,
+            bitSize     = 32,
+            bitOffset   = 0,
+            base        = pr.UInt,
+            mode        = 'RO',
+        ))
+
+        self.add(pr.RemoteVariable(
+            name        = 'LastPartitionWord0',
+            offset      = 0x44,
+            bitSize     = 48,
+            bitOffset   = 0,
+            base        = pr.UInt,
+            mode        = 'RO',
+        ))
+
+        self.add(pr.RemoteVariable(
             name = "MessageDelay2",
             offset = 0x28,
             bitSize = 64,
             mode = "RO",
+            hidden = True,
             disp = '{:d}'))
         
