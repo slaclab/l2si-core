@@ -80,7 +80,8 @@ package XpmExtensionPkg is
    type XpmEventDataArray is array (natural range <>) of XpmEventDataType;
 
    function toSlv (xpmEvent                  : XpmEventDataType) return slv;
-   function toXpmEventDataType(partitionWord : slv(47 downto 0); valid : sl := 'Z') return XpmEventDataType;
+   function toXpmEventDataType(partitionWord : slv(47 downto 0)) return XpmEventDataType;
+   function toXpmEventDataType(partitionWord : slv(47 downto 0); valid : sl) return XpmEventDataType;   
 
    type XpmTransitionDataType is record
       valid   : sl;
@@ -126,11 +127,11 @@ package body XpmExtensionPkg is
 
    function toXpmMessageType (timing : TimingExtensionMessageType) return XpmMessageType
    is
-      variable xpm : XpmMessageType;
-      variable i   : integer := 0;
+      variable xpm  : XpmMessageType;
+      variable i    : integer := 0;
       variable data : slv(XPM_MESSAGE_BITS_C-1 downto 0);
    begin
-      data := timing.data(511 downto 512-XPM_MESSAGE_BITS_C);
+      data      := timing.data(511 downto 512-XPM_MESSAGE_BITS_C);
       xpm.valid := timing.valid;
       assignRecord(i, data, xpm.partitionAddr);
       for j in 0 to XPM_PARTITIONS_C-1 loop
@@ -158,7 +159,7 @@ package body XpmExtensionPkg is
       return vector;
    end function;
 
-   function toXpmEventDataType(partitionWord : slv(47 downto 0); valid : sl := 'Z') return XpmEventDataType is
+   function toXpmEventDataType(partitionWord : slv(47 downto 0)) return XpmEventDataType is
       variable xpmEvent : XpmEventDataType := XPM_EVENT_DATA_INIT_C;
       variable i        : integer          := 0;
       variable validV   : sl;
@@ -170,17 +171,21 @@ package body XpmExtensionPkg is
       assignRecord(i, partitionWord, xpmEvent.l1Expect);  -- 8
       assignRecord(i, partitionWord, xpmEvent.l1Accept);  -- 9
       assignRecord(i, partitionWord, xpmEvent.l1Tag);     --14:10
-      if (valid = 'Z') then
-         assignRecord(i, partitionWord, xpmEvent.valid);  -- 15
-      else
-         validV := valid;                                 -- VHDL is so stupid
-         assignRecord(i, partitionWord, validV);          -- 15
-      end if;
+      assignRecord(i, partitionWord, xpmEvent.valid);     -- 15
       assignRecord(i, partitionWord, xpmEvent.count);     -- 39:16
       assignRecord(i, partitionWord, xpmEvent.payload);   -- 47:40
 
       return xpmEvent;
    end function;
+
+   function toXpmEventDataType(partitionWord : slv(47 downto 0); valid : sl) return XpmEventDataType is
+      variable xpmEvent : XpmEventDataType := XPM_EVENT_DATA_INIT_C;
+   begin
+      xpmEvent := toXpmEventDataType(partitionWord);
+      xpmEvent.valid := valid;
+      return xpmEvent;
+   end function;
+   
 
 
    function toSlv (xpmTransition : XpmTransitionDataType) return slv is
