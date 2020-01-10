@@ -92,17 +92,13 @@ architecture rtl of TriggerEventBuffer is
       triggerDelay      : slv(31 downto 0);
       overflow          : sl;
       fifoRst           : sl;
-      messageDelay      : slv8Array(1 downto 0);
       eventCount        : slv(31 downto 0);
       transitionCount   : slv(31 downto 0);
       validCount        : slv(31 downto 0);
+      triggerCount      : slv(31 downto 0);
       l0Count           : slv(31 downto 0);
       l1AcceptCount     : slv(31 downto 0);
       l1RejectCount     : slv(31 downto 0);
-
-      readDelayWr    : sl;
-      readDelayRd    : sl;
-      readDelayValue : slv(63 downto 0);
 
       fifoAxisMaster : AxiStreamMasterType;
 
@@ -130,17 +126,14 @@ architecture rtl of TriggerEventBuffer is
       triggerDelay      => toSlv(42, 32),
       overflow          => '0',
       fifoRst           => '0',
-      messageDelay      => (others => (others => '0')),
-      eventCount        => (others => '0'),
-      transitionCount   => (others => '0'),
-      validCount        => (others => '0'),
-      l0Count           => (others => '0'),
-      l1AcceptCount     => (others => '0'),
-      l1RejectCount     => (others => '0'),
 
-      readDelayWr    => '0',
-      readDelayRd    => '0',
-      readDelayValue => (others => '0'),
+      eventCount      => (others => '0'),
+      transitionCount => (others => '0'),
+      validCount      => (others => '0'),
+      triggerCount    => (others => '0'),
+      l0Count         => (others => '0'),
+      l1AcceptCount   => (others => '0'),
+      l1RejectCount   => (others => '0'),
 
       fifoAxisMaster => axiStreamMasterInit(EVENT_AXIS_CONFIG_C),
       -- outputs     =>
@@ -171,14 +164,12 @@ architecture rtl of TriggerEventBuffer is
    signal syncTriggerDataValid    : sl;
    signal syncTriggerDataSlv      : slv(47 downto 0);
 
-   signal readDelayout : slv(63 downto 0);
-
 begin
 
 
    comb : process (alignedTimingMessage, alignedTimingStrobe, alignedXpmMessage, axilReadMaster,
-                   axilWriteMaster, fifoAxisCtrl, promptTimingMessage, promptTimingStrobe,
-                   promptXpmMessage, r, readDelayOut, timingRxRst) is
+                   axilWriteMaster, fifoAxisCtrl, promptTimingStrobe, promptXpmMessage, r,
+                   timingRxRst) is
       variable v      : RegType;
       variable axilEp : AxiLiteEndpointType;
    begin
@@ -190,9 +181,6 @@ begin
 
       v.fifoAxisMaster.tValid := '0';
 
-      v.readDelayWr := '0';
-      v.readDelayRd := '0';
-
       --------------------------------------------
       -- Trigger output logic
       -- Watch for and decode triggers on prompt interface
@@ -202,14 +190,10 @@ begin
       if (promptTimingStrobe = '1' and promptXpmMessage.valid = '1') then
          v.triggerData := toXpmEventDataType(promptXpmMessage.partitionWord(v.partitionV));
 
-         -- Count time since last event
-         if (v.triggerData.valid = '1') then
-            v.readDelayWr := '1';
-         end if;
-
          -- Gate output valid if disabled by configuration
          if (r.enable = '0') then
             v.triggerData.valid := '0';
+            v.triggerCount      := r.triggerCount + 1;
          end if;
       end if;
 
@@ -231,12 +215,6 @@ begin
          -- Don't pass data through when disabled
          if (r.enable = '0' or r.enableEventBuffer = '0') then
             v.streamValid := '0';
-         end if;
-
-         -- Latch delay between prompt and aligned (should match the configured delay)
-         if (v.eventData.valid = '1') then
-            v.readDelayRd    := '1';
-            v.readDelayValue := promptTimingMessage.timeStamp - readDelayOut;
          end if;
 
          -- Create the EventHeader from timing and event data
@@ -270,32 +248,32 @@ begin
             v.fifoAxisMaster.tValid := '0';
          end if;
 
-         -- Count stuff
-         -- Could maybe do this with registered data?
 
          if (r.enable = '1') then
             v.validCount := r.validCount + 1;
          end if;
 
-         if (v.streamValid = '1') and (v.eventData.valid = '1') then
-            if(v.eventData.l0Accept = '1') then
-               v.l0Count := r.l0Count + 1;
-            end if;
+      end if;
 
-            v.eventCount := r.eventCount + 1;
+      -- Count stuff
+      -- Could maybe do this with registered data?
+      if (r.streamValid = '1') and (r.eventData.valid = '1') then
+         v.eventCount := r.eventCount + 1;
 
-            if (v.eventData.l1Expect = '1') then
-               if (v.eventData.l1Accept = '1') then
-                  v.l1AcceptCount := r.l1AcceptCount + 1;
-               else
-                  v.l1RejectCount := r.l1RejectCount + 1;
-               end if;
-            end if;
-         end if;
-         if (v.transitionData.valid = '1') then
-            v.transitionCount := r.transitionCount + 1;
+         if(r.eventData.l0Accept = '1') then
+            v.l0Count := r.l0Count + 1;
          end if;
 
+         if (r.eventData.l1Expect = '1') then
+            if (r.eventData.l1Accept = '1') then
+               v.l1AcceptCount := r.l1AcceptCount + 1;
+            else
+               v.l1RejectCount := r.l1RejectCount + 1;
+            end if;
+         end if;
+      end if;
+      if (r.transitionData.valid = '1') then
+         v.transitionCount := r.transitionCount + 1;
       end if;
 
 
@@ -311,15 +289,16 @@ begin
       axiSlaveRegisterR(axilEp, x"08", 0, r.overflow);
       axiSlaveRegisterR(axilEp, X"08", 1, fifoAxisCtrl.pause);
       axiSlaveRegister(axilEp, X"08", 16, v.fifoPauseThresh);
-      axiSlaveRegisterR(axilEp, x"0C", 0, r.messageDelay(1));
+--      axiSlaveRegisterR(axilEp, x"0C", 0, r.messageDelay(1));
       axiSlaveRegisterR(axilEp, x"10", 0, r.l0Count);
       axiSlaveRegisterR(axilEp, x"14", 0, r.l1AcceptCount);
       axiSlaveRegisterR(axilEp, x"1C", 0, r.l1RejectCount);
       axiSlaveRegister(axilEp, X"20", 0, v.triggerDelay);
-      axiSlaveRegisterR(axilEp, X"28", 0, r.readDelayValue);
+--      axiSlaveRegisterR(axilEp, X"28", 0, r.readDelayValue);
       axiSlaveRegisterR(axilEp, X"30", 0, r.eventCount);
       axiSlaveRegisterR(axilEp, X"34", 0, r.transitionCount);
       axiSlaveRegisterR(axilEp, X"38", 0, r.validCount);
+      axiSlaveRegisterR(axilEp, X"3C", 0, r.triggerCount);      
       axiSlaveRegisterR(axilEp, X"40", 0, alignedXpmMessage.partitionAddr);
       axiSlaveRegisterR(axilEp, X"44", 0, alignedXpmMessage.partitionWord(0));
 
@@ -445,22 +424,5 @@ begin
          dout   => eventTimingMessageSlv);   -- [out]
    eventTimingMessage <= toTimingMessageType(eventTimingMessageSlv);
 
-   U_Fifo_Delay_Check : entity surf.Fifo
-      generic map (
-         TPD_G           => TPD_G,
-         GEN_SYNC_FIFO_G => true,
-         MEMORY_TYPE_G   => "block",
-         FWFT_EN_G       => true,
-         PIPE_STAGES_G   => 0,                     -- make sure this lines up right with event fifo
-         DATA_WIDTH_G    => 64,
-         ADDR_WIDTH_G    => 9)
-      port map (
-         rst    => r.fifoRst,                      -- [in]
-         wr_clk => timingRxClk,                    -- [in]
-         wr_en  => r.readDelayWr,                  -- [in]
-         din    => promptTimingMessage.timeStamp,  -- [in]
-         rd_clk => timingRxClk,                    -- [in]
-         rd_en  => r.readDelayRd,                  -- [in]
-         dout   => readDelayOut);                  -- [out]
 end architecture rtl;
 

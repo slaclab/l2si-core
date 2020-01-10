@@ -66,16 +66,16 @@ class TriggerEventBuffer(pr.Device):
             disp        = '{:d}'            
         ))
         
-        self.add(pr.RemoteVariable(
-            name        = 'MessageDelay',
-            description = 'Measure delay of each meassage',
-            offset      = 0x0C,
-            bitSize     = 8,
-            bitOffset   = 0,
-            base        = pr.UInt,
-            mode        = 'RO',
-            disp        = '{:d}'            
-        ))
+#         self.add(pr.RemoteVariable(
+#             name        = 'MessageDelay',
+#             description = 'Measure delay of each meassage',
+#             offset      = 0x0C,
+#             bitSize     = 8,
+#             bitOffset   = 0,
+#             base        = pr.UInt,
+#             mode        = 'RO',
+#             disp        = '{:d}'            
+#         ))
 
         self.add(pr.RemoteVariable(
             name        = 'EventCount',
@@ -110,8 +110,16 @@ class TriggerEventBuffer(pr.Device):
             mode        = 'RO',
             disp        = '{:d}'
         ))
-        
-        
+
+        self.add(pr.RemoteVariable(
+            name        = 'TriggerCount',
+            offset      = 0x3C,
+            bitSize     = 32,
+            bitOffset   = 0,
+            base        = pr.UInt,
+            mode        = 'RO',
+            disp        = '{:d}'
+        ))
         
         self.add(pr.RemoteVariable(
             name        = 'L0Count',
@@ -175,11 +183,11 @@ class TriggerEventBuffer(pr.Device):
             mode        = 'RO',
         ))
 
-        self.add(pr.RemoteVariable(
-            name = "MessageDelay2",
-            offset = 0x28,
-            bitSize = 64,
-            mode = "RO",
-            hidden = True,
-            disp = '{:d}'))
+#         self.add(pr.RemoteVariable(
+#             name = "MessageDelay2",
+#             offset = 0x28,
+#             bitSize = 64,
+#             mode = "RO",
+#             hidden = True,
+#             disp = '{:d}'))
         
