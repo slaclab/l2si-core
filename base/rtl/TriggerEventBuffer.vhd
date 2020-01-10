@@ -180,6 +180,7 @@ begin
       v.fifoRst := '0';
 
       v.fifoAxisMaster.tValid := '0';
+      v.streamValid           := '0';
 
       --------------------------------------------
       -- Trigger output logic
@@ -189,11 +190,14 @@ begin
       v.triggerData.valid := '0';
       if (promptTimingStrobe = '1' and promptXpmMessage.valid = '1') then
          v.triggerData := toXpmEventDataType(promptXpmMessage.partitionWord(v.partitionV));
+         if (v.triggerData.valid = '1' and v.triggerData.l0Accept = '1') then
+            v.triggerCount := r.triggerCount + 1;
+         end if;
 
          -- Gate output valid if disabled by configuration
          if (r.enable = '0') then
             v.triggerData.valid := '0';
-            v.triggerCount      := r.triggerCount + 1;
+
          end if;
       end if;
 
@@ -258,7 +262,7 @@ begin
       -- Count stuff
       -- Could maybe do this with registered data?
       if (r.streamValid = '1') and (r.eventData.valid = '1') then
-         v.eventCount := r.eventCount + 1;
+
 
          if(r.eventData.l0Accept = '1') then
             v.l0Count := r.l0Count + 1;
@@ -298,7 +302,7 @@ begin
       axiSlaveRegisterR(axilEp, X"30", 0, r.eventCount);
       axiSlaveRegisterR(axilEp, X"34", 0, r.transitionCount);
       axiSlaveRegisterR(axilEp, X"38", 0, r.validCount);
-      axiSlaveRegisterR(axilEp, X"3C", 0, r.triggerCount);      
+      axiSlaveRegisterR(axilEp, X"3C", 0, r.triggerCount);
       axiSlaveRegisterR(axilEp, X"40", 0, alignedXpmMessage.partitionAddr);
       axiSlaveRegisterR(axilEp, X"44", 0, alignedXpmMessage.partitionWord(0));
 
