@@ -156,12 +156,14 @@ begin
   GEN_DS_ENABLE : for i in 0 to NDSLinks-1 generate
     GEN_ENABLE: if ENABLE_DS_LINKS_G(i)='1' generate
       xpmConfig.dsLink(i).enable     <= '1';
+      xpmConfig.dsLink(i).groupMask  <= x"ff";
     end generate;
   end generate;
    
   GEN_BP_ENABLE : for i in 0 to NBPLinks-1 generate
     GEN_ENABLE: if ENABLE_BP_LINKS_G(i)='1' generate
       xpmConfig.bpLink(i).enable     <= '1';
+      xpmConfig.bpLink(i).groupMask  <= x"ff";
     end generate;
   end generate;
 
@@ -224,9 +226,9 @@ begin
      pconfig(0).l0Select.enabled <= '1';
      pconfig(0).l0Select.rateSel <= toSlv(RATE_SELECT_G,16);
      pconfig(0).l0Select.destSel <= x"8000";
-     pconfig(0).inhibit.setup(0).enable   <= '1';
-     pconfig(0).inhibit.setup(0).limit    <= toSlv(3,4);
-     pconfig(0).inhibit.setup(0).interval <= toSlv(10,12);
+     --pconfig(0).inhibit.setup(0).enable   <= '1';
+     --pconfig(0).inhibit.setup(0).limit    <= toSlv(3,4);
+     --pconfig(0).inhibit.setup(0).interval <= toSlv(10,12);
 
      for i in 1 to NPartitions-1 loop
        pconfig(i).l0Select.enabled <= '1';
