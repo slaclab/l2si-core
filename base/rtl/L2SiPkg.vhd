@@ -108,6 +108,7 @@ package body L2SiPkg is
       i := i+1;                                                -- 63 - 8
       assignSlv(i, vector, eventHeader.timeStamp);             -- 127:64 - 64
       assignSlv(i, vector, eventHeader.partitions);            -- 135:128 - 8
+      i := i +8;
       assignSlv(i, vector, eventHeader.triggerInfo);           -- 151:136 - 16
       assignSlv(i, vector, eventHeader.count);                 -- 175:152 - 24
       assignSlv(i, vector, eventHeader.version);               -- 183:176 - 8
@@ -123,6 +124,7 @@ package body L2SiPkg is
       i := i+8;
       assignRecord(i, vector, eventHeader.timeStamp);
       assignRecord(i, vector, eventHeader.partitions);
+      i := i+8;
       assignRecord(i, vector, eventHeader.triggerInfo);
       assignRecord(i, vector, eventHeader.count);
       assignRecord(i, vector, eventHeader.version);
