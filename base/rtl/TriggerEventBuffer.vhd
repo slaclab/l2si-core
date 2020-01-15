@@ -168,8 +168,8 @@ begin
 
 
    comb : process (alignedTimingMessage, alignedTimingStrobe, alignedXpmMessage, axilReadMaster,
-                   axilWriteMaster, fifoAxisCtrl, promptTimingStrobe, promptXpmMessage, r,
-                   timingRxRst) is
+                   axilWriteMaster, fifoAxisCtrl, fifoWrCnt, promptTimingStrobe, promptXpmMessage,
+                   r, timingRxRst) is
       variable v      : RegType;
       variable axilEp : AxiLiteEndpointType;
    begin
