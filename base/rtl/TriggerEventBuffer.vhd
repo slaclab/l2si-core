@@ -235,13 +235,11 @@ begin
 
          -- Place the EventHeader into an AXI-Stream transaction
          if (v.streamValid = '1') then
-            if (fifoAxisCtrl.pause = '0') then
+            if (fifoAxisCtrl.overflow = '0') then
                v.fifoAxisMaster.tValid                                := '1';
                v.fifoAxisMaster.tdata(EVENT_HEADER_BITS_C-1 downto 0) := toSlv(v.eventHeader);
                v.fifoAxisMaster.tDest(0)                              := v.transitionData.valid;
                v.fifoAxisMaster.tLast                                 := '1';
-            else
-               v.overflow := '1';
             end if;
          end if;
 
@@ -257,6 +255,11 @@ begin
             v.validCount := r.validCount + 1;
          end if;
 
+      end if;
+
+      -- Latch FIFO overflow if seen
+      if (fifoAxisCtrl.overflow = '1') then
+         v.overflow := '1';
       end if;
 
       -- Count stuff
@@ -292,6 +295,8 @@ begin
       axiSlaveRegister(axilEp, x"04", 0, v.partition);
       axiSlaveRegisterR(axilEp, x"08", 0, r.overflow);
       axiSlaveRegisterR(axilEp, X"08", 1, fifoAxisCtrl.pause);
+      axiSlaveRegisterR(axilEp, X"08", 2, fifoAxisCtrl.overflow);
+      axiSlaveRegisterR(axilEp, X"08", 3, fifoWrCnt);
       axiSlaveRegister(axilEp, X"08", 16, v.fifoPauseThresh);
 --      axiSlaveRegisterR(axilEp, x"0C", 0, r.messageDelay(1));
       axiSlaveRegisterR(axilEp, x"10", 0, r.l0Count);
