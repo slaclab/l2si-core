@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-07-10
--- Last update: 2019-12-19
+-- Last update: 2020-01-15
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -92,7 +92,7 @@ architecture top_level_app of XpmMini is
     streamReset=> '1',
     advance    => '0',
     stream     => TIMING_SERIAL_INIT_C,
-    state      => INIT_S,
+    state      => IDLE_S,
     eword      => 0,
     ipart      => 0,
     bcastCount => 0 );
@@ -113,21 +113,14 @@ architecture top_level_app of XpmMini is
   signal dsFull         : FullArray   (NDsLinks-1 downto 0);
   signal dsRxRcvs       : Slv32Array  (NDsLinks-1 downto 0);
   signal dsId           : Slv32Array  (NDsLinks-1 downto 0);
-  signal bpRxLinkFullS  : Slv16Array        (NBpLinks-1 downto 0);
   signal linkConfig     : XpmLinkConfigArray(NDsLinks-1 downto 0);
   
-  --  Serialized data to sensor links
-  signal txData         : slv(15 downto 0);
-  signal txDataK        : slv( 1 downto 0);
-
-  signal timingStream_streams : TimingSerialArray(NSTREAMS_C-1 downto 0);
-  signal fstreams             : TimingSerialArray(NSTREAMS_C-1 downto 0);
-  signal ostreams             : TimingSerialArray(NSTREAMS_C-1 downto 0);
-  signal stream0_data: slv(15 downto 0);
+  signal fstreams             : TimingSerialArray(NSTREAMS_C-1 downto 0) := (others=>TIMING_SERIAL_INIT_C);
+  signal ostreams             : TimingSerialArray(NSTREAMS_C-1 downto 0) := (others=>TIMING_SERIAL_INIT_C);
+  signal timingStream_advance : slv              (NSTREAMS_C-1 downto 0) := (others=>'0');
   signal streamIds   : Slv4Array        (NSTREAMS_C-1 downto 0) := (x"1",x"2",x"0");
   signal advance     : slv              (NSTREAMS_C-1 downto 0);
-  signal fadvance    : slv              (NSTREAMS_C-1 downto 0);
-  signal pdepth      : Slv8Array (NPartitions-1 downto 0);
+  signal pdepth      : Slv8Array (NPartitions-1 downto 0) := (others=>x"00");
   signal expWord     : Slv48Array(NPartitions-1 downto 0) := (others=>toSlv(XPM_PARTITION_DATA_INIT_C));
 
 begin
@@ -153,6 +146,7 @@ begin
     linkConfig(i).rxPllReset <= config.dsLink(i).rxPllReset;
     linkConfig(i).txDelayRst <= config.dsLink(i).txReset;
     linkConfig(i).txDelay    <= (others=>'0');
+    linkConfig(i).rxTimeOut  <= toSlv(100,9);
     linkConfig(i).groupMask  <= toSlv(1,NPartitions);
     linkConfig(i).trigsrc    <= (others=>'0');
       
@@ -200,23 +194,24 @@ begin
 
   status.partition.l0Select <= partitionStatus.l0Select;
 
-  GEN_STR : for i in 0 to NSTREAMS_C-1 generate
+  GEN_STR : for i in 0 to 0 generate
     U_FIFO : entity work.FifoSync
       generic map ( ADDR_WIDTH_G => 4,
                     DATA_WIDTH_G => 16,
                     FWFT_EN_G    => true )
       port map ( clk     => timingClk,
                  rst     => rin.streamReset,
-                 wr_en   => timingStream.advance(i),
-                 din     => timingStream_streams(i).data,
-                 rd_en   => fadvance(i),
+                 wr_en   => timingStream_advance(i),
+                 din     => timingStream.streams(i).data,
+                 rd_en   => advance (i),
                  dout    => fstreams(i).data,
                  valid   => fstreams(i).ready,
                  full    => open );
+    timingStream_advance(i) <= rin.advance;
     fstreams(i).offset <= timingStream.streams(i).offset;
     fstreams(i).last   <= timingStream.streams(i).last;
   end generate;
-  
+
   U_Master : entity work.XpmAppMaster
     generic map ( NDsLinks   => NDsLinks )
     port map ( regclk        => regclk,
@@ -225,9 +220,9 @@ begin
                status        => partitionStatus,
                timingClk     => timingClk,
                timingRst     => timingRst,
-               streams       => timingStream_streams,
+               streams       => timingStream.streams,
                streamIds     => streamIds,
-               advance       => timingStream.advance,
+               advance       => timingStream_advance,
                fiducial      => timingStream.fiducial,
                full          => r.full          (0),
                l1Input       => r.l1input       (0),
@@ -247,8 +242,14 @@ begin
     constant pd   : XpmBroadcastType := PDELAY;
   begin
     v            := r;
-    v.advance    := advance(2);
     v.fiducial   := timingStream.fiducial & r.fiducial(r.fiducial'left downto 1);
+
+    -- advance not driven for XpmMini; mock it up
+    if v.fiducial(r.fiducial'left downto r.fiducial'left-2)=0 then
+      v.advance  := timingStream.streams(0).ready;
+    else
+      v.advance  := '0';
+    end if;
     
     case r.state is
       when IDLE_S =>
@@ -312,8 +313,8 @@ begin
 
     ostreams           <= fstreams;
     ostreams(2)        <= r.stream;
-    ostreams(2).offset <= fstreams(2).offset;
-    ostreams(2).last   <= fstreams(2).last;
+    ostreams(2).offset <= toSlv(0,7);
+    ostreams(2).last   <= '1';
 
   end process;
 

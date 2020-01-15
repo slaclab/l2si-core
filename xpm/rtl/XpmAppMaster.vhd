@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-07-10
--- Last update: 2019-07-29
+-- Last update: 2020-01-15
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -65,7 +65,7 @@ architecture rtl of XpmAppMaster is
     cuTimingV  : sl;
   end record;
   constant REG_INIT_C : RegType := (
-    result     => (others=>'0'),
+    result     => toSlv(XPM_PARTITION_DATA_INIT_C),
     latch      => '0',
     insertMsg  => '0',
     strobeMsg  => '0',
