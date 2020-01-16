@@ -1,23 +1,15 @@
 -------------------------------------------------------------------------------
--- Title      : 
--------------------------------------------------------------------------------
--- File       : DtiPkg.vhd
--- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
--- Created    : 2016-03-25
--- Last update: 2018-08-23
--- Platform   : 
--- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
 -- Description: Programmable configuration and status fields
 -------------------------------------------------------------------------------
--- This file is part of 'LCLS2 Dti Core'.
--- It is subject to the license terms in the LICENSE.txt file found in the 
--- top-level directory of this distribution and at: 
---    https://confluence.slac.stanford.edu/display/ppareg/LICENSE.html. 
--- No part of 'LCLS2 Dti Core', including this file, 
--- may be copied, modified, propagated, or distributed except according to 
--- the terms contained in the LICENSE.txt file.
+-- This file is part of 'L2SI Core'. It is subject to
+-- the license terms in the LICENSE.txt file found in the top-level directory
+-- of this distribution and at:
+--    https://confluence.slac.stanford.edu/display/ppareg/LICENSE.html.
+-- No part of 'L2SI Core', including this file, may be
+-- copied, modified, propagated, or distributed except according to the terms
+-- contained in the LICENSE.txt file.
 -------------------------------------------------------------------------------
 
 library ieee;

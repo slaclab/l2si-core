@@ -1,24 +1,22 @@
 -------------------------------------------------------------------------------
--- Title      : 
--------------------------------------------------------------------------------
 -- Company    : SLAC National Accelerator Laboratory
 -------------------------------------------------------------------------------
 -- Description: Sensor link deserializer
 --
--- This module receives the sensor link datastream and extracts the readout
+-- This module receives the sensor link data stream and extracts the readout
 -- status and event feedback information, if any.  The readout status is expressed
 -- by the 'full' signal which is asserted either by the almost full status from
 -- the link or the history of 'l0Accept' and 'l1Accept' signals with the given
 -- link configuration limits 'config'.
 --
 -------------------------------------------------------------------------------
--- This file is part of 'LCLS2 XPM Core'.
--- It is subject to the license terms in the LICENSE.txt file found in the 
--- top-level directory of this distribution and at: 
---    https://confluence.slac.stanford.edu/display/ppareg/LICENSE.html. 
--- No part of 'LCLS2 XPM Core', including this file, 
--- may be copied, modified, propagated, or distributed except according to 
--- the terms contained in the LICENSE.txt file.
+-- This file is part of 'L2SI Core'. It is subject to
+-- the license terms in the LICENSE.txt file found in the top-level directory
+-- of this distribution and at:
+--    https://confluence.slac.stanford.edu/display/ppareg/LICENSE.html.
+-- No part of 'L2SI Core', including this file, may be
+-- copied, modified, propagated, or distributed except according to the terms
+-- contained in the LICENSE.txt file.
 -------------------------------------------------------------------------------
 
 library ieee;

@@ -1,17 +1,15 @@
 -------------------------------------------------------------------------------
--- Title      : XpmSeqPkg
--------------------------------------------------------------------------------
 -- Company    : SLAC National Accelerator Laboratory
 -------------------------------------------------------------------------------
--- Description: Package of constants and record definitions for the Timing Geneartor.
+-- Description: Package of constants and record definitions for the Timing Generator.
 -------------------------------------------------------------------------------
--- This file is part of 'LCLS2 Timing Core'.
--- It is subject to the license terms in the LICENSE.txt file found in the 
--- top-level directory of this distribution and at: 
---    https://confluence.slac.stanford.edu/display/ppareg/LICENSE.html. 
--- No part of 'LCLS2 Timing Core', including this file, 
--- may be copied, modified, propagated, or distributed except according to 
--- the terms contained in the LICENSE.txt file.
+-- This file is part of 'L2SI Core'. It is subject to
+-- the license terms in the LICENSE.txt file found in the top-level directory
+-- of this distribution and at:
+--    https://confluence.slac.stanford.edu/display/ppareg/LICENSE.html.
+-- No part of 'L2SI Core', including this file, may be
+-- copied, modified, propagated, or distributed except according to the terms
+-- contained in the LICENSE.txt file.
 -------------------------------------------------------------------------------
 library IEEE;
 use IEEE.STD_LOGIC_1164.all;

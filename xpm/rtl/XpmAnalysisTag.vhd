@@ -1,6 +1,4 @@
 -------------------------------------------------------------------------------
--- Title      : 
--------------------------------------------------------------------------------
 -- Company    : SLAC National Accelerator Laboratory
 -------------------------------------------------------------------------------
 -- Description: Analysis Tag Insertion
@@ -8,7 +6,7 @@
 -- Analysis tag bits are segregated into sets where only one bit in a set may be
 -- asserted at any time.  A set of tag bits represents a group of analysis nodes
 -- that work together and consequently receive exclusive events.  The bit groupings
--- are configured programmably according to 'config'.  Each group contains its
+-- are configured programmability according to 'config'.  Each group contains its
 -- own FIFO for ordering analysis event requests.
 --
 -- Requests to tag events for analysis are received through the programmable register
@@ -16,13 +14,13 @@
 -- signal and incremented via the 'pop' input signal.
 -- 
 -------------------------------------------------------------------------------
--- This file is part of 'LCLS2 XPM Core'.
--- It is subject to the license terms in the LICENSE.txt file found in the 
--- top-level directory of this distribution and at: 
---    https://confluence.slac.stanford.edu/display/ppareg/LICENSE.html. 
--- No part of 'LCLS2 XPM Core', including this file, 
--- may be copied, modified, propagated, or distributed except according to 
--- the terms contained in the LICENSE.txt file.
+-- This file is part of 'L2SI Core'. It is subject to
+-- the license terms in the LICENSE.txt file found in the top-level directory
+-- of this distribution and at:
+--    https://confluence.slac.stanford.edu/display/ppareg/LICENSE.html.
+-- No part of 'L2SI Core', including this file, may be
+-- copied, modified, propagated, or distributed except according to the terms
+-- contained in the LICENSE.txt file.
 -------------------------------------------------------------------------------
 
 library ieee;

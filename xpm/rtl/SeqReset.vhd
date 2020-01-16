@@ -1,6 +1,4 @@
 -------------------------------------------------------------------------------
--- Title      : 
--------------------------------------------------------------------------------
 -- Company    : SLAC National Accelerator Laboratory
 -------------------------------------------------------------------------------
 -- Description: Calculates automated jumps in sequencer instruction RAM.
@@ -9,13 +7,13 @@
 --   Any state change that isn't acted upon because of a higher priority reaction
 --   will be enacted on the following cycle.
 -------------------------------------------------------------------------------
--- This file is part of 'LCLS2 Timing Core'.
--- It is subject to the license terms in the LICENSE.txt file found in the 
--- top-level directory of this distribution and at: 
---    https://confluence.slac.stanford.edu/display/ppareg/LICENSE.html. 
--- No part of 'LCLS2 Timing Core', including this file, 
--- may be copied, modified, propagated, or distributed except according to 
--- the terms contained in the LICENSE.txt file.
+-- This file is part of 'L2SI Core'. It is subject to
+-- the license terms in the LICENSE.txt file found in the top-level directory
+-- of this distribution and at:
+--    https://confluence.slac.stanford.edu/display/ppareg/LICENSE.html.
+-- No part of 'L2SI Core', including this file, may be
+-- copied, modified, propagated, or distributed except according to the terms
+-- contained in the LICENSE.txt file.
 -------------------------------------------------------------------------------
 LIBRARY ieee;
 USE ieee.std_logic_1164.ALL;

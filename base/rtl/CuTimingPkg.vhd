@@ -2,17 +2,15 @@
 -- Title      : CuTiming interface package
 -------------------------------------------------------------------------------
 -- Company    : SLAC National Accelerator Laboratory
--- Platform   : 
--- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
 -- Description: Defines constants and functions for decoding CuTiming messages
 -- on the Timing Extension bus.
 -------------------------------------------------------------------------------
--- This file is part of L2Si. It is subject to
+-- This file is part of 'L2SI Core'. It is subject to
 -- the license terms in the LICENSE.txt file found in the top-level directory
 -- of this distribution and at:
 --    https://confluence.slac.stanford.edu/display/ppareg/LICENSE.html.
--- No part of L2Si, including this file, may be
+-- No part of 'L2SI Core', including this file, may be
 -- copied, modified, propagated, or distributed except according to the terms
 -- contained in the LICENSE.txt file.
 -------------------------------------------------------------------------------

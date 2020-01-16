@@ -1,23 +1,15 @@
 -------------------------------------------------------------------------------
--- Title      : 
--------------------------------------------------------------------------------
--- File       : JtagBridgeWrapper.vhd
--- Author     : Matt Weaver  <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
--- Created    : 2018-06-27
--- Last update: 2018-07-02
--- Platform   : 
--- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
 -- Description: 
 -------------------------------------------------------------------------------
--- This file is part of 'LCLS2 XPM Core'.
--- It is subject to the license terms in the LICENSE.txt file found in the
--- top-level directory of this distribution and at:
+-- This file is part of 'L2SI Core'. It is subject to
+-- the license terms in the LICENSE.txt file found in the top-level directory
+-- of this distribution and at:
 --    https://confluence.slac.stanford.edu/display/ppareg/LICENSE.html.
--- No part of 'LCLS2 XPM Core', including this file,
--- may be copied, modified, propagated, or distributed except according to
--- the terms contained in the LICENSE.txt file.
+-- No part of 'L2SI Core', including this file, may be
+-- copied, modified, propagated, or distributed except according to the terms
+-- contained in the LICENSE.txt file.
 -------------------------------------------------------------------------------
 
 library ieee;
