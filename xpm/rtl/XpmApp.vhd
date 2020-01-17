@@ -92,7 +92,7 @@ architecture top_level_app of XpmApp is
       full           : LinkFullArray (XPM_PARTITIONS_C-1 downto 0);
       fullfb         : slv (XPM_PARTITIONS_C-1 downto 0);
       l1feedback     : LinkL1InpArray(XPM_PARTITIONS_C-1 downto 0);
-      fiducial       : slv(3 downto 0);
+      fiducial       : sl;
       source         : sl;
       paddr          : slv(XPM_PARTITION_ADDR_LENGTH_C-1 downto 0);  -- platform address
       paddrStrobe    : sl;
@@ -114,7 +114,7 @@ architecture top_level_app of XpmApp is
       full           => (others => (others => '0')),
       fullfb         => (others => '0'),
       l1feedback     => (others => (others => XPM_L1_FEEDBACK_INIT_C)),
-      fiducial       => x"0",
+      fiducial       => '0',
       source         => '1',
       paddr          => (others => '1'),
       paddrStrobe    => '0',
@@ -153,6 +153,7 @@ architecture top_level_app of XpmApp is
    signal ostreams             : TimingSerialArray(NSTREAMS_C-1 downto 0);
    signal stream0_data         : slv(15 downto 0);
    signal streamIds            : Slv4Array (NSTREAMS_C-1 downto 0) := (x"1", x"2", x"0");
+   signal fiducial             : slv (NSTREAMS_C-1 downto 0);
    signal advance              : slv (NSTREAMS_C-1 downto 0);
    signal fadvance             : slv (NSTREAMS_C-1 downto 0);
    signal pmaster              : slv (XPM_PARTITIONS_C-1 downto 0);
@@ -173,7 +174,7 @@ begin
          linkStat.rxId      := dsId (i);
          status.dsLink(i)   <= linkStat;
       end loop;
-      status.bpLink <= bpStatus;
+      status.bpLink(bpStatus'range) <= bpStatus;
    end process;
 
    GEN_SYNCBP : for i in 0 to NUM_BP_LINKS_G-1 generate
@@ -247,7 +248,7 @@ begin
             streamIds   => streamIds,
             paddr       => r.paddr,
             paddrStrobe => r.paddrStrobe,
-            fiducial    => r.fiducial(0),
+            fiducial    => fiducial(0),
             advance_o   => open,
             txData      => dsTxData (i),
             txDataK     => dsTxDataK(i));
@@ -285,7 +286,7 @@ begin
          streamIds   => streamIds,
          paddr       => r.paddr,
          paddrStrobe => r.paddrStrobe,
-         fiducial    => r.fiducial(0),
+         fiducial    => fiducial(0),
          advance_o   => advance,
          txData      => bpTxData,
          txDataK     => bpTxDataK);
@@ -332,17 +333,19 @@ begin
       U_FIFO : entity surf.FifoSync
          generic map (
             ADDR_WIDTH_G => 4,
-            DATA_WIDTH_G => 16,
+            DATA_WIDTH_G => 17,
             FWFT_EN_G    => true)
          port map (
-            clk   => timingClk,
-            rst   => rin.streamReset,
-            wr_en => timingStream.advance(i),
-            din   => timingStream_streams(i).data,
-            rd_en => fadvance(i),
-            dout  => fstreams(i).data,
-            valid => fstreams(i).ready,
-            full  => open);
+            clk               => timingClk,
+            rst               => rin.streamReset,
+            wr_en             => timingStream.advance(i),
+            din (15 downto 0) => timingStream_streams(i).data,
+            din (16)          => r.fiducial,
+            rd_en             => fadvance(i),
+            dout(15 downto 0) => fstreams(i).data,
+            dout(16)          => fiducial(i),
+            valid             => fstreams(i).ready,
+            full              => open);
       fstreams(i).offset <= timingStream.streams(i).offset;
       fstreams(i).last   <= timingStream.streams(i).last;
    end generate;
@@ -367,9 +370,9 @@ begin
             streamIds  => streamIds,
             advance    => timingStream.advance,
             fiducial   => timingStream.fiducial,
-            full       => r.full (i),
+            full       => r.full       (i),
             l1Feedback => r.l1feedback (i),
-            result     => expWord (i));
+            result     => expWord      (i));
 
       U_SyncMaster : entity surf.Synchronizer
          generic map(
@@ -408,7 +411,12 @@ begin
       v             := r;
       v.advance     := advance (2);
       v.msgComplete := '0';
-      v.fiducial    := timingStream.fiducial & r.fiducial(r.fiducial'left downto 1);
+
+      if timingStream.fiducial = '1' then
+        v.fiducial := '1';
+      elsif timingStream.advance(0) = '1' then
+        v.fiducial := '0';
+      end if;
 
       case r.state is
          when IDLE_S =>
@@ -542,8 +550,8 @@ begin
 
       ostreams           <= fstreams;
       ostreams(2)        <= r.stream;
-      ostreams(2).offset <= fstreams(2).offset;
-      ostreams(2).last   <= fstreams(2).last;
+      ostreams(2).offset <= toSlv(0,7);
+      ostreams(2).last   <= '1';
 
    end process;
 

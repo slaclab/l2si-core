@@ -239,6 +239,7 @@ package body XpmExtensionPkg is
       assignSlv(i, partitionAddr, broadcast.value);
       i             := 24;
       indexTmp      := toSlv(broadcast.index, 3);
+      assignSlv(i, partitionAddr, indexTmp);
       i             := 28;
       assignSlv(i, partitionAddr, broadcast.btype);
       return partitionAddr;

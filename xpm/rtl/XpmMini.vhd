@@ -69,13 +69,12 @@ architecture top_level_app of XpmMini is
    type RegType is record
       full        : LinkFullArray (XPM_PARTITIONS_C-1 downto 0);
       l1feedback  : LinkL1InpArray(XPM_PARTITIONS_C-1 downto 0);
-      fiducial    : slv(3 downto 0);
+      fiducial    : sl;
       paddr       : slv(XPM_PARTITION_ADDR_LENGTH_C-1 downto 0);  -- platform address
       paddrStrobe : sl;
       bcastr      : slv(XPM_PARTITION_ADDR_LENGTH_C-1 downto 0);  -- received Xpm Broadcast
       bcastf      : slv(XPM_PARTITION_ADDR_LENGTH_C-1 downto 0);  -- Xpm Broadcast to forward
       streamReset : sl;
-      advance     : sl;
       stream      : TimingSerialType;
       state       : StateType;
       eword       : integer range 0 to (XPM_NUM_TAG_BYTES_C+1)/2;
@@ -85,13 +84,12 @@ architecture top_level_app of XpmMini is
    constant REG_INIT_C : RegType := (
       full        => (others => (others => '0')),
       l1feedback  => (others => (others => XPM_L1_FEEDBACK_INIT_C)),
-      fiducial    => (others => '0'),
+      fiducial    => '0',
       paddr       => (others => '1'),
       paddrStrobe => '0',
       bcastr      => (others => '1'),
       bcastf      => (others => '1'),
       streamReset => '1',
-      advance     => '0',
       stream      => TIMING_SERIAL_INIT_C,
       state       => IDLE_S,
       eword       => 0,
@@ -119,11 +117,12 @@ architecture top_level_app of XpmMini is
 
    signal fstreams             : TimingSerialArray(NSTREAMS_C-1 downto 0);
    signal ostreams             : TimingSerialArray(NSTREAMS_C-1 downto 0);
-   signal timingStream_advance : slv (NSTREAMS_C-1 downto 0)             := (others => '0');
    signal streamIds            : Slv4Array (NSTREAMS_C-1 downto 0)       := (x"1", x"2", x"0");
+   signal fiducial             : sl;
    signal advance              : slv (NSTREAMS_C-1 downto 0);
+   signal pdepthI              : slv(7 downto 0);
    signal pdepth               : Slv8Array (XPM_PARTITIONS_C-1 downto 0) := (others => (others => '0'));
-   signal expWord              : Slv48Array(XPM_PARTITIONS_C-1 downto 0) := (others => (others => '0'));
+   signal expWord              : Slv48Array(XPM_PARTITIONS_C-1 downto 0) := (others => toSlv(XPM_TRANSITION_DATA_INIT_C));
 
 begin
 
@@ -164,7 +163,7 @@ begin
             streamIds   => streamIds,
             paddr       => r.paddr,
             paddrStrobe => r.paddrStrobe,
-            fiducial    => r.fiducial(0),
+            fiducial    => fiducial,
             advance_o   => advance,
             txData      => dsTx (i).data,
             txDataK     => dsTx (i).dataK);
@@ -204,22 +203,23 @@ begin
 
    status.partition.l0Select <= partitionStatus.l0Select;
 
-   GEN_STR : for i in 0 to NSTREAMS_C-1 generate
+   GEN_STR : for i in 0 to 0 generate
       U_FIFO : entity surf.FifoSync
          generic map (
             ADDR_WIDTH_G => 4,
-            DATA_WIDTH_G => 16,
+            DATA_WIDTH_G => 17,
             FWFT_EN_G    => true)
          port map (
-            clk   => timingClk,
-            rst   => rin.streamReset,
-            wr_en => timingStream_advance(i),
-            din   => timingStream.streams(i).data,
-            rd_en => advance (i),
-            dout  => fstreams(i).data,
-            valid => fstreams(i).ready,
-            full  => open);
-      timingStream_advance(i) <= rin.advance;
+           clk               => timingClk,
+           rst               => rin.streamReset,
+           wr_en             => timingStream.advance(i),
+           din(15 downto 0)  => timingStream.streams(i).data,
+           din(16)           => r.fiducial,
+           rd_en             => advance (i),
+           dout(15 downto 0) => fstreams(i).data,
+           dout(16)          => fiducial,
+           valid             => fstreams(i).ready,
+           full              => open);
       fstreams(i).offset      <= timingStream.streams(i).offset;
       fstreams(i).last        <= timingStream.streams(i).last;
    end generate;
@@ -237,11 +237,16 @@ begin
          timingRst  => timingRst,
          streams    => timingStream.streams,
          streamIds  => streamIds,
-         advance    => timingStream_advance,
+         advance    => timingStream.advance,
          fiducial   => timingStream.fiducial,
-         full       => r.full(0),
+         full       => r.full      (0),
          l1Feedback => r.l1feedback(0),
-         result     => expWord(0));
+         result     => expWord     (0));
+
+   --
+   --  Actual delay is 1 greater than configuration
+   --
+   pdepthI <= partitionConfig.pipeline.depth_fids+1;
 
    U_SyncDelay : entity surf.SynchronizerVector
       generic map (
@@ -249,7 +254,7 @@ begin
          WIDTH_G => 8)
       port map (
          clk     => timingClk,
-         dataIn  => partitionConfig.pipeline.depth_fids,
+         dataIn  => pdepthI,
          dataOut => pdepth(0));
 
    pdepth(7) <= pdepth(0);
@@ -268,13 +273,10 @@ begin
    begin
       v          := r;
 
-      v.fiducial := timingStream.fiducial & r.fiducial(r.fiducial'left downto 1);
-
-      -- advance not driven for XpmMini; mock it up
-      if v.fiducial(r.fiducial'left downto r.fiducial'left-2) = 0 then
-         v.advance := timingStream.streams(0).ready;
-      else
-         v.advance := '0';
+      if timingStream.fiducial = '1' then
+        v.fiducial := '1';
+      elsif timingStream.advance(0) = '1' then
+        v.fiducial := '0';
       end if;
 
       case r.state is
@@ -337,8 +339,7 @@ begin
 
       rin <= v;
 
-      ostreams(0)           <= fstreams(0);
-      ostreams(1) <= fstreams(1);
+      ostreams           <= fstreams;
       ostreams(2)        <= r.stream;
       ostreams(2).offset <= toSlv(0, 7);
       ostreams(2).last   <= '1';
