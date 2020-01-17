@@ -257,21 +257,24 @@ begin
       end if;
 
       -- Count stuff
-      if (r.streamValid = '1') and (r.eventData.valid = '1') then
-         if(r.eventData.l0Accept = '1') then
-            v.l0Count := r.l0Count + 1;
-         end if;
+      if (r.streamValid = '1') then
+         if (r.eventData.valid = '1') then
+            if (r.eventData.l0Accept = '1') then
+               v.l0Count := r.l0Count + 1;
+            end if;
 
-         if (r.eventData.l1Expect = '1') then
-            if (r.eventData.l1Accept = '1') then
-               v.l1AcceptCount := r.l1AcceptCount + 1;
-            else
-               v.l1RejectCount := r.l1RejectCount + 1;
+            if (r.eventData.l1Expect = '1') then
+               if (r.eventData.l1Accept = '1') then
+                  v.l1AcceptCount := r.l1AcceptCount + 1;
+               else
+                  v.l1RejectCount := r.l1RejectCount + 1;
+               end if;
             end if;
          end if;
-      end if;
-      if (r.transitionData.valid = '1') then
-         v.transitionCount := r.transitionCount + 1;
+
+         if (r.transitionData.valid = '1') then
+            v.transitionCount := r.transitionCount + 1;
+         end if;
       end if;
 
 
