@@ -174,7 +174,7 @@ begin
          generic map (
             TPD_G        => TPD_G,
             SRL_EN_G     => true,
-            DELAY_G      => TF_DELAY_G+1,
+            DELAY_G      => 128, --TF_DELAY_G+1,
             REG_OUTPUT_G => false,
             WIDTH_G      => 49)
          port map (
