@@ -72,7 +72,7 @@ architecture rtl of XpmAppMaster is
       cuTimingV  : sl;
    end record;
    constant REG_INIT_C : RegType := (
-      result     => toSlv(XPM_EVENT_DATA_INIT_C),
+      result     => toSlv(XPM_TRANSITION_DATA_INIT_C),
       latch      => '0',
       insertMsg  => '0',
       strobeMsg  => '0',
