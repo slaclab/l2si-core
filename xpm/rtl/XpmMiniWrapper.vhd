@@ -123,7 +123,7 @@ begin
       generic map (
          TPD_G       => TPD_G,
          NARRAYSBSA  => 1,
-         STREAM_INTF => true)
+         STREAM_INTF => false)
       port map (
          -- Register Interface
          statusO    => tpgStatus,
