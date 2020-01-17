@@ -83,6 +83,15 @@ architecture top_level of XpmMiniWrapper is
 
    signal update : sl;
 
+   type RegType is record
+     advance : sl;
+   end record;
+
+   constant REG_INIT_C : RegType := ( advance => '0' );
+
+   signal r    : RegType := REG_INIT_C;
+   signal rin  : RegType;
+
 begin
 
    U_XBAR : entity surf.AxiLiteCrossbar
@@ -155,8 +164,6 @@ begin
    xpmStream.advance(0) <= tpgAdvance;
    xpmStream.streams(0) <= tpgStream;
 
-   tpgAdvance <= tpgStream.ready;
-
    U_Xpm : entity l2si_core.XpmMini
       generic map (
          TPD_G          => TPD_G,
@@ -175,5 +182,28 @@ begin
          dsTx         => dsTx,
          timingStream => xpmStream);
 
+   comb : process ( r, timingRst, tpgFiducial, tpgStream ) is
+     variable v : RegType;
+   begin
+     v := r;
+
+     v.advance := tpgStream.ready and not tpgFiducial;
+     
+     if timingRst = '1' then
+       v := REG_INIT_C;
+     end if;
+
+     rin <= v;
+
+     tpgAdvance <= v.advance;
+   end process;
+
+   seq : process ( timingClk )
+   begin
+     if rising_edge(timingClk) then
+       r <= rin;
+     end if;
+   end process;
+   
 end top_level;
 
