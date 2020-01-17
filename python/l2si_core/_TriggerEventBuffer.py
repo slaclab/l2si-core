@@ -36,8 +36,8 @@ class TriggerEventBuffer(pr.Device):
         ))
 
         self.add(pr.RemoteVariable(
-            name        = 'Overflow',
-            description = 'Event Buffer overflow detected',
+            name        = 'XpmOverflow',
+            description = 'Overflow signal to XPM Feedback',
             offset      = 0x08,
             bitSize     = 1,
             bitOffset   = 0,
@@ -46,13 +46,33 @@ class TriggerEventBuffer(pr.Device):
         ))
 
         self.add(pr.RemoteVariable(
-            name        = 'Pause',
-            description = 'Event Buffer Pause condition',
+            name        = 'XpmPause',
+            description = 'Event Buffer Pause condition and signal to XPM Feedback',
             offset      = 0x08,
             bitSize     = 1,
             bitOffset   = 1,
             base        = pr.Bool,
             mode        = 'RO',
+        ))
+
+        self.add(pr.RemoteVariable(
+            name        = 'FifoOverflow',
+            description = 'Event Buffer Overflow condition',
+            offset      = 0x08,
+            bitSize     = 1,
+            bitOffset   = 2,
+            base        = pr.Bool,
+            mode        = 'RO',
+        ))
+        
+
+        self.add(pr.RemoteVariable(
+            name = 'FifoWrCnt',
+            description = 'Number of Events in Event Buffer',
+            offset = 0x08,
+            bitSize = 5,
+            bitOffset = 3,
+            mode = 'RO'
         ))
 
         self.add(pr.RemoteVariable(
@@ -77,16 +97,6 @@ class TriggerEventBuffer(pr.Device):
 #             disp        = '{:d}'            
 #         ))
 
-        self.add(pr.RemoteVariable(
-            name        = 'EventCount',
-            description = '',
-            offset      = 0x30,
-            bitSize     = 32,
-            bitOffset   = 0,
-            base        = pr.UInt,
-            mode        = 'RO',
-            disp        = '{:d}'
-        ))
 
         self.add(pr.RemoteVariable(
             name        = 'TransitionCount',

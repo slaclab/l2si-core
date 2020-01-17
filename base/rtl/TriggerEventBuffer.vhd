@@ -88,7 +88,6 @@ architecture rtl of TriggerEventBuffer is
       triggerDelay      : slv(31 downto 0);
       overflow          : sl;
       fifoRst           : sl;
-      eventCount        : slv(31 downto 0);
       transitionCount   : slv(31 downto 0);
       validCount        : slv(31 downto 0);
       triggerCount      : slv(31 downto 0);
@@ -123,7 +122,6 @@ architecture rtl of TriggerEventBuffer is
       overflow          => '0',
       fifoRst           => '0',
 
-      eventCount      => (others => '0'),
       transitionCount => (others => '0'),
       validCount      => (others => '0'),
       triggerCount    => (others => '0'),
@@ -259,10 +257,7 @@ begin
       end if;
 
       -- Count stuff
-      -- Could maybe do this with registered data?
       if (r.streamValid = '1') and (r.eventData.valid = '1') then
-
-
          if(r.eventData.l0Accept = '1') then
             v.l0Count := r.l0Count + 1;
          end if;
@@ -300,7 +295,6 @@ begin
       axiSlaveRegisterR(axilEp, x"1C", 0, r.l1RejectCount);
       axiSlaveRegister(axilEp, X"20", 0, v.triggerDelay);
 --      axiSlaveRegisterR(axilEp, X"28", 0, r.readDelayValue);
-      axiSlaveRegisterR(axilEp, X"30", 0, r.eventCount);
       axiSlaveRegisterR(axilEp, X"34", 0, r.transitionCount);
       axiSlaveRegisterR(axilEp, X"38", 0, r.validCount);
       axiSlaveRegisterR(axilEp, X"3C", 0, r.triggerCount);
