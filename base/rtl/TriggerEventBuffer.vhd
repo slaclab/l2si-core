@@ -219,8 +219,7 @@ begin
          v.eventHeader.pulseId     := alignedTimingMessage.pulseId;
          v.eventHeader.timeStamp   := alignedTimingMessage.timeStamp;
          v.eventHeader.count       := v.eventData.count;
-         v.eventHeader.payload     := v.eventData.payload;
-         v.eventHeader.triggerInfo := alignedXpmMessage.partitionWord(v.partitionV)(15 downto 0);  -- Fix this uglyness later
+         v.eventHeader.triggerInfo := alignedXpmMessage.partitionWord(v.partitionV)(15 downto 0);  -- Fix this uglyness later         
          v.eventHeader.partitions  := (others => '0');
          for i in 0 to 7 loop
             v.tmpEventData              := toXpmEventDataType(alignedXpmMessage.partitionWord(i));
