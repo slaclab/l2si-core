@@ -77,7 +77,7 @@ package XpmExtensionPkg is
 
    function toSlv (xpmEvent                  : XpmEventDataType) return slv;
    function toXpmEventDataType(partitionWord : slv(47 downto 0)) return XpmEventDataType;
-   function toXpmEventDataType(partitionWord : slv(47 downto 0); valid : sl) return XpmEventDataType;   
+   function toXpmEventDataType(partitionWord : slv(47 downto 0); valid : sl) return XpmEventDataType;
 
    type XpmTransitionDataType is record
       valid   : sl;
@@ -177,24 +177,24 @@ package body XpmExtensionPkg is
    function toXpmEventDataType(partitionWord : slv(47 downto 0); valid : sl) return XpmEventDataType is
       variable xpmEvent : XpmEventDataType := XPM_EVENT_DATA_INIT_C;
    begin
-      xpmEvent := toXpmEventDataType(partitionWord);
+      xpmEvent       := toXpmEventDataType(partitionWord);
       xpmEvent.valid := valid;
       return xpmEvent;
    end function;
-   
+
 
 
    function toSlv (xpmTransition : XpmTransitionDataType) return slv is
       variable vector : slv(47 downto 0) := (others => '0');
       variable i      : integer          := 0;
    begin
-      assignSlv(i, vector, "0");                       -- 0
-      assignSlv(i, vector, xpmTransition.l0Tag);       -- 5:1
-      assignSlv(i, vector, xpmTransition.header);      -- 13:6
-      assignSlv(i, vector, "0");                       -- 14
-      assignSlv(i, vector, not(xpmTransition.valid));  -- 15
-      assignSlv(i, vector, xpmTransition.count);       -- 39:16
-      assignSlv(i, vector, xpmTransition.payload);     -- 47:40
+      assignSlv(i, vector, "0");                               -- 0
+      assignSlv(i, vector, xpmTransition.l0Tag);               -- 5:1
+      assignSlv(i, vector, "00");                              -- 7:6
+      assignSlv(i, vector, xpmTransition.header(6 downto 0));  -- 14:8
+      assignSlv(i, vector, not(xpmTransition.valid));          -- 15
+      assignSlv(i, vector, xpmTransition.count);               -- 39:16
+      assignSlv(i, vector, xpmTransition.payload);             -- 47:40
       return vector;
    end function;
 
@@ -202,13 +202,14 @@ package body XpmExtensionPkg is
       variable xpmTransition : XpmTransitionDataType := XPM_TRANSITION_DATA_INIT_C;
       variable i             : integer               := 0;
    begin
-      i := i+1;
+      i := 1;
       assignRecord(i, partitionWord, xpmTransition.l0Tag);
+      i := 8;
       assignRecord(i, partitionWord, xpmTransition.header);
-      i := i+1;
 
       assignRecord(i, partitionWord, xpmTransition.valid);
       xpmTransition.valid := not xpmTransition.valid;
+
       assignRecord(i, partitionWord, xpmTransition.count);
       assignRecord(i, partitionWord, xpmTransition.payload);
       return xpmTransition;
