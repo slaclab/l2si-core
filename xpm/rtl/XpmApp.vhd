@@ -405,7 +405,7 @@ begin
                    expWord, pmaster, pdepth, paddr) is
       variable v         : RegType;
       variable tidx      : integer;
-      variable mhdr      : slv(7 downto 0);
+      variable mhdr      : slv(6 downto 0);
       variable broadcast : XpmBroadcastType;
    begin
       v             := r;
