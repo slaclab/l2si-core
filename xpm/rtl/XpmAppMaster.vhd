@@ -85,9 +85,6 @@ architecture rtl of XpmAppMaster is
    signal rin : RegType;
 
    signal msgConfig   : XpmPartMsgConfigType;
-   signal messageDin  : slv(msgConfig.hdr'length+msgConfig.payload'length-1 downto 0);
-   signal messageDout : slv(msgConfig.hdr'length+msgConfig.payload'length-1 downto 0);
-   signal msgWr       : sl;
    signal msgRdCount  : slv(3 downto 0);
 
    --  feedback data from sensor links
@@ -134,7 +131,7 @@ begin
             probe0(2)             => fiducial,
             probe0(3)             => timingBus_valid,
             probe0(4)             => config.message.insert,
-            probe0(5)             => msgWr,
+            probe0(5)             => '0',
             probe0(6)             => r.insertMsg,
             probe0(7)             => r.strobeMsg,
             probe0(15 downto 8)   => l0Tag (7 downto 0),
@@ -254,35 +251,23 @@ begin
    --             rdvalid        => status.anaRd,
    --             tag            => analysisTag );
 
-   messageDin        <= config.message.payload & config.message.hdr;
-   msgConfig.hdr     <= messageDout(config.message.hdr'range);
-   msgConfig.payload <= messageDout(config.message.payload'left+config.message.hdr'length downto config.message.hdr'length);
-
-   U_LatchMsg : entity surf.SynchronizerOneShot
-      generic map (
-         TPD_G => TPD_G)
-      port map (
-         clk     => regClk,
-         dataIn  => config.message.insert,
-         dataOut => msgWr);
-
    U_SyncMsgPayload : entity surf.FifoAsync
       generic map (
          TPD_G        => TPD_G,
-         DATA_WIDTH_G => messageDin'length,
+         DATA_WIDTH_G => config.message.header'length,
          ADDR_WIDTH_G => 4,
          FWFT_EN_G    => true)
       port map (
          rst           => timingRst,
          wr_clk        => regClk,
-         wr_en         => msgWr,
-         din           => messageDin,
+         wr_en         => config.message.insert,
+         din           => config.message.header,
          --
          rd_clk        => timingClk,
          rd_en         => r.strobeMsg,
          rd_data_count => msgRdCount,
          valid         => msgConfig.insert,
-         dout          => messageDout);
+         dout          => msgConfig.header);
 
    U_SyncReset : entity surf.RstSync
       generic map (
@@ -319,8 +304,7 @@ begin
             v.strobeMsg := '1';
             msg.valid   := '1';
             msg.l0tag   := l0Tag(msg.l0tag'range);
-            msg.header  := msgConfig.hdr;
-            msg.payload := msgConfig.payload;
+            msg.header  := msgConfig.header(6 downto 0);
             msg.count   := l0Tag(msg.count'range);
             v.result    := toSlv(msg);
          else

@@ -219,8 +219,7 @@ begin
       axiSlaveRegister (ep, X"048", 16, v.config.partition.pipeline.depth_fids);
 
       axiSlaveRegister (ep, X"04C", 15, v.config.partition.message.insert);
-      axiSlaveRegister (ep, X"04C", 0, v.config.partition.message.hdr);
-      axiSlaveRegister (ep, X"050", 0, v.config.partition.message.payload);
+      axiSlaveRegister (ep, X"04C", 0, v.config.partition.message.header);
 
       -- Set the status
       axiSlaveDefault(ep, v.axilWriteSlave, v.axilReadSlave);

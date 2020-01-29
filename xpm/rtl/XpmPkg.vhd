@@ -266,14 +266,12 @@ package XpmPkg is
       setup => (others => XPM_INHIBIT_CONFIG_INIT_C));
 
    type XpmPartMsgConfigType is record
-      insert  : sl;
-      hdr     : slv(7 downto 0);
-      payload : slv(7 downto 0);
+      insert : sl;
+      header : slv(7 downto 0);
    end record;
    constant XPM_PART_MSG_CONFIG_INIT_C : XpmPartMsgConfigType := (
-      insert  => '0',
-      hdr     => (others => '0'),
-      payload => (others => '0'));
+      insert => '0',
+      header => (others => '0'));
 
    --  Clear event header -> event data match fifos
    constant MSG_CLEAR_FIFO  : slv(7 downto 0) := toSlv(0, 8);
