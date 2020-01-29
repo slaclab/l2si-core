@@ -526,12 +526,12 @@ begin
       v.groupLinkClear := (others => '0');
       if r.msgComplete = '1' and r.msg(15) = '0' then
          mhdr := toXpmTransitionDataType(r.msg).header;
-         case (mhdr(7 downto 6)) is
+         case (mhdr(6 downto 5)) is
             when "00" =>                -- Transition
                null;
             when "01" =>                -- Occurrence
-               case (mhdr(5 downto 0)) is
-                  when "000000" =>      -- ClearReadout
+               case (mhdr(4 downto 0)) is
+                  when "00000" =>      -- ClearReadout
                      v.groupLinkClear(r.msgGroup) := '1';
                   when others => null;
                end case;
