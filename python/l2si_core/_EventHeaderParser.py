@@ -1,4 +1,5 @@
-
+import ctypes
+import struct
 
 def getField(value, highBit, lowBit):
     mask = 2**(highBit-lowBit+1)-1
