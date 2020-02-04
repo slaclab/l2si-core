@@ -55,6 +55,7 @@ entity XpmAppMaster is
       advance    : in  slv (2 downto 0);
       fiducial   : in  sl;
       full       : in  slv (26 downto 0);
+      overflow   : in  slv(26 downto 0);
       l1Feedback : in  XpmL1FeedbackArray (NUM_DS_LINKS_G-1 downto 0) := (others => XPM_L1_FEEDBACK_INIT_C);
       result     : out slv (47 downto 0));
 end XpmAppMaster;
@@ -84,13 +85,13 @@ architecture rtl of XpmAppMaster is
    signal r   : RegType := REG_INIT_C;
    signal rin : RegType;
 
-   signal msgConfig   : XpmPartMsgConfigType;
-   signal msgRdCount  : slv(3 downto 0);
+   signal msgConfig  : XpmPartMsgConfigType;
+   signal msgRdCount : slv(3 downto 0);
 
    --  feedback data from sensor links
    --  L0 inhibit decision
-   signal l0Reset : sl;
-   signal inhibit : sl;
+   signal l0Reset       : sl;
+   signal inhibit       : sl;
    --  L0 trigger output
    signal l0Accept      : sl;
    signal l0Reject      : sl;
@@ -114,6 +115,8 @@ architecture rtl of XpmAppMaster is
    signal cuRx_delayOverflow : sl;
 
    signal depth_clks_20 : slv(19 downto 0);
+
+   signal fullOrOverflow : slv(26 downto 0);
 
    component ila_0
       port (clk    : in sl;
@@ -177,6 +180,7 @@ begin
          valid_o    => cuRx_valid,
          overflow_o => cuRx_delayOverflow);
 
+   fullOrOverflow <= full or overflow;
    U_Inhibit : entity l2si_core.XpmInhibit
       generic map (
          TPD_G => TPD_G)
@@ -189,7 +193,7 @@ begin
          --
          clk               => timingClk,
          rst               => timingRst,
-         full(26 downto 0) => full,
+         full(26 downto 0) => fullOrOverflow,
          full(27)          => r.insertMsg,
          fiducial          => fiducial,
          l0Accept          => l0Accept,

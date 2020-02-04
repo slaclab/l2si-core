@@ -91,6 +91,8 @@ architecture top_level_app of XpmApp is
    type RegType is record
       full           : LinkFullArray (XPM_PARTITIONS_C-1 downto 0);
       fullfb         : slv (XPM_PARTITIONS_C-1 downto 0);
+      overflow       : LinkFullArray (XPM_PARTITIONS_C-1 downto 0);
+      overflowfb     : slv (XPM_PARTITIONS_C-1 downto 0);
       l1feedback     : LinkL1InpArray(XPM_PARTITIONS_C-1 downto 0);
       fiducial       : sl;
       source         : sl;
@@ -113,6 +115,8 @@ architecture top_level_app of XpmApp is
    constant REG_INIT_C : RegType := (
       full           => (others => (others => '0')),
       fullfb         => (others => '0'),
+      overflow       => (others => (others => '0')),
+      overflowfb     => (others => '0'),
       l1feedback     => (others => (others => XPM_L1_FEEDBACK_INIT_C)),
       fiducial       => '0',
       source         => '1',
@@ -144,6 +148,7 @@ architecture top_level_app of XpmApp is
    signal l1Feedback    : L1FeedbackArray(NUM_DS_LINKS_G-1 downto 0);
    signal isXpm         : slv (NUM_DS_LINKS_G-1 downto 0);
    signal dsFull        : FullArray (NUM_DS_LINKS_G-1 downto 0);
+   signal dsOverflow    : FullArray (NUM_DS_LINKS_G-1 downto 0);
    signal dsRxRcvs      : Slv32Array (NUM_DS_LINKS_G-1 downto 0);
    signal dsId          : Slv32Array (NUM_DS_LINKS_G-1 downto 0);
    signal bpRxLinkFullS : Slv16Array (NUM_BP_LINKS_G-1 downto 0);
@@ -161,6 +166,7 @@ architecture top_level_app of XpmApp is
    signal pdepth               : Slv8Array (XPM_PARTITIONS_C-1 downto 0);
    signal expWord              : Slv48Array(XPM_PARTITIONS_C-1 downto 0);
    signal fullfb               : slv (XPM_PARTITIONS_C-1 downto 0);
+   signal overflowfb           : slv (XPM_PARTITIONS_C-1 downto 0);
    signal paddr                : slv (XPM_PARTITION_ADDR_LENGTH_C-1 downto 0);
 begin
 
@@ -215,6 +221,16 @@ begin
          dataIn  => r.fullfb,
          dataOut => fullfb);
 
+   U_overflowFb : entity surf.SynchronizerVector
+      generic map (
+         TPD_G   => TPD_G,
+         WIDTH_G => fullfb'length)
+      port map (
+         clk     => timingFbClk,
+         dataIn  => r.overflowfb,
+         dataOut => overflowfb);
+
+
    U_GroupClear : entity surf.SynchronizerOneShotVector
       generic map (
          TPD_G   => TPD_G,
@@ -231,6 +247,7 @@ begin
          id                 => timingFbId,
          detectorPartitions => (others => (others => '0')),
          full               => fullfb,
+         overflow           => overflowfb,
          l1feedbacks        => (others => XPM_L1_FEEDBACK_INIT_C),
          phy                => timingFb);
 
@@ -261,7 +278,7 @@ begin
             rst        => timingRst,
             config     => config.dsLink(i),
             full       => dsFull (i),
-            overflow   => open,
+            overflow   => dsOverflow(i),
             l1Feedback => l1Feedback (i),
             rxClk      => dsRxClk (i),
             rxRst      => dsRxRst (i),
@@ -370,9 +387,10 @@ begin
             streamIds  => streamIds,
             advance    => timingStream.advance,
             fiducial   => timingStream.fiducial,
-            full       => r.full       (i),
+            full       => r.full (i),
+            overflow   => r.overflow(i),
             l1Feedback => r.l1feedback (i),
-            result     => expWord      (i));
+            result     => expWord (i));
 
       U_SyncMaster : entity surf.Synchronizer
          generic map(
@@ -400,9 +418,8 @@ begin
    --
    -- timingStream carries its own 'advance' signal as well as fiducial.
    -- 
-   comb : process (r, timingRst, dsFull, bpRxLinkFullS, l1Feedback,
-                   timingStream, fstreams, advance,
-                   expWord, pmaster, pdepth, paddr) is
+   comb : process (advance, bpRxLinkFullS, dsFull, dsOverflow, expWord, fstreams, l1Feedback, paddr,
+                   pdepth, pmaster, r, timingRst, timingStream) is
       variable v         : RegType;
       variable tidx      : integer;
       variable mhdr      : slv(6 downto 0);
@@ -413,9 +430,9 @@ begin
       v.msgComplete := '0';
 
       if timingStream.fiducial = '1' then
-        v.fiducial := '1';
+         v.fiducial := '1';
       elsif timingStream.advance(0) = '1' then
-        v.fiducial := '0';
+         v.fiducial := '0';
       end if;
 
       case r.state is
@@ -511,6 +528,7 @@ begin
       for i in 0 to XPM_PARTITIONS_C-1 loop
          for j in 0 to NUM_DS_LINKS_G-1 loop
             v.full (i)(j)      := dsFull (j)(i);
+            v.overflow(i)(j)   := dsOverflow(j)(i);
             v.l1feedback(i)(j) := l1Feedback(j)(i);
          end loop;
          for j in 0 to NUM_BP_LINKS_G-1 loop
@@ -520,6 +538,10 @@ begin
             v.fullfb(i) := '1';
          else
             v.fullfb(i) := '0';
+         end if;
+
+         if (pmaster(i) = '0' and v.overflow(i) /= 0) then
+            v.overflowfb(i) := '1';
          end if;
       end loop;
 
@@ -531,7 +553,7 @@ begin
                null;
             when "01" =>                -- Occurrence
                case (mhdr(4 downto 0)) is
-                  when "00000" =>      -- ClearReadout
+                  when "00000" =>       -- ClearReadout
                      v.groupLinkClear(r.msgGroup) := '1';
                   when others => null;
                end case;
@@ -550,7 +572,7 @@ begin
 
       ostreams           <= fstreams;
       ostreams(2)        <= r.stream;
-      ostreams(2).offset <= toSlv(0,7);
+      ostreams(2).offset <= toSlv(0, 7);
       ostreams(2).last   <= '1';
 
    end process;
