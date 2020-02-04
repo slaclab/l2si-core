@@ -184,16 +184,10 @@ begin
       -- Output on triggerData interface
       --------------------------------------------
       v.triggerData.valid := '0';
-      if (promptTimingStrobe = '1' and promptXpmMessage.valid = '1') then
+      if (promptTimingStrobe = '1' and promptXpmMessage.valid = '1' and r.enable = '1') then
          v.triggerData := toXpmEventDataType(promptXpmMessage.partitionWord(v.partitionV));
          if (v.triggerData.valid = '1' and v.triggerData.l0Accept = '1') then
             v.triggerCount := r.triggerCount + 1;
-         end if;
-
-         -- Gate output valid if disabled by configuration
-         if (r.enable = '0') then
-            v.triggerData.valid := '0';
-
          end if;
       end if;
 
