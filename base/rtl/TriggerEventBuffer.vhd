@@ -94,6 +94,7 @@ architecture rtl of TriggerEventBuffer is
       l0Count           : slv(31 downto 0);
       l1AcceptCount     : slv(31 downto 0);
       l1RejectCount     : slv(31 downto 0);
+      resetCounters     : sl;
 
       fifoAxisMaster : AxiStreamMasterType;
 
@@ -128,6 +129,7 @@ architecture rtl of TriggerEventBuffer is
       l0Count         => (others => '0'),
       l1AcceptCount   => (others => '0'),
       l1RejectCount   => (others => '0'),
+      resetCounters   => '0',
 
       fifoAxisMaster => axiStreamMasterInit(EVENT_AXIS_CONFIG_C),
       -- outputs     =>
@@ -276,6 +278,14 @@ begin
          end if;
       end if;
 
+      v.resetCounters := '0';           -- Pulsed for 1 cycle
+      if (r.resetCounters = '1') then
+         v.l0Count       := (others => '0');
+         v.l1AcceptCount := (others => '0');
+         v.l1RejectCount := (others => '0');
+         v.validCount    := (others => '0');
+         v.triggerCount  := (others => '0');
+      end if;
 
       --------------------------------------------
       -- Axi lite interface
@@ -302,6 +312,7 @@ begin
       axiSlaveRegisterR(axilEp, X"3C", 0, r.triggerCount);
       axiSlaveRegisterR(axilEp, X"40", 0, alignedXpmMessage.partitionAddr);
       axiSlaveRegisterR(axilEp, X"44", 0, alignedXpmMessage.partitionWord(0));
+      axiSlaveRegister(axilEp, X"4C", 0, v.resetCounters);
 
       axiSlaveDefault(axilEp, v.axilWriteSlave, v.axilReadSlave, AXI_RESP_DECERR_C);
 

@@ -231,7 +231,8 @@ class XpmMini(pr.Device):
             offset       = 0x4C,
             bitSize      = 1,
             bitOffset    = 15,
-            mode         = 'RW',
+            mode         = 'WO',
+            hidden       = True,
         )) 
         
         self.add(pr.RemoteVariable( 
@@ -240,13 +241,12 @@ class XpmMini(pr.Device):
             bitSize      = 8,
             bitOffset    = 0,
             mode         = 'RW',
+            hidden       = True,
         )) 
         
-        self.add(pr.RemoteVariable( 
-            name         = "PartitionMessage_Payload",
-            offset       = 0x50,
-            bitSize      = 8,
-            bitOffset    = 0,
-            mode         = 'RW',
-        )) 
         
+        @self.command()
+        def SendTransition(arg):
+            self.PartitionMessage_Hdr.set(arg)
+            self.PartitionMessage_Insert.set(1)
+            
