@@ -193,11 +193,10 @@ class TriggerEventBuffer(pr.Device):
             mode        = 'RO',
         ))
 
-#         self.add(pr.RemoteVariable(
-#             name = "MessageDelay2",
-#             offset = 0x28,
-#             bitSize = 64,
-#             mode = "RO",
-#             hidden = True,
-#             disp = '{:d}'))
+        self.add(pr.RemoteCommand(
+            name = 'ResetCounters',
+            offset = 0x4C,
+            bitSize = 1,
+            bitOffset = 0,
+            function = pr.RemoteCommand.touchOne))
         
