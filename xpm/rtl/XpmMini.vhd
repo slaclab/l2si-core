@@ -68,6 +68,7 @@ architecture top_level_app of XpmMini is
    type StateType is (IDLE_S, INIT_S, SLAVE_S, PADDR_S, EWORD_S, EOS_S);
    type RegType is record
       full        : LinkFullArray (XPM_PARTITIONS_C-1 downto 0);
+      overflow    : LinkFullArray (XPM_PARTITIONS_C-1 downto 0);
       l1feedback  : LinkL1InpArray(XPM_PARTITIONS_C-1 downto 0);
       fiducial    : sl;
       paddr       : slv(XPM_PARTITION_ADDR_LENGTH_C-1 downto 0);  -- platform address
@@ -83,6 +84,7 @@ architecture top_level_app of XpmMini is
    end record;
    constant REG_INIT_C : RegType := (
       full        => (others => (others => '0')),
+      overflow    => (others => (others => '0')),
       l1feedback  => (others => (others => XPM_L1_FEEDBACK_INIT_C)),
       fiducial    => '0',
       paddr       => (others => '1'),
@@ -110,19 +112,20 @@ architecture top_level_app of XpmMini is
    signal isXpm         : slv (NUM_DS_LINKS_G-1 downto 0);
    signal rxErr         : slv (NUM_DS_LINKS_G-1 downto 0);
    signal dsFull        : FullArray (NUM_DS_LINKS_G-1 downto 0);
+   signal dsOverflow    : FullArray (NUM_DS_LINKS_G-1 downto 0);
    signal dsRxRcvs      : Slv32Array (NUM_DS_LINKS_G-1 downto 0);
    signal dsId          : Slv32Array (NUM_DS_LINKS_G-1 downto 0);
    signal bpRxLinkFullS : Slv16Array (NUM_BP_LINKS_G-1 downto 0);
    signal linkConfig    : XpmLinkConfigArray(NUM_DS_LINKS_G-1 downto 0);
 
-   signal fstreams             : TimingSerialArray(NSTREAMS_C-1 downto 0);
-   signal ostreams             : TimingSerialArray(NSTREAMS_C-1 downto 0);
-   signal streamIds            : Slv4Array (NSTREAMS_C-1 downto 0)       := (x"1", x"2", x"0");
-   signal fiducial             : sl;
-   signal advance              : slv (NSTREAMS_C-1 downto 0);
-   signal pdepthI              : slv(7 downto 0);
-   signal pdepth               : Slv8Array (XPM_PARTITIONS_C-1 downto 0) := (others => (others => '0'));
-   signal expWord              : Slv48Array(XPM_PARTITIONS_C-1 downto 0) := (others => toSlv(XPM_TRANSITION_DATA_INIT_C));
+   signal fstreams  : TimingSerialArray(NSTREAMS_C-1 downto 0);
+   signal ostreams  : TimingSerialArray(NSTREAMS_C-1 downto 0);
+   signal streamIds : Slv4Array (NSTREAMS_C-1 downto 0)       := (x"1", x"2", x"0");
+   signal fiducial  : sl;
+   signal advance   : slv (NSTREAMS_C-1 downto 0);
+   signal pdepthI   : slv(7 downto 0);
+   signal pdepth    : Slv8Array (XPM_PARTITIONS_C-1 downto 0) := (others => (others => '0'));
+   signal expWord   : Slv48Array(XPM_PARTITIONS_C-1 downto 0) := (others => toSlv(XPM_TRANSITION_DATA_INIT_C));
 
 begin
 
@@ -179,6 +182,7 @@ begin
             rst        => timingRst,
             config     => linkConfig(i),
             full       => dsFull(i),
+            overflow   => dsOverflow(i),
             l1Feedback => l1Feedback(i),
             rxClk      => dsRxClk(i),
             rxRst      => dsRxRst(i),
@@ -210,18 +214,18 @@ begin
             DATA_WIDTH_G => 17,
             FWFT_EN_G    => true)
          port map (
-           clk               => timingClk,
-           rst               => rin.streamReset,
-           wr_en             => timingStream.advance(i),
-           din(15 downto 0)  => timingStream.streams(i).data,
-           din(16)           => r.fiducial,
-           rd_en             => advance (i),
-           dout(15 downto 0) => fstreams(i).data,
-           dout(16)          => fiducial,
-           valid             => fstreams(i).ready,
-           full              => open);
-      fstreams(i).offset      <= timingStream.streams(i).offset;
-      fstreams(i).last        <= timingStream.streams(i).last;
+            clk               => timingClk,
+            rst               => rin.streamReset,
+            wr_en             => timingStream.advance(i),
+            din(15 downto 0)  => timingStream.streams(i).data,
+            din(16)           => r.fiducial,
+            rd_en             => advance (i),
+            dout(15 downto 0) => fstreams(i).data,
+            dout(16)          => fiducial,
+            valid             => fstreams(i).ready,
+            full              => open);
+      fstreams(i).offset <= timingStream.streams(i).offset;
+      fstreams(i).last   <= timingStream.streams(i).last;
    end generate;
 
    U_Master : entity l2si_core.XpmAppMaster
@@ -239,9 +243,10 @@ begin
          streamIds  => streamIds,
          advance    => timingStream.advance,
          fiducial   => timingStream.fiducial,
-         full       => r.full      (0),
+         full       => r.full(0),
+         overflow   => r.overflow(0),
          l1Feedback => r.l1feedback(0),
-         result     => expWord     (0));
+         result     => expWord(0));
 
    --
    --  Actual delay is 1 greater than configuration
@@ -265,18 +270,18 @@ begin
    pdepth(2) <= pdepth(0);
    pdepth(1) <= pdepth(0);
 
-   comb : process (advance, dsFull, expWord, fstreams, l1Feedback, pdepth, r, timingRst,
+   comb : process (advance, dsFull, dsOverflow, expWord, fstreams, l1Feedback, pdepth, r, timingRst,
                    timingStream) is
       variable v    : RegType;
       variable tidx : integer;
 --      constant pd   : XpmBroadcastType := PDELAY;
    begin
-      v          := r;
+      v := r;
 
       if timingStream.fiducial = '1' then
-        v.fiducial := '1';
+         v.fiducial := '1';
       elsif timingStream.advance(0) = '1' then
-        v.fiducial := '0';
+         v.fiducial := '0';
       end if;
 
       case r.state is
@@ -328,7 +333,8 @@ begin
 
       for i in 0 to XPM_PARTITIONS_C-1 loop
          for j in 0 to NUM_DS_LINKS_G-1 loop
-            v.full (i)(j)      := dsFull (j)(i);
+            v.full(i)(j)       := dsFull (j)(i);
+            v.overflow(i)(j)   := dsOverflow (j)(i);
             v.l1feedback(i)(j) := l1Feedback(j)(i);
          end loop;
       end loop;
