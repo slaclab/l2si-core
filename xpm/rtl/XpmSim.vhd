@@ -1,26 +1,15 @@
 -------------------------------------------------------------------------------
--- Title      : 
--------------------------------------------------------------------------------
--- File       : XpmSim.vhd
--- Author     : Matt Weaver <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
--- Created    : 2015-07-10
--- Last update: 2019-12-09
--- Platform   : 
--- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
--- Description: XpmApp's Top Level
--- 
--- Note: Common-to-XpmApp interface defined here (see URL below)
---       https://confluence.slac.stanford.edu/x/rLyMCw
+-- Description: 
 -------------------------------------------------------------------------------
--- This file is part of 'LCLS2 DAQ Software'.
--- It is subject to the license terms in the LICENSE.txt file found in the 
--- top-level directory of this distribution and at: 
---    https://confluence.slac.stanford.edu/display/ppareg/LICENSE.html. 
--- No part of 'LCLS2 DAQ Software', including this file, 
--- may be copied, modified, propagated, or distributed except according to 
--- the terms contained in the LICENSE.txt file.
+-- This file is part of 'L2SI Core'. It is subject to
+-- the license terms in the LICENSE.txt file found in the top-level directory
+-- of this distribution and at:
+--    https://confluence.slac.stanford.edu/display/ppareg/LICENSE.html.
+-- No part of 'L2SI Core', including this file, may be
+-- copied, modified, propagated, or distributed except according to the terms
+-- contained in the LICENSE.txt file.
 -------------------------------------------------------------------------------
 
 library ieee;
@@ -30,14 +19,20 @@ use ieee.std_logic_unsigned.all;
 use STD.textio.all;
 use ieee.std_logic_textio.all;
 
-use work.StdRtlPkg.all;
-use work.TimingExtnPkg.all;
-use work.TimingPkg.all;
-use work.TPGPkg.all;
-use work.XpmPkg.all;
-use work.XpmMiniPkg.all;
-use work.AxiLitePkg.all;
-use work.AxiStreamPkg.all;
+
+library surf;
+use surf.StdRtlPkg.all;
+
+library lcls_timing_core;
+use lcls_timing_core.TimingExtnPkg.all;
+use lcls_timing_core.TimingPkg.all;
+use lcls_timing_core.TPGPkg.all;
+
+library l2si_core;
+use l2si_core.XpmPkg.all;
+use l2si_core.XpmMiniPkg.all;
+use surf.AxiLitePkg.all;
+use surf.AxiStreamPkg.all;
  
 library unisim;
 use unisim.vcomponents.all;
@@ -133,7 +128,7 @@ begin
   dsTxRst <= (others=>recTimingRst);
   bpTxClk <= recTimingClk;
   
-  U_TPG : entity work.TPGMini
+  U_TPG : entity lcls_timing_core.TPGMini
     port map ( txClk    => recTimingClk,
                txRst    => recTimingRst,
                txRdy    => '1',
@@ -263,7 +258,7 @@ begin
      wait;
    end process;
 
-   U_SimSerializer : entity work.TimingSerializer
+   U_SimSerializer : entity lcls_timing_core.TimingSerializer
      generic map ( STREAMS_C => xData.streams'length )
      port map ( clk       => recTimingClk,
                 rst       => recTimingRst,
@@ -274,7 +269,7 @@ begin
                 data      => open,
                 dataK     => open );
      
-   U_Application : entity work.XpmApp
+   U_Application : entity l2si_core.XpmApp
       generic map ( NDsLinks => linkStatus'length,
                     NBpLinks => bpRxLinkUp'length )
       port map (
