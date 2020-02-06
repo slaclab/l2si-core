@@ -32,21 +32,6 @@ package XpmMiniPkg is
    -----------------------------------------------------------
    -- Application: Configurations, Constants and Records Types
    -----------------------------------------------------------
-
-   -- This doesn't belong here but not sure where to move it
-   constant NSTREAMS_C : integer := 3;
-
-   type XpmMiniStreamType is record
-      fiducial : sl;
-      streams  : TimingSerialArray(NSTREAMS_C-1 downto 0);
-      advance  : slv (NSTREAMS_C-1 downto 0);
-   end record;
-
-   constant XPM_MINI_STREAM_INIT_C : XpmMiniStreamType := (
-      fiducial => '0',
-      streams  => (others => TIMING_SERIAL_INIT_C),
-      advance  => (others => '0'));
-
    type XpmMiniPartitionStatusType is record
       l0Select : XpmL0SelectStatusType;
    end record;

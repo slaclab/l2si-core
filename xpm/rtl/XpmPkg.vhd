@@ -21,6 +21,9 @@ use ieee.std_logic_arith.all;
 library surf;
 use surf.StdRtlPkg.all;
 
+library lcls_timing_core;
+use lcls_timing_core.TimingPkg.all;
+
 package XpmPkg is
 
    -----------------------------------------------------------
@@ -37,6 +40,20 @@ package XpmPkg is
    constant XPM_NUM_TAG_BYTES_C   : integer := 4;
    constant XPM_NUM_L1_TRIGGERS_C : integer := 1;
    constant XPM_LCTR_DEPTH_C      : integer := 40;
+
+   -- This doesn't belong here but not sure where to move it
+   constant NSTREAMS_C : integer := 3;
+
+   type XpmStreamType is record
+      fiducial : sl;
+      streams  : TimingSerialArray(NSTREAMS_C-1 downto 0);
+      advance  : slv (NSTREAMS_C-1 downto 0);
+   end record;
+
+   constant XPM_STREAM_INIT_C : XpmStreamType := (
+      fiducial => '0',
+      streams  => (others => TIMING_SERIAL_INIT_C),
+      advance  => (others => '0'));
 
    type XpmTxSerialType is record
       data  : slv(15 downto 0);
