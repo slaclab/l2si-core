@@ -1,13 +1,5 @@
 -------------------------------------------------------------------------------
--- Title      : 
--------------------------------------------------------------------------------
--- File       : SeqReset.vhd
--- Author     : Matt Weaver  <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
--- Created    : 2015-09-15
--- Last update: 2016-04-13
--- Platform   : 
--- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
 -- Description: Calculates automated jumps in sequencer instruction RAM.
 --   Reacts to BCS fault state change, MPS state change, and manual reset.
@@ -15,28 +7,32 @@
 --   Any state change that isn't acted upon because of a higher priority reaction
 --   will be enacted on the following cycle.
 -------------------------------------------------------------------------------
--- This file is part of 'LCLS2 Timing Core'.
--- It is subject to the license terms in the LICENSE.txt file found in the 
--- top-level directory of this distribution and at: 
---    https://confluence.slac.stanford.edu/display/ppareg/LICENSE.html. 
--- No part of 'LCLS2 Timing Core', including this file, 
--- may be copied, modified, propagated, or distributed except according to 
--- the terms contained in the LICENSE.txt file.
+-- This file is part of 'L2SI Core'. It is subject to
+-- the license terms in the LICENSE.txt file found in the top-level directory
+-- of this distribution and at:
+--    https://confluence.slac.stanford.edu/display/ppareg/LICENSE.html.
+-- No part of 'L2SI Core', including this file, may be
+-- copied, modified, propagated, or distributed except according to the terms
+-- contained in the LICENSE.txt file.
 -------------------------------------------------------------------------------
 LIBRARY ieee;
-use work.all;
-
 USE ieee.std_logic_1164.ALL;
 use ieee.std_logic_arith.all;
 use ieee.std_logic_unsigned.all;
+
 library UNISIM;
 use UNISIM.VCOMPONENTS.ALL;
-use work.TimingPkg.all;
-use work.TPGPkg.all;
-use work.StdRtlPkg.all;
+
+library lcls_timing_core;
+use lcls_timing_core.TimingPkg.all;
+use lcls_timing_core.TPGPkg.all;
+
+library surf;
+use surf.StdRtlPkg.all;
 
 entity SeqReset is
-   generic ( TPD_G : time := 1 ns);
+   generic (
+      TPD_G : time := 1 ns);
    port ( 
       -- Clock and reset
       clk                : in  sl;
@@ -69,7 +65,7 @@ begin
 
   resetO <= rin.resetO;
   
-  comb: process (r, config, resetReq, strobe, frame)
+  comb: process (config, frame, r, resetReq, strobe)
      variable v : RegType;
      variable rateSel : sl;
   begin  -- process

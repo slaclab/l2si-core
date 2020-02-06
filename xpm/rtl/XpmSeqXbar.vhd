@@ -1,23 +1,15 @@
 -------------------------------------------------------------------------------
--- Title      : 
--------------------------------------------------------------------------------
--- File       : XpmSeqXbar.vhd
--- Author     : Matt Weaver  <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
--- Created    : 2015-09-25
--- Last update: 2018-03-24
--- Platform   : 
--- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
 -- Description: 
 -------------------------------------------------------------------------------
--- This file is part of 'LCLS2 Timing Core'.
--- It is subject to the license terms in the LICENSE.txt file found in the 
--- top-level directory of this distribution and at: 
---    https://confluence.slac.stanford.edu/display/ppareg/LICENSE.html. 
--- No part of 'LCLS2 Timing Core', including this file, 
--- may be copied, modified, propagated, or distributed except according to 
--- the terms contained in the LICENSE.txt file.
+-- This file is part of 'L2SI Core'. It is subject to
+-- the license terms in the LICENSE.txt file found in the top-level directory
+-- of this distribution and at:
+--    https://confluence.slac.stanford.edu/display/ppareg/LICENSE.html.
+-- No part of 'L2SI Core', including this file, may be
+-- copied, modified, propagated, or distributed except according to the terms
+-- contained in the LICENSE.txt file.
 -------------------------------------------------------------------------------
 
 library ieee;
@@ -25,10 +17,16 @@ use ieee.std_logic_1164.all;
 use ieee.std_logic_unsigned.all;
 use ieee.std_logic_arith.all;
 
-use work.StdRtlPkg.all;
-use work.AxiLitePkg.all;
-use work.TPGPkg.all;
-use work.XpmSeqPkg.all;
+
+library surf;
+use surf.StdRtlPkg.all;
+use surf.AxiLitePkg.all;
+
+library lcls_timing_core;
+use lcls_timing_core.TPGPkg.all;
+
+library l2si_core;
+use l2si_core.XpmSeqPkg.all;
 
 entity XpmSeqXbar is
    generic (
@@ -72,7 +70,7 @@ architecture xbar of XpmSeqXbar is
 
 begin
 
-  U_AxiLiteAsync : entity work.AxiLiteAsync
+  U_AxiLiteAsync : entity surf.AxiLiteAsync
     generic map (
       TPD_G => TPD_G)
     port map (
@@ -92,7 +90,7 @@ begin
    --------------------------
    -- AXI-Lite: Crossbar Core
    --------------------------  
-   U_XBAR : entity work.AxiLiteCrossbar
+   U_XBAR : entity surf.AxiLiteCrossbar
       generic map (
          TPD_G              => TPD_G,
          NUM_SLAVE_SLOTS_G  => 1,
@@ -110,7 +108,7 @@ begin
          mAxiReadMasters     => mAxilReadMasters,
          mAxiReadSlaves      => mAxilReadSlaves);
 
-   U_SeqJumpReg : entity work.XpmSeqJumpReg
+   U_SeqJumpReg : entity l2si_core.XpmSeqJumpReg
       port map (
          axiReadMaster  => mAxilReadMasters (SEQJUMP_INDEX_C),
          axiReadSlave   => mAxilReadSlaves  (SEQJUMP_INDEX_C),
@@ -121,7 +119,7 @@ begin
          axiClk         => clk,
          axiRst         => rst);
 
-   U_SeqStateReg : entity work.XpmSeqStateReg
+   U_SeqStateReg : entity l2si_core.XpmSeqStateReg
       port map (
          axiReadMaster  => mAxilReadMasters (SEQSTATE_INDEX_C),
          axiReadSlave   => mAxilReadSlaves  (SEQSTATE_INDEX_C),
@@ -132,7 +130,7 @@ begin
          axiClk         => clk,
          axiRst         => rst);
 
-   U_SeqMemReg : entity work.XpmSeqMemReg
+   U_SeqMemReg : entity l2si_core.XpmSeqMemReg
       port map (
          axiReadMaster  => mAxilReadMasters (SEQMEM_INDEX_C),
          axiReadSlave   => mAxilReadSlaves  (SEQMEM_INDEX_C),
