@@ -52,7 +52,7 @@ entity TriggerEventManager is
       timingRxClk : in sl;
       timingRxRst : in sl;
       timingBus   : in TimingBusType;
-
+      
       -- Timing Tx Feedback
       timingTxClk : in  sl;
       timingTxRst : in  sl;
@@ -62,6 +62,7 @@ entity TriggerEventManager is
       triggerClk  : in  sl;
       triggerRst  : in  sl;
       triggerData : out TriggerEventDataArray(NUM_DETECTORS_G-1 downto 0);
+      clear       : out slv(NUM_DETECTORS_G-1 downto 0);
 
       -- L1 trigger feedback
       l1Clk       : in  sl                                                 := '0';
@@ -276,6 +277,7 @@ begin
             triggerClk           => triggerClk,                          -- [in]
             triggerRst           => triggerRst,                          -- [in]
             triggerData          => triggerData(i),                      -- [out]
+            clear                => clear(i),                            -- [out]
             eventClk             => eventClk,                            -- [in]
             eventRst             => eventRst,                            -- [in]
             eventTimingMessage   => eventTimingMessages(i),              -- [out]

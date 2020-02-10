@@ -27,9 +27,9 @@ use unisim.vcomponents.all;
 
 entity XpmLinkClocks is
    port (
-     clkP             : in  sl;
-     clkN             : in  sl;
-     clkO             : out slv(NDSLinks-1 downto 0) );
+      clkP             : in  sl;
+      clkN             : in  sl;
+      clkO             : out slv(XPM_MAX_DS_LINKS_C-1 downto 0) );
 end XpmLinkClocks;
 
 architecture rtl of XpmLinkClocks is
@@ -49,7 +49,7 @@ begin
          ODIV2 => open,
          O     => clkRef);
 
-   GEN_REFCLK: for i in 0 to NDSLinks-1 generate
+   GEN_REFCLK: for i in 0 to XPM_MAX_DS_LINKS_C-1 generate
      clkO(i) <= clkRef;
    end generate;
 end rtl;

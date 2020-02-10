@@ -19,11 +19,10 @@ use ieee.std_logic_unsigned.all;
 
 library surf;
 use surf.StdRtlPkg.all;
+use surf.AxiLitePkg.all;
 
 library lcls_timing_core;
-use lcls_timing_core.TimingExtnPkg.all;
 use lcls_timing_core.TimingPkg.all;
-use surf.AxiLitePkg.all;
 use lcls_timing_core.TPGPkg.all;
 
 library l2si_core;
@@ -55,7 +54,7 @@ architecture top_level_app of XpmMiniSim is
    signal tpgFiducial : sl;
 
    signal xpmConfig : XpmMiniConfigType := XPM_MINI_CONFIG_INIT_C;
-   signal xpmStream : XpmStreamType     := XPM_STREAM_INIT_C;
+   signal xpmStream : XpmMiniStreamType     := XPM_MINI_STREAM_INIT_C;
 
    signal dsTx : TimingPhyType := TIMING_PHY_INIT_C;
 
@@ -105,7 +104,7 @@ begin
 
    U_Xpm : entity l2si_core.XpmMini
       generic map (
-         NDsLinks => 1)
+         NUM_DS_LINKS_G => 1)
       port map (
          regclk       => timingClk,
          regrst       => timingRst,

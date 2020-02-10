@@ -25,6 +25,7 @@ use lcls_timing_core.TimingPkg.all;
 
 library l2si_core;
 use l2si_core.L2SiPkg.all;
+use l2si_core.XpmPkg.all;
 use l2si_core.XpmExtensionPkg.all;
 
 entity TriggerEventBuffer is
@@ -65,6 +66,7 @@ entity TriggerEventBuffer is
       triggerClk  : in  sl;
       triggerRst  : in  sl;
       triggerData : out TriggerEventDataType;
+      clear       : out sl;
 
       -- Event/Transition output
       eventClk           : in  sl;
@@ -88,6 +90,7 @@ architecture rtl of TriggerEventBuffer is
       triggerDelay      : slv(31 downto 0);
       overflow          : sl;
       fifoRst           : sl;
+      linkAddress       : slv(XPM_PARTITION_ADDR_LENGTH_C-1 downto 0);
       transitionCount   : slv(31 downto 0);
       validCount        : slv(31 downto 0);
       triggerCount      : slv(31 downto 0);
@@ -95,6 +98,14 @@ architecture rtl of TriggerEventBuffer is
       l1AcceptCount     : slv(31 downto 0);
       l1RejectCount     : slv(31 downto 0);
       resetCounters     : sl;
+
+      cnts              : slv(11 downto 0);
+      cntsToTrig        : slv(11 downto 0);
+      fullToTrig        : slv(11 downto 0);
+      nfullToTrig       : slv(11 downto 0);
+      afull             : sl;
+      cntOflow          : sl;
+      stable            : sl;
 
       fifoAxisMaster : AxiStreamMasterType;
 
@@ -122,7 +133,8 @@ architecture rtl of TriggerEventBuffer is
       triggerDelay      => toSlv(42, 32),
       overflow          => '0',
       fifoRst           => '0',
-
+      linkAddress       => (others => '1'),
+      
       transitionCount => (others => '0'),
       validCount      => (others => '0'),
       triggerCount    => (others => '0'),
@@ -131,6 +143,14 @@ architecture rtl of TriggerEventBuffer is
       l1RejectCount   => (others => '0'),
       resetCounters   => '0',
 
+      cnts            => (others => '0'),
+      cntsToTrig      => (others => '0'),
+      fullToTrig      => (others => '0'),
+      nfullToTrig     => (others => '1'),
+      afull           => '0',
+      cntOflow        => '0',
+      stable          => '0',
+      
       fifoAxisMaster => axiStreamMasterInit(EVENT_AXIS_CONFIG_C),
       -- outputs     =>
       triggerData    => XPM_EVENT_DATA_INIT_C,
@@ -165,8 +185,10 @@ begin
 
    comb : process (alignedTimingMessage, alignedTimingStrobe, alignedXpmMessage, axilReadMaster,
                    axilWriteMaster, fifoAxisCtrl, fifoWrCnt, promptTimingStrobe, promptXpmMessage,
+                   eventAxisCtrl,
                    r, timingRxRst) is
       variable v      : RegType;
+      variable vfull  : sl;
       variable axilEp : AxiLiteEndpointType;
    begin
       v := r;
@@ -232,6 +254,11 @@ begin
             end if;
          end if;
 
+         -- Latch the link address
+         if (toXpmBroadcastType(alignedXpmMessage.partitionAddr).btype = XPM_BROADCAST_XADDR_C) then
+            v.linkAddress := alignedXpmMessage.partitionAddr;
+         end if;
+         
          -- Special case - reset fifo, mask any tValid
          if (v.transitionData.valid = '1' and v.transitionData.header = MSG_CLEAR_FIFO_C) then
             v.overflow              := '0';
@@ -272,6 +299,29 @@ begin
          end if;
       end if;
 
+      -- Monitor time between full assertion and trigger arrival
+      v.cnts := r.cnts + 1;
+      if uAnd(r.cnts) = '1' then
+         v.cntOflow := '1';
+      end if;
+
+      vfull   := fifoAxisCtrl.pause or eventAxisCtrl.pause;
+      v.afull := vfull;
+      if vfull /= r.afull then
+         v.cnts     := (others=>'0');
+         v.cntOflow := '0';
+         v.stable   := r.cntOflow;
+         if (r.afull = '1' and r.stable = '1' and r.cntsToTrig > r.fullToTrig) then
+            v.fullToTrig := r.cntsToTrig;
+         end if;
+      elsif (r.triggerData.valid = '1' and r.triggerData.l0Accept = '1') then
+         if r.afull = '1' then
+            v.cntsToTrig := r.cnts;
+         elsif (r.stable = '1' and r.cntOflow = '0' and r.cnts < r.nfullToTrig) then
+            v.nfullToTrig := r.cnts;
+         end if;
+      end if;
+        
       v.resetCounters := '0';           -- Pulsed for 1 cycle
       if (r.resetCounters = '1') then
          v.l0Count       := (others => '0');
@@ -279,6 +329,8 @@ begin
          v.l1RejectCount := (others => '0');
          v.validCount    := (others => '0');
          v.triggerCount  := (others => '0');
+         v.fullToTrig    := (others => '0');
+         v.nfullToTrig   := (others => '1');
       end if;
 
       --------------------------------------------
@@ -295,7 +347,7 @@ begin
       axiSlaveRegisterR(axilEp, X"08", 2, fifoAxisCtrl.overflow);
       axiSlaveRegisterR(axilEp, X"08", 3, fifoWrCnt);
       axiSlaveRegister(axilEp, X"08", 16, v.fifoPauseThresh);
---      axiSlaveRegisterR(axilEp, x"0C", 0, r.messageDelay(1));
+      axiSlaveRegisterR(axilEp, x"0C", 0, r.linkAddress);
       axiSlaveRegisterR(axilEp, x"10", 0, r.l0Count);
       axiSlaveRegisterR(axilEp, x"14", 0, r.l1AcceptCount);
       axiSlaveRegisterR(axilEp, x"1C", 0, r.l1RejectCount);
@@ -307,6 +359,8 @@ begin
       axiSlaveRegisterR(axilEp, X"40", 0, alignedXpmMessage.partitionAddr);
       axiSlaveRegisterR(axilEp, X"44", 0, alignedXpmMessage.partitionWord(0));
       axiSlaveRegister(axilEp, X"4C", 0, v.resetCounters);
+      axiSlaveRegisterR(axilEp, X"50", 0, r.fullToTrig);
+      axiSlaveRegisterR(axilEp, X"54", 0, r.nfullToTrig);
 
       axiSlaveDefault(axilEp, v.axilWriteSlave, v.axilReadSlave, AXI_RESP_DECERR_C);
 
@@ -370,6 +424,14 @@ begin
             valid  => syncTriggerDataValid,     -- [out]
             dout   => syncTriggerDataSlv);      -- [out]
       triggerData <= toXpmEventDataType(syncTriggerDataSlv, syncTriggerDataValid);
+
+      U_SynchronizerClear : entity surf.Synchronizer
+         generic map (
+            TPD_G   => TPD_G )
+         port map (
+            clk        => triggerClk,
+            dataIn     => r.fifoRst,
+            dataOut    => clear );
    end generate TRIGGER_SYNC_GEN;
 
    NO_TRIGGER_SYNC_GEN : if (TRIGGER_CLK_IS_TIMING_RX_CLK_G) generate
