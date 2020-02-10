@@ -90,7 +90,6 @@ architecture rtl of TriggerEventBuffer is
       triggerDelay      : slv(31 downto 0);
       overflow          : sl;
       fifoRst           : sl;
-      linkAddress       : slv(XPM_PARTITION_ADDR_LENGTH_C-1 downto 0);
       transitionCount   : slv(31 downto 0);
       validCount        : slv(31 downto 0);
       triggerCount      : slv(31 downto 0);
@@ -133,7 +132,6 @@ architecture rtl of TriggerEventBuffer is
       triggerDelay      => toSlv(42, 32),
       overflow          => '0',
       fifoRst           => '0',
-      linkAddress       => (others => '1'),
       
       transitionCount => (others => '0'),
       validCount      => (others => '0'),
@@ -254,11 +252,6 @@ begin
             end if;
          end if;
 
-         -- Latch the link address
-         if (toXpmBroadcastType(alignedXpmMessage.partitionAddr).btype = XPM_BROADCAST_XADDR_C) then
-            v.linkAddress := alignedXpmMessage.partitionAddr;
-         end if;
-         
          -- Special case - reset fifo, mask any tValid
          if (v.transitionData.valid = '1' and v.transitionData.header = MSG_CLEAR_FIFO_C) then
             v.overflow              := '0';
@@ -341,26 +334,24 @@ begin
 
       axiSlaveRegister(axilEp, x"00", 0, v.enable);
       axiSlaveRegister(axilEp, x"00", 1, v.enableEventBuffer);
+      axiSlaveRegister(axilEp, X"00", 2, v.resetCounters);
       axiSlaveRegister(axilEp, x"04", 0, v.partition);
-      axiSlaveRegisterR(axilEp, x"08", 0, r.overflow);
-      axiSlaveRegisterR(axilEp, X"08", 1, fifoAxisCtrl.pause);
-      axiSlaveRegisterR(axilEp, X"08", 2, fifoAxisCtrl.overflow);
-      axiSlaveRegisterR(axilEp, X"08", 3, fifoWrCnt);
-      axiSlaveRegister(axilEp, X"08", 16, v.fifoPauseThresh);
-      axiSlaveRegisterR(axilEp, x"0C", 0, r.linkAddress);
-      axiSlaveRegisterR(axilEp, x"10", 0, r.l0Count);
-      axiSlaveRegisterR(axilEp, x"14", 0, r.l1AcceptCount);
+      axiSlaveRegister(axilEp, X"08", 0, v.fifoPauseThresh);
+      axiSlaveRegister(axilEp, X"0C", 0, v.triggerDelay);
+      axiSlaveRegisterR(axilEp, x"10", 0, r.overflow);
+      axiSlaveRegisterR(axilEp, X"10", 1, fifoAxisCtrl.pause);
+      axiSlaveRegisterR(axilEp, X"10", 2, fifoAxisCtrl.overflow);
+      axiSlaveRegisterR(axilEp, X"10", 3, fifoWrCnt);
+      axiSlaveRegisterR(axilEp, x"14", 0, r.l0Count);
+      axiSlaveRegisterR(axilEp, x"18", 0, r.l1AcceptCount);
       axiSlaveRegisterR(axilEp, x"1C", 0, r.l1RejectCount);
-      axiSlaveRegister(axilEp, X"20", 0, v.triggerDelay);
---      axiSlaveRegisterR(axilEp, X"28", 0, r.readDelayValue);
-      axiSlaveRegisterR(axilEp, X"34", 0, r.transitionCount);
-      axiSlaveRegisterR(axilEp, X"38", 0, r.validCount);
-      axiSlaveRegisterR(axilEp, X"3C", 0, r.triggerCount);
-      axiSlaveRegisterR(axilEp, X"40", 0, alignedXpmMessage.partitionAddr);
-      axiSlaveRegisterR(axilEp, X"44", 0, alignedXpmMessage.partitionWord(0));
-      axiSlaveRegister(axilEp, X"4C", 0, v.resetCounters);
-      axiSlaveRegisterR(axilEp, X"50", 0, r.fullToTrig);
-      axiSlaveRegisterR(axilEp, X"54", 0, r.nfullToTrig);
+      axiSlaveRegisterR(axilEp, X"20", 0, r.transitionCount);
+      axiSlaveRegisterR(axilEp, X"24", 0, r.validCount);
+      axiSlaveRegisterR(axilEp, X"28", 0, r.triggerCount);
+      axiSlaveRegisterR(axilEp, X"2C", 0, alignedXpmMessage.partitionAddr);
+      axiSlaveRegisterR(axilEp, X"30", 0, alignedXpmMessage.partitionWord(0));
+      axiSlaveRegisterR(axilEp, X"38", 0, r.fullToTrig);
+      axiSlaveRegisterR(axilEp, X"3C", 0, r.nfullToTrig);
 
       axiSlaveDefault(axilEp, v.axilWriteSlave, v.axilReadSlave, AXI_RESP_DECERR_C);
 
