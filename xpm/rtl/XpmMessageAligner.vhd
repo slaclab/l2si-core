@@ -208,7 +208,7 @@ begin
          if (broadcastMessage.btype = XPM_BROADCAST_PDELAY_C) then
             v.partitionDelays(broadcastMessage.index) := broadcastMessage.value;
          elsif (broadcastMessage.btype = XPM_BROADCAST_XADDR_C) then
-            v.linkAddress := promptXpmMessage.partitionAddr;
+            v.rxId := promptXpmMessage.partitionAddr;
          end if;
       end if;
 
@@ -230,7 +230,7 @@ begin
 
       axilWriteSlave <= r.axilWriteSlave;
       axilReadSlave  <= r.axilReadSlave;
-      xpmId          <= r.xpmId;
+      xpmId          <= r.txId;
 
       rin <= v;
    end process;
