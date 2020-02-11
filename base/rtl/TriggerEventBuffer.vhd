@@ -239,7 +239,7 @@ begin
          v.eventHeader.partitions  := (others => '0');
          for i in 0 to 7 loop
             v.tmpEventData              := toXpmEventDataType(alignedXpmMessage.partitionWord(i));
-            v.eventHeader.partitions(i) := v.tmpEventData.l0Accept and v.tmpEventData.valid;
+            v.eventHeader.partitions(i) := v.tmpEventData.l0Accept or not v.tmpEventData.valid;
          end loop;
 
          -- Place the EventHeader into an AXI-Stream transaction
