@@ -248,7 +248,7 @@ begin
          full               => fullfb,
          overflow           => overflowfb,
          l1Feedback         => l1Partitions   (XPM_PARTITIONS_C),
-         l1Acks             => l1PartitionAcks(XPM_PARTITIONS_C),
+         l1Ack              => l1PartitionAcks(XPM_PARTITIONS_C),
          phy                => timingFb);
 
    GEN_DSLINK : for i in 0 to NUM_DS_LINKS_G-1 generate
