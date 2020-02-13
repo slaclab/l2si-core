@@ -70,7 +70,7 @@ architecture rtl of XpmRxLink is
       rxRcvs     : slv(31 downto 0);
       pfull      : slv(XPM_PARTITIONS_C-1 downto 0);
       overflow   : slv(XPM_PARTITIONS_C-1 downto 0);
-      l1slv      : slv(l1FeedbackSlv'range);
+      l1slv      : slv(31 downto 0);
       l1wr       : sl;
       strobe     : slv(XPM_PARTITIONS_C-1 downto 0);
       timeout    : slv(8 downto 0);
@@ -83,7 +83,7 @@ architecture rtl of XpmRxLink is
       rxRcvs     => (others => '0'),
       pfull      => (others => '1'),
       overflow   => (others => '0'),
-      l1slv      => toSlv(XPM_L1_FEEDBACK_INIT_C),
+      l1slv      => (others => '0'),
       l1wr       => '0',
       strobe     => (others => '0'),
       timeout    => (others => '0'));
@@ -103,13 +103,13 @@ begin
       generic map (
          TPD_G        => TPD_G,
          FWFT_EN_G    => true,
-         DATA_WIDTH_G => r.l1slv'length,
+         DATA_WIDTH_G => l1FeedbackSlv'length,
          ADDR_WIDTH_G => 4)
       port map (
          rst               => rxRst,
          wr_clk            => rxClk,
          wr_en             => r.l1wr,
-         din               => r.l1slv,
+         din               => r.l1slv(l1FeedbackSlv'range),
          rd_clk            => clk,
          rd_en             => l1Ack,
          valid             => l1FeedbackValid,
@@ -208,7 +208,7 @@ begin
                v.state := IDLE_S;
             else
                v.l1slv(31 downto 16) := rxData;
-               if (toL1Feedback(v.l1slv).partition and uconfig.groupMask) /= 0 then
+               if uconfig.groupMask(conv_integer(toL1Feedback(v.l1slv).partition)) = '1' then
                   v.l1wr             := '1';
                end if;
                v.state               := PFULL_S;
