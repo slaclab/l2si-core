@@ -80,9 +80,12 @@ architecture rtl of TriggerEventBuffer is
 
    constant FIFO_ADDR_WIDTH_C : integer := 5;
 
+   type TriggerModeType is (MANUAL_TRIGGERS_S, XPM_TRIGGERS_S);
+
    type RegType is record
       enable            : sl;
       enableEventBuffer : sl;
+      mode : TriggerModeType;
       partition         : slv(2 downto 0);
       fifoPauseThresh   : slv(FIFO_ADDR_WIDTH_C-1 downto 0);
       triggerDelay      : slv(31 downto 0);
@@ -95,6 +98,7 @@ architecture rtl of TriggerEventBuffer is
       l1AcceptCount     : slv(31 downto 0);
       l1RejectCount     : slv(31 downto 0);
       resetCounters     : sl;
+      softTrigger : sl;
 
       fifoAxisMaster : AxiStreamMasterType;
 
@@ -117,6 +121,7 @@ architecture rtl of TriggerEventBuffer is
    constant REG_INIT_C : RegType := (
       enable            => '0',
       enableEventBuffer => '0',
+      mode => XPM_TRIGGERS_S,
       partition         => (others => '0'),
       fifoPauseThresh   => toslv(16, FIFO_ADDR_WIDTH_C),
       triggerDelay      => toSlv(42, 32),
@@ -130,6 +135,7 @@ architecture rtl of TriggerEventBuffer is
       l1AcceptCount   => (others => '0'),
       l1RejectCount   => (others => '0'),
       resetCounters   => '0',
+      softTrigger => '0',
 
       fifoAxisMaster => axiStreamMasterInit(EVENT_AXIS_CONFIG_C),
       -- outputs     =>
@@ -178,73 +184,109 @@ begin
       v.fifoAxisMaster.tValid := '0';
       v.streamValid           := '0';
 
-      --------------------------------------------
-      -- Trigger output logic
-      -- Watch for and decode triggers on prompt interface
-      -- Output on triggerData interface
-      --------------------------------------------
-      v.triggerData.valid := '0';
-      if (promptTimingStrobe = '1' and promptXpmMessage.valid = '1' and r.enable = '1') then
-         v.triggerData := toXpmEventDataType(promptXpmMessage.partitionWord(v.partitionV));
-         if (v.triggerData.valid = '1' and v.triggerData.l0Accept = '1') then
-            v.triggerCount := r.triggerCount + 1;
-         end if;
-      end if;
+      v.triggerData.valid    := '0';
+      v.triggerData.l0Accept := '0';
 
-      --------------------------------------------
-      -- Event/Transition logic
-      -- Watch for events/transitions on aligned interface
-      -- Place entries into FIFO
-      --------------------------------------------
-      if (alignedTimingStrobe = '1' and alignedXpmMessage.valid = '1') then
-         -- Decode event data from configured partitionWord
-         -- Decode as both event and transition and use the .valid field to determine which one to use
-         v.eventData      := toXpmEventDataType(alignedXpmMessage.partitionWord(v.partitionV));
-         v.transitionData := toXpmTransitionDataType(alignedXpmMessage.partitionWord(v.partitionV));
-
-         -- Pass on events with l0Accept
-         -- Pass on transitions
-         v.streamValid := (v.eventData.valid and v.eventData.l0Accept) or v.transitionData.valid;
-
-         -- Don't pass data through when disabled
-         if (r.enable = '0' or r.enableEventBuffer = '0') then
-            v.streamValid := '0';
-         end if;
-
-         -- Create the EventHeader from timing and event data
-         v.eventHeader.pulseId     := alignedTimingMessage.pulseId;
-         v.eventHeader.timeStamp   := alignedTimingMessage.timeStamp;
-         v.eventHeader.count       := v.eventData.count;
-         v.eventHeader.triggerInfo := alignedXpmMessage.partitionWord(v.partitionV)(15 downto 0);  -- Fix this uglyness later         
-         v.eventHeader.partitions  := (others => '0');
-         for i in 0 to 7 loop
-            v.tmpEventData              := toXpmEventDataType(alignedXpmMessage.partitionWord(i));
-            v.eventHeader.partitions(i) := v.tmpEventData.l0Accept and v.tmpEventData.valid;
-         end loop;
-
-         -- Place the EventHeader into an AXI-Stream transaction
-         if (v.streamValid = '1') then
-            if (fifoAxisCtrl.overflow = '0') then
-               v.fifoAxisMaster.tValid                                := '1';
-               v.fifoAxisMaster.tdata(EVENT_HEADER_BITS_C-1 downto 0) := toSlv(v.eventHeader);
-               v.fifoAxisMaster.tDest(0)                              := v.transitionData.valid;
-               v.fifoAxisMaster.tLast                                 := '1';
+      case r.mode is
+         when MANUAL_TRIGGERS_S =>
+            if (promptTimingStrobe = '1' and r.enable = '1') then
+               -- Latch each timing message
+               v.lastTimingMessage := promptTimingMessage;
             end if;
+
+            if (extTrigRise = '1' or r.softTrigRise = '1') then
+               -- Put out the trigger right away
+               v.triggerData.valid    := '1';
+               v.triggerData.l0Accept := '1';
+               v.triggerData.l0Tag    := r.triggerData.l0Tag + 1;
+               v.triggerData.count    := r.triggerData.count + 1;
+
+               -- And also the Event Message with timing data from the last received timing message
+               v.eventData := v.triggerData;
+
+               v.eventHeader.pulseId     := r.lastTimingMessage.pulseId;
+               v.eventHeader.timeStamp   := r.lastTimingMessage.timeStamp;
+               v.eventHeader.count       := v.eventData.count;
+               v.eventHeader.triggerInfo := (others => '0');
+               v.eventHeader.partitions  := (others => '0');
+
+               v.streamValid := r.enable and r.enableEventBuffer;
+
+            end if;
+
+
+         when XPM_TRIGGERS_S =>
+            --------------------------------------------
+            -- Trigger output logic
+            -- Watch for and decode triggers on prompt interface
+            -- Output on triggerData interface
+            --------------------------------------------
+            if (promptTimingStrobe = '1' and promptXpmMessage.valid = '1' and r.enable = '1') then
+               v.triggerData := toXpmEventDataType(promptXpmMessage.partitionWord(v.partitionV));
+               if (v.triggerData.valid = '1' and v.triggerData.l0Accept = '1') then
+                  v.triggerCount := r.triggerCount + 1;
+               end if;
+            end if;
+
+            --------------------------------------------
+            -- Event/Transition logic
+            -- Watch for events/transitions on aligned interface
+            -- Place entries into FIFO
+            --------------------------------------------
+            if (alignedTimingStrobe = '1' and alignedXpmMessage.valid = '1') then
+               -- Decode event data from configured partitionWord
+               -- Decode as both event and transition and use the .valid field to determine which one to use
+               v.eventData      := toXpmEventDataType(alignedXpmMessage.partitionWord(v.partitionV));
+               v.transitionData := toXpmTransitionDataType(alignedXpmMessage.partitionWord(v.partitionV));
+
+               -- Pass on events with l0Accept
+               -- Pass on transitions
+               v.streamValid := (v.eventData.valid and v.eventData.l0Accept) or v.transitionData.valid;
+
+               -- Don't pass data through when disabled
+               if (r.enable = '0' or r.enableEventBuffer = '0') then
+                  v.streamValid := '0';
+               end if;
+
+               -- Create the EventHeader from timing and event data
+               v.eventHeader.pulseId     := alignedTimingMessage.pulseId;
+               v.eventHeader.timeStamp   := alignedTimingMessage.timeStamp;
+               v.eventHeader.count       := v.eventData.count;
+               v.eventHeader.triggerInfo := alignedXpmMessage.partitionWord(v.partitionV)(15 downto 0);  -- Fix this uglyness later         
+               v.eventHeader.partitions  := (others => '0');
+               for i in 0 to 7 loop
+                  v.tmpEventData              := toXpmEventDataType(alignedXpmMessage.partitionWord(i));
+                  v.eventHeader.partitions(i) := v.tmpEventData.l0Accept and v.tmpEventData.valid;
+               end loop;
+
+
+               -- Special case - reset fifo, mask any tValid
+               if (v.transitionData.valid = '1' and v.transitionData.header = MSG_CLEAR_FIFO_C) then
+                  v.overflow              := '0';
+                  v.fifoRst               := '1';
+                  v.fifoAxisMaster.tValid := '0';
+               end if;
+
+
+               if (r.enable = '1') then
+                  v.validCount := r.validCount + 1;
+               end if;
+
+            end if;
+         when others => null;
+      end case;
+
+      -- Place the EventHeader into an AXI-Stream transaction
+      if (v.streamValid = '1') then
+         if (fifoAxisCtrl.overflow = '0') then
+            v.fifoAxisMaster.tValid                                := '1';
+            v.fifoAxisMaster.tdata(EVENT_HEADER_BITS_C-1 downto 0) := toSlv(v.eventHeader);
+            v.fifoAxisMaster.tDest(0)                              := v.transitionData.valid;
+            v.fifoAxisMaster.tLast                                 := '1';
          end if;
-
-         -- Special case - reset fifo, mask any tValid
-         if (v.transitionData.valid = '1' and v.transitionData.header = MSG_CLEAR_FIFO_C) then
-            v.overflow              := '0';
-            v.fifoRst               := '1';
-            v.fifoAxisMaster.tValid := '0';
-         end if;
-
-
-         if (r.enable = '1') then
-            v.validCount := r.validCount + 1;
-         end if;
-
       end if;
+
+
 
       -- Latch FIFO overflow if seen
       if (fifoAxisCtrl.overflow = '1') then
