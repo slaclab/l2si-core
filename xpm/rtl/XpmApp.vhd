@@ -85,7 +85,6 @@ end XpmApp;
 architecture top_level_app of XpmApp is
 
    type LinkFullArray is array (natural range<>) of slv(26 downto 0);
-   type LinkL1InpArray is array (natural range<>) of XpmL1FeedbackArray(NUM_DS_LINKS_G-1 downto 0);
 
    type StateType is (IDLE_S, INIT_S, SLAVE_S, PADDR_S, EWORD_S, EOS_S);
    type RegType is record
@@ -93,7 +92,6 @@ architecture top_level_app of XpmApp is
       fullfb         : slv (XPM_PARTITIONS_C-1 downto 0);
       overflow       : LinkFullArray (XPM_PARTITIONS_C-1 downto 0);
       overflowfb     : slv (XPM_PARTITIONS_C-1 downto 0);
-      l1feedback     : LinkL1InpArray(XPM_PARTITIONS_C-1 downto 0);
       fiducial       : sl;
       source         : sl;
       paddr          : slv(XPM_PARTITION_ADDR_LENGTH_C-1 downto 0);  -- platform address
@@ -117,7 +115,6 @@ architecture top_level_app of XpmApp is
       fullfb         => (others => '0'),
       overflow       => (others => (others => '0')),
       overflowfb     => (others => '0'),
-      l1feedback     => (others => (others => XPM_L1_FEEDBACK_INIT_C)),
       fiducial       => '0',
       source         => '1',
       paddr          => (others => '1'),
@@ -142,10 +139,13 @@ architecture top_level_app of XpmApp is
 
 
    --  feedback data from sensor links
-   type L1FeedbackArray is array (natural range<>) of XpmL1FeedbackArray(XPM_PARTITIONS_C-1 downto 0);
    type FullArray is array (natural range<>) of slv (XPM_PARTITIONS_C-1 downto 0);
 
-   signal l1Feedback    : L1FeedbackArray(NUM_DS_LINKS_G-1 downto 0);
+   signal l1Feedbacks     : XpmL1FeedbackArray(NUM_DS_LINKS_G-1 downto 0);
+   signal l1FeedbackAcks  : slv               (NUM_DS_LINKS_G-1 downto 0);
+   signal l1Partitions    : XpmL1FeedbackArray(XPM_PARTITIONS_C downto 0);
+   signal l1PartitionAcks : slv               (XPM_PARTITIONS_C downto 0);
+
    signal isXpm         : slv (NUM_DS_LINKS_G-1 downto 0);
    signal dsFull        : FullArray (NUM_DS_LINKS_G-1 downto 0);
    signal dsOverflow    : FullArray (NUM_DS_LINKS_G-1 downto 0);
@@ -245,10 +245,10 @@ begin
          clk                => timingFbClk,
          rst                => timingFbRst,
          id                 => timingFbId,
-         detectorPartitions => (others => (others => '0')),
          full               => fullfb,
          overflow           => overflowfb,
-         l1feedbacks        => (others => XPM_L1_FEEDBACK_INIT_C),
+         l1Feedback         => l1Partitions   (XPM_PARTITIONS_C),
+         l1Acks             => l1PartitionAcks(XPM_PARTITIONS_C),
          phy                => timingFb);
 
    GEN_DSLINK : for i in 0 to NUM_DS_LINKS_G-1 generate
@@ -279,7 +279,8 @@ begin
             config     => config.dsLink(i),
             full       => dsFull (i),
             overflow   => dsOverflow(i),
-            l1Feedback => l1Feedback (i),
+            l1Feedback => l1Feedbacks (i),
+            l1Ack      => l1FeedbackAcks (i),
             rxClk      => dsRxClk (i),
             rxRst      => dsRxRst (i),
             rxData     => dsRxData (i),
@@ -307,6 +308,18 @@ begin
          advance_o   => advance,
          txData      => bpTxData,
          txDataK     => bpTxDataK);
+
+   U_L1Router : entity l2si_core.XpmL1Router
+      generic map ( 
+         TPD_G           => TPD_G,
+         NUM_LINKS_G     => l1Feedbacks'length )
+      port map (
+         clk            => timingClk,
+         rst            => timingRst,
+         l1FeedbacksIn  => l1Feedbacks,
+         l1InAcks       => l1FeedbackAcks,
+         l1FeedbacksOut => l1Partitions,
+         l1OutAcks      => l1PartitionAcks );
 
    --
    --  Let the local sequencer replace its part in the incoming stream
@@ -389,7 +402,8 @@ begin
             fiducial   => timingStream.fiducial,
             full       => r.full (i),
             overflow   => r.overflow(i),
-            l1Feedback => r.l1feedback (i),
+            l1Feedback => l1Partitions(i),
+            l1Ack      => l1PartitionAcks(i),
             result     => expWord (i));
 
       U_SyncMaster : entity surf.Synchronizer
@@ -418,7 +432,7 @@ begin
    --
    -- timingStream carries its own 'advance' signal as well as fiducial.
    -- 
-   comb : process (advance, bpRxLinkFullS, dsFull, dsOverflow, expWord, fstreams, l1Feedback, paddr,
+   comb : process (advance, bpRxLinkFullS, dsFull, dsOverflow, expWord, fstreams, paddr,
                    pdepth, pmaster, r, timingRst, timingStream) is
       variable v         : RegType;
       variable tidx      : integer;
@@ -529,7 +543,6 @@ begin
          for j in 0 to NUM_DS_LINKS_G-1 loop
             v.full (i)(j)      := dsFull (j)(i);
             v.overflow(i)(j)   := dsOverflow(j)(i);
-            v.l1feedback(i)(j) := l1Feedback(j)(i);
          end loop;
          for j in 0 to NUM_BP_LINKS_G-1 loop
             v.full (i)(j+16) := bpRxLinkFullS(j)(i);

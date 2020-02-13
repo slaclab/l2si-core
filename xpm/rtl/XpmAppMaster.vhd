@@ -56,7 +56,8 @@ entity XpmAppMaster is
       fiducial   : in  sl;
       full       : in  slv (26 downto 0);
       overflow   : in  slv(26 downto 0);
-      l1Feedback : in  XpmL1FeedbackArray (NUM_DS_LINKS_G-1 downto 0) := (others => XPM_L1_FEEDBACK_INIT_C);
+      l1Feedback : in  XpmL1FeedbackType := XPM_L1_FEEDBACK_INIT_C;
+      l1Ack      : out sl;
       result     : out slv (47 downto 0));
 end XpmAppMaster;
 

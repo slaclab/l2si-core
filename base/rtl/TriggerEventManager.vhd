@@ -183,7 +183,25 @@ architecture rtl of TriggerEventManager is
    signal l1FeedbacksSync : XpmL1FeedbackArray(NUM_DETECTORS_G-1 downto 0);
    signal l1AcksTx        : slv(NUM_DETECTORS_G-1 downto 0);
 
+   signal partitionsFull     : slv(XPM_PARTITIONS_C-1 downto 0);
+   signal partitionsOverflow : slv(XPM_PARTITIONS_C-1 downto 0);
 
+   constant L1_AXI_CONFIG_C : AxiStreamConfigType := (
+      TSTRB_EN_C    => false,
+      TDATA_BYTES_C => 4,
+      TDEST_BITS_C  => 4,
+      TID_BITS_C    => 0,
+      TKEEP_MODE_C  => TKEEP_NORMAL_C,
+      TUSER_BITS_C  => 0,
+      TUSER_MODE_C  => TUSER_NORMAL_C );
+
+   signal l1Masters     : AxiStreamMasterArray(NUM_DETECTORS_G-1 downto 0) := (others=>axiStreamMasterInit(L1_AXI_CONFIG_C));
+   signal l1Slaves      : AxiStreamSlaveArray (NUM_DETECTORS_G-1 downto 0);
+   signal l1Master      : AxiStreamMasterType;
+   signal l1MasterSync  : AxiStreamMasterType;
+   signal l1Slave       : AxiStreamSlaveType;
+   signal l1SlaveSync   : AxiStreamSlaveType;
+   
 begin
 
    -----------------------------------------------
@@ -309,64 +327,72 @@ begin
       fromSlv(timingRxToTimingTxSyncSlvOut, xpmIdSync, detectorPartitionsSync, fullSync, overflowSync);
    end process conv_slv;
 
-   -----------------------------------------------
-   -- Synchronize l1Feedbacks from l1Clk to timingTxClk
-   -----------------------------------------------
+   ------------------------------------------------------------------
+   -- Arbitrate and synchronize l1Feedbacks from l1Clk to timingTxClk
+   ------------------------------------------------------------------
+   
    l1_sync_gen : for i in 0 to NUM_DETECTORS_G-1 generate
-      U_Synchronizer_1 : entity surf.Synchronizer
-         generic map (
-            TPD_G         => TPD_G,
-            BYPASS_SYNC_G => L1_CLK_IS_TIMING_TX_CLK_G,
-            STAGES_G      => 3)
-         port map (
-            clk     => timingTxClk,                -- [in]
-            rst     => timingTxRst,                -- [in]
-            dataIn  => l1Feedbacks(i).valid,       -- [in]
-            dataOut => l1FeedbacksSync(i).valid);  -- [out]
+      l1Masters(i).tData(toSlv(XPM_L1_FEEDBACK_INIT_C)'range) <= toSlv(l1Feedbacks(i));
+      l1Masters(i).tValid <= l1Feedbacks(i).valid;
+      l1Masters(i).tLast  <= '1';
+      l1Acks   (i) <= l1Slaves(i).tReady;
+   end generate;
 
-      U_SynchronizerVector : entity surf.SynchronizerVector
-         generic map (
-            TPD_G         => TPD_G,
-            BYPASS_SYNC_G => L1_CLK_IS_TIMING_TX_CLK_G,
-            STAGES_G      => 2,
-            WIDTH_G       => 18)
-         port map (
-            clk                  => timingTxClk,              -- [in]
-            rst                  => timingTxRst,              -- [in]
-            dataIn(3 downto 0)   => l1Feedbacks(i).trigsrc,   -- [in]
-            dataIn(8 downto 4)   => l1Feedbacks(i).tag,       -- [in]
-            dataIn(17 downto 9)  => l1Feedbacks(i).trigword,  -- [in]                                                            -- 
-            dataOut(3 downto 0)  => l1FeedbacksSync(i).trigsrc,    -- [out]
-            dataOut(8 downto 4)  => l1FeedbacksSync(i).tag,   -- [out]
-            dataOut(17 downto 9) => l1FeedbacksSync(i).trigword);  -- [out]
-   end generate l1_sync_gen;  --
-
-   -- Sync l1Acks from timingTxClk to l1Clk
-   U_SynchronizerVector_1 : entity surf.SynchronizerVector
+   U_L1_Mux : entity surf.AxiStreamMux
       generic map (
-         TPD_G         => TPD_G,
-         BYPASS_SYNC_G => L1_CLK_IS_TIMING_TX_CLK_G,
-         WIDTH_G       => NUM_DETECTORS_G)
+         TPD_G        => TPD_G,
+         NUM_SLAVES_G => NUM_DETECTORS_G )
       port map (
-         clk     => l1Clk,              -- [in]
-         rst     => l1Rst,              -- [in]
-         dataIn  => l1AcksTx,           -- [in]
-         dataOut => l1Acks);            -- [out]
+         axisClk    => l1Clk,
+         axisRst    => l1Rst,
+         sAxisMasters => l1Masters,
+         sAxisSlaves  => l1Slaves,
+         mAxisMaster  => l1Master,
+         mAxisSlave   => l1Slave );
+         
+   -- only crossing clock domains
+   U_L1_Fifo : entity surf.AxiStreamFifoV2
+      generic map (
+         TPD_G               => TPD_G,
+         GEN_SYNC_FIFO_G     => L1_CLK_IS_TIMING_TX_CLK_G,
+         SLAVE_AXI_CONFIG_G  => L1_AXI_CONFIG_C,
+         MASTER_AXI_CONFIG_G => L1_AXI_CONFIG_C )
+      port map (
+         sAxisClk    => l1Clk,
+         sAxisRst    => l1Rst,
+         sAxisMaster => l1Master,
+         sAxisSlave  => l1Slave,
+         mAxisClk    => timingTxClk,
+         mAxisRst    => timingTxRst,
+         mAxisMaster => l1MasterSync,
+         mAxisSlave  => l1SlaveSync );
 
+   partitions : process ( detectorPartitionsSync, fullSync, overflowSync ) is
+   begin
+      partitionsFull     <= (others=>'0');
+      partitionsOverflow <= (others=>'0');
+      for i in 0 to NUM_DETECTORS_G-1 loop
+         if fullSync(i) = '1' then
+            partitionsFull    (conv_integer(detectorPartitionsSync(i))) <= '1';
+         end if;
+         if overflowSync(i) = '1' then
+            partitionsOverflow(conv_integer(detectorPartitionsSync(i))) <= '1';
+         end if;       
+      end loop;
+   end process partitions;
+   
    -- Create upstream message
    U_XpmTimingFb_1 : entity l2si_core.XpmTimingFb
       generic map (
-         TPD_G           => TPD_G,
-         NUM_DETECTORS_G => NUM_DETECTORS_G)
+         TPD_G           => TPD_G )
       port map (
          clk                => timingTxClk,             -- [in]
          rst                => timingTxRst,             -- [in]
          id                 => xpmIdSync,               -- [in]
-         detectorPartitions => detectorPartitionsSync,  -- [in]
-         full               => fullSync,                -- [in]
-         overflow           => overflowSync,            -- [in]
-         l1Feedbacks        => l1FeedbacksSync,         -- [in]
-         l1Acks             => l1AcksTx,                -- [out]
+         full               => partitionsFull,          -- [in]
+         overflow           => partitionsOverflow,      -- [in]
+         l1Feedback         => toL1Feedback(l1MasterSync.tData), -- [in]
+         l1Ack              => l1SlaveSync.tReady,      -- [out]
          phy                => timingTxPhy);            -- [out]
 
 

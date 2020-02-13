@@ -63,13 +63,11 @@ end XpmMini;
 architecture top_level_app of XpmMini is
 
    type LinkFullArray is array (natural range<>) of slv(26 downto 0);
-   type LinkL1InpArray is array (natural range<>) of XpmL1FeedbackArray(NUM_DS_LINKS_G-1 downto 0);
 
    type StateType is (IDLE_S, INIT_S, SLAVE_S, PADDR_S, EWORD_S, EOS_S);
    type RegType is record
       full        : LinkFullArray (XPM_PARTITIONS_C-1 downto 0);
       overflow    : LinkFullArray (XPM_PARTITIONS_C-1 downto 0);
-      l1feedback  : LinkL1InpArray(XPM_PARTITIONS_C-1 downto 0);
       fiducial    : sl;
       paddr       : slv(XPM_PARTITION_ADDR_LENGTH_C-1 downto 0);  -- platform address
       paddrStrobe : sl;
@@ -85,7 +83,6 @@ architecture top_level_app of XpmMini is
    constant REG_INIT_C : RegType := (
       full        => (others => (others => '0')),
       overflow    => (others => (others => '0')),
-      l1feedback  => (others => (others => XPM_L1_FEEDBACK_INIT_C)),
       fiducial    => '0',
       paddr       => (others => '1'),
       paddrStrobe => '0',
@@ -105,10 +102,13 @@ architecture top_level_app of XpmMini is
    signal partitionStatus : XpmPartitionStatusType;
 
    --  feedback data from sensor links
-   type L1FeedbackArray is array (natural range<>) of XpmL1FeedbackArray(XPM_PARTITIONS_C-1 downto 0);
    type FullArray is array (natural range<>) of slv (XPM_PARTITIONS_C-1 downto 0);
 
-   signal l1Feedback    : L1FeedbackArray(NUM_DS_LINKS_G-1 downto 0);
+   signal l1Feedbacks     : XpmL1FeedbackArray(NUM_DS_LINKS_G-1 downto 0) := (others => XPM_L1_FEEDBACK_INIT_C);
+   signal l1FeedbackAcks  : slv               (NUM_DS_LINKS_G-1 downto 0);
+   signal l1Partitions    : XpmL1FeedbackArray(XPM_PARTITIONS_C downto 0);
+   signal l1PartitionAcks : slv               (XPM_PARTITIONS_C downto 0);
+
    signal isXpm         : slv (NUM_DS_LINKS_G-1 downto 0);
    signal rxErr         : slv (NUM_DS_LINKS_G-1 downto 0);
    signal dsFull        : FullArray (NUM_DS_LINKS_G-1 downto 0);
@@ -183,7 +183,8 @@ begin
             config     => linkConfig(i),
             full       => dsFull(i),
             overflow   => dsOverflow(i),
-            l1Feedback => l1Feedback(i),
+            l1Feedback => l1Feedbacks (i),
+            l1Ack      => l1FeedbackAcks (i),
             rxClk      => dsRxClk(i),
             rxRst      => dsRxRst(i),
             rxData     => dsRx(i).data,
@@ -194,6 +195,18 @@ begin
             rxRcvs     => dsRxRcvs(i));
 
    end generate GEN_DSLINK;
+
+   U_L1Router : entity l2si_core.XpmL1Router
+      generic map ( 
+         TPD_G           => TPD_G,
+         NUM_LINKS_G     => l1Feedbacks'length )
+      port map (
+         clk            => timingClk,
+         rst            => timingRst,
+         l1FeedbacksIn  => l1Feedbacks,
+         l1InAcks       => l1FeedbackAcks,
+         l1FeedbacksOut => l1Partitions,
+         l1OutAcks      => l1PartitionAcks );
 
    --  Form the full partition configuration
    partitionConfig.master   <= '1';
@@ -245,7 +258,8 @@ begin
          fiducial   => timingStream.fiducial,
          full       => r.full(0),
          overflow   => r.overflow(0),
-         l1Feedback => r.l1feedback(0),
+         l1Feedback => l1Partitions(0),
+         l1Ack      => l1PartitionAcks(0),
          result     => expWord(0));
 
    --
@@ -270,7 +284,7 @@ begin
    pdepth(2) <= pdepth(0);
    pdepth(1) <= pdepth(0);
 
-   comb : process (advance, dsFull, dsOverflow, expWord, fstreams, l1Feedback, pdepth, r, timingRst,
+   comb : process (advance, dsFull, dsOverflow, expWord, fstreams, pdepth, r, timingRst,
                    timingStream) is
       variable v    : RegType;
       variable tidx : integer;
@@ -335,7 +349,6 @@ begin
          for j in 0 to NUM_DS_LINKS_G-1 loop
             v.full(i)(j)       := dsFull (j)(i);
             v.overflow(i)(j)   := dsOverflow (j)(i);
-            v.l1feedback(i)(j) := l1Feedback(j)(i);
          end loop;
       end loop;
 
