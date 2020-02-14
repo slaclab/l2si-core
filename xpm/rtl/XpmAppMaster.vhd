@@ -51,12 +51,12 @@ entity XpmAppMaster is
       timingRst  : in  sl;
       --
       streams    : in  TimingSerialArray(2 downto 0);
-      streamIds  : in  Slv4Array (2 downto 0)                         := (x"2", x"1", x"0");
+      streamIds  : in  Slv4Array (2 downto 0) := (x"2", x"1", x"0");
       advance    : in  slv (2 downto 0);
       fiducial   : in  sl;
-      full       : in  slv (26 downto 0);
+      pause      : in  slv (26 downto 0);
       overflow   : in  slv(26 downto 0);
-      l1Feedback : in  XpmL1FeedbackType := XPM_L1_FEEDBACK_INIT_C;
+      l1Feedback : in  XpmL1FeedbackType      := XPM_L1_FEEDBACK_INIT_C;
       l1Ack      : out sl;
       result     : out slv (47 downto 0));
 end XpmAppMaster;
@@ -117,7 +117,7 @@ architecture rtl of XpmAppMaster is
 
    signal depth_clks_20 : slv(19 downto 0);
 
-   signal fullOrOverflow : slv(26 downto 0);
+   signal pauseOrOverflow : slv(26 downto 0);
 
    component ila_0
       port (clk    : in sl;
@@ -181,26 +181,26 @@ begin
          valid_o    => cuRx_valid,
          overflow_o => cuRx_delayOverflow);
 
-   fullOrOverflow <= full or overflow;
+   pauseOrOverflow <= pause or overflow;
    U_Inhibit : entity l2si_core.XpmInhibit
       generic map (
          TPD_G => TPD_G)
       port map (
-         regclk            => regclk,
-         update            => update,
-         clear             => config.l0Select.reset,
-         config            => config.inhibit,
-         status            => status.inhibit,
+         regclk             => regclk,
+         update             => update,
+         clear              => config.l0Select.reset,
+         config             => config.inhibit,
+         status             => status.inhibit,
          --
-         clk               => timingClk,
-         rst               => timingRst,
-         full(26 downto 0) => fullOrOverflow,
-         full(27)          => r.insertMsg,
-         fiducial          => fiducial,
-         l0Accept          => l0Accept,
-         l1Accept          => l1Accept,
-         rejecc            => l0Reject,
-         inhibit           => inhibit);
+         clk                => timingClk,
+         rst                => timingRst,
+         pause(26 downto 0) => pauseOrOverflow,
+         pause(27)          => r.insertMsg,
+         fiducial           => fiducial,
+         l0Accept           => l0Accept,
+         l1Accept           => l1Accept,
+         rejecc             => l0Reject,
+         inhibit            => inhibit);
 
    U_L0Select : entity l2si_core.XpmL0Select
       generic map (

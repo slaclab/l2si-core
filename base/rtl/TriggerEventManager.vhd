@@ -52,7 +52,7 @@ entity TriggerEventManager is
       timingRxClk : in sl;
       timingRxRst : in sl;
       timingBus   : in TimingBusType;
-      
+
       -- Timing Tx Feedback
       timingTxClk : in  sl;
       timingTxRst : in  sl;
@@ -119,7 +119,7 @@ architecture rtl of TriggerEventManager is
 
    -- Event header cache outputs
    signal detectorPartitions : slv3array(NUM_DETECTORS_G-1 downto 0);
-   signal full               : slv(NUM_DETECTORS_G-1 downto 0) := (others => '0');
+   signal pause              : slv(NUM_DETECTORS_G-1 downto 0) := (others => '0');
    signal overflow           : slv(NUM_DETECTORS_G-1 downto 0) := (others => '0');
 
 
@@ -131,7 +131,7 @@ architecture rtl of TriggerEventManager is
    function toSlv (
       xpmId              : slv(31 downto 0);
       detectorPartitions : slv3Array(NUM_DETECTORS_G-1 downto 0);
-      full               : slv(NUM_DETECTORS_G-1 downto 0);
+      pause              : slv(NUM_DETECTORS_G-1 downto 0);
       overflow           : slv(NUM_DETECTORS_G-1 downto 0))
       return slv is
 
@@ -142,7 +142,7 @@ architecture rtl of TriggerEventManager is
       for j in 0 to NUM_DETECTORS_G-1 loop
          assignSlv(i, vector, detectorPartitions(j));
       end loop;
-      assignSlv(i, vector, full);
+      assignSlv(i, vector, pause);
       assignSlv(i, vector, overflow);
       return vector;
    end function;
@@ -151,24 +151,24 @@ architecture rtl of TriggerEventManager is
       signal vector             : in  slv(FB_SYNC_VECTOR_BITS_C-1 downto 0);
       signal xpmId              : out slv(31 downto 0);
       signal detectorPartitions : out slv3Array(NUM_DETECTORS_G-1 downto 0);
-      signal full               : out slv(NUM_DETECTORS_G-1 downto 0);
+      signal pause              : out slv(NUM_DETECTORS_G-1 downto 0);
       signal overflow           : out slv(NUM_DETECTORS_G-1 downto 0)) is
       variable i           : integer := 0;
       variable xpmIdTmp    : slv(31 downto 0);
       variable dpTmp       : slv3array(NUM_DETECTORS_G-1 downto 0);
-      variable fullTmp     : slv(NUM_DETECTORS_G-1 downto 0);
+      variable pauseTmp    : slv(NUM_DETECTORS_G-1 downto 0);
       variable overflowTmp : slv(NUM_DETECTORS_G-1 downto 0);
    begin
       assignRecord(i, vector, xpmIdTmp);
       for j in 0 to NUM_DETECTORS_G-1 loop
          assignRecord(i, vector, dpTmp(j));
       end loop;
-      assignRecord(i, vector, fullTmp);
+      assignRecord(i, vector, pauseTmp);
       assignRecord(i, vector, overflowTmp);
 
       xpmId              <= xpmIdTmp;
       detectorPartitions <= dpTmp;
-      full               <= fullTmp;
+      pause              <= pauseTmp;
       overflow           <= overflowTmp;
    end procedure fromSlv;
 
@@ -177,13 +177,13 @@ architecture rtl of TriggerEventManager is
 
    signal xpmIdSync              : slv(31 downto 0);
    signal detectorPartitionsSync : slv3array(NUM_DETECTORS_G-1 downto 0);
-   signal fullSync               : slv(NUM_DETECTORS_G-1 downto 0);
+   signal pauseSync              : slv(NUM_DETECTORS_G-1 downto 0);
    signal overflowSync           : slv(NUM_DETECTORS_G-1 downto 0);
 
    signal l1FeedbacksSync : XpmL1FeedbackArray(NUM_DETECTORS_G-1 downto 0);
    signal l1AcksTx        : slv(NUM_DETECTORS_G-1 downto 0);
 
-   signal partitionsFull     : slv(XPM_PARTITIONS_C-1 downto 0);
+   signal partitionsPause    : slv(XPM_PARTITIONS_C-1 downto 0);
    signal partitionsOverflow : slv(XPM_PARTITIONS_C-1 downto 0);
 
    constant L1_AXI_CONFIG_C : AxiStreamConfigType := (
@@ -193,15 +193,15 @@ architecture rtl of TriggerEventManager is
       TID_BITS_C    => 0,
       TKEEP_MODE_C  => TKEEP_NORMAL_C,
       TUSER_BITS_C  => 0,
-      TUSER_MODE_C  => TUSER_NORMAL_C );
+      TUSER_MODE_C  => TUSER_NORMAL_C);
 
-   signal l1Masters     : AxiStreamMasterArray(NUM_DETECTORS_G-1 downto 0) := (others=>axiStreamMasterInit(L1_AXI_CONFIG_C));
-   signal l1Slaves      : AxiStreamSlaveArray (NUM_DETECTORS_G-1 downto 0);
-   signal l1Master      : AxiStreamMasterType;
-   signal l1MasterSync  : AxiStreamMasterType;
-   signal l1Slave       : AxiStreamSlaveType;
-   signal l1SlaveSync   : AxiStreamSlaveType;
-   
+   signal l1Masters    : AxiStreamMasterArray(NUM_DETECTORS_G-1 downto 0) := (others => axiStreamMasterInit(L1_AXI_CONFIG_C));
+   signal l1Slaves     : AxiStreamSlaveArray (NUM_DETECTORS_G-1 downto 0);
+   signal l1Master     : AxiStreamMasterType;
+   signal l1MasterSync : AxiStreamMasterType;
+   signal l1Slave      : AxiStreamSlaveType;
+   signal l1SlaveSync  : AxiStreamSlaveType;
+
 begin
 
    -----------------------------------------------
@@ -290,7 +290,7 @@ begin
             alignedTimingMessage => alignedTimingMessage,                -- [in]
             alignedXpmMessage    => alignedXpmMessage,                   -- [in]
             partition            => detectorPartitions(i),               -- [out]
-            full                 => full(i),                             -- [out]
+            pause                => pause(i),                            -- [out]
             overflow             => overflow(i),                         -- [out]
             triggerClk           => triggerClk,                          -- [in]
             triggerRst           => triggerRst,                          -- [in]
@@ -306,10 +306,10 @@ begin
 
 
    -----------------------------------------------
-   -- Send almost full and overflow data back upstream
+   -- Send pause and overflow data back upstream
    -----------------------------------------------
    -- Synchronize to transmit clock
-   timingRxToTimingTxSyncSlvIn <= toSlv(xpmId, detectorPartitions, full, overflow);
+   timingRxToTimingTxSyncSlvIn <= toSlv(xpmId, detectorPartitions, pause, overflow);
    U_SynchronizerFifo_xpmId : entity surf.SynchronizerFifo
       generic map (
          TPD_G        => TPD_G,
@@ -324,39 +324,39 @@ begin
 
    conv_slv : process (timingRxToTimingTxSyncSlvOut) is
    begin
-      fromSlv(timingRxToTimingTxSyncSlvOut, xpmIdSync, detectorPartitionsSync, fullSync, overflowSync);
+      fromSlv(timingRxToTimingTxSyncSlvOut, xpmIdSync, detectorPartitionsSync, pauseSync, overflowSync);
    end process conv_slv;
 
    ------------------------------------------------------------------
    -- Arbitrate and synchronize l1Feedbacks from l1Clk to timingTxClk
    ------------------------------------------------------------------
-   
+
    l1_sync_gen : for i in 0 to NUM_DETECTORS_G-1 generate
       l1Masters(i).tData(toSlv(XPM_L1_FEEDBACK_INIT_C)'range) <= toSlv(l1Feedbacks(i));
-      l1Masters(i).tValid <= l1Feedbacks(i).valid;
-      l1Masters(i).tLast  <= '1';
-      l1Acks   (i) <= l1Slaves(i).tReady;
+      l1Masters(i).tValid                                     <= l1Feedbacks(i).valid;
+      l1Masters(i).tLast                                      <= '1';
+      l1Acks (i)                                              <= l1Slaves(i).tReady;
    end generate;
 
    U_L1_Mux : entity surf.AxiStreamMux
       generic map (
          TPD_G        => TPD_G,
-         NUM_SLAVES_G => NUM_DETECTORS_G )
+         NUM_SLAVES_G => NUM_DETECTORS_G)
       port map (
-         axisClk    => l1Clk,
-         axisRst    => l1Rst,
+         axisClk      => l1Clk,
+         axisRst      => l1Rst,
          sAxisMasters => l1Masters,
          sAxisSlaves  => l1Slaves,
          mAxisMaster  => l1Master,
-         mAxisSlave   => l1Slave );
-         
+         mAxisSlave   => l1Slave);
+
    -- only crossing clock domains
    U_L1_Fifo : entity surf.AxiStreamFifoV2
       generic map (
          TPD_G               => TPD_G,
          GEN_SYNC_FIFO_G     => L1_CLK_IS_TIMING_TX_CLK_G,
          SLAVE_AXI_CONFIG_G  => L1_AXI_CONFIG_C,
-         MASTER_AXI_CONFIG_G => L1_AXI_CONFIG_C )
+         MASTER_AXI_CONFIG_G => L1_AXI_CONFIG_C)
       port map (
          sAxisClk    => l1Clk,
          sAxisRst    => l1Rst,
@@ -365,35 +365,35 @@ begin
          mAxisClk    => timingTxClk,
          mAxisRst    => timingTxRst,
          mAxisMaster => l1MasterSync,
-         mAxisSlave  => l1SlaveSync );
+         mAxisSlave  => l1SlaveSync);
 
-   partitions : process ( detectorPartitionsSync, fullSync, overflowSync ) is
+   partitions : process (detectorPartitionsSync, pauseSync, overflowSync) is
    begin
-      partitionsFull     <= (others=>'0');
-      partitionsOverflow <= (others=>'0');
+      partitionsPause    <= (others => '0');
+      partitionsOverflow <= (others => '0');
       for i in 0 to NUM_DETECTORS_G-1 loop
-         if fullSync(i) = '1' then
-            partitionsFull    (conv_integer(detectorPartitionsSync(i))) <= '1';
+         if pauseSync(i) = '1' then
+            partitionsPause (conv_integer(detectorPartitionsSync(i))) <= '1';
          end if;
          if overflowSync(i) = '1' then
             partitionsOverflow(conv_integer(detectorPartitionsSync(i))) <= '1';
-         end if;       
+         end if;
       end loop;
    end process partitions;
-   
+
    -- Create upstream message
    U_XpmTimingFb_1 : entity l2si_core.XpmTimingFb
       generic map (
-         TPD_G           => TPD_G )
+         TPD_G => TPD_G)
       port map (
-         clk                => timingTxClk,             -- [in]
-         rst                => timingTxRst,             -- [in]
-         id                 => xpmIdSync,               -- [in]
-         full               => partitionsFull,          -- [in]
-         overflow           => partitionsOverflow,      -- [in]
-         l1Feedback         => toL1Feedback(l1MasterSync.tData), -- [in]
-         l1Ack              => l1SlaveSync.tReady,      -- [out]
-         phy                => timingTxPhy);            -- [out]
+         clk        => timingTxClk,                       -- [in]
+         rst        => timingTxRst,                       -- [in]
+         id         => xpmIdSync,                         -- [in]
+         pause      => partitionsPause,                   -- [in]
+         overflow   => partitionsOverflow,                -- [in]
+         l1Feedback => toL1Feedback(l1MasterSync.tData),  -- [in]
+         l1Ack      => l1SlaveSync.tReady,                -- [out]
+         phy        => timingTxPhy);                      -- [out]
 
 
 end architecture rtl;

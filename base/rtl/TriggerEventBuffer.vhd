@@ -59,7 +59,7 @@ entity TriggerEventBuffer is
 
       -- Feedback
       partition : out slv(2 downto 0);
-      pause      : out sl;
+      pause     : out sl;
       overflow  : out sl;
 
       -- Trigger output
@@ -102,8 +102,8 @@ architecture rtl of TriggerEventBuffer is
       fbTimerOverflow : sl;
       fbTimerActive   : sl;
       fbTimerToTrig   : slv(11 downto 0);
-      pauseToTrig      : slv(11 downto 0);
-      notPauseToTrig     : slv(11 downto 0);
+      pauseToTrig     : slv(11 downto 0);
+      notPauseToTrig  : slv(11 downto 0);
       pause           : sl;
 
 
@@ -146,8 +146,8 @@ architecture rtl of TriggerEventBuffer is
       fbTimerOverflow => '0',
       fbTimerActive   => '0',
       fbTimerToTrig   => (others => '0'),
-      pauseToTrig      => (others => '0'),
-      notPauseToTrig     => (others => '1'),
+      pauseToTrig     => (others => '0'),
+      notPauseToTrig  => (others => '1'),
       pause           => '0',
 
       fifoAxisMaster => axiStreamMasterInit(EVENT_AXIS_CONFIG_C),
@@ -327,13 +327,13 @@ begin
 
       v.resetCounters := '0';           -- Pulsed for 1 cycle
       if (r.resetCounters = '1') then
-         v.l0Count       := (others => '0');
-         v.l1AcceptCount := (others => '0');
-         v.l1RejectCount := (others => '0');
-         v.validCount    := (others => '0');
-         v.triggerCount  := (others => '0');
+         v.l0Count        := (others => '0');
+         v.l1AcceptCount  := (others => '0');
+         v.l1RejectCount  := (others => '0');
+         v.validCount     := (others => '0');
+         v.triggerCount   := (others => '0');
          v.pauseToTrig    := (others => '0');
-         v.notPauseToTrig   := (others => '1');
+         v.notPauseToTrig := (others => '1');
       end if;
 
       --------------------------------------------
@@ -351,7 +351,7 @@ begin
       axiSlaveRegisterR(axilEp, x"10", 0, r.overflow);
       axiSlaveRegisterR(axilEp, X"10", 1, r.pause);
       axiSlaveRegisterR(axilEp, X"10", 2, fifoAxisCtrl.overflow);
-      axiSlaveRegisterR(axilEp, X"10", 3, fifoAxisCtrl.pause);      
+      axiSlaveRegisterR(axilEp, X"10", 3, fifoAxisCtrl.pause);
       axiSlaveRegisterR(axilEp, X"10", 4, fifoWrCnt);
       axiSlaveRegisterR(axilEp, x"14", 0, r.l0Count);
       axiSlaveRegisterR(axilEp, x"18", 0, r.l1AcceptCount);
@@ -377,7 +377,7 @@ begin
       axilReadSlave  <= r.axilReadSlave;
       partition      <= r.partition;
       overflow       <= r.overflow;
-      pause <= r.pause;
+      pause          <= r.pause;
 
    end process comb;
 

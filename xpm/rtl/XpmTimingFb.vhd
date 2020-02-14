@@ -29,18 +29,18 @@ use l2si_core.XpmExtensionPkg.all;
 
 entity XpmTimingFb is
    generic (
-      TPD_G           : time                 := 1 ns);
+      TPD_G : time := 1 ns);
    port (
-      clk                : in  sl;
-      rst                : in  sl;
-      pllReset           : in  sl                                    := '0';
-      phyReset           : in  sl                                    := '0';
-      id                 : in  slv(31 downto 0)                      := (others => '1');
-      full               : in  slv(XPM_PARTITIONS_C-1 downto 0)      := (others => '0');
-      overflow           : in  slv(XPM_PARTITIONS_C-1 downto 0)      := (others => '0');
-      l1Feedback         : in  XpmL1FeedbackType                     := XPM_L1_FEEDBACK_INIT_C;
-      l1Ack              : out sl;
-      phy                : out TimingPhyType);
+      clk        : in  sl;
+      rst        : in  sl;
+      pllReset   : in  sl                               := '0';
+      phyReset   : in  sl                               := '0';
+      id         : in  slv(31 downto 0)                 := (others => '1');
+      pause      : in  slv(XPM_PARTITIONS_C-1 downto 0) := (others => '0');
+      overflow   : in  slv(XPM_PARTITIONS_C-1 downto 0) := (others => '0');
+      l1Feedback : in  XpmL1FeedbackType                := XPM_L1_FEEDBACK_INIT_C;
+      l1Ack      : out sl;
+      phy        : out TimingPhyType);
 end XpmTimingFb;
 
 architecture rtl of XpmTimingFb is
@@ -53,7 +53,7 @@ architecture rtl of XpmTimingFb is
       ready        : sl;
       state        : StateType;
       idleCnt      : slv(MAX_IDLE_C'range);
-      lastFull     : slv(XPM_PARTITIONS_C-1 downto 0);
+      lastPause    : slv(XPM_PARTITIONS_C-1 downto 0);
       lastOverflow : slv(XPM_PARTITIONS_C-1 downto 0);
       l1Feedback   : XpmL1FeedbackType;
       l1Ack        : sl;
@@ -65,7 +65,7 @@ architecture rtl of XpmTimingFb is
       ready        => '0',
       state        => IDLE_S,
       idleCnt      => (others => '0'),
-      lastFull     => (others => '1'),
+      lastPause    => (others => '1'),
       lastOverflow => (others => '0'),
       l1Feedback   => XPM_L1_FEEDBACK_INIT_C,
       l1Ack        => '0',
@@ -87,8 +87,8 @@ begin
    phy.control.polarity    <= '0';
    phy.control.bufferByRst <= '0';
 
-   comb : process (full, id, l1Feedback, overflow, r, rst) is
-      variable v                 : RegType;
+   comb : process (pause, id, l1Feedback, overflow, r, rst) is
+      variable v : RegType;
    begin
       v := r;
 
@@ -96,14 +96,14 @@ begin
       v.l1Ack   := '0';
       v.ready   := '0';
 
-      if (r.lastFull /= full) or (r.lastOverflow /= overflow) then
+      if (r.lastPause /= pause) or (r.lastOverflow /= overflow) then
          v.ready := '1';
       end if;
       if (r.idleCnt = MAX_IDLE_C) then
          v.ready := '1';
       end if;
       if l1Feedback.valid = '1' then
-        v.ready := '1';
+         v.ready := '1';
       end if;
 
       case (r.state) is
@@ -114,38 +114,38 @@ begin
                v.txData  := D_215_C & K_SOF_C;
                v.state   := ID1_S;
             else
-               v.txData  := D_215_C & K_COM_C;
+               v.txData := D_215_C & K_COM_C;
             end if;
          when ID1_S =>
             v.txDataK := "00";
             v.txData  := id(15 downto 0);
             v.state   := ID2_S;
          when ID2_S =>
-            v.txDataK  := "00";
-            v.txData   := id(31 downto 16);
-            v.state    := PFULL_S;
+            v.txDataK := "00";
+            v.txData  := id(31 downto 16);
+            v.state   := PFULL_S;
          when PFULL_S =>
             v.txDataK             := "00";
             v.txData              := (others => '0');
-            v.txData( 7 downto 0) := full;
+            v.txData(7 downto 0)  := pause;
             v.txData(15 downto 8) := overflow;
-            v.lastFull            := full;
+            v.lastPause           := pause;
             v.lastOverflow        := overflow;
             if l1Feedback.valid = '1' then
-               v.l1Feedback       := l1Feedback;
-               v.l1Ack            := '1';
-               v.state            := PDATA1_S;
+               v.l1Feedback := l1Feedback;
+               v.l1Ack      := '1';
+               v.state      := PDATA1_S;
             else
-               v.state            := EOF_S;
+               v.state := EOF_S;
             end if;
          when PDATA1_S =>
-            v.txDataK             := "00";
-            v.txData              := resize(toSlv(r.l1Feedback),16);
-            v.state               := PDATA2_S;
+            v.txDataK := "00";
+            v.txData  := resize(toSlv(r.l1Feedback), 16);
+            v.state   := PDATA2_S;
          when PDATA2_S =>
-            v.txDataK             := "00";
-            v.txData              := resize(toSlv(r.l1Feedback),32)(15 downto 0);
-            v.state               := PFULL_S;
+            v.txDataK := "00";
+            v.txData  := resize(toSlv(r.l1Feedback), 32)(15 downto 0);
+            v.state   := PFULL_S;
          when EOF_S =>
             v.txData := D_215_C & K_EOF_C;
             v.state  := IDLE_S;

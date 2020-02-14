@@ -70,7 +70,7 @@ entity XpmApp is
       bpTxData        : out slv(15 downto 0);
       bpTxDataK       : out slv(1 downto 0);
       bpStatus        : in  XpmBpLinkStatusArray(NUM_BP_LINKS_G downto 0);
-      bpRxLinkFull    : in  Slv16Array (NUM_BP_LINKS_G-1 downto 0);
+      bpRxLinkPause   : in  Slv16Array (NUM_BP_LINKS_G-1 downto 0);
       -- Timing Interface (timingClk domain) 
       timingClk       : in  sl;
       timingRst       : in  sl;
@@ -84,13 +84,13 @@ end XpmApp;
 
 architecture top_level_app of XpmApp is
 
-   type LinkFullArray is array (natural range<>) of slv(26 downto 0);
+   type LinkPauseArray is array (natural range<>) of slv(26 downto 0);
 
    type StateType is (IDLE_S, INIT_S, SLAVE_S, PADDR_S, EWORD_S, EOS_S);
    type RegType is record
-      full           : LinkFullArray (XPM_PARTITIONS_C-1 downto 0);
-      fullfb         : slv (XPM_PARTITIONS_C-1 downto 0);
-      overflow       : LinkFullArray (XPM_PARTITIONS_C-1 downto 0);
+      pause          : LinkPauseArray (XPM_PARTITIONS_C-1 downto 0);
+      pausefb        : slv (XPM_PARTITIONS_C-1 downto 0);
+      overflow       : LinkPauseArray (XPM_PARTITIONS_C-1 downto 0);
       overflowfb     : slv (XPM_PARTITIONS_C-1 downto 0);
       fiducial       : sl;
       source         : sl;
@@ -111,8 +111,8 @@ architecture top_level_app of XpmApp is
       groupLinkClear : slv(XPM_PARTITIONS_C-1 downto 0);
    end record;
    constant REG_INIT_C : RegType := (
-      full           => (others => (others => '0')),
-      fullfb         => (others => '0'),
+      pause          => (others => (others => '0')),
+      pausefb        => (others => '0'),
       overflow       => (others => (others => '0')),
       overflowfb     => (others => '0'),
       fiducial       => '0',
@@ -139,19 +139,19 @@ architecture top_level_app of XpmApp is
 
 
    --  feedback data from sensor links
-   type FullArray is array (natural range<>) of slv (XPM_PARTITIONS_C-1 downto 0);
+   type PauseArray is array (natural range<>) of slv (XPM_PARTITIONS_C-1 downto 0);
 
    signal l1Feedbacks     : XpmL1FeedbackArray(NUM_DS_LINKS_G-1 downto 0);
-   signal l1FeedbackAcks  : slv               (NUM_DS_LINKS_G-1 downto 0);
+   signal l1FeedbackAcks  : slv (NUM_DS_LINKS_G-1 downto 0);
    signal l1Partitions    : XpmL1FeedbackArray(XPM_PARTITIONS_C downto 0);
-   signal l1PartitionAcks : slv               (XPM_PARTITIONS_C downto 0);
+   signal l1PartitionAcks : slv (XPM_PARTITIONS_C downto 0);
 
-   signal isXpm         : slv (NUM_DS_LINKS_G-1 downto 0);
-   signal dsFull        : FullArray (NUM_DS_LINKS_G-1 downto 0);
-   signal dsOverflow    : FullArray (NUM_DS_LINKS_G-1 downto 0);
-   signal dsRxRcvs      : Slv32Array (NUM_DS_LINKS_G-1 downto 0);
-   signal dsId          : Slv32Array (NUM_DS_LINKS_G-1 downto 0);
-   signal bpRxLinkFullS : Slv16Array (NUM_BP_LINKS_G-1 downto 0);
+   signal isXpm          : slv (NUM_DS_LINKS_G-1 downto 0);
+   signal dsPause        : PauseArray (NUM_DS_LINKS_G-1 downto 0);
+   signal dsOverflow     : PauseArray (NUM_DS_LINKS_G-1 downto 0);
+   signal dsRxRcvs       : Slv32Array (NUM_DS_LINKS_G-1 downto 0);
+   signal dsId           : Slv32Array (NUM_DS_LINKS_G-1 downto 0);
+   signal bpRxLinkPauseS : Slv16Array (NUM_BP_LINKS_G-1 downto 0);
 
    signal timingStream_streams : TimingSerialArray(NSTREAMS_C-1 downto 0);
    signal fstreams             : TimingSerialArray(NSTREAMS_C-1 downto 0);
@@ -165,7 +165,7 @@ architecture top_level_app of XpmApp is
    signal pdepthI              : Slv8Array (XPM_PARTITIONS_C-1 downto 0);
    signal pdepth               : Slv8Array (XPM_PARTITIONS_C-1 downto 0);
    signal expWord              : Slv48Array(XPM_PARTITIONS_C-1 downto 0);
-   signal fullfb               : slv (XPM_PARTITIONS_C-1 downto 0);
+   signal pausefb              : slv (XPM_PARTITIONS_C-1 downto 0);
    signal overflowfb           : slv (XPM_PARTITIONS_C-1 downto 0);
    signal paddr                : slv (XPM_PARTITION_ADDR_LENGTH_C-1 downto 0);
 begin
@@ -184,14 +184,14 @@ begin
    end process;
 
    GEN_SYNCBP : for i in 0 to NUM_BP_LINKS_G-1 generate
-      U_SyncFull : entity surf.SynchronizerVector
+      U_SyncPause : entity surf.SynchronizerVector
          generic map (
             TPD_G   => TPD_G,
             WIDTH_G => 16)
          port map (
             clk     => timingClk,
-            dataIn  => bpRxLinkFull(i),
-            dataOut => bpRxLinkFullS(i));
+            dataIn  => bpRxLinkPause(i),
+            dataOut => bpRxLinkPauseS(i));
    end generate;
 
    U_SyncPaddrRx : entity surf.SynchronizerVector
@@ -212,19 +212,19 @@ begin
          dataIn  => config.paddr,
          dataOut => paddr);
 
-   U_FullFb : entity surf.SynchronizerVector
+   U_PauseFb : entity surf.SynchronizerVector
       generic map (
          TPD_G   => TPD_G,
-         WIDTH_G => fullfb'length)
+         WIDTH_G => pausefb'length)
       port map (
          clk     => timingFbClk,
-         dataIn  => r.fullfb,
-         dataOut => fullfb);
+         dataIn  => r.pausefb,
+         dataOut => pausefb);
 
    U_overflowFb : entity surf.SynchronizerVector
       generic map (
          TPD_G   => TPD_G,
-         WIDTH_G => fullfb'length)
+         WIDTH_G => pausefb'length)
       port map (
          clk     => timingFbClk,
          dataIn  => r.overflowfb,
@@ -242,14 +242,14 @@ begin
 
    U_TimingFb : entity l2si_core.XpmTimingFb
       port map (
-         clk                => timingFbClk,
-         rst                => timingFbRst,
-         id                 => timingFbId,
-         full               => fullfb,
-         overflow           => overflowfb,
-         l1Feedback         => l1Partitions   (XPM_PARTITIONS_C),
-         l1Ack              => l1PartitionAcks(XPM_PARTITIONS_C),
-         phy                => timingFb);
+         clk        => timingFbClk,
+         rst        => timingFbRst,
+         id         => timingFbId,
+         pause      => pausefb,
+         overflow   => overflowfb,
+         l1Feedback => l1Partitions (XPM_PARTITIONS_C),
+         l1Ack      => l1PartitionAcks(XPM_PARTITIONS_C),
+         phy        => timingFb);
 
    GEN_DSLINK : for i in 0 to NUM_DS_LINKS_G-1 generate
       U_TxLink : entity l2si_core.XpmTxLink
@@ -277,7 +277,7 @@ begin
             clk        => timingClk,
             rst        => timingRst,
             config     => config.dsLink(i),
-            full       => dsFull (i),
+            pause      => dsPause (i),
             overflow   => dsOverflow(i),
             l1Feedback => l1Feedbacks (i),
             l1Ack      => l1FeedbackAcks (i),
@@ -310,16 +310,16 @@ begin
          txDataK     => bpTxDataK);
 
    U_L1Router : entity l2si_core.XpmL1Router
-      generic map ( 
-         TPD_G           => TPD_G,
-         NUM_LINKS_G     => l1Feedbacks'length )
+      generic map (
+         TPD_G       => TPD_G,
+         NUM_LINKS_G => l1Feedbacks'length)
       port map (
          clk            => timingClk,
          rst            => timingRst,
          l1FeedbacksIn  => l1Feedbacks,
          l1InAcks       => l1FeedbackAcks,
          l1FeedbacksOut => l1Partitions,
-         l1OutAcks      => l1PartitionAcks );
+         l1OutAcks      => l1PartitionAcks);
 
    --
    --  Let the local sequencer replace its part in the incoming stream
@@ -400,7 +400,7 @@ begin
             streamIds  => streamIds,
             advance    => timingStream.advance,
             fiducial   => timingStream.fiducial,
-            full       => r.full (i),
+            pause      => r.pause (i),
             overflow   => r.overflow(i),
             l1Feedback => l1Partitions(i),
             l1Ack      => l1PartitionAcks(i),
@@ -432,7 +432,7 @@ begin
    --
    -- timingStream carries its own 'advance' signal as well as fiducial.
    -- 
-   comb : process (advance, bpRxLinkFullS, dsFull, dsOverflow, expWord, fstreams, paddr,
+   comb : process (advance, bpRxLinkPauseS, dsPause, dsOverflow, expWord, fstreams, paddr,
                    pdepth, pmaster, r, timingRst, timingStream) is
       variable v         : RegType;
       variable tidx      : integer;
@@ -541,16 +541,16 @@ begin
 
       for i in 0 to XPM_PARTITIONS_C-1 loop
          for j in 0 to NUM_DS_LINKS_G-1 loop
-            v.full (i)(j)      := dsFull (j)(i);
-            v.overflow(i)(j)   := dsOverflow(j)(i);
+            v.pause (i)(j)   := dsPause (j)(i);
+            v.overflow(i)(j) := dsOverflow(j)(i);
          end loop;
          for j in 0 to NUM_BP_LINKS_G-1 loop
-            v.full (i)(j+16) := bpRxLinkFullS(j)(i);
+            v.pause (i)(j+16) := bpRxLinkPauseS(j)(i);
          end loop;
-         if pmaster(i) = '0' and v.full(i) /= 0 then
-            v.fullfb(i) := '1';
+         if pmaster(i) = '0' and v.pause(i) /= 0 then
+            v.pausefb(i) := '1';
          else
-            v.fullfb(i) := '0';
+            v.pausefb(i) := '0';
          end if;
 
          if (pmaster(i) = '0' and v.overflow(i) /= 0) then

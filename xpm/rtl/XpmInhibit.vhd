@@ -3,7 +3,7 @@
 -------------------------------------------------------------------------------
 -- Description: Level-0 trigger inhibit aggregation
 --
--- Assert 'inhibit' as logical OR of link 'full' status for all enabled
+-- Assert 'inhibit' as logical OR of link 'pause' status for all enabled
 -- links ('config').
 --
 -------------------------------------------------------------------------------
@@ -39,7 +39,7 @@ entity XpmInhibit is
       --  timing clock domain
       clk      : in  sl;
       rst      : in  sl;
-      full     : in  slv(27 downto 0);      -- status from downstream links
+      pause    : in  slv(27 downto 0);      -- status from downstream links
       fiducial : in  sl;
       l0Accept : in  sl;
       l1Accept : in  sl;
@@ -59,7 +59,7 @@ architecture rtl of XpmInhibit is
    signal r_in : RegType;
 
    signal proginhb : slv(config.setup'range);
-   signal fullb    : slv(27 downto 0);
+   signal pauseb   : slv(27 downto 0);
    signal inhSrc   : slv(31 downto 0);
    signal dtSrc    : slv(31 downto 0);
    signal evcounts : SlVectorArray(31 downto 0, 31 downto 0);
@@ -67,21 +67,21 @@ architecture rtl of XpmInhibit is
 
 begin
    status  <= r.status;
-   inhibit <= uOr(fullb) or uOr(proginhb);
+   inhibit <= uOr(pauseb) or uOr(proginhb);
 
-   inhSrc <= (proginhb & fullb) when rejecc = '1' else
+   inhSrc <= (proginhb & pauseb) when rejecc = '1' else
              (others => '0');
 
-   dtSrc <= (proginhb & fullb) when fiducial = '1' else
+   dtSrc <= (proginhb & pauseb) when fiducial = '1' else
             (others => '0');
 
-   --U_SyncFull : entity surf.SynchronizerVector
+   --U_SyncPause : entity surf.SynchronizerVector
    --  generic map ( WIDTH_G => 28 )
    --  port map ( clk     => clk,
-   --             dataIn  => full,
-   --             dataOut => fullb );
+   --             dataIn  => pause,
+   --             dataOut => pauseb );
    --  Already synchronous
-   fullb <= full;
+   pauseb <= pause;
 
    U_Status : entity surf.SyncStatusVector
       generic map (

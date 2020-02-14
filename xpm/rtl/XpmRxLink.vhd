@@ -5,7 +5,7 @@
 --
 -- This module receives the sensor link data stream and extracts the readout
 -- status and event feedback information, if any.  The readout status is expressed
--- by the 'full' signal which is asserted either by the almost full status from
+-- by the 'pause' signal which is asserted either by the almost full status from
 -- the link or the history of 'l0Accept' and 'l1Accept' signals with the given
 -- link configuration limits 'config'.
 --
@@ -41,7 +41,7 @@ entity XpmRxLink is
       clk        : in  sl;
       rst        : in  sl;
       config     : in  XpmLinkConfigType;
-      full       : out slv(XPM_PARTITIONS_C-1 downto 0);
+      pause       : out slv(XPM_PARTITIONS_C-1 downto 0);
       overflow   : out slv(XPM_PARTITIONS_C-1 downto 0);
       l1Feedback : out XpmL1FeedbackType;
       l1Ack      : in  sl := '0';
@@ -57,7 +57,7 @@ entity XpmRxLink is
 end XpmRxLink;
 
 architecture rtl of XpmRxLink is
-   type RxStateType is (IDLE_S, PFULL_S, ID1_S, ID2_S, PDATA1_S, PDATA2_S);
+   type RxStateType is (IDLE_S, PAUSE_S, ID1_S, ID2_S, PDATA1_S, PDATA2_S);
 
    signal l1FeedbackValid : sl;
    signal l1FeedbackSlv   : slv(toSlv(XPM_L1_FEEDBACK_INIT_C)'range);
@@ -68,7 +68,7 @@ architecture rtl of XpmRxLink is
       isXpm      : sl;
       id         : slv(31 downto 0);
       rxRcvs     : slv(31 downto 0);
-      pfull      : slv(XPM_PARTITIONS_C-1 downto 0);
+      pause      : slv(XPM_PARTITIONS_C-1 downto 0);
       overflow   : slv(XPM_PARTITIONS_C-1 downto 0);
       l1slv      : slv(31 downto 0);
       l1wr       : sl;
@@ -81,7 +81,7 @@ architecture rtl of XpmRxLink is
       isXpm      => '0',
       id         => (others => '0'),
       rxRcvs     => (others => '0'),
-      pfull      => (others => '1'),
+      pause      => (others => '1'),
       overflow   => (others => '0'),
       l1slv      => (others => '0'),
       l1wr       => '0',
@@ -129,15 +129,15 @@ begin
          dataIn  => config.enable,
          dataOut => uconfig.enable);
 
-   U_Full : entity surf.SynchronizerVector
+   U_Pause : entity surf.SynchronizerVector
       generic map (
          TPD_G   => TPD_G,
          INIT_G  => toSlv(-1, XPM_PARTITIONS_C),
          WIDTH_G => XPM_PARTITIONS_C)
       port map (
          clk     => clk,
-         dataIn  => r.pfull,
-         dataOut => full);
+         dataIn  => r.pause,
+         dataOut => pause);
 
    U_Overflow : entity surf.SynchronizerVector
       generic map (
@@ -191,9 +191,9 @@ begin
             v.state           := ID2_S;
          when ID2_S =>
             v.id(31 downto 16) := rxData;
-            v.state            := PFULL_S;
-         when PFULL_S =>
-            v.pfull    := rxData( 7 downto 0) and uconfig.groupMask;
+            v.state            := PAUSE_S;
+         when PAUSE_S =>
+            v.pause    := rxData( 7 downto 0) and uconfig.groupMask;
             v.overflow := rxData(15 downto 8) and uconfig.groupMask;
             v.state    := PDATA1_S;
          when PDATA1_S =>
@@ -211,21 +211,21 @@ begin
                if uconfig.groupMask(conv_integer(toL1Feedback(v.l1slv).partition)) = '1' then
                   v.l1wr             := '1';
                end if;
-               v.state               := PFULL_S;
+               v.state               := PAUSE_S;
             end if;
          when others => null;
       end case;
 
       if (rxRst = '1' or rxErr = '1') then
          v       := REG_INIT_C;
-         v.pfull := uconfig.groupMask;
+         v.pause := uconfig.groupMask;
       end if;
 
       if (uconfig.enable = '0') then
-         v.pfull  := (others => '0');
+         v.pause  := (others => '0');
          v.l1wr   := '0';
       elsif (r.timeout = uconfig.rxTimeOut) then
-         v.pfull   := uconfig.groupMask;
+         v.pause   := uconfig.groupMask;
          v.timeout := (others => '0');
       end if;
 
