@@ -87,6 +87,7 @@ def parseEventHeaderFrame(frame):
     frameSize = frame.getPayload()
     ba = bytearray(frameSize)
     channel = frame.getChannel()
+    print(f'Got Event Header frame with channel: {channel} and size: {frameSize}')
     frame.read(ba, 0)
 
     return parseBa2(ba)
