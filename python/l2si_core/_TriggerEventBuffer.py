@@ -199,7 +199,7 @@ class TriggerEventBuffer(pr.Device):
         ))
 
         self.add(pr.RemoteVariable(
-            name        = 'FullToTrig',
+            name        = 'PauseToTrig',
             offset      = 0x38,
             bitSize     = 12,
             bitOffset   = 0,
@@ -208,7 +208,7 @@ class TriggerEventBuffer(pr.Device):
         ))
 
         self.add(pr.RemoteVariable(
-            name        = 'NotFullToTrig',
+            name        = 'NotPauseToTrig',
             offset      = 0x3C,
             bitSize     = 12,
             bitOffset   = 0,
