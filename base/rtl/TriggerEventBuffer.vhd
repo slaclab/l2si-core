@@ -344,7 +344,7 @@ begin
 
       axiSlaveRegister(axilEp, x"00", 0, v.enable);
       axiSlaveRegister(axilEp, x"00", 1, v.enableEventBuffer);
-      axiSlaveRegister(axilEp, X"00", 2, v.resetCounters);
+
       axiSlaveRegister(axilEp, x"04", 0, v.partition);
       axiSlaveRegister(axilEp, X"08", 0, v.fifoPauseThresh);
       axiSlaveRegister(axilEp, X"0C", 0, v.triggerDelay);
@@ -363,6 +363,7 @@ begin
       axiSlaveRegisterR(axilEp, X"30", 0, alignedXpmMessage.partitionWord(0));
       axiSlaveRegisterR(axilEp, X"38", 0, r.pauseToTrig);
       axiSlaveRegisterR(axilEp, X"3C", 0, r.notPauseToTrig);
+      axiSlaveRegister(axilEp, X"40", 0, v.resetCounters);
 
       axiSlaveDefault(axilEp, v.axilWriteSlave, v.axilReadSlave, AXI_RESP_DECERR_C);
 
