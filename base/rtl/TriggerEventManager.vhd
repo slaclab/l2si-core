@@ -180,9 +180,6 @@ architecture rtl of TriggerEventManager is
    signal pauseSync              : slv(NUM_DETECTORS_G-1 downto 0);
    signal overflowSync           : slv(NUM_DETECTORS_G-1 downto 0);
 
-   signal l1FeedbacksSync : XpmL1FeedbackArray(NUM_DETECTORS_G-1 downto 0);
-   signal l1AcksTx        : slv(NUM_DETECTORS_G-1 downto 0);
-
    signal partitionsPause    : slv(XPM_PARTITIONS_C-1 downto 0);
    signal partitionsOverflow : slv(XPM_PARTITIONS_C-1 downto 0);
 
@@ -201,6 +198,7 @@ architecture rtl of TriggerEventManager is
    signal l1MasterSync : AxiStreamMasterType;
    signal l1Slave      : AxiStreamSlaveType;
    signal l1SlaveSync  : AxiStreamSlaveType;
+   signal l1Feedback   : XpmL1FeedbackType;
 
 begin
 
@@ -382,18 +380,19 @@ begin
    end process partitions;
 
    -- Create upstream message
+   l1Feedback <= toL1Feedback(l1MasterSync.tData(21 downto 0));
    U_XpmTimingFb_1 : entity l2si_core.XpmTimingFb
       generic map (
          TPD_G => TPD_G)
       port map (
-         clk        => timingTxClk,                       -- [in]
-         rst        => timingTxRst,                       -- [in]
-         id         => xpmIdSync,                         -- [in]
-         pause      => partitionsPause,                   -- [in]
-         overflow   => partitionsOverflow,                -- [in]
-         l1Feedback => toL1Feedback(l1MasterSync.tData),  -- [in]
-         l1Ack      => l1SlaveSync.tReady,                -- [out]
-         phy        => timingTxPhy);                      -- [out]
+         clk        => timingTxClk,         -- [in]
+         rst        => timingTxRst,         -- [in]
+         id         => xpmIdSync,           -- [in]
+         pause      => partitionsPause,     -- [in]
+         overflow   => partitionsOverflow,  -- [in]
+         l1Feedback => l1Feedback,          -- [in]
+         l1Ack      => l1SlaveSync.tReady,  -- [out]
+         phy        => timingTxPhy);        -- [out]
 
 
 end architecture rtl;
