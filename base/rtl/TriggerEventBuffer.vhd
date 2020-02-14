@@ -185,7 +185,7 @@ begin
 
    -- Event AXIS bus pause is the application pause signal
    -- It needs to be synchronizer to timingRxClk
-   U_Synchronizer_1 : entity work.Synchronizer
+   U_Synchronizer_1 : entity surf.Synchronizer
       generic map (
          TPD_G => TPD_G)
       port map (
