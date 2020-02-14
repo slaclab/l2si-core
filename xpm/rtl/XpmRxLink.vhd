@@ -41,11 +41,11 @@ entity XpmRxLink is
       clk        : in  sl;
       rst        : in  sl;
       config     : in  XpmLinkConfigType;
-      pause       : out slv(XPM_PARTITIONS_C-1 downto 0);
+      pause      : out slv(XPM_PARTITIONS_C-1 downto 0);
       overflow   : out slv(XPM_PARTITIONS_C-1 downto 0);
       l1Feedback : out XpmL1FeedbackType;
       l1Ack      : in  sl := '0';
-      
+
       rxClk   : in  sl;
       rxRst   : in  sl;
       rxData  : in  slv(15 downto 0);
@@ -59,34 +59,36 @@ end XpmRxLink;
 architecture rtl of XpmRxLink is
    type RxStateType is (IDLE_S, PAUSE_S, ID1_S, ID2_S, PDATA1_S, PDATA2_S);
 
+   constant L1_FB_SLV_LENGTH_C : integer := toSlv(XPM_L1_FEEDBACK_INIT_C)'length;
+
    signal l1FeedbackValid : sl;
-   signal l1FeedbackSlv   : slv(toSlv(XPM_L1_FEEDBACK_INIT_C)'range);
-   
+   signal l1FeedbackSlv   : slv(L1_FB_SLV_LENGTH_C-1 downto 0);
+
    type RegType is record
-      state      : RxStateType;
-      partition  : integer range 0 to XPM_PARTITIONS_C-1;
-      isXpm      : sl;
-      id         : slv(31 downto 0);
-      rxRcvs     : slv(31 downto 0);
-      pause      : slv(XPM_PARTITIONS_C-1 downto 0);
-      overflow   : slv(XPM_PARTITIONS_C-1 downto 0);
-      l1slv      : slv(31 downto 0);
-      l1wr       : sl;
-      strobe     : slv(XPM_PARTITIONS_C-1 downto 0);
-      timeout    : slv(8 downto 0);
+      state     : RxStateType;
+      partition : integer range 0 to XPM_PARTITIONS_C-1;
+      isXpm     : sl;
+      id        : slv(31 downto 0);
+      rxRcvs    : slv(31 downto 0);
+      pause     : slv(XPM_PARTITIONS_C-1 downto 0);
+      overflow  : slv(XPM_PARTITIONS_C-1 downto 0);
+      l1slv     : slv(31 downto 0);
+      l1wr      : sl;
+      strobe    : slv(XPM_PARTITIONS_C-1 downto 0);
+      timeout   : slv(8 downto 0);
    end record;
    constant REG_INIT_C : RegType := (
-      state      => IDLE_S,
-      partition  => 0,
-      isXpm      => '0',
-      id         => (others => '0'),
-      rxRcvs     => (others => '0'),
-      pause      => (others => '1'),
-      overflow   => (others => '0'),
-      l1slv      => (others => '0'),
-      l1wr       => '0',
-      strobe     => (others => '0'),
-      timeout    => (others => '0'));
+      state     => IDLE_S,
+      partition => 0,
+      isXpm     => '0',
+      id        => (others => '0'),
+      rxRcvs    => (others => '0'),
+      pause     => (others => '1'),
+      overflow  => (others => '0'),
+      l1slv     => (others => '0'),
+      l1wr      => '0',
+      strobe    => (others => '0'),
+      timeout   => (others => '0'));
 
    signal r   : RegType := REG_INIT_C;
    signal rin : RegType;
@@ -103,24 +105,24 @@ begin
       generic map (
          TPD_G        => TPD_G,
          FWFT_EN_G    => true,
-         DATA_WIDTH_G => l1FeedbackSlv'length,
+         DATA_WIDTH_G => L1_FB_SLV_LENGTH_C,
          ADDR_WIDTH_G => 4)
       port map (
-         rst               => rxRst,
-         wr_clk            => rxClk,
-         wr_en             => r.l1wr,
-         din               => r.l1slv(l1FeedbackSlv'range),
-         rd_clk            => clk,
-         rd_en             => l1Ack,
-         valid             => l1FeedbackValid,
-         dout              => l1FeedbackSlv );
+         rst    => rxRst,
+         wr_clk => rxClk,
+         wr_en  => r.l1wr,
+         din    => r.l1slv(L1_FB_SLV_LENGTH_C-1 downto 0),
+         rd_clk => clk,
+         rd_en  => l1Ack,
+         valid  => l1FeedbackValid,
+         dout   => l1FeedbackSlv);
 
    process (l1FeedbackSlv, l1FeedbackValid) is
    begin
       l1Feedback       <= toL1Feedback(l1FeedbackSlv);
       l1Feedback.valid <= l1FeedbackValid;
    end process;
-   
+
    U_Enable : entity surf.Synchronizer
       generic map (
          TPD_G => TPD_G)
@@ -175,7 +177,7 @@ begin
       v.timeout := (others => '0');
       v.l1wr    := '0';
 
-      v.isXpm   := uAnd(r.id(31 downto 24));
+      v.isXpm := uAnd(r.id(31 downto 24));
 
       case (r.state) is
          when IDLE_S =>
@@ -193,7 +195,7 @@ begin
             v.id(31 downto 16) := rxData;
             v.state            := PAUSE_S;
          when PAUSE_S =>
-            v.pause    := rxData( 7 downto 0) and uconfig.groupMask;
+            v.pause    := rxData(7 downto 0) and uconfig.groupMask;
             v.overflow := rxData(15 downto 8) and uconfig.groupMask;
             v.state    := PDATA1_S;
          when PDATA1_S =>
@@ -209,9 +211,9 @@ begin
             else
                v.l1slv(31 downto 16) := rxData;
                if uconfig.groupMask(conv_integer(toL1Feedback(v.l1slv).partition)) = '1' then
-                  v.l1wr             := '1';
+                  v.l1wr := '1';
                end if;
-               v.state               := PAUSE_S;
+               v.state := PAUSE_S;
             end if;
          when others => null;
       end case;
@@ -222,8 +224,8 @@ begin
       end if;
 
       if (uconfig.enable = '0') then
-         v.pause  := (others => '0');
-         v.l1wr   := '0';
+         v.pause := (others => '0');
+         v.l1wr  := '0';
       elsif (r.timeout = uconfig.rxTimeOut) then
          v.pause   := uconfig.groupMask;
          v.timeout := (others => '0');
