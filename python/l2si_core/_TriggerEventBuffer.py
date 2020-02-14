@@ -209,3 +209,5 @@ class TriggerEventBuffer(pr.Device):
             bitOffset = 0,
             function = pr.RemoteCommand.touchOne))
         
+    def countReset():
+        self.ResetCounters()
