@@ -59,7 +59,7 @@ entity TriggerEventBuffer is
 
       -- Feedback
       partition : out slv(2 downto 0);
-      full      : out sl;
+      pause      : out sl;
       overflow  : out sl;
 
       -- Trigger output
@@ -98,13 +98,14 @@ architecture rtl of TriggerEventBuffer is
       l1RejectCount     : slv(31 downto 0);
       resetCounters     : sl;
 
-      cnts              : slv(11 downto 0);
-      cntsToTrig        : slv(11 downto 0);
-      fullToTrig        : slv(11 downto 0);
-      nfullToTrig       : slv(11 downto 0);
-      afull             : sl;
-      cntOflow          : sl;
-      stable            : sl;
+      fbTimer         : slv(11 downto 0);
+      fbTimerOverflow : sl;
+      fbTimerActive   : sl;
+      fbTimerToTrig   : slv(11 downto 0);
+      pauseToTrig      : slv(11 downto 0);
+      notPauseToTrig     : slv(11 downto 0);
+      pause           : sl;
+
 
       fifoAxisMaster : AxiStreamMasterType;
 
@@ -132,7 +133,7 @@ architecture rtl of TriggerEventBuffer is
       triggerDelay      => toSlv(42, 32),
       overflow          => '0',
       fifoRst           => '0',
-      
+
       transitionCount => (others => '0'),
       validCount      => (others => '0'),
       triggerCount    => (others => '0'),
@@ -141,14 +142,14 @@ architecture rtl of TriggerEventBuffer is
       l1RejectCount   => (others => '0'),
       resetCounters   => '0',
 
-      cnts            => (others => '0'),
-      cntsToTrig      => (others => '0'),
-      fullToTrig      => (others => '0'),
-      nfullToTrig     => (others => '1'),
-      afull           => '0',
-      cntOflow        => '0',
-      stable          => '0',
-      
+      fbTimer         => (others => '0'),
+      fbTimerOverflow => '0',
+      fbTimerActive   => '0',
+      fbTimerToTrig   => (others => '0'),
+      pauseToTrig      => (others => '0'),
+      notPauseToTrig     => (others => '1'),
+      pause           => '0',
+
       fifoAxisMaster => axiStreamMasterInit(EVENT_AXIS_CONFIG_C),
       -- outputs     =>
       triggerData    => XPM_EVENT_DATA_INIT_C,
@@ -178,15 +179,26 @@ architecture rtl of TriggerEventBuffer is
    signal syncTriggerDataValid    : sl;
    signal syncTriggerDataSlv      : slv(47 downto 0);
 
+   signal eventAxisCtrlPauseSync : sl;
+
 begin
+
+   -- Event AXIS bus pause is the application pause signal
+   -- It needs to be synchronizer to timingRxClk
+   U_Synchronizer_1 : entity work.Synchronizer
+      generic map (
+         TPD_G => TPD_G)
+      port map (
+         clk     => timingRxClk,              -- [in]
+         rst     => timingRxRst,              -- [in]
+         dataIn  => eventAxisCtrl.pause,      -- [in]
+         dataOut => eventAxisCtrlPauseSync);  -- [out]
 
 
    comb : process (alignedTimingMessage, alignedTimingStrobe, alignedXpmMessage, axilReadMaster,
-                   axilWriteMaster, fifoAxisCtrl, fifoWrCnt, promptTimingStrobe, promptXpmMessage,
-                   eventAxisCtrl,
-                   r, timingRxRst) is
+                   axilWriteMaster, eventAxisCtrlPauseSync, fifoAxisCtrl, fifoWrCnt,
+                   promptTimingStrobe, promptXpmMessage, r, timingRxRst) is
       variable v      : RegType;
-      variable vfull  : sl;
       variable axilEp : AxiLiteEndpointType;
    begin
       v := r;
@@ -203,7 +215,7 @@ begin
       -- Watch for and decode triggers on prompt interface
       -- Output on triggerData interface
       --------------------------------------------
-      v.triggerData.valid := '0';
+      v.triggerData := XPM_EVENT_DATA_INIT_C;
       if (promptTimingStrobe = '1' and promptXpmMessage.valid = '1' and r.enable = '1') then
          v.triggerData := toXpmEventDataType(promptXpmMessage.partitionWord(v.partitionV));
          if (v.triggerData.valid = '1' and v.triggerData.l0Accept = '1') then
@@ -235,7 +247,7 @@ begin
          v.eventHeader.pulseId     := alignedTimingMessage.pulseId;
          v.eventHeader.timeStamp   := alignedTimingMessage.timeStamp;
          v.eventHeader.count       := v.eventData.count;
-         v.eventHeader.triggerInfo := alignedXpmMessage.partitionWord(v.partitionV)(15 downto 0);  -- Fix this uglyness later         
+         v.eventHeader.triggerInfo := alignedXpmMessage.partitionWord(v.partitionV)(15 downto 0);
          v.eventHeader.partitions  := (others => '0');
          for i in 0 to 7 loop
             v.tmpEventData              := toXpmEventDataType(alignedXpmMessage.partitionWord(i));
@@ -292,29 +304,27 @@ begin
          end if;
       end if;
 
-      -- Monitor time between full assertion and trigger arrival
-      v.cnts := r.cnts + 1;
-      if uAnd(r.cnts) = '1' then
-         v.cntOflow := '1';
+      -- Monitor time between pause assertion and trigger arrival
+      v.fbTimer := r.fbTimer + 1;
+      if uAnd(r.fbTimer) = '1' then
+         v.fbTimerOverflow := '1';
       end if;
-
-      vfull   := fifoAxisCtrl.pause or eventAxisCtrl.pause;
-      v.afull := vfull;
-      if vfull /= r.afull then
-         v.cnts     := (others=>'0');
-         v.cntOflow := '0';
-         v.stable   := r.cntOflow;
-         if (r.afull = '1' and r.stable = '1' and r.cntsToTrig > r.fullToTrig) then
-            v.fullToTrig := r.cntsToTrig;
+      v.pause := fifoAxisCtrl.pause or eventAxisCtrlPauseSync;
+      if v.pause /= r.pause then
+         v.fbTimer         := (others => '0');
+         v.fbTimerOverflow := '0';
+         v.fbTimerActive   := r.fbTimerOverflow;
+         if (r.pause = '1' and r.fbTimerActive = '1' and r.fbTimerToTrig > r.pauseToTrig) then
+            v.pauseToTrig := r.fbTimerToTrig;
          end if;
       elsif (r.triggerData.valid = '1' and r.triggerData.l0Accept = '1') then
-         if r.afull = '1' then
-            v.cntsToTrig := r.cnts;
-         elsif (r.stable = '1' and r.cntOflow = '0' and r.cnts < r.nfullToTrig) then
-            v.nfullToTrig := r.cnts;
+         if r.pause = '1' then
+            v.fbTimerToTrig := r.fbTimer;
+         elsif (r.fbTimerActive = '1' and r.fbTimerOverflow = '0' and r.fbTimer < r.notPauseToTrig) then
+            v.notPauseToTrig := r.fbTimer;
          end if;
       end if;
-        
+
       v.resetCounters := '0';           -- Pulsed for 1 cycle
       if (r.resetCounters = '1') then
          v.l0Count       := (others => '0');
@@ -322,8 +332,8 @@ begin
          v.l1RejectCount := (others => '0');
          v.validCount    := (others => '0');
          v.triggerCount  := (others => '0');
-         v.fullToTrig    := (others => '0');
-         v.nfullToTrig   := (others => '1');
+         v.pauseToTrig    := (others => '0');
+         v.notPauseToTrig   := (others => '1');
       end if;
 
       --------------------------------------------
@@ -339,9 +349,10 @@ begin
       axiSlaveRegister(axilEp, X"08", 0, v.fifoPauseThresh);
       axiSlaveRegister(axilEp, X"0C", 0, v.triggerDelay);
       axiSlaveRegisterR(axilEp, x"10", 0, r.overflow);
-      axiSlaveRegisterR(axilEp, X"10", 1, fifoAxisCtrl.pause);
+      axiSlaveRegisterR(axilEp, X"10", 1, r.pause);
       axiSlaveRegisterR(axilEp, X"10", 2, fifoAxisCtrl.overflow);
-      axiSlaveRegisterR(axilEp, X"10", 3, fifoWrCnt);
+      axiSlaveRegisterR(axilEp, X"10", 3, fifoAxisCtrl.pause);      
+      axiSlaveRegisterR(axilEp, X"10", 4, fifoWrCnt);
       axiSlaveRegisterR(axilEp, x"14", 0, r.l0Count);
       axiSlaveRegisterR(axilEp, x"18", 0, r.l1AcceptCount);
       axiSlaveRegisterR(axilEp, x"1C", 0, r.l1RejectCount);
@@ -350,8 +361,8 @@ begin
       axiSlaveRegisterR(axilEp, X"28", 0, r.triggerCount);
       axiSlaveRegisterR(axilEp, X"2C", 0, alignedXpmMessage.partitionAddr);
       axiSlaveRegisterR(axilEp, X"30", 0, alignedXpmMessage.partitionWord(0));
-      axiSlaveRegisterR(axilEp, X"38", 0, r.fullToTrig);
-      axiSlaveRegisterR(axilEp, X"3C", 0, r.nfullToTrig);
+      axiSlaveRegisterR(axilEp, X"38", 0, r.pauseToTrig);
+      axiSlaveRegisterR(axilEp, X"3C", 0, r.notPauseToTrig);
 
       axiSlaveDefault(axilEp, v.axilWriteSlave, v.axilReadSlave, AXI_RESP_DECERR_C);
 
@@ -366,6 +377,7 @@ begin
       axilReadSlave  <= r.axilReadSlave;
       partition      <= r.partition;
       overflow       <= r.overflow;
+      pause <= r.pause;
 
    end process comb;
 
@@ -418,11 +430,11 @@ begin
 
       U_SynchronizerClear : entity surf.Synchronizer
          generic map (
-            TPD_G   => TPD_G )
+            TPD_G => TPD_G)
          port map (
-            clk        => triggerClk,
-            dataIn     => r.fifoRst,
-            dataOut    => clear );
+            clk     => triggerClk,
+            dataIn  => r.fifoRst,
+            dataOut => clear);
    end generate TRIGGER_SYNC_GEN;
 
    NO_TRIGGER_SYNC_GEN : if (TRIGGER_CLK_IS_TIMING_RX_CLK_G) generate
@@ -457,8 +469,6 @@ begin
          mAxisRst        => eventRst,           -- [in]
          mAxisMaster     => eventAxisMaster,    -- [out]
          mAxisSlave      => eventAxisSlave);    -- [in]
-
-   full <= fifoAxisCtrl.pause or eventAxisCtrl.pause;
 
    -----------------------------------------------
    -- Buffer TimingMessage that corresponds to each event placed in event fifo

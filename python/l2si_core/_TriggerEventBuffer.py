@@ -78,7 +78,7 @@ class TriggerEventBuffer(pr.Device):
 
         self.add(pr.RemoteVariable(
             name        = 'XpmPause',
-            description = 'Event Buffer Pause condition and signal to XPM Feedback',
+            description = 'Pause condition and signal to XPM Feedback',
             offset      = 0x10,
             bitSize     = 1,
             bitOffset   = 1,
@@ -95,13 +95,23 @@ class TriggerEventBuffer(pr.Device):
             base        = pr.Bool,
             mode        = 'RO',
         ))
+
+        self.add(pr.RemoteVariable(
+            name        = 'FifoPause',
+            description = 'Event Buffer Pause condition',
+            offset      = 0x10,
+            bitSize     = 1,
+            bitOffset   = 3,
+            base        = pr.Bool,
+            mode        = 'RO',
+        ))
         
         self.add(pr.RemoteVariable(
             name = 'FifoWrCnt',
             description = 'Number of Events in Event Buffer',
             offset = 0x10,
             bitSize = 5,
-            bitOffset = 3,
+            bitOffset = 4,
             mode = 'RO'
         ))
 
