@@ -57,7 +57,7 @@ entity XpmMini is
       timingClk    : in  sl;
       timingRst    : in  sl;
       dsTx         : out TimingPhyArray (NUM_DS_LINKS_G-1 downto 0);
-      timingStream : in  XpmMiniStreamType);
+      timingStream : in  XpmStreamType);
 end XpmMini;
 
 architecture top_level_app of XpmMini is

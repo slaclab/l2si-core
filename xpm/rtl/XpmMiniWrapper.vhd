@@ -79,18 +79,18 @@ architecture top_level of XpmMiniWrapper is
 
    signal xpmStatus : XpmMiniStatusType;
    signal xpmConfig : XpmMiniConfigType;
-   signal xpmStream : XpmMiniStreamType := XPM_MINI_STREAM_INIT_C;
+   signal xpmStream : XpmStreamType := XPM_STREAM_INIT_C;
 
    signal update : sl;
 
    type RegType is record
-     advance : sl;
+      advance : sl;
    end record;
 
-   constant REG_INIT_C : RegType := ( advance => '0' );
+   constant REG_INIT_C : RegType := (advance => '0');
 
-   signal r    : RegType := REG_INIT_C;
-   signal rin  : RegType;
+   signal r   : RegType := REG_INIT_C;
+   signal rin : RegType;
 
 begin
 
@@ -182,28 +182,28 @@ begin
          dsTx         => dsTx,
          timingStream => xpmStream);
 
-   comb : process ( r, timingRst, tpgFiducial, tpgStream ) is
-     variable v : RegType;
+   comb : process (r, timingRst, tpgFiducial, tpgStream) is
+      variable v : RegType;
    begin
-     v := r;
+      v := r;
 
-     v.advance := tpgStream.ready and not tpgFiducial;
-     
-     if timingRst = '1' then
-       v := REG_INIT_C;
-     end if;
+      v.advance := tpgStream.ready and not tpgFiducial;
 
-     rin <= v;
+      if timingRst = '1' then
+         v := REG_INIT_C;
+      end if;
 
-     tpgAdvance <= v.advance;
+      rin <= v;
+
+      tpgAdvance <= v.advance;
    end process;
 
-   seq : process ( timingClk )
+   seq : process (timingClk)
    begin
-     if rising_edge(timingClk) then
-       r <= rin;
-     end if;
+      if rising_edge(timingClk) then
+         r <= rin;
+      end if;
    end process;
-   
+
 end top_level;
 

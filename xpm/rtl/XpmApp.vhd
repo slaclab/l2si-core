@@ -75,7 +75,7 @@ entity XpmApp is
       timingClk       : in  sl;
       timingRst       : in  sl;
 --      timingIn          : in  TimingRxType;
-      timingStream    : in  XpmMiniStreamType;
+      timingStream    : in  XpmStreamType;
       timingFbClk     : in  sl;
       timingFbRst     : in  sl;
       timingFbId      : in  slv(31 downto 0);
