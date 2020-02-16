@@ -199,25 +199,23 @@ begin
             v.overflow := rxData(15 downto 8) and uconfig.groupMask;
             v.state    := PDATA1_S;
          when PDATA1_S =>
-            if (rxDataK = "01" and rxData = (D_215_C & K_EOF_C)) then
-               v.state := IDLE_S;
-            else
-               v.l1slv(15 downto 0) := rxData;
-               v.state              := PDATA2_S;
-            end if;
+            v.l1slv(15 downto 0) := rxData;
+            v.state              := PDATA2_S;
          when PDATA2_S =>
-            if (rxDataK = "01" and rxData = (D_215_C & K_EOF_C)) then
-               v.state := IDLE_S;
-            else
-               v.l1slv(31 downto 16) := rxData;
-               if uconfig.groupMask(conv_integer(toL1Feedback(v.l1slv).partition)) = '1' then
-                  v.l1wr := '1';
-               end if;
-               v.state := PAUSE_S;
+            v.l1slv(31 downto 16) := rxData;
+            if uconfig.groupMask(conv_integer(toL1Feedback(v.l1slv).partition)) = '1' then
+               v.l1wr := '1';
             end if;
+            v.state := PAUSE_S;
          when others => null;
       end case;
 
+      -- EOF always returns to IDLE
+      if (rxDataK = "01" and rxData = (D_215_C & K_EOF_C)) then
+         v       := r;
+         v.state := IDLE_S;
+      end if;
+      
       if (rxRst = '1' or rxErr = '1') then
          v       := REG_INIT_C;
          v.pause := uconfig.groupMask;

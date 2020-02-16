@@ -225,7 +225,8 @@ begin
       axiSlaveDefault(axilEp, v.axilWriteSlave, v.axilReadSlave, AXI_RESP_DECERR_C);
 
       if rst = '1' then
-         v := REG_INIT_C;
+         v      := REG_INIT_C;
+         v.txId := r.txId;    -- can this survive a reset
       end if;
 
       axilWriteSlave <= r.axilWriteSlave;
