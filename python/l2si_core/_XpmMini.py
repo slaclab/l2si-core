@@ -14,6 +14,15 @@ class XpmMini(pr.Device):
         super().__init__(**kwargs)
 
         self.add(pr.RemoteVariable( 
+            name         = "AxilRdEn",
+            offset       = 0x14,
+            bitSize      = 1,
+            bitOffset    = 31,
+            base         = pr.Bool,
+            mode         = 'RW',
+        )) 
+
+        self.add(pr.RemoteVariable( 
             name         = "Link",
             offset       = 0x00,
             bitSize      = 4,
@@ -159,14 +168,6 @@ class XpmMini(pr.Device):
             base         = pr.Bool
         )) 
         
-        self.add(pr.RemoteVariable( 
-            name         = "AxilRdEn",
-            offset       = 0x14,
-            bitSize      = 1,
-            bitOffset    = 31,
-            base         = pr.Bool,
-            mode         = 'RW',
-        )) 
         
         self.add(pr.RemoteVariable( 
             name         = "Config_L0Select_RateSel",
@@ -176,7 +177,7 @@ class XpmMini(pr.Device):
             mode         = 'RW',
             enum = {
                 0: '1 MHz',
-                1: '100 kHz',
+                1: '70 kHz',
                 2: '10 kHz',
                 3: '1 kHz',
                 4: '100 Hz',
