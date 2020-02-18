@@ -24,16 +24,6 @@ class TriggerEventBuffer(pr.Device):
         ))
         
         self.add(pr.RemoteVariable(
-            name        = 'EventBufferEnable',
-            description = 'Enables the event buffer in firmware',
-            offset      = 0x00,
-            bitSize     = 1,
-            bitOffset   = 1,
-            base        = pr.Bool,
-            mode        = 'RW',
-        ))
-        
-        self.add(pr.RemoteVariable(
             name        = 'Partition',
             description = 'Selected Partition to listen for events on',
             offset      = 0x04,
