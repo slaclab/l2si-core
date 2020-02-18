@@ -64,14 +64,16 @@ architecture rtl of XpmMessageAligner is
    constant TF_DELAY_SLV_C : slv(6 downto 0) := toSlv(TF_DELAY_G, 7);
 
    type RegType is record
-      xpmId           : slv(31 downto 0);
+      txId            : slv(31 downto 0);
+      rxId            : slv(31 downto 0);
       partitionDelays : Slv7Array(XPM_PARTITIONS_C-1 downto 0);
       axilWriteSlave  : AxiLiteWriteSlaveType;
       axilReadSlave   : AxiLiteReadSlaveType;
    end record;
 
    constant REG_INIT_C : RegType := (
-      xpmId           => (others => '0'),
+      txId            => (others => '0'),
+      rxId            => (others => '1'),
       partitionDelays => (others => (others => '0')),
       axilWriteSlave  => AXI_LITE_WRITE_SLAVE_INIT_C,
       axilReadSlave   => AXI_LITE_READ_SLAVE_INIT_C);
@@ -205,6 +207,8 @@ begin
          broadcastMessage := toXpmBroadcastType(promptXpmMessage.partitionAddr);
          if (broadcastMessage.btype = XPM_BROADCAST_PDELAY_C) then
             v.partitionDelays(broadcastMessage.index) := broadcastMessage.value;
+         elsif (broadcastMessage.btype = XPM_BROADCAST_XADDR_C) then
+            v.rxId := promptXpmMessage.partitionAddr;
          end if;
       end if;
 
@@ -214,17 +218,20 @@ begin
          axiSlaveRegisterR(axilEp, X"00"+ toSlv(i*4, 8), 0, r.partitionDelays(i));
       end loop;
 
-      axiSlaveRegister(axilEp, X"20", 0, v.xpmId);
+      axiSlaveRegister(axilEp, X"20", 0, v.txId);
+
+      axiSlaveRegisterR(axilEp, X"24", 0, v.rxId);
 
       axiSlaveDefault(axilEp, v.axilWriteSlave, v.axilReadSlave, AXI_RESP_DECERR_C);
 
       if rst = '1' then
-         v := REG_INIT_C;
+         v      := REG_INIT_C;
+         v.txId := r.txId;    -- can this survive a reset
       end if;
 
       axilWriteSlave <= r.axilWriteSlave;
       axilReadSlave  <= r.axilReadSlave;
-      xpmId          <= r.xpmId;
+      xpmId          <= r.txId;
 
       rin <= v;
    end process;

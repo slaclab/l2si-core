@@ -22,14 +22,10 @@ use ieee.std_logic_unsigned.all;
 library unisim;
 use unisim.vcomponents.all;
 
-
 library surf;
 use surf.StdRtlPkg.all;
 use surf.AxiStreamPkg.all;
 use surf.AxiLitePkg.all;
-
-library l2si_core;
-use l2si_core.DtiPkg.all;
 use surf.Pgp3Pkg.all;
 
 entity DtiPgp3Fb is

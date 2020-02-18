@@ -24,7 +24,6 @@ library surf;
 use surf.StdRtlPkg.all;
 
 library lcls_timing_core;
-use lcls_timing_core.TimingExtnPkg.all;
 use lcls_timing_core.TimingPkg.all;
 use lcls_timing_core.TPGPkg.all;
 
@@ -39,20 +38,20 @@ use unisim.vcomponents.all;
 
 entity XpmSim is
   generic ( USE_TX_REF        : boolean := false;
-            ENABLE_DS_LINKS_G : slv(NDSLinks-1 downto 0) := (others=>'0');
-            ENABLE_BP_LINKS_G : slv(NBPLinks-1 downto 0) := (others=>'0');
+            ENABLE_DS_LINKS_G : slv(XPM_MAX_DS_LINKS_C-1 downto 0) := (others=>'0');
+            ENABLE_BP_LINKS_G : slv(XPM_MAX_BP_LINKS_C-1 downto 0) := (others=>'0');
             RATE_DIV_G        : integer := 4;
             RATE_SELECT_G     : integer := 1;
             PIPELINE_DEPTH_G  : integer := 200 );
   port ( txRefClk     : in  sl := '0';
-         dsRxClk      : in  slv       (NDSLinks-1 downto 0);
-         dsRxRst      : in  slv       (NDSLinks-1 downto 0);
-         dsRxData     : in  Slv16Array(NDSLinks-1 downto 0);
-         dsRxDataK    : in  Slv2Array (NDSLinks-1 downto 0);
-         dsTxClk      : out slv       (NDSLinks-1 downto 0);
-         dsTxRst      : out slv       (NDSLinks-1 downto 0);
-         dsTxData     : out Slv16Array(NDSLinks-1 downto 0);
-         dsTxDataK    : out Slv2Array (NDSLinks-1 downto 0);
+         dsRxClk      : in  slv       (XPM_MAX_DS_LINKS_C-1 downto 0);
+         dsRxRst      : in  slv       (XPM_MAX_DS_LINKS_C-1 downto 0);
+         dsRxData     : in  Slv16Array(XPM_MAX_DS_LINKS_C-1 downto 0);
+         dsRxDataK    : in  Slv2Array (XPM_MAX_DS_LINKS_C-1 downto 0);
+         dsTxClk      : out slv       (XPM_MAX_DS_LINKS_C-1 downto 0);
+         dsTxRst      : out slv       (XPM_MAX_DS_LINKS_C-1 downto 0);
+         dsTxData     : out Slv16Array(XPM_MAX_DS_LINKS_C-1 downto 0);
+         dsTxDataK    : out Slv2Array (XPM_MAX_DS_LINKS_C-1 downto 0);
          --
          bpTxClk      : out sl;
          bpTxLinkUp   : in  sl;
@@ -60,8 +59,8 @@ entity XpmSim is
          bpTxDataK    : out slv( 1 downto 0);
          bpRxClk      : in  sl;
          bpRxClkRst   : in  sl;
-         bpRxLinkUp   : in  slv       (NBPLinks-1 downto 0);
-         bpRxLinkFull : in  Slv16Array(NBPLinks-1 downto 0) );
+         bpRxLinkUp   : in  slv       (XPM_MAX_BP_LINKS_C-1 downto 0);
+         bpRxLinkFull : in  Slv16Array(XPM_MAX_BP_LINKS_C-1 downto 0) );
 end XpmSim;
 
 architecture top_level_app of XpmSim is
@@ -78,16 +77,16 @@ architecture top_level_app of XpmSim is
    signal tpgConfig : TPGConfigType := TPG_CONFIG_INIT_C;
    signal xpmConfig : XpmConfigType := XPM_CONFIG_INIT_C;
    signal xpmStatus : XpmStatusType;
-   signal linkStatus: XpmLinkStatusArray(NDSLinks-1 downto 0) := (others=>XPM_LINK_STATUS_INIT_C);
+   signal linkStatus: XpmLinkStatusArray(XPM_MAX_DS_LINKS_C-1 downto 0) := (others=>XPM_LINK_STATUS_INIT_C);
    
    -- Timing Interface (timingClk domain) 
 --   signal xData      : TimingRxType := TIMING_RX_INIT_C;
-   signal xData      : XpmStreamType := (
+   signal xData      : XpmMiniStreamType := (
      fiducial => '0',
      streams  => (others=>TIMING_SERIAL_INIT_C),
      advance  => (others=>'0') );
    
-   signal pconfig : XpmPartitionConfigArray(NPartitions-1 downto 0) := (others=>XPM_PARTITION_CONFIG_INIT_C);
+   signal pconfig : XpmPartitionConfigArray(XPM_PARTITIONS_C-1 downto 0) := (others=>XPM_PARTITION_CONFIG_INIT_C);
    
 begin
 
@@ -148,14 +147,14 @@ begin
   xpmConfig.dsLink(0).txDelay <= toSlv(200,20);
   xpmConfig.dsLink(1).txDelay <= toSlv(200,20);
 
-  GEN_DS_ENABLE : for i in 0 to NDSLinks-1 generate
+  GEN_DS_ENABLE : for i in 0 to XPM_MAX_DS_LINKS_C-1 generate
     GEN_ENABLE: if ENABLE_DS_LINKS_G(i)='1' generate
       xpmConfig.dsLink(i).enable     <= '1';
       xpmConfig.dsLink(i).groupMask  <= x"ff";
     end generate;
   end generate;
    
-  GEN_BP_ENABLE : for i in 0 to NBPLinks-1 generate
+  GEN_BP_ENABLE : for i in 0 to XPM_MAX_BP_LINKS_C-1 generate
     GEN_ENABLE: if ENABLE_BP_LINKS_G(i)='1' generate
       xpmConfig.bpLink(i).enable     <= '1';
       xpmConfig.bpLink(i).groupMask  <= x"ff";
@@ -164,7 +163,7 @@ begin
 
   process is
   begin
-     for i in 0 to NPartitions-1 loop
+     for i in 0 to XPM_PARTITIONS_C-1 loop
        -- Realistic
        -- pconfig(i).pipeline.depth_clks <= toSlv((80+i)*200,16);
        -- pconfig(i).pipeline.depth_fids <= toSlv((80+i),8);
@@ -173,8 +172,9 @@ begin
        pconfig(i).pipeline.depth_fids <= toSlv((20+i),8);
      end loop;
 
+     pconfig(0).master <= '1';
+     
      if SIM_ANALYSIS_TAG_G then
-       pconfig(0).master        <= '1';
        pconfig(0).analysis.rst  <= x"f";
        pconfig(0).analysis.tag  <= x"00000000";
        pconfig(0).analysis.push <= x"0";
@@ -209,7 +209,7 @@ begin
        wait until regClk='1';
        wait until regClk='0';
        
-       for i in 0 to NPartitions-1 loop
+       for i in 0 to XPM_PARTITIONS_C-1 loop
          pconfig(i).message.insert  <= '0';
        end loop;
 
@@ -225,7 +225,7 @@ begin
      --pconfig(0).inhibit.setup(0).limit    <= toSlv(3,4);
      --pconfig(0).inhibit.setup(0).interval <= toSlv(10,12);
 
-     for i in 1 to NPartitions-1 loop
+     for i in 1 to XPM_PARTITIONS_C-1 loop
        pconfig(i).l0Select.enabled <= '1';
        pconfig(i).l0Select.rateSel <= toSlv(1,16);
        pconfig(i).l0Select.destSel <= x"8000";
@@ -238,15 +238,15 @@ begin
      wait for 10 us;
 
      if GEN_CLEAR_G then
-       for i in 0 to NPartitions-1 loop
-         pconfig(i).message.hdr     <= MSG_CLEAR_FIFO;
+       for i in 0 to XPM_PARTITIONS_C-1 loop
+         pconfig(i).message.header  <= MSG_CLEAR_FIFO;
          pconfig(i).message.insert  <= '1';
        end loop;
        
        wait until regClk='1';
        wait until regClk='0';
        
-       for i in 0 to NPartitions-1 loop
+       for i in 0 to XPM_PARTITIONS_C-1 loop
          pconfig(i).message.insert  <= '0';
        end loop;
 
@@ -270,8 +270,8 @@ begin
                 dataK     => open );
      
    U_Application : entity l2si_core.XpmApp
-      generic map ( NDsLinks => linkStatus'length,
-                    NBpLinks => bpRxLinkUp'length )
+      generic map ( NUM_DS_LINKS_G => linkStatus'length,
+                    NUM_BP_LINKS_G => bpRxLinkUp'length )
       port map (
          -----------------------
          -- Application Ports --
@@ -295,7 +295,7 @@ begin
          ----------------------
          regclk          => regClk,
          regrst          => regRst,
-         update          => toSlv(1,NPartitions),
+         update          => toSlv(1,XPM_PARTITIONS_C),
          status          => xpmStatus,
          config          => xpmConfig,
          axilReadMaster  => AXI_LITE_READ_MASTER_INIT_C,

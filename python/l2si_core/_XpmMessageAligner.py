@@ -24,8 +24,14 @@ class XpmMessageAligner(pr.Device):
                 disp = '{:d}'))
 
         self.add(pr.RemoteVariable(
-            name = f'XpmId',
+            name = f'TxId',
             offset = 0x20,
             bitSize = 32,
             mode = 'RW'))
+
+        self.add(pr.RemoteVariable(
+            name = f'RxId',
+            offset = 0x24,
+            bitSize = 32,
+            mode = 'RO'))
         
