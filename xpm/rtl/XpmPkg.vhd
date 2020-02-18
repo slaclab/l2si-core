@@ -311,7 +311,7 @@ package XpmPkg is
    end record;
    constant XPM_PIPELINE_CONFIG_INIT_C : XpmPipelineConfigType := (
       depth_clks => toSlv(100*200, 16),
-      depth_fids => toSlv(100, 8));
+      depth_fids => toSlv(99, 8));
 
    type XpmBsaConfigType is record
       enabled     : sl;

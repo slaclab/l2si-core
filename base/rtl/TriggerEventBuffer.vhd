@@ -83,20 +83,19 @@ architecture rtl of TriggerEventBuffer is
    constant FIFO_ADDR_WIDTH_C : integer := 5;
 
    type RegType is record
-      enable            : sl;
-      enableEventBuffer : sl;
-      partition         : slv(2 downto 0);
-      fifoPauseThresh   : slv(FIFO_ADDR_WIDTH_C-1 downto 0);
-      triggerDelay      : slv(31 downto 0);
-      overflow          : sl;
-      fifoRst           : sl;
-      transitionCount   : slv(31 downto 0);
-      validCount        : slv(31 downto 0);
-      triggerCount      : slv(31 downto 0);
-      l0Count           : slv(31 downto 0);
-      l1AcceptCount     : slv(31 downto 0);
-      l1RejectCount     : slv(31 downto 0);
-      resetCounters     : sl;
+      enable          : sl;
+      partition       : slv(2 downto 0);
+      fifoPauseThresh : slv(FIFO_ADDR_WIDTH_C-1 downto 0);
+      triggerDelay    : slv(31 downto 0);
+      overflow        : sl;
+      fifoRst         : sl;
+      transitionCount : slv(31 downto 0);
+      validCount      : slv(31 downto 0);
+      triggerCount    : slv(31 downto 0);
+      l0Count         : slv(31 downto 0);
+      l1AcceptCount   : slv(31 downto 0);
+      l1RejectCount   : slv(31 downto 0);
+      resetCounters   : sl;
 
       fbTimer         : slv(11 downto 0);
       fbTimerOverflow : sl;
@@ -126,13 +125,12 @@ architecture rtl of TriggerEventBuffer is
    end record RegType;
 
    constant REG_INIT_C : RegType := (
-      enable            => '0',
-      enableEventBuffer => '0',
-      partition         => (others => '0'),
-      fifoPauseThresh   => toslv(16, FIFO_ADDR_WIDTH_C),
-      triggerDelay      => toSlv(42, 32),
-      overflow          => '0',
-      fifoRst           => '0',
+      enable          => '0',
+      partition       => (others => '0'),
+      fifoPauseThresh => toslv(16, FIFO_ADDR_WIDTH_C),
+      triggerDelay    => toSlv(42, 32),
+      overflow        => '0',
+      fifoRst         => '0',
 
       transitionCount => (others => '0'),
       validCount      => (others => '0'),
@@ -208,7 +206,7 @@ begin
       v.fifoRst := '0';
 
       v.fifoAxisMaster.tValid := '0';
-      v.streamValid           := '0';
+
 
       --------------------------------------------
       -- Trigger output logic
@@ -228,6 +226,7 @@ begin
       -- Watch for events/transitions on aligned interface
       -- Place entries into FIFO
       --------------------------------------------
+      v.streamValid := '0';
       if (alignedTimingStrobe = '1' and alignedXpmMessage.valid = '1') then
          -- Decode event data from configured partitionWord
          -- Decode as both event and transition and use the .valid field to determine which one to use
@@ -239,7 +238,7 @@ begin
          v.streamValid := (v.eventData.valid and v.eventData.l0Accept) or v.transitionData.valid;
 
          -- Don't pass data through when disabled
-         if (r.enable = '0' or r.enableEventBuffer = '0') then
+         if (r.enable = '0') then
             v.streamValid := '0';
          end if;
 
@@ -265,6 +264,7 @@ begin
          end if;
 
          -- Special case - reset fifo, mask any tValid
+         -- Note that this logic is active even when the r.enable register = 0.
          if (v.transitionData.valid = '1' and v.transitionData.header = MSG_CLEAR_FIFO_C) then
             v.overflow              := '0';
             v.fifoRst               := '1';
@@ -343,8 +343,6 @@ begin
       axiSlaveWaitTxn(axilEp, axilWriteMaster, axilReadMaster, v.axilWriteSlave, v.axilReadSlave);
 
       axiSlaveRegister(axilEp, x"00", 0, v.enable);
-      axiSlaveRegister(axilEp, x"00", 1, v.enableEventBuffer);
-
       axiSlaveRegister(axilEp, x"04", 0, v.partition);
       axiSlaveRegister(axilEp, X"08", 0, v.fifoPauseThresh);
       axiSlaveRegister(axilEp, X"0C", 0, v.triggerDelay);
