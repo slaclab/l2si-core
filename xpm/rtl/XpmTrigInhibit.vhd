@@ -3,7 +3,7 @@
 -------------------------------------------------------------------------------
 -- Description: Level-0 trigger inhibit aggregation
 --
--- Assert 'inhibit' as logical OR of link 'full' status for all enabled
+-- Assert 'inhibit' as logical OR of link 'pause' status for all enabled
 -- links ('config').
 --
 -------------------------------------------------------------------------------
@@ -46,13 +46,13 @@ architecture rtl of XpmTrigInhibit is
       count  : slv(config.interval'range);
       target : slv(config.interval'range);
       rd_cnt : sl;
-      full   : sl;
+      pause   : sl;
    end record;
    constant REG_INIT_C : RegType := (
       count  => (others => '0'),
       target => (others => '0'),
       rd_cnt => '0',
-      full   => '0');
+      pause   => '0');
 
    signal r   : RegType := REG_INIT_C;
    signal rin : RegType;
@@ -65,7 +65,7 @@ architecture rtl of XpmTrigInhibit is
 
 begin
 
-   inhibit <= r.full;
+   inhibit <= r.pause;
    fiforst <= rst or not uconfig.enable;
 
    U_Interval : entity surf.SynchronizerVector
@@ -122,9 +122,9 @@ begin
          v.target := r.count+uconfig.interval;
          --  latch the fifo status
          if (valid_cnt = '1' and dcount = uconfig.limit) then
-            v.full := '1';
+            v.pause := '1';
          else
-            v.full := '0';
+            v.pause := '0';
          end if;
       end if;
 

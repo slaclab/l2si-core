@@ -375,20 +375,24 @@ package XpmPkg is
    -- XPM L1 Feedbacks
    -----------------------------------------------
    type XpmL1FeedbackType is record
-      valid    : sl;
-      trigsrc  : slv(3 downto 0);
-      tag      : slv(4 downto 0);
-      trigword : slv(8 downto 0);
+      valid     : sl;
+      partition : slv(2 downto 0);
+      trigsrc   : slv(3 downto 0);
+      tag       : slv(4 downto 0);
+      trigword  : slv(8 downto 0);
    end record;
 
    type XpmL1FeedbackArray is array (natural range <>) of XpmL1FeedbackType;
 
    constant XPM_L1_FEEDBACK_INIT_C : XpmL1FeedbackType := (
-      valid    => '0',
-      trigsrc  => (others => '0'),
-      tag      => (others => '0'),
-      trigword => (others => '0'));
+      valid     => '0',
+      partition => (others => '0'),
+      trigsrc   => (others => '0'),
+      tag       => (others => '0'),
+      trigword  => (others => '0'));
 
+   function toSlv(s : XpmL1FeedbackType) return slv;
+   function toL1Feedback(vector : slv) return XpmL1FeedbackType;
 
 
 end package XpmPkg;
@@ -427,5 +431,28 @@ package body XpmPkg is
       return v;
    end function;
 
+   function toSlv(s : XpmL1FeedbackType) return slv is
+      variable vector : slv(21 downto 0) := (others=>'0');
+      variable i      : integer := 0;
+   begin
+      assignSlv(i, vector, s.valid);
+      assignSlv(i, vector, s.partition);
+      assignSlv(i, vector, s.trigsrc);
+      assignSlv(i, vector, s.tag);
+      assignSlv(i, vector, s.trigword);
+      return vector;
+   end function;
+   
+   function toL1Feedback(vector : slv) return XpmL1FeedbackType is
+      variable s : XpmL1FeedbackType := XPM_L1_FEEDBACK_INIT_C;
+      variable i : integer := 0;
+   begin
+      assignRecord(i, vector, s.valid);
+      assignRecord(i, vector, s.partition);
+      assignRecord(i, vector, s.trigsrc);
+      assignRecord(i, vector, s.tag);
+      assignRecord(i, vector, s.trigword);
+      return s;
+   end function;
 
 end package body XpmPkg;

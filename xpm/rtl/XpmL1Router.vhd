@@ -1,7 +1,10 @@
 -------------------------------------------------------------------------------
 -- Company    : SLAC National Accelerator Laboratory
 -------------------------------------------------------------------------------
--- Description: Distribution of MGT clocks
+-- Description: XpmL1Router
+-- 
+-- Note: Common-to-XpmApp interface defined here (see URL below)
+--       https://confluence.slac.stanford.edu/x/rLyMCw
 -------------------------------------------------------------------------------
 -- This file is part of 'L2SI Core'. It is subject to
 -- the license terms in the LICENSE.txt file found in the top-level directory
@@ -14,42 +17,31 @@
 
 library ieee;
 use ieee.std_logic_1164.all;
-
+use ieee.std_logic_unsigned.all;
 
 library surf;
 use surf.StdRtlPkg.all;
+use surf.AxiStreamPkg.all;
 
 library l2si_core;
 use l2si_core.XpmPkg.all;
 
-library unisim;
-use unisim.vcomponents.all;
-
-entity XpmLinkClocks is
+entity XpmL1Router is
+   generic (
+      TPD_G       : time         := 1 ns;
+      NUM_LINKS_G : integer      := 1 );
    port (
-      clkP             : in  sl;
-      clkN             : in  sl;
-      clkO             : out slv(XPM_MAX_DS_LINKS_C-1 downto 0) );
-end XpmLinkClocks;
+     clk            : in  sl;
+     rst            : in  sl;
+     l1FeedbacksIn  : in  XpmL1FeedbackArray(NUM_LINKS_G-1 downto 0);
+     l1InAcks       : out slv               (NUM_LINKS_G-1 downto 0);
+     l1FeedbacksOut : out XpmL1FeedbackArray(XPM_PARTITIONS_C downto 0);
+     l1OutAcks      : in  slv               (XPM_PARTITIONS_C downto 0) );
+end XpmL1Router;
 
-architecture rtl of XpmLinkClocks is
+architecture top_level_app of XpmL1Router is
 
-  signal clkRef : sl;
-  
 begin
-   XPM_IBUFDS_GTE3 : IBUFDS_GTE3
-      generic map (
-         REFCLK_EN_TX_PATH  => '0',
-         REFCLK_HROW_CK_SEL => "01",    -- 2'b01: ODIV2 = Divide-by-2 version of O
-         REFCLK_ICNTL_RX    => "00")
-      port map (
-         I     => clkP,
-         IB    => clkN,
-         CEB   => '0',
-         ODIV2 => open,
-         O     => clkRef);
-
-   GEN_REFCLK: for i in 0 to XPM_MAX_DS_LINKS_C-1 generate
-     clkO(i) <= clkRef;
-   end generate;
-end rtl;
+   l1InAcks       <= (others=>'1');
+   l1FeedbacksOut <= (others=>XPM_L1_FEEDBACK_INIT_C);
+end top_level_app;
