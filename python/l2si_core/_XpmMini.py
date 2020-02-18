@@ -176,7 +176,7 @@ class XpmMini(pr.Device):
             bitOffset    = 0,
             mode         = 'RW',
             enum = {
-                0: '929 kHz'
+                0: '929 kHz',
                 1: '71 kHz',
                 2: '10 kHz',
                 3: '1 kHz',
