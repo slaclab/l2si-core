@@ -176,13 +176,15 @@ class XpmMini(pr.Device):
             bitOffset    = 0,
             mode         = 'RW',
             enum = {
-                0: '929 kHz',
-                1: '71 kHz',
-                2: '10 kHz',
-                3: '1 kHz',
-                4: '100 Hz',
-                5: '10 Hz',
-                6: '1 Hz'}
+                0x0000: '929 kHz',
+                0x0001: '71 kHz',
+                0x0002: '10 kHz',
+                0x0003: '1 kHz',
+                0x0004: '100 Hz',
+                0x0005: '10 Hz',
+                0x0006: '1 Hz',
+                0x8000: 'Undefined',
+            }
         )) 
         
         self.add(pr.RemoteVariable( 
