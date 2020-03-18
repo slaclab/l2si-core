@@ -263,7 +263,7 @@ begin
             rst         => timingRst,
             streams     => ostreams,
             streamIds   => streamIds,
-            paddr       => r.paddr,
+            paddr       => paddr,
             paddrStrobe => r.paddrStrobe,
             fiducial    => fiducial(0),
             advance_o   => open,
@@ -302,7 +302,7 @@ begin
          rst         => timingRst,
          streams     => ostreams,
          streamIds   => streamIds,
-         paddr       => r.paddr,
+         paddr       => paddr,
          paddrStrobe => r.paddrStrobe,
          fiducial    => fiducial(0),
          advance_o   => advance,
@@ -388,7 +388,8 @@ begin
          generic map (
             TPD_G          => TPD_G,
             NUM_DS_LINKS_G => NUM_DS_LINKS_G,
-            DEBUG_G        => (i < 1))
+--            DEBUG_G        => (i < 1))
+            DEBUG_G        => false )
          port map (
             regclk     => regclk,
             update     => update (i),
@@ -510,7 +511,7 @@ begin
             if r.source = '1' then
                -- master of all : compose the word
                if r.bcastCount = 8 then
-                  v.paddr       := paddr;
+                  v.paddr       := (others=>'1');
                   v.bcastf      := paddr;
                   v.bcastCount  := 0;
                   v.paddrStrobe := '1';
@@ -553,6 +554,7 @@ begin
             v.pausefb(i) := '0';
          end if;
 
+         v.overflowfb(i) := '0';
          if (pmaster(i) = '0' and v.overflow(i) /= 0) then
             v.overflowfb(i) := '1';
          end if;

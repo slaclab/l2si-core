@@ -195,8 +195,8 @@ begin
             v.id(31 downto 16) := rxData;
             v.state            := PAUSE_S;
          when PAUSE_S =>
-            v.pause    := rxData(7 downto 0) and uconfig.groupMask;
-            v.overflow := rxData(15 downto 8) and uconfig.groupMask;
+            v.pause    := rxData( 7 downto 0);
+            v.overflow := rxData(15 downto 8);
             v.state    := PDATA1_S;
          when PDATA1_S =>
             v.l1slv(15 downto 0) := rxData;
@@ -217,18 +217,22 @@ begin
       end if;
       
       if (rxRst = '1' or rxErr = '1') then
-         v       := REG_INIT_C;
-         v.pause := uconfig.groupMask;
+         v          := REG_INIT_C;
       end if;
 
       if (uconfig.enable = '0') then
-         v.pause := (others => '0');
-         v.l1wr  := '0';
+         v.pause    := (others => '0');
+         v.overflow := (others => '0');
+         v.l1wr     := '0';
       elsif (r.timeout = uconfig.rxTimeOut) then
-         v.pause   := uconfig.groupMask;
-         v.timeout := (others => '0');
+         v.pause    := (others => '1');
+         v.overflow := (others => '1');
+         v.timeout  := (others => '0');
       end if;
 
+      v.pause    := v.pause and uconfig.groupMask;
+      v.overflow := v.overflow and uconfig.groupMask;
+      
       rin <= v;
    end process comb;
 
