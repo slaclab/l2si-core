@@ -21,17 +21,20 @@ class XpmMessageAligner(pr.Device):
                 offset = i*4,
                 bitSize = 7,
                 mode = 'RO',
-                disp = '{:d}'))
+                disp = '{:d}',
+                pollInterval = 1,))
 
         self.add(pr.RemoteVariable(
             name = f'TxId',
             offset = 0x20,
             bitSize = 32,
-            mode = 'RW'))
+            mode = 'RW',
+            pollInterval = 1,))
 
         self.add(pr.RemoteVariable(
             name = f'RxId',
             offset = 0x24,
             bitSize = 32,
-            mode = 'RO'))
+            mode = 'RO',
+            pollInterval = 1,))
         
