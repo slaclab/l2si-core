@@ -266,7 +266,7 @@ begin
 
          -- Special case - reset fifo, mask any tValid
          -- Note that this logic is active even when the r.enable register = 0.
-         if (v.transitionData.valid = '1' and v.transitionData.header = MSG_CLEARREADOUT_FIFO_C) then
+         if (v.transitionData.valid = '1' and v.transitionData.header = MSG_CLEAR_FIFO_C) then
             v.overflow              := '0';
             v.fifoRst               := '1';
             v.fifoAxisMaster.tValid := '0';
