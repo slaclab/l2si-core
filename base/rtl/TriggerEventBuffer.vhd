@@ -66,7 +66,7 @@ entity TriggerEventBuffer is
       triggerClk  : in  sl;
       triggerRst  : in  sl;
       triggerData : out TriggerEventDataType;
-      clear       : out sl;
+
 
       -- Event/Transition output
       eventClk           : in  sl;
@@ -74,7 +74,8 @@ entity TriggerEventBuffer is
       eventTimingMessage : out TimingMessageType;
       eventAxisMaster    : out AxiStreamMasterType;
       eventAxisSlave     : in  AxiStreamSlaveType;
-      eventAxisCtrl      : in  AxiStreamCtrlType);
+      eventAxisCtrl      : in  AxiStreamCtrlType;
+      clearReadout       : out sl);
 
 end entity TriggerEventBuffer;
 
@@ -265,7 +266,7 @@ begin
 
          -- Special case - reset fifo, mask any tValid
          -- Note that this logic is active even when the r.enable register = 0.
-         if (v.transitionData.valid = '1' and v.transitionData.header = MSG_CLEAR_FIFO_C) then
+         if (v.transitionData.valid = '1' and v.transitionData.header = MSG_CLEARREADOUT_FIFO_C) then
             v.overflow              := '0';
             v.fifoRst               := '1';
             v.fifoAxisMaster.tValid := '0';
@@ -427,13 +428,13 @@ begin
             dout   => syncTriggerDataSlv);      -- [out]
       triggerData <= toXpmEventDataType(syncTriggerDataSlv, syncTriggerDataValid);
 
-      U_SynchronizerClear : entity surf.Synchronizer
+      U_SynchronizerClearReadout : entity surf.SynchronizerOneShot
          generic map (
             TPD_G => TPD_G)
          port map (
-            clk     => triggerClk,
+            clk     => eventClk,
             dataIn  => r.fifoRst,
-            dataOut => clear);
+            dataOut => clearReadout);
    end generate TRIGGER_SYNC_GEN;
 
    NO_TRIGGER_SYNC_GEN : if (TRIGGER_CLK_IS_TIMING_RX_CLK_G) generate

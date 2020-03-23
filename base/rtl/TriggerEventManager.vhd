@@ -62,7 +62,6 @@ entity TriggerEventManager is
       triggerClk  : in  sl;
       triggerRst  : in  sl;
       triggerData : out TriggerEventDataArray(NUM_DETECTORS_G-1 downto 0);
-      clear       : out slv(NUM_DETECTORS_G-1 downto 0);
 
       -- L1 trigger feedback
       l1Clk       : in  sl                                                 := '0';
@@ -77,6 +76,7 @@ entity TriggerEventManager is
       eventAxisMasters    : out AxiStreamMasterArray(NUM_DETECTORS_G-1 downto 0);
       eventAxisSlaves     : in  AxiStreamSlaveArray(NUM_DETECTORS_G-1 downto 0);
       eventAxisCtrl       : in  AxiStreamCtrlArray(NUM_DETECTORS_G-1 downto 0);
+      clearReadout        : out slv(NUM_DETECTORS_G-1 downto 0);
 
       -- AXI-Lite
       axilClk         : in  sl;
@@ -293,13 +293,13 @@ begin
             triggerClk           => triggerClk,                          -- [in]
             triggerRst           => triggerRst,                          -- [in]
             triggerData          => triggerData(i),                      -- [out]
-            clear                => clear(i),                            -- [out]
             eventClk             => eventClk,                            -- [in]
             eventRst             => eventRst,                            -- [in]
             eventTimingMessage   => eventTimingMessages(i),              -- [out]
             eventAxisMaster      => eventAxisMasters(i),                 -- [out]
             eventAxisSlave       => eventAxisSlaves(i),                  -- [in]
-            eventAxisCtrl        => eventAxisCtrl(i));                   -- [in]
+            eventAxisCtrl        => eventAxisCtrl(i),                    -- [in]
+            clearReadout         => clearReadout(i));                    -- [out]      
    end generate GEN_DETECTORS;
 
 
