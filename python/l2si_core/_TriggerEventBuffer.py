@@ -21,6 +21,7 @@ class TriggerEventBuffer(pr.Device):
             bitOffset   = 0,
             base        = pr.Bool,
             mode        = 'RW',
+            pollInterval = 1,
         ))
         
         self.add(pr.RemoteVariable(
@@ -32,6 +33,7 @@ class TriggerEventBuffer(pr.Device):
             base        = pr.UInt,
             mode        = 'RW',
             disp        = '{:d}',
+            pollInterval = 1,
         ))
 
         self.add(pr.RemoteVariable(
@@ -42,7 +44,8 @@ class TriggerEventBuffer(pr.Device):
             bitOffset   = 0,
             base        = pr.UInt,
             mode        = 'RW',
-            disp        = '{:d}'            
+            disp        = '{:d}',            
+            pollInterval = 1,
         ))
         
         self.add(pr.RemoteVariable(
@@ -53,7 +56,8 @@ class TriggerEventBuffer(pr.Device):
             bitOffset   = 0,
             base        = pr.UInt,
             mode        = 'RW',
-            disp        = '{:d}'            
+            disp        = '{:d}',            
+            pollInterval = 1,
         ))
 
         self.add(pr.RemoteVariable(
@@ -64,6 +68,7 @@ class TriggerEventBuffer(pr.Device):
             bitOffset   = 0,
             base        = pr.Bool,
             mode        = 'RO',
+            pollInterval = 1,
         ))
 
         self.add(pr.RemoteVariable(
@@ -74,6 +79,7 @@ class TriggerEventBuffer(pr.Device):
             bitOffset   = 1,
             base        = pr.Bool,
             mode        = 'RO',
+            pollInterval = 1,
         ))
 
         self.add(pr.RemoteVariable(
@@ -84,6 +90,7 @@ class TriggerEventBuffer(pr.Device):
             bitOffset   = 2,
             base        = pr.Bool,
             mode        = 'RO',
+            pollInterval = 1,
         ))
 
         self.add(pr.RemoteVariable(
@@ -94,6 +101,7 @@ class TriggerEventBuffer(pr.Device):
             bitOffset   = 3,
             base        = pr.Bool,
             mode        = 'RO',
+            pollInterval = 1,
         ))
         
         self.add(pr.RemoteVariable(
@@ -102,7 +110,8 @@ class TriggerEventBuffer(pr.Device):
             offset = 0x10,
             bitSize = 5,
             bitOffset = 4,
-            mode = 'RO'
+            mode = 'RO',
+            pollInterval = 1,
         ))
 
         self.add(pr.RemoteVariable(
@@ -113,7 +122,8 @@ class TriggerEventBuffer(pr.Device):
             bitOffset   = 0,
             base        = pr.UInt,
             mode        = 'RO',
-            disp        = '{:d}'
+            disp        = '{:d}',
+            pollInterval = 1,
         ))
         
         self.add(pr.RemoteVariable(
@@ -124,7 +134,8 @@ class TriggerEventBuffer(pr.Device):
             bitOffset   = 0,
             base        = pr.UInt,
             mode        = 'RO',
-            disp        = '{:d}'            
+            disp        = '{:d}',            
+            pollInterval = 1,
         ))
         
         self.add(pr.RemoteVariable(
@@ -135,7 +146,8 @@ class TriggerEventBuffer(pr.Device):
             bitOffset   = 0,
             base        = pr.UInt,
             mode        = 'RO',
-            disp        = '{:d}'            
+            disp        = '{:d}',            
+            pollInterval = 1,
         ))
         
         self.add(pr.RemoteVariable(
@@ -146,7 +158,8 @@ class TriggerEventBuffer(pr.Device):
             bitOffset   = 0,
             base        = pr.UInt,
             mode        = 'RO',
-            disp        = '{:d}'
+            disp        = '{:d}',
+            pollInterval = 1,
         ))
 
         self.add(pr.RemoteVariable(
@@ -157,7 +170,8 @@ class TriggerEventBuffer(pr.Device):
             bitOffset   = 0,
             base        = pr.UInt,
             mode        = 'RO',
-            disp        = '{:d}'
+            disp        = '{:d}',
+            pollInterval = 1,
         ))
 
         self.add(pr.RemoteVariable(
@@ -167,7 +181,8 @@ class TriggerEventBuffer(pr.Device):
             bitOffset   = 0,
             base        = pr.UInt,
             mode        = 'RO',
-            disp        = '{:d}'
+            disp        = '{:d}',
+            pollInterval = 1,
         ))
         
         self.add(pr.RemoteVariable(
@@ -177,6 +192,7 @@ class TriggerEventBuffer(pr.Device):
             bitOffset   = 0,
             base        = pr.UInt,
             mode        = 'RO',
+            pollInterval = 1,
         ))
 
         self.add(pr.RemoteVariable(
@@ -186,6 +202,7 @@ class TriggerEventBuffer(pr.Device):
             bitOffset   = 0,
             base        = pr.UInt,
             mode        = 'RO',
+            pollInterval = 1,
         ))
 
         self.add(pr.RemoteVariable(
@@ -195,6 +212,7 @@ class TriggerEventBuffer(pr.Device):
             bitOffset   = 0,
             base        = pr.UInt,
             mode        = 'RO',
+            pollInterval = 1,
         ))
 
         self.add(pr.RemoteVariable(
@@ -204,6 +222,7 @@ class TriggerEventBuffer(pr.Device):
             bitOffset   = 0,
             base        = pr.UInt,
             mode        = 'RO',
+            pollInterval = 1,
         ))
 
         self.add(pr.RemoteCommand(
