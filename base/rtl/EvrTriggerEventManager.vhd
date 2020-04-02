@@ -40,13 +40,14 @@ use l2si_core.XpmExtensionPkg.all;
 entity EvrTriggerEventManager is
 
    generic (
-      TPD_G                          : time                 := 1 ns;
-      NUM_DETECTORS_G                : integer range 1 to 8 := 8;
-      AXIL_BASE_ADDR_G               : slv(31 downto 0)     := (others => '0');
-      EVENT_AXIS_CONFIG_G            : AxiStreamConfigType  := EVENT_AXIS_CONFIG_C;
-      L1_CLK_IS_TIMING_TX_CLK_G      : boolean              := false;
-      TRIGGER_CLK_IS_TIMING_RX_CLK_G : boolean              := false;
-      EVENT_CLK_IS_TIMING_RX_CLK_G   : boolean              := false);
+      TPD_G                        : time                 := 1 ns;
+      AXIL_BASE_ADDR_G             : slv(31 downto 0)     := (others => '0');
+      EVR_CHANNELS_G               : natural              := 1;
+      EVR_TRIGGERS_G               : natural range 1 to 8 := 1;
+      EVR_TRIG_DEPTH_G             : natural              := 1;
+      EVR_TRIG_PIPE_G              : natural              := 0;
+      EVENT_AXIS_CONFIG_G          : AxiStreamConfigType  := EVENT_AXIS_CONFIG_C;
+      EVENT_CLK_IS_TIMING_RX_CLK_G : boolean              := false);
    port (
       -- Timing Rx interface
       timingRxClk : in sl;
@@ -82,7 +83,8 @@ architecture rtl of EvrTriggerEventManager is
    constant AXIL_TEB_C     : IntegerArray(0 to NUM_DETECTORS_G-1) := list(1, NUM_DETECTORS_G, 1);
 
    constant AXIL_XBAR_CONFIG_C : AxiLiteCrossbarMasterConfigArray(AXIL_MASTERS_C-1 downto 0) := genAxiLiteConfig(AXIL_MASTERS_C, AXIL_BASE_ADDR_G, 12, 8);
-                                        -- Axi bus sync'd to timingClk
+
+   -- Axi bus sync'd to timingClk
    signal timingAxilReadMaster  : AxiLiteReadMasterType;
    signal timingAxilReadSlave   : AxiLiteReadSlaveType;
    signal timingAxilWriteMaster : AxiLiteWriteMasterType;
@@ -138,41 +140,51 @@ begin
          mAxiReadMasters     => locAxilReadMasters,     -- [out]
          mAxiReadSlaves      => locAxilReadSlaves);     -- [in]
 
+   U_EvrV2CoreTriggers_1 : entity lcls_timing_core.EvrV2CoreTriggers
+      generic map (
+         TPD_G           => TPD_G,
+         NCHANNELS_G     => EVR_CHANNELS_G
+         NTRIGGERS_G     => EVR_TRIGGERS_G,
+         TRIG_DEPTH_G    => EVR_TRIG_DEPTH_G,
+         TRIG_PIPE_G     => EVR_TRIG_PIPE_G,
+         COMMON_CLK_G    => true,
+         EVR_CARD_G      => false,
+         AXIL_BASEADDR_G => AXIL_XBAR_CONFIG_C(EVR_AXIL_C).baseAddr)
+      port map (
+         axilClk         => timingRxClk,                      -- [in]
+         axilRst         => timingRxRst,                      -- [in]
+         axilWriteMaster => locAxilWriteMasters(EVR_AXIL_C),  -- [in]
+         axilWriteSlave  => locAxilWriteSlaves(EVR_AXIL_C),   -- [out]
+         axilReadMaster  => locAxilReadMasters(EVR_AXIL_C),   -- [in]
+         axilReadSlave   => locAxilReadSlaves(EVR_AXIL_C),    -- [out]
+         evrClk          => timingRxClk,                      -- [in]
+         evrRst          => timingRxRst,                      -- [in]
+         evrBus          => timingBus,                        -- [in]
+         trigOut         => evrTriggerOut,                    -- [out]
+         evrModeSel      => evrModeSel);                      -- [in]
 
-   GEN_DETECTORS : for i in NUM_DETECTORS_G-1 downto 0 generate
-      U_TriggerEventBuffer_1 : entity l2si_core.EvrTriggerEventBuffer
+   GEN_TRIGGER_EVENT_BUFFERS : for i in EVR_TRIGGERS_G-1 downto 0 generate
+      U_EvrTriggerEventBuffer_1 : entity work.EvrTriggerEventBuffer
          generic map (
-            TPD_G                          => TPD_G,
-            EVENT_AXIS_CONFIG_G            => EVENT_AXIS_CONFIG_G,
-            TRIGGER_CLK_IS_TIMING_RX_CLK_G => TRIGGER_CLK_IS_TIMING_RX_CLK_G,
-            EVENT_CLK_IS_TIMING_RX_CLK_G   => EVENT_CLK_IS_TIMING_RX_CLK_G)
+            TPD_G                        => TPD_G,
+            TRIGGER_INDEX_C              => i,
+            EVENT_AXIS_CONFIG_G          => EVENT_AXIS_CONFIG_G,
+            EVENT_CLK_IS_TIMING_RX_CLK_G => EVENT_CLK_IS_TIMING_RX_CLK_G)
          port map (
-            timingRxClk          => timingRxClk,                         -- [in]
-            timingRxRst          => timingRxRst,                         -- [in]
-            axilReadMaster       => locAxilReadMasters(AXIL_TEB_C(i)),   -- [in]
-            axilReadSlave        => locAxilReadSlaves(AXIL_TEB_C(i)),    -- [out]
-            axilWriteMaster      => locAxilWriteMasters(AXIL_TEB_C(i)),  -- [in]
-            axilWriteSlave       => locAxilWriteSlaves(AXIL_TEB_C(i)),   -- [out]
-            promptTimingStrobe   => timingBus.strobe,                    -- [in]            
-            promptTimingMessage  => timingBus.message,                   -- [in]
-            promptXpmMessage     => xpmMessage,                          -- [in]
-            alignedTimingstrobe  => alignedTimingStrobe,                 -- [in]
-            alignedTimingMessage => alignedTimingMessage,                -- [in]
-            alignedXpmMessage    => alignedXpmMessage,                   -- [in]
-            partition            => detectorPartitions(i),               -- [out]
-            pause                => pause(i),                            -- [out]
-            overflow             => overflow(i),                         -- [out]
-            triggerClk           => triggerClk,                          -- [in]
-            triggerRst           => triggerRst,                          -- [in]
-            triggerData          => triggerData(i),                      -- [out]
-            eventClk             => eventClk,                            -- [in]
-            eventRst             => eventRst,                            -- [in]
-            eventTimingMessage   => eventTimingMessages(i),              -- [out]
-            eventAxisMaster      => eventAxisMasters(i),                 -- [out]
-            eventAxisSlave       => eventAxisSlaves(i),                  -- [in]
-            eventAxisCtrl        => eventAxisCtrl(i),                    -- [in]
-            clearReadout         => clearReadout(i));                    -- [out]      
-   end generate GEN_DETECTORS;
+            timingRxClk        => timingRxClk,         -- [in]
+            timingRxRst        => timingRxRst,         -- [in]
+            axilReadMaster     => axilReadMaster,      -- [in]
+            axilReadSlave      => axilReadSlave,       -- [out]
+            axilWriteMaster    => axilWriteMaster,     -- [in]
+            axilWriteSlave     => axilWriteSlave,      -- [out]
+            evrTriggers        => evrTriggers,         -- [in]
+            eventClk           => eventClk,            -- [in]
+            eventRst           => eventRst,            -- [in]
+            eventTimingMessage => eventTimingMessage,  -- [out]
+            eventAxisMaster    => eventAxisMaster,     -- [out]
+            eventAxisSlave     => eventAxisSlave,      -- [in]
+            eventAxisCtrl      => eventAxisCtrl);      -- [in]
+   end generate GEN_TRIGGER_EVENT_BUFFERS;
 
 
 
