@@ -18,19 +18,13 @@ library ieee;
 use ieee.std_logic_1164.all;
 use ieee.std_logic_unsigned.all;
 
--- surf
-
 library surf;
 use surf.StdRtlPkg.all;
 use surf.AxiLitePkg.all;
 use surf.AxiStreamPkg.all;
 
--- lcls-timing-core
-
 library lcls_timing_core;
 use lcls_timing_core.TimingPkg.all;
-
--- l2si
 
 library l2si_core;
 use l2si_core.L2SiPkg.all;
