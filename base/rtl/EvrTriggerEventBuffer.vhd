@@ -27,10 +27,9 @@ library l2si_core;
 use l2si_core.L2SiPkg.all;
 
 entity EvrTriggerEventBuffer is
-
    generic (
       TPD_G                        : time                := 1 ns;
-      TRIGGER_INDEX_C              : natural             := 0;
+      TRIGGER_INDEX_G              : natural             := 0;
       EVENT_AXIS_CONFIG_G          : AxiStreamConfigType := EVENT_AXIS_CONFIG_C;
       EVENT_CLK_IS_TIMING_RX_CLK_G : boolean             := false);
    port (
@@ -44,20 +43,15 @@ entity EvrTriggerEventBuffer is
       axilWriteMaster : in  AxiLiteWriteMasterType;
       axilWriteSlave  : out AxiLiteWriteSlaveType;
 
-      evrTriggers : in TimingPkg.TimingTrigType;
-
-      -- Trigger output
---       triggerClk  : in  sl;
---       triggerRst  : in  sl;
---       triggerData : out TriggerEventDataType;
+      evrTriggers : in  lcls_timing_core.TimingPkg.TimingTrigType;
+      triggerData : out TriggerEventDataType;
 
       -- Event/Transition output
-      eventClk           : in  sl;
-      eventRst           : in  sl;
-      eventTimingMessage : out TimingMessageType;
-      eventAxisMaster    : out AxiStreamMasterType;
-      eventAxisSlave     : in  AxiStreamSlaveType;
-      eventAxisCtrl      : in  AxiStreamCtrlType);
+      eventClk        : in  sl;
+      eventRst        : in  sl;
+      eventAxisMaster : out AxiStreamMasterType;
+      eventAxisSlave  : in  AxiStreamSlaveType;
+      eventAxisCtrl   : in  AxiStreamCtrlType);
 
 end entity EvrTriggerEventBuffer;
 
@@ -74,6 +68,7 @@ architecture rtl of EvrTriggerEventBuffer is
       resetCounters   : sl;
       fifoAxisMaster  : AxiStreamMasterType;
       -- outputs
+      triggerData     : TriggerEventDataType;
       axilReadSlave   : AxiLiteReadSlaveType;
       axilWriteSlave  : AxiLiteWriteSlaveType;
    end record RegType;
@@ -87,6 +82,7 @@ architecture rtl of EvrTriggerEventBuffer is
       resetCounters   => '0',
       fifoAxisMaster  => axiStreamMasterInit(EVENT_AXIS_CONFIG_C),
       -- outputs
+      triggerData     => TRIGGER_EVENT_DATA_INIT_C,
       axilReadSlave   => AXI_LITE_READ_SLAVE_INIT_C,
       axilWriteSlave  => AXI_LITE_WRITE_SLAVE_INIT_C);
 
@@ -121,17 +117,30 @@ begin
 
       v.fifoRst               := '0';
       v.fifoAxisMaster.tValid := '0';
+      v.triggerData.valid     := '0';
+      v.triggerData.l0Accept  := '0';
+      v.resetCounters         := '0';
 
-      if (evrTriggers.trigPulse(TRIGGER_INDEX_C) = '1') then
+      if (evrTriggers.trigPulse(TRIGGER_INDEX_G) = '1') then
          v.triggerCount                        := r.triggerCount + 1;
          v.fifoAxisMaster.tValid               := '1';
          v.fifoAxisMaster.tdata(63 downto 0)   := (others => '0');
          v.fifoAxisMaster.tdata(127 downto 64) := evrTriggers.timeStamp;
          v.fifoAxisMaster.tLast                := '1';
+
+         v.triggerData.valid    := '1';
+         v.triggerData.l0Accept := '1';
+         v.triggerData.l0Tag    := v.triggerCount(4 downto 0);
+         v.triggerData.count    := v.triggerCount(23 downto 0);
+
       end if;
 
       if (fifoAxisCtrl.overflow = '1') then
          v.overflow := '1';
+      end if;
+
+      if (r.resetCounters = '1') then
+         v.triggerCount := (others => '0');
       end if;
 
       --------------------------------------------
@@ -141,11 +150,8 @@ begin
       axiSlaveWaitTxn(axilEp, axilWriteMaster, axilReadMaster, v.axilWriteSlave, v.axilReadSlave);
 
       axiSlaveRegister(axilEp, x"00", 0, v.enable);
-      axiSlaveRegister(axilEp, x"04", 0, v.partition);
       axiSlaveRegister(axilEp, X"08", 0, v.fifoPauseThresh);
-      axiSlaveRegister(axilEp, X"0C", 0, v.triggerDelay);
       axiSlaveRegisterR(axilEp, x"10", 0, r.overflow);
-      axiSlaveRegisterR(axilEp, X"10", 1, r.pause);
       axiSlaveRegisterR(axilEp, X"10", 2, fifoAxisCtrl.overflow);
       axiSlaveRegisterR(axilEp, X"10", 3, fifoAxisCtrl.pause);
       axiSlaveRegisterR(axilEp, X"10", 4, fifoWrCnt);
@@ -162,9 +168,9 @@ begin
       rin <= v;
 
       -- outputs
+      triggerData    <= r.triggerData;
       axilWriteSlave <= r.axilWriteSlave;
       axilReadSlave  <= r.axilReadSlave;
-
    end process comb;
 
    seq : process (timingRxClk) is

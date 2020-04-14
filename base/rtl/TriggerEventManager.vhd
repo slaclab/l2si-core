@@ -38,7 +38,6 @@ use l2si_core.XpmPkg.all;
 use l2si_core.XpmExtensionPkg.all;
 
 entity TriggerEventManager is
-
    generic (
       TPD_G                          : time                 := 1 ns;
       NUM_DETECTORS_G                : integer range 1 to 8 := 8;
