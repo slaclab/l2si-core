@@ -37,8 +37,6 @@ entity EvrTriggerEventManager is
       AXIL_BASE_ADDR_G             : slv(31 downto 0)     := (others => '0');
       EVR_CHANNELS_G               : natural              := 1;
       EVR_TRIGGERS_G               : natural range 1 to 8 := 1;
-      EVR_TRIG_DEPTH_G             : natural              := 1;
-      EVR_TRIG_PIPE_G              : natural              := 0;
       EVENT_AXIS_CONFIG_G          : AxiStreamConfigType  := EVENT_AXIS_CONFIG_C;
       EVENT_CLK_IS_TIMING_RX_CLK_G : boolean              := false);
    port (
@@ -71,7 +69,44 @@ architecture rtl of EvrTriggerEventManager is
    constant AXIL_EVR_C     : integer                             := 0;
    constant AXIL_TEB_C     : IntegerArray(0 to EVR_TRIGGERS_G-1) := list(1, EVR_TRIGGERS_G, 1);
 
-   constant AXIL_XBAR_CONFIG_C : AxiLiteCrossbarMasterConfigArray(AXIL_MASTERS_C-1 downto 0) := genAxiLiteConfig(AXIL_MASTERS_C, AXIL_BASE_ADDR_G, 12, 8);
+   constant AXIL_XBAR_CONFIG_C : AxiLiteCrossbarMasterConfigArray(AXIL_MASTERS_C-1 downto 0) := (
+      AXIL_EVR_C  => (
+         baseAddr      => AXI_BASE_ADDR_G+x"0000",
+         addrBits      => 15,
+         connectivity  => x"FFFF"),
+      AXIL_TEB_C(0)  => (
+         baseAddr      => AXI_BASE_ADDR_G+x"8000",
+         addrBits      => 8,
+         connectivity  => x"FFFF"),
+      AXIL_TEB_C(1)  => (
+         baseAddr      => AXI_BASE_ADDR_G+x"8100",
+         addrBits      => 8,
+         connectivity  => x"FFFF"),
+      AXIL_TEB_C(2)  => (
+         baseAddr      => AXI_BASE_ADDR_G+x"8200",
+         addrBits      => 8,
+         connectivity  => x"FFFF"),
+      AXIL_TEB_C(3)  => (
+         baseAddr      => AXI_BASE_ADDR_G+x"8300",
+         addrBits      => 8,
+         connectivity  => x"FFFF"),
+      AXIL_TEB_C(4)  => (
+         baseAddr      => AXI_BASE_ADDR_G+x"8400",
+         addrBits      => 8,
+         connectivity  => x"FFFF"),
+      AXIL_TEB_C(5)  => (
+         baseAddr      => AXI_BASE_ADDR_G+x"8500",
+         addrBits      => 8,
+         connectivity  => x"FFFF"),
+      AXIL_TEB_C(6)  => (
+         baseAddr      => AXI_BASE_ADDR_G+x"8600",
+         addrBits      => 8,
+         connectivity  => x"FFFF"),
+      AXIL_TEB_C(7)  => (
+         baseAddr      => AXI_BASE_ADDR_G+x"8700",
+         addrBits      => 8,
+         connectivity  => x"FFFF"));
+      
 
    -- Axi bus sync'd to timingClk
    signal timingAxilReadMaster  : AxiLiteReadMasterType;
@@ -138,8 +173,8 @@ begin
          TPD_G           => TPD_G,
          NCHANNELS_G     => EVR_CHANNELS_G,
          NTRIGGERS_G     => EVR_TRIGGERS_G,
-         TRIG_DEPTH_G    => EVR_TRIG_DEPTH_G,
-         TRIG_PIPE_G     => EVR_TRIG_PIPE_G,
+         TRIG_DEPTH_G    => 28,
+         TRIG_PIPE_G     => 0,
          COMMON_CLK_G    => true,
          EVR_CARD_G      => false,
          AXIL_BASEADDR_G => AXIL_XBAR_CONFIG_C(AXIL_EVR_C).baseAddr)
