@@ -29,6 +29,7 @@ use surf.AxiLitePkg.all;
 library lcls_timing_core;
 use lcls_timing_core.TimingPkg.all;
 use lcls_timing_core.TPGPkg.all;
+use lcls_timing_core.TPGMiniEdefPkg.all;
 
 library l2si_core;
 use l2si_core.XpmPkg.all;
@@ -48,6 +49,8 @@ entity XpmMiniWrapper is
       dsRxClk : in slv (NUM_DS_LINKS_G-1 downto 0);
       dsRxRst : in slv (NUM_DS_LINKS_G-1 downto 0);
       dsRx    : in TimingRxArray (NUM_DS_LINKS_G-1 downto 0);
+
+      tpgMiniStream : out TimingPhyType := TIMING_PHY_INIT_C;
 
       axilClk         : in  sl;
       axilRst         : in  sl;
@@ -71,11 +74,12 @@ architecture top_level of XpmMiniWrapper is
    signal mAxilReadMasters  : AxiLiteReadMasterArray (NUM_AXI_MASTERS_C-1 downto 0);
    signal mAxilReadSlaves   : AxiLiteReadSlaveArray (NUM_AXI_MASTERS_C-1 downto 0);
 
-   signal tpgStatus   : TPGStatusType;
-   signal tpgConfig   : TPGConfigType;
-   signal tpgStream   : TimingSerialType;
-   signal tpgAdvance  : sl;
-   signal tpgFiducial : sl;
+   signal tpgStatus     : TPGStatusType;
+   signal tpgConfig     : TPGConfigType;
+   signal tpgEdefConfig : TPGMiniEdefConfigType;
+   signal tpgStream     : TimingSerialType;
+   signal tpgAdvance    : sl;
+   signal tpgFiducial   : sl;
 
    signal xpmStatus : XpmMiniStatusType;
    signal xpmConfig : XpmMiniConfigType;
@@ -144,6 +148,18 @@ begin
          streams(0) => tpgStream,
          advance(0) => tpgAdvance,
          fiducial   => tpgFiducial);
+
+   U_TPGMiniStream_1 : entity lcls_timing_core.TPGMiniStream
+      generic map (
+         TPD_G => TPD_G)
+      port map (
+         config     => tpgConfig,             -- [in]
+         edefConfig => tpgEdefConfig,         -- [in]
+         txClk      => timingClk,             -- [in]
+         txRst      => timingRst,             -- [in]
+         txRdy      => '1',                   -- [in]
+         txData     => tpgMiniStream.data,    -- [out]
+         txDataK    => tpgMiniStream.dataK);  -- [out]
 
    U_XpmReg : entity l2si_core.XpmMiniReg
       generic map (
