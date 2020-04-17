@@ -8,17 +8,29 @@
 ## the terms contained in the LICENSE.txt file.
 ##############################################################################
 import pyrogue as pr
-
+import LclsTimingCore
 import l2si_core
 
 class TriggerEventManager(pr.Device):
-    def __init__(self, numDetectors=1, **kwargs):
+    def __init__(
+            self,
+            numDetectors=1,
+            enLclsI=False,
+            enLclsII=True,
+            **kwargs):
         super().__init__(**kwargs)
 
-        self.add(l2si_core.XpmMessageAligner(
-            offset = 0x0000))
+        if enLclsI:
+            self.add(LclsTimingCore.EvrV2CoreTriggers(
+                offset = 0x0000))
+
+        if enLclsII:
+            self.add(l2si_core.XpmMessageAligner(
+                offset = 0x8000))
 
         for i in range(numDetectors):
             self.add(l2si_core.TriggerEventBuffer(
                 name = f'TriggerEventBuffer[{i}]',
-                offset = 0x100 + (i * 0x100)))
+                offset = 0x9000 + (i * 0x100),
+                enLclsI = enLclsI,
+                enLclsII = enLclsII))
