@@ -32,6 +32,9 @@ entity TriggerEventBuffer is
 
    generic (
       TPD_G                          : time                := 1 ns;
+      TRIGGER_INDEX_G                : integer             := 0;
+      EN_LCLS_I_TIMING_G             : boolean             := false;
+      EN_LCLS_II_TIMING_G            : boolean             := true;
       EVENT_AXIS_CONFIG_G            : AxiStreamConfigType := EVENT_AXIS_CONFIG_C;
       TRIGGER_CLK_IS_TIMING_RX_CLK_G : boolean             := false;
       EVENT_CLK_IS_TIMING_RX_CLK_G   : boolean             := false);
@@ -46,6 +49,9 @@ entity TriggerEventBuffer is
       axilWriteMaster : in  AxiLiteWriteMasterType;
       axilWriteSlave  : out AxiLiteWriteSlaveType;
 
+      -- EVR triggers for LCLS-I timing
+      timingMode  : in sl;
+      evrTriggers : in TimingTrigType;
 
       -- Prompt header and event bus
       promptTimingStrobe  : in sl;
@@ -71,7 +77,7 @@ entity TriggerEventBuffer is
       -- Event/Transition output
       eventClk           : in  sl;
       eventRst           : in  sl;
-      eventTimingMessage : out TimingMessageType;
+      eventTimingMessage : out TimingMessageType := TIMING_MESSAGE_INIT_C;
       eventAxisMaster    : out AxiStreamMasterType;
       eventAxisSlave     : in  AxiStreamSlaveType;
       eventAxisCtrl      : in  AxiStreamCtrlType;
@@ -151,7 +157,7 @@ architecture rtl of TriggerEventBuffer is
 
       fifoAxisMaster => axiStreamMasterInit(EVENT_AXIS_CONFIG_C),
       -- outputs     =>
-      triggerData    => XPM_EVENT_DATA_INIT_C,
+      triggerData    => TRIGGER_EVENT_DATA_INIT_C,
       axilReadSlave  => AXI_LITE_READ_SLAVE_INIT_C,
       axilWriteSlave => AXI_LITE_WRITE_SLAVE_INIT_C,
 
@@ -195,135 +201,167 @@ begin
 
 
    comb : process (alignedTimingMessage, alignedTimingStrobe, alignedXpmMessage, axilReadMaster,
-                   axilWriteMaster, eventAxisCtrlPauseSync, fifoAxisCtrl, fifoWrCnt,
-                   promptTimingStrobe, promptXpmMessage, r, timingRxRst) is
+                   axilWriteMaster, eventAxisCtrlPauseSync, evrTriggers, fifoAxisCtrl, fifoWrCnt,
+                   promptTimingStrobe, promptXpmMessage, r, timingMode, timingRxRst) is
       variable v      : RegType;
       variable axilEp : AxiLiteEndpointType;
    begin
       v := r;
 
-      v.partitionV := conv_integer(r.partition);
+      if (EN_LCLS_I_TIMING_G and timingMode = '0') then
+         -- LCLS-I EVR Trigger buffer logic
+         v.fifoRst               := '0';
+         v.fifoAxisMaster.tValid := '0';
+         v.triggerData.valid     := '0';
+         v.triggerData.l0Accept  := '0';
+         v.resetCounters         := '0';
 
-      v.fifoRst := '0';
+         if (evrTriggers.trigPulse(TRIGGER_INDEX_G) = '1') then
+            v.triggerCount                        := r.triggerCount + 1;
+            v.fifoAxisMaster.tValid               := '1';
+            v.fifoAxisMaster.tdata(63 downto 0)   := (others => '0');
+            v.fifoAxisMaster.tdata(127 downto 64) := evrTriggers.timeStamp;
+            v.fifoAxisMaster.tLast                := '1';
 
-      v.fifoAxisMaster.tValid := '0';
+            v.triggerData.valid    := '1';
+            v.triggerData.l0Accept := '1';
+            v.triggerData.l0Tag    := v.triggerCount(4 downto 0);
+            v.triggerData.count    := v.triggerCount(23 downto 0);
 
-
-      --------------------------------------------
-      -- Trigger output logic
-      -- Watch for and decode triggers on prompt interface
-      -- Output on triggerData interface
-      --------------------------------------------
-      v.triggerData := XPM_EVENT_DATA_INIT_C;
-      if (promptTimingStrobe = '1' and promptXpmMessage.valid = '1' and r.enable = '1') then
-         v.triggerData := toXpmEventDataType(promptXpmMessage.partitionWord(v.partitionV));
-         if (v.triggerData.valid = '1' and v.triggerData.l0Accept = '1') then
-            v.triggerCount := r.triggerCount + 1;
-         end if;
-      end if;
-
-      --------------------------------------------
-      -- Event/Transition logic
-      -- Watch for events/transitions on aligned interface
-      -- Place entries into FIFO
-      --------------------------------------------
-      v.streamValid := '0';
-      if (alignedTimingStrobe = '1' and alignedXpmMessage.valid = '1') then
-         -- Decode event data from configured partitionWord
-         -- Decode as both event and transition and use the .valid field to determine which one to use
-         v.eventData      := toXpmEventDataType(alignedXpmMessage.partitionWord(v.partitionV));
-         v.transitionData := toXpmTransitionDataType(alignedXpmMessage.partitionWord(v.partitionV));
-
-         -- Pass on events with l0Accept
-         -- Pass on transitions
-         v.streamValid := (v.eventData.valid and v.eventData.l0Accept) or v.transitionData.valid;
-
-         -- Don't pass data through when disabled
-         if (r.enable = '0') then
-            v.streamValid := '0';
          end if;
 
-         -- Create the EventHeader from timing and event data
-         v.eventHeader.pulseId     := alignedTimingMessage.pulseId;
-         v.eventHeader.timeStamp   := alignedTimingMessage.timeStamp;
-         v.eventHeader.count       := v.eventData.count;
-         v.eventHeader.triggerInfo := alignedXpmMessage.partitionWord(v.partitionV)(15 downto 0);
-         v.eventHeader.partitions  := (others => '0');
-         for i in 0 to 7 loop
-            v.tmpEventData              := toXpmEventDataType(alignedXpmMessage.partitionWord(i));
-            v.eventHeader.partitions(i) := v.tmpEventData.l0Accept or not v.tmpEventData.valid;
-         end loop;
+         if (fifoAxisCtrl.overflow = '1') then
+            v.overflow := '1';
+         end if;
 
-         -- Place the EventHeader into an AXI-Stream transaction
-         if (v.streamValid = '1') then
-            if (fifoAxisCtrl.overflow = '0') then
-               v.fifoAxisMaster.tValid                                := '1';
-               v.fifoAxisMaster.tdata(EVENT_HEADER_BITS_C-1 downto 0) := toSlv(v.eventHeader);
-               v.fifoAxisMaster.tDest(0)                              := v.transitionData.valid;
-               v.fifoAxisMaster.tLast                                 := '1';
+         if (r.resetCounters = '1') then
+            v.triggerCount := (others => '0');
+         end if;
+
+      elsif (EN_LCLS_II_TIMING_G and timingMode = '1') then
+         -- LCLS-II XPM Trigger Buffer Logic
+
+         v.partitionV            := conv_integer(r.partition);
+         v.fifoRst               := '0';
+         v.fifoAxisMaster.tValid := '0';
+
+         --------------------------------------------
+         -- Trigger output logic
+         -- Watch for and decode triggers on prompt interface
+         -- Output on triggerData interface
+         --------------------------------------------
+         v.triggerData := XPM_EVENT_DATA_INIT_C;
+         if (promptTimingStrobe = '1' and promptXpmMessage.valid = '1' and r.enable = '1') then
+            v.triggerData := toXpmEventDataType(promptXpmMessage.partitionWord(v.partitionV));
+            if (v.triggerData.valid = '1' and v.triggerData.l0Accept = '1') then
+               v.triggerCount := r.triggerCount + 1;
             end if;
          end if;
 
-         -- Special case - reset fifo, mask any tValid
-         -- Note that this logic is active even when the r.enable register = 0.
-         if (v.transitionData.valid = '1' and v.transitionData.header = MSG_CLEAR_FIFO_C) then
-            v.overflow              := '0';
-            v.fifoRst               := '1';
-            v.fifoAxisMaster.tValid := '0';
-         end if;
+         --------------------------------------------
+         -- Event/Transition logic
+         -- Watch for events/transitions on aligned interface
+         -- Place entries into FIFO
+         --------------------------------------------
+         v.streamValid := '0';
+         if (alignedTimingStrobe = '1' and alignedXpmMessage.valid = '1') then
+            -- Decode event data from configured partitionWord
+            -- Decode as both event and transition and use the .valid field to determine which one to use
+            v.eventData      := toXpmEventDataType(alignedXpmMessage.partitionWord(v.partitionV));
+            v.transitionData := toXpmTransitionDataType(alignedXpmMessage.partitionWord(v.partitionV));
 
+            -- Pass on events with l0Accept
+            -- Pass on transitions
+            v.streamValid := (v.eventData.valid and v.eventData.l0Accept) or v.transitionData.valid;
 
-         if (r.enable = '1') then
-            v.validCount := r.validCount + 1;
-         end if;
-
-      end if;
-
-      -- Latch FIFO overflow if seen
-      if (fifoAxisCtrl.overflow = '1') then
-         v.overflow := '1';
-      end if;
-
-      -- Count stuff
-      if (r.streamValid = '1') then
-         if (r.eventData.valid = '1') then
-            if (r.eventData.l0Accept = '1') then
-               v.l0Count := r.l0Count + 1;
+            -- Don't pass data through when disabled
+            if (r.enable = '0') then
+               v.streamValid := '0';
             end if;
 
-            if (r.eventData.l1Expect = '1') then
-               if (r.eventData.l1Accept = '1') then
-                  v.l1AcceptCount := r.l1AcceptCount + 1;
-               else
-                  v.l1RejectCount := r.l1RejectCount + 1;
+            -- Create the EventHeader from timing and event data
+            v.eventHeader.pulseId     := alignedTimingMessage.pulseId;
+            v.eventHeader.timeStamp   := alignedTimingMessage.timeStamp;
+            v.eventHeader.count       := v.eventData.count;
+            v.eventHeader.triggerInfo := alignedXpmMessage.partitionWord(v.partitionV)(15 downto 0);
+            v.eventHeader.partitions  := (others => '0');
+            for i in 0 to 7 loop
+               v.tmpEventData              := toXpmEventDataType(alignedXpmMessage.partitionWord(i));
+               v.eventHeader.partitions(i) := v.tmpEventData.l0Accept or not v.tmpEventData.valid;
+            end loop;
+
+            -- Place the EventHeader into an AXI-Stream transaction
+            if (v.streamValid = '1') then
+               if (fifoAxisCtrl.overflow = '0') then
+                  v.fifoAxisMaster.tValid                                := '1';
+                  v.fifoAxisMaster.tdata(EVENT_HEADER_BITS_C-1 downto 0) := toSlv(v.eventHeader);
+                  v.fifoAxisMaster.tDest(0)                              := v.transitionData.valid;
+                  v.fifoAxisMaster.tLast                                 := '1';
                end if;
             end if;
+
+            -- Special case - reset fifo, mask any tValid
+            -- Note that this logic is active even when the r.enable register = 0.
+            if (v.transitionData.valid = '1' and v.transitionData.header = MSG_CLEAR_FIFO_C) then
+               v.overflow              := '0';
+               v.fifoRst               := '1';
+               v.fifoAxisMaster.tValid := '0';
+            end if;
+
+
+            if (r.enable = '1') then
+               v.validCount := r.validCount + 1;
+            end if;
+
          end if;
 
-         if (r.transitionData.valid = '1') then
-            v.transitionCount := r.transitionCount + 1;
+         -- Latch FIFO overflow if seen
+         if (fifoAxisCtrl.overflow = '1') then
+            v.overflow := '1';
          end if;
-      end if;
 
-      -- Monitor time between pause assertion and trigger arrival
-      v.fbTimer := r.fbTimer + 1;
-      if uAnd(r.fbTimer) = '1' then
-         v.fbTimerOverflow := '1';
-      end if;
-      v.pause := fifoAxisCtrl.pause or eventAxisCtrlPauseSync;
-      if v.pause /= r.pause then
-         v.fbTimer         := (others => '0');
-         v.fbTimerOverflow := '0';
-         v.fbTimerActive   := r.fbTimerOverflow;
-         if (r.pause = '1' and r.fbTimerActive = '1' and r.fbTimerToTrig > r.pauseToTrig) then
-            v.pauseToTrig := r.fbTimerToTrig;
+         -- Count stuff
+         if (r.streamValid = '1') then
+            if (r.eventData.valid = '1') then
+               if (r.eventData.l0Accept = '1') then
+                  v.l0Count := r.l0Count + 1;
+               end if;
+
+               if (r.eventData.l1Expect = '1') then
+                  if (r.eventData.l1Accept = '1') then
+                     v.l1AcceptCount := r.l1AcceptCount + 1;
+                  else
+                     v.l1RejectCount := r.l1RejectCount + 1;
+                  end if;
+               end if;
+            end if;
+
+            if (r.transitionData.valid = '1') then
+               v.transitionCount := r.transitionCount + 1;
+            end if;
          end if;
-      elsif (r.triggerData.valid = '1' and r.triggerData.l0Accept = '1') then
-         if r.pause = '1' then
-            v.fbTimerToTrig := r.fbTimer;
-         elsif (r.fbTimerActive = '1' and r.fbTimerOverflow = '0' and r.fbTimer < r.notPauseToTrig) then
-            v.notPauseToTrig := r.fbTimer;
+
+         -- Monitor time between pause assertion and trigger arrival
+         v.fbTimer := r.fbTimer + 1;
+         if uAnd(r.fbTimer) = '1' then
+            v.fbTimerOverflow := '1';
          end if;
+         v.pause := fifoAxisCtrl.pause or eventAxisCtrlPauseSync;
+         if v.pause /= r.pause then
+            v.fbTimer         := (others => '0');
+            v.fbTimerOverflow := '0';
+            v.fbTimerActive   := r.fbTimerOverflow;
+            if (r.pause = '1' and r.fbTimerActive = '1' and r.fbTimerToTrig > r.pauseToTrig) then
+               v.pauseToTrig := r.fbTimerToTrig;
+            end if;
+         elsif (r.triggerData.valid = '1' and r.triggerData.l0Accept = '1') then
+            if r.pause = '1' then
+               v.fbTimerToTrig := r.fbTimer;
+            elsif (r.fbTimerActive = '1' and r.fbTimerOverflow = '0' and r.fbTimer < r.notPauseToTrig) then
+               v.notPauseToTrig := r.fbTimer;
+            end if;
+         end if;
+
       end if;
 
       v.resetCounters := '0';           -- Pulsed for 1 cycle
@@ -343,26 +381,33 @@ begin
       -- Determine the transaction type
       axiSlaveWaitTxn(axilEp, axilWriteMaster, axilReadMaster, v.axilWriteSlave, v.axilReadSlave);
 
+      -- Common Registers
       axiSlaveRegister(axilEp, x"00", 0, v.enable);
-      axiSlaveRegister(axilEp, x"04", 0, v.partition);
-      axiSlaveRegister(axilEp, X"08", 0, v.fifoPauseThresh);
-      axiSlaveRegister(axilEp, X"0C", 0, v.triggerDelay);
       axiSlaveRegisterR(axilEp, x"10", 0, r.overflow);
-      axiSlaveRegisterR(axilEp, X"10", 1, r.pause);
       axiSlaveRegisterR(axilEp, X"10", 2, fifoAxisCtrl.overflow);
       axiSlaveRegisterR(axilEp, X"10", 3, fifoAxisCtrl.pause);
       axiSlaveRegisterR(axilEp, X"10", 4, fifoWrCnt);
-      axiSlaveRegisterR(axilEp, x"14", 0, r.l0Count);
-      axiSlaveRegisterR(axilEp, x"18", 0, r.l1AcceptCount);
-      axiSlaveRegisterR(axilEp, x"1C", 0, r.l1RejectCount);
-      axiSlaveRegisterR(axilEp, X"20", 0, r.transitionCount);
-      axiSlaveRegisterR(axilEp, X"24", 0, r.validCount);
+      axiSlaveRegister(axilEp, X"10", 31, v.fifoRst);
       axiSlaveRegisterR(axilEp, X"28", 0, r.triggerCount);
-      axiSlaveRegisterR(axilEp, X"2C", 0, alignedXpmMessage.partitionAddr);
-      axiSlaveRegisterR(axilEp, X"30", 0, alignedXpmMessage.partitionWord(0));
-      axiSlaveRegisterR(axilEp, X"38", 0, r.pauseToTrig);
-      axiSlaveRegisterR(axilEp, X"3C", 0, r.notPauseToTrig);
       axiSlaveRegister(axilEp, X"40", 0, v.resetCounters);
+
+      -- LCLS-II only registers
+      if (EN_LCLS_II_TIMING_G) then
+         axiSlaveRegister(axilEp, x"04", 0, v.partition);
+         axiSlaveRegister(axilEp, X"0C", 0, v.triggerDelay);
+         axiSlaveRegister(axilEp, X"08", 0, v.fifoPauseThresh);
+         axiSlaveRegisterR(axilEp, X"10", 1, r.pause);
+         axiSlaveRegisterR(axilEp, x"14", 0, r.l0Count);
+         axiSlaveRegisterR(axilEp, x"18", 0, r.l1AcceptCount);
+         axiSlaveRegisterR(axilEp, x"1C", 0, r.l1RejectCount);
+         axiSlaveRegisterR(axilEp, X"20", 0, r.transitionCount);
+         axiSlaveRegisterR(axilEp, X"24", 0, r.validCount);
+         axiSlaveRegisterR(axilEp, X"2C", 0, alignedXpmMessage.partitionAddr);
+         axiSlaveRegisterR(axilEp, X"30", 0, alignedXpmMessage.partitionWord(0));
+         axiSlaveRegisterR(axilEp, X"38", 0, r.pauseToTrig);
+         axiSlaveRegisterR(axilEp, X"3C", 0, r.notPauseToTrig);
+      end if;
+
 
       axiSlaveDefault(axilEp, v.axilWriteSlave, v.axilReadSlave, AXI_RESP_DECERR_C);
 
@@ -473,25 +518,27 @@ begin
    -----------------------------------------------
    -- Buffer TimingMessage that corresponds to each event placed in event fifo
    -----------------------------------------------
-   alignedTimingMessageSlv <= toSlvNoBsa(alignedTimingMessage);
-   U_Fifo_1 : entity surf.Fifo
-      generic map (
-         TPD_G           => TPD_G,
-         GEN_SYNC_FIFO_G => EVENT_CLK_IS_TIMING_RX_CLK_G,
-         MEMORY_TYPE_G   => "block",
-         FWFT_EN_G       => true,
-         PIPE_STAGES_G   => 1,               -- make sure this lines up right with event fifo
-         DATA_WIDTH_G    => TIMING_MESSAGE_BITS_NO_BSA_C,
-         ADDR_WIDTH_G    => FIFO_ADDR_WIDTH_C)
-      port map (
-         rst    => r.fifoRst,                -- [in]
-         wr_clk => timingRxClk,              -- [in]
-         wr_en  => r.fifoAxisMaster.tValid,  -- [in]
-         din    => alignedTimingMessageSlv,  -- [in]
-         rd_clk => eventClk,                 -- [in]
-         rd_en  => eventAxisSlave.tReady,    -- [in] -- This is probably wrong
-         dout   => eventTimingMessageSlv);   -- [out]
-   eventTimingMessage <= toTimingMessageType(eventTimingMessageSlv);
+   GEN_EVENT_TIMING_MESSAGE : if (EN_LCLS_II_TIMING_G) generate
+      alignedTimingMessageSlv <= toSlvNoBsa(alignedTimingMessage);
+      U_Fifo_1 : entity surf.Fifo
+         generic map (
+            TPD_G           => TPD_G,
+            GEN_SYNC_FIFO_G => EVENT_CLK_IS_TIMING_RX_CLK_G,
+            MEMORY_TYPE_G   => "block",
+            FWFT_EN_G       => true,
+            PIPE_STAGES_G   => 1,               -- make sure this lines up right with event fifo
+            DATA_WIDTH_G    => TIMING_MESSAGE_BITS_NO_BSA_C,
+            ADDR_WIDTH_G    => FIFO_ADDR_WIDTH_C)
+         port map (
+            rst    => r.fifoRst,                -- [in]
+            wr_clk => timingRxClk,              -- [in]
+            wr_en  => r.fifoAxisMaster.tValid,  -- [in]
+            din    => alignedTimingMessageSlv,  -- [in]
+            rd_clk => eventClk,                 -- [in]
+            rd_en  => eventAxisSlave.tReady,    -- [in] -- This is probably wrong
+            dout   => eventTimingMessageSlv);   -- [out]
+      eventTimingMessage <= toTimingMessageType(eventTimingMessageSlv);
+   end generate GEN_EVENT_TIMING_MESSAGE;
 
 end architecture rtl;
 
