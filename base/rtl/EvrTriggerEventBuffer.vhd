@@ -109,7 +109,8 @@ begin
          dataOut => eventAxisCtrlPauseSync);  -- [out]
 
 
-   comb : process (axilReadMaster, axilWriteMaster, fifoAxisCtrl, fifoWrCnt, r, timingRxRst) is
+   comb : process (axilReadMaster, axilWriteMaster, evrTriggers, fifoAxisCtrl, fifoWrCnt, r,
+                   timingRxRst) is
       variable v      : RegType;
       variable axilEp : AxiLiteEndpointType;
    begin
