@@ -256,20 +256,11 @@ class XpmMini(pr.Device):
         )) 
         
         self.add(pr.RemoteVariable( 
-            name         = "PartitionMessage_Insert",
+            name         = "PartitionMessage",
             offset       = 0x4C,
-            bitSize      = 1,
-            bitOffset    = 15,
-            mode         = 'WO',
-            hidden       = True,
-        )) 
-        
-        self.add(pr.RemoteVariable( 
-            name         = "PartitionMessage_Hdr",
-            offset       = 0x4C,
-            bitSize      = 8,
+            bitSize      = 16,
             bitOffset    = 0,
-            mode         = 'RW',
+            mode         = 'WO',
             hidden       = True,
         )) 
         
