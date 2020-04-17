@@ -387,6 +387,9 @@ begin
       axiSlaveRegisterR(axilEp, X"10", 2, fifoAxisCtrl.overflow);
       axiSlaveRegisterR(axilEp, X"10", 3, fifoAxisCtrl.pause);
       axiSlaveRegisterR(axilEp, X"10", 4, fifoWrCnt);
+      axiSlaveRegisterR(axilEp, X"10", 16, timingMode);
+      axiSlaveRegisterR(axilEp, X"10", 17, toSl(EN_LCLS_I_TIMING_G));
+      axiSlaveRegisterR(axilEp, X"10", 18, toSl(EN_LCLS_II_TIMING_G));
       axiSlaveRegister(axilEp, X"10", 31, v.fifoRst);
       axiSlaveRegisterR(axilEp, X"28", 0, r.triggerCount);
       axiSlaveRegister(axilEp, X"40", 0, v.resetCounters);
