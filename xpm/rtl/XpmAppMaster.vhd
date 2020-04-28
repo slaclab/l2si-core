@@ -86,7 +86,8 @@ architecture rtl of XpmAppMaster is
    signal r   : RegType := REG_INIT_C;
    signal rin : RegType;
 
-   signal msgConfig  : XpmPartMsgConfigType;
+   signal msgConfig    : XpmPartMsgConfigType;
+   signal msgConfigInt : XpmPartMsgConfigType;
    signal msgRdCount : slv(3 downto 0);
 
    --  feedback data from sensor links
@@ -116,6 +117,7 @@ architecture rtl of XpmAppMaster is
    signal cuRx_delayOverflow : sl;
 
    signal depth_clks_20 : slv(19 downto 0);
+   signal depth_fids_7  : slv( 6 downto 0);
 
    signal pauseOrOverflow : slv(26 downto 0);
 
@@ -246,7 +248,9 @@ begin
    --             --tag            => l1AcceptTag );
    --             accept         => open,
    --             tag            => open );
-
+   l1Ack <= '1';
+   l1AcceptTag <= (others=>'0');
+   
    --U_AnalysisTag : entity l2si_core.XpmAnalysisTag
    --  port map ( wrclk          => regclk,
    --             config         => config.analysis,
@@ -255,6 +259,7 @@ begin
    --             rddone         => r.partStrobe,
    --             rdvalid        => status.anaRd,
    --             tag            => analysisTag );
+   status.anaRd    <= (others=>'0');
 
    U_SyncMsgPayload : entity surf.FifoAsync
       generic map (
@@ -269,10 +274,28 @@ begin
          din           => config.message.header,
          --
          rd_clk        => timingClk,
-         rd_en         => r.strobeMsg,
+         rd_en         => fiducial,
          rd_data_count => msgRdCount,
-         valid         => msgConfig.insert,
-         dout          => msgConfig.header);
+         valid         => msgConfigInt.insert,
+         dout          => msgConfigInt.header);
+
+   depth_fids_7 <= resize(config.pipeline.depth_fids, 7);
+
+   U_MsgDelay : entity surf.SlvDelay
+      generic map (
+         TPD_G        => TPD_G,
+         SRL_EN_G     => true,
+         DELAY_G      => 128,
+         REG_OUTPUT_G => false,
+         WIDTH_G      => 9 )
+      port map (
+         clk              => timingClk,                 -- [in]
+         en               => fiducial,                  -- [in]
+         delay            => depth_fids_7,
+         din (7 downto 0) => msgConfigInt.header,
+         din (8)          => msgConfigInt.insert,
+         dout(7 downto 0) => msgConfig.header,
+         dout(8)          => msgConfig.insert );
 
    U_SyncReset : entity surf.RstSync
       generic map (
