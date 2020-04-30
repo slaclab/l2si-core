@@ -22,8 +22,13 @@ addons:
   apt:
     packages:
       - python3
+      - flake8
 
 stages:
+    - name: software_check
+      if: (type == pull_request) or (tag IS present) or (branch == master)
+    - name: gen_release
+      if: tag IS present
     - name: deploy_dev
       if: branch = pre-release AND tag IS blank AND NOT (type = pull_request)
     - name: deploy_tag
@@ -32,6 +37,14 @@ stages:
 # Generate and deploy documentation
 jobs:
   include:
+    - &software-check-stage
+      stage: software_check
+      name: "Check Python for Errors"
+      script:
+        - cd $TRAVIS_BUILD_DIR
+        - python3 -m compileall -f python
+        - flake8 --count python
+    
     - &deploy-conda-stage       # Conda for linux
       stage: deploy_dev
       name: "Deploy Conda"
@@ -89,4 +102,12 @@ jobs:
       #os: osx
       #language: ruby  # osx does not support language=python
       #env: CONDA_TOKEN=$CONDA_UPLOAD_TOKEN_TAG
+
+    - stage: gen_release
+      name: "Generate Release"
+      install:
+        - git clone https://github.com/slaclab/ruckus.git
+        - pip install -r ruckus/scripts/pip_requirements.txt
+      script:
+        - python ruckus/scripts/releaseGen.py
 
