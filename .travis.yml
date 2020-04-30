@@ -22,6 +22,7 @@ addons:
   apt:
     packages:
       - python3
+      - flake8
 
 stages:
     - name: gen_release
@@ -34,6 +35,9 @@ stages:
     # only try to generate the documentation
     - name: generate
       if: (branch != master OR (type == pull_request)) AND tag IS blank
+    - name: software_check
+      if: (type == pull_request) or (tag IS present) or (branch == master)
+
     - name: deploy_dev
       if: branch = pre-release AND tag IS blank AND NOT (type = pull_request)
     - name: deploy_tag
@@ -42,6 +46,14 @@ stages:
 # Generate and deploy documentation
 jobs:
   include:
+    - &software-check-stage
+      stage: software_check
+      name: "Check Python for Errors"
+      script:
+        - cd $TRAVIS_BUILD_DIR
+        - python3 -m compileall -f python
+        - flake8 --count python
+    
     - &deploy-conda-stage       # Conda for linux
       stage: deploy_dev
       name: "Deploy Conda"
@@ -103,8 +115,8 @@ jobs:
     - stage: gen_release
       name: "Generate Release"
       install:
-         - git clone https://github.com/slaclab/ruckus.git
-         - pip install -r ruckus/scripts/pip_requirements.txt
+        - git clone https://github.com/slaclab/ruckus.git
+        - pip install -r ruckus/scripts/pip_requirements.txt
       script:
-         - python ruckus/scripts/releaseGen.py
-         
+        - python ruckus/scripts/releaseGen.py
+
