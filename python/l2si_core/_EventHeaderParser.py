@@ -30,7 +30,7 @@ class PackedStruct(ctypes.LittleEndianStructure):
                 li.append(f'{f[0]} - {getattr(self, f[0]):x}')
             else:
                 li.append(f'{f[0]} - {getattr(self, f[0])}')
-        return '\n'.join(l)
+        return '\n'.join(li)
 
     def __new__(self, ba):
         return self.from_buffer_copy(ba)
