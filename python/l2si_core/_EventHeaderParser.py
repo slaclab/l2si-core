@@ -24,12 +24,12 @@ class PackedStruct(ctypes.LittleEndianStructure):
     _pack_ = 1
 
     def __str__(self):
-        l = []
+        li = []
         for f in self._fields_:
-            if issubclass(f[1], _ctypes._SimpleCData):
-                l.append(f'{f[0]} - {getattr(self, f[0]):x}')
+            if issubclass(f[1], ctypes._SimpleCData):
+                li.append(f'{f[0]} - {getattr(self, f[0]):x}')
             else:
-                l.append(f'{f[0]} - {getattr(self, f[0])}')
+                li.append(f'{f[0]} - {getattr(self, f[0])}')
         return '\n'.join(l)
 
     def __new__(self, ba):
@@ -95,6 +95,7 @@ def parseEventHeaderFrame(frame):
 def parseBa1(ba):
     eh = EventHeader(ba=ba)
     ti = TriggerInfo(eh.triggerInfo)
+    return ti
 
 
 fmt = '<QQBxHLxxxxxxxx'
