@@ -1,10 +1,10 @@
 ##############################################################################
 ## This file is part of 'L2SI Core'.
-## It is subject to the license terms in the LICENSE.txt file found in the 
-## top-level directory of this distribution and at: 
-##    https://confluence.slac.stanford.edu/display/ppareg/LICENSE.html. 
-## No part of 'L2SI Core', including this file, 
-## may be copied, modified, propagated, or distributed except according to 
+## It is subject to the license terms in the LICENSE.txt file found in the
+## top-level directory of this distribution and at:
+##    https://confluence.slac.stanford.edu/display/ppareg/LICENSE.html.
+## No part of 'L2SI Core', including this file,
+## may be copied, modified, propagated, or distributed except according to
 ## the terms contained in the LICENSE.txt file.
 ##############################################################################
 import ctypes
@@ -44,7 +44,7 @@ class TransitionInfo(PackedStruct):
         ('l0Tag', c_uint, 5),
         ('dmy2', c_uint, 2),
         ('header', c_uint, 7)]
-        
+
 
 class EventInfo(PackedStruct):
     _fields_ = [
@@ -83,7 +83,7 @@ class EventHeader(PackedStruct):
 
 def parseEventHeaderFrame(frame):
     """Given a rogue Frame representing an Event Header or Transition, parse into a dictionary of fields"""
-    
+
     frameSize = frame.getPayload()
     ba = bytearray(frameSize)
     channel = frame.getChannel()
@@ -99,14 +99,13 @@ def parseBa1(ba):
 
 fmt = '<QQBxHLxxxxxxxx'
 def parseBa2(ba):
-    s = struct.unpack(fmt, ba) 
-    d = {} 
-    d['pulseId'] = (s[0] & 0x00FFFFFFFFFFFFFF) 
-    d['timeStamp'] = s[1] 
-    d['partitions'] = s[2] 
-    d['triggerInfo'] = s[3] 
-    d['count'] = s[4] & 0x00FFFFFF 
+    s = struct.unpack(fmt, ba)
+    d = {}
+    d['pulseId'] = (s[0] & 0x00FFFFFFFFFFFFFF)
+    d['timeStamp'] = s[1]
+    d['partitions'] = s[2]
+    d['triggerInfo'] = s[3]
+    d['count'] = s[4] & 0x00FFFFFF
     d['version'] = s[4] >> 24
 
-    return d 
-
+    return d
