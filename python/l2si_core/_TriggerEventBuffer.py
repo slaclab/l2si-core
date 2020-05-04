@@ -1,10 +1,10 @@
 ##############################################################################
 ## This file is part of 'L2SI Core'.
-## It is subject to the license terms in the LICENSE.txt file found in the 
-## top-level directory of this distribution and at: 
-##    https://confluence.slac.stanford.edu/display/ppareg/LICENSE.html. 
-## No part of 'L2SI Core', including this file, 
-## may be copied, modified, propagated, or distributed except according to 
+## It is subject to the license terms in the LICENSE.txt file found in the
+## top-level directory of this distribution and at:
+##    https://confluence.slac.stanford.edu/display/ppareg/LICENSE.html.
+## No part of 'L2SI Core', including this file,
+## may be copied, modified, propagated, or distributed except according to
 ## the terms contained in the LICENSE.txt file.
 ##############################################################################
 import pyrogue as pr
@@ -23,7 +23,7 @@ class TriggerEventBuffer(pr.Device):
             mode        = 'RW',
             pollInterval = 1,
         ))
-        
+
         self.add(pr.RemoteVariable(
             name        = 'Partition',
             description = 'Selected Partition to listen for events on',
@@ -44,10 +44,10 @@ class TriggerEventBuffer(pr.Device):
             bitOffset   = 0,
             base        = pr.UInt,
             mode        = 'RW',
-            disp        = '{:d}',            
+            disp        = '{:d}',
             pollInterval = 1,
         ))
-        
+
         self.add(pr.RemoteVariable(
             name        = 'TriggerDelay',
             description = 'Number of timingClk cycles to delay trigger output to application',
@@ -56,7 +56,7 @@ class TriggerEventBuffer(pr.Device):
             bitOffset   = 0,
             base        = pr.UInt,
             mode        = 'RW',
-            disp        = '{:d}',            
+            disp        = '{:d}',
             pollInterval = 1,
         ))
 
@@ -103,7 +103,7 @@ class TriggerEventBuffer(pr.Device):
             mode        = 'RO',
             pollInterval = 1,
         ))
-        
+
         self.add(pr.RemoteVariable(
             name = 'FifoWrCnt',
             description = 'Number of Events in Event Buffer',
@@ -125,7 +125,7 @@ class TriggerEventBuffer(pr.Device):
             disp        = '{:d}',
             pollInterval = 1,
         ))
-        
+
         self.add(pr.RemoteVariable(
             name        = 'L1AcceptCount',
             description = 'Number of L1 Triggers Accepted',
@@ -134,10 +134,10 @@ class TriggerEventBuffer(pr.Device):
             bitOffset   = 0,
             base        = pr.UInt,
             mode        = 'RO',
-            disp        = '{:d}',            
+            disp        = '{:d}',
             pollInterval = 1,
         ))
-        
+
         self.add(pr.RemoteVariable(
             name        = 'L1RejectCount',
             description = 'Number of L1 Triggers Rejected',
@@ -146,10 +146,10 @@ class TriggerEventBuffer(pr.Device):
             bitOffset   = 0,
             base        = pr.UInt,
             mode        = 'RO',
-            disp        = '{:d}',            
+            disp        = '{:d}',
             pollInterval = 1,
         ))
-        
+
         self.add(pr.RemoteVariable(
             name        = 'TransitionCount',
             description = '',
@@ -184,7 +184,7 @@ class TriggerEventBuffer(pr.Device):
             disp        = '{:d}',
             pollInterval = 1,
         ))
-        
+
         self.add(pr.RemoteVariable(
             name        = 'LastPartitionAddr',
             offset      = 0x2C,
@@ -231,6 +231,6 @@ class TriggerEventBuffer(pr.Device):
             bitSize = 1,
             bitOffset = 0,
             function = pr.RemoteCommand.touchOne))
-        
+
     def countReset(self):
         self.ResetCounters()
