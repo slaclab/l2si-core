@@ -26,6 +26,9 @@ use surf.AxiStreamPkg.all;
 library l2si_core;
 use l2si_core.XpmPkg.all;
 
+--
+--  Still need to route l1 feedback upstream when we are not mastering the partition
+--
 entity XpmL1Router is
     generic (
        TPD_G       : time         := 1 ns;
@@ -68,6 +71,12 @@ begin
             l1FeedbacksOut(i).valid <= '0';
          end if;
       end loop;
+
+      -- Complete implementation
+      req <= vreq;
+
+      l1FeedbacksOut(XPM_PARTITIONS_C) <= XPM_L1_FEEDBACK_INIT_C;
+        
    end process comb;
   
    GEN_PARTITION : for i in 0 to XPM_PARTITIONS_C-1 generate
