@@ -89,7 +89,7 @@ begin
 
       rin <= v;
    end process comb;
-   
+
    seq : process (clk) is
    begin
       if rising_edge(clk) then
