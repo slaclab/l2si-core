@@ -130,7 +130,8 @@ begin
          axiWriteSlave  => mAxilWriteSlaves(TPG_MINI_INDEX_C),
          irqActive      => '0',
          status         => tpgStatus,
-         config         => tpgConfig);
+         config         => tpgConfig,
+         edefConfig     => tpgEdefConfig);
 
    U_TPG : entity lcls_timing_core.TPGMini
       generic map (
