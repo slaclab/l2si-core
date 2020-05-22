@@ -91,6 +91,7 @@ architecture rtl of TriggerEventBuffer is
 
    type RegType is record
       enable          : sl;
+      evrTrigLast     : sl;
       partition       : slv(2 downto 0);
       fifoPauseThresh : slv(FIFO_ADDR_WIDTH_C-1 downto 0);
       triggerDelay    : slv(31 downto 0);
@@ -133,6 +134,7 @@ architecture rtl of TriggerEventBuffer is
 
    constant REG_INIT_C : RegType := (
       enable          => '0',
+      evrTrigLast     => '0',
       partition       => (others => '0'),
       fifoPauseThresh => toslv(16, FIFO_ADDR_WIDTH_C),
       triggerDelay    => toSlv(42, 32),
@@ -215,8 +217,9 @@ begin
          v.triggerData.valid     := '0';
          v.triggerData.l0Accept  := '0';
          v.resetCounters         := '0';
+         v.evrTrigLast           := evrTriggers.trigPulse(TRIGGER_INDEX_G);
 
-         if (evrTriggers.trigPulse(TRIGGER_INDEX_G) = '1') then
+         if (evrTriggers.trigPulse(TRIGGER_INDEX_G) = '1' and r.evrTrigLast = '0' and r.enable = '1') then
             v.triggerCount                        := r.triggerCount + 1;
             v.fifoAxisMaster.tValid               := '1';
             v.fifoAxisMaster.tdata(63 downto 0)   := (others => '0');
