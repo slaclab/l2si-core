@@ -38,6 +38,7 @@ package L2SiPkg is
 
    subtype TriggerEventDataType is XpmEventDataType;
    subtype TriggerEventDataArray is XpmEventDataArray;
+   constant TRIGGER_EVENT_DATA_INIT_C : TriggerEventDataType := XPM_EVENT_DATA_INIT_C;
 
    subtype TriggerL1FeedbackType is XpmL1FeedbackType;
    subtype TriggerL1FeedbackArray is XpmL1FeedbackArray;
