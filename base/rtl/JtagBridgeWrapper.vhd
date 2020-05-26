@@ -1,7 +1,7 @@
 -------------------------------------------------------------------------------
 -- Company    : SLAC National Accelerator Laboratory
 -------------------------------------------------------------------------------
--- Description: 
+-- Description:
 -------------------------------------------------------------------------------
 -- This file is part of 'L2SI Core'. It is subject to
 -- the license terms in the LICENSE.txt file found in the top-level directory
@@ -73,7 +73,7 @@ architecture mapping of JtagBridgeWrapper is
   signal aresetn : sl;
 
   signal tck,tdi,tdo,tms : sl;
-  
+
 begin
 
   aresetn <= not axilRst;
@@ -83,7 +83,7 @@ begin
                tdi => tdi,
                tms => tms,
                tck => tck );
-  
+
   U_JtagBridge : jtag_bridge
     port map ( s_axi_aclk    => axilClk,
                s_axi_aresetn => aresetn,

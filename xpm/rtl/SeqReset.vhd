@@ -33,7 +33,7 @@ use surf.StdRtlPkg.all;
 entity SeqReset is
    generic (
       TPD_G : time := 1 ns);
-   port ( 
+   port (
       -- Clock and reset
       clk                : in  sl;
       rst                : in  sl;
@@ -46,7 +46,7 @@ entity SeqReset is
 end SeqReset;
 
 -- Define architecture for top level module
-architecture mapping of SeqReset is 
+architecture mapping of SeqReset is
 
   type RegType is record
      req     : sl;
@@ -57,14 +57,14 @@ architecture mapping of SeqReset is
      req     => '0',
      latch   => '0',
      resetO  => '0');
-  
+
   signal r   : RegType := REG_INIT_C;
   signal rin : RegType;
-  
+
 begin
 
   resetO <= rin.resetO;
-  
+
   comb: process (config, frame, r, resetReq, strobe)
      variable v : RegType;
      variable rateSel : sl;
@@ -72,7 +72,7 @@ begin
     v        := r;
     v.resetO := '0';
     v.req    := resetReq;
-    
+
     --  Check for synchronized jump cycle
     case (config.syncSel(15 downto 14)) is
        when "00" => rateSel := frame.fixedRates(conv_integer(config.syncSel(3 downto 0)));
@@ -92,8 +92,8 @@ begin
     if (r.latch='1' and rateSel='1' and strobe='1') then
        v.latch  :='0';
        v.resetO :='1';
-    end if;   
-      
+    end if;
+
     rin <= v;
   end process comb;
 
@@ -103,5 +103,5 @@ begin
       r <= rin after TPD_G;
     end if;
   end process seq;
-  
+
 end mapping;

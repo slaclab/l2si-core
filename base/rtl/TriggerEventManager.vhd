@@ -58,7 +58,7 @@ entity TriggerEventManager is
       timingTxRst : in  sl;
       timingTxPhy : out TimingPhyType;
 
-      -- Triggers 
+      -- Triggers
       triggerClk  : in  sl;
       triggerRst  : in  sl;
       triggerData : out TriggerEventDataArray(NUM_DETECTORS_G-1 downto 0);
@@ -223,7 +223,7 @@ begin
          mAxiWriteSlave  => timingAxilWriteSlave);  -- [in]
 
    -----------------------------------------------
-   -- Fan out AXI-Lite 
+   -- Fan out AXI-Lite
    -----------------------------------------------
    U_AxiLiteCrossbar_1 : entity surf.AxiLiteCrossbar
       generic map (
@@ -281,7 +281,7 @@ begin
             axilReadSlave        => locAxilReadSlaves(AXIL_TEB_C(i)),    -- [out]
             axilWriteMaster      => locAxilWriteMasters(AXIL_TEB_C(i)),  -- [in]
             axilWriteSlave       => locAxilWriteSlaves(AXIL_TEB_C(i)),   -- [out]
-            promptTimingStrobe   => timingBus.strobe,                    -- [in]            
+            promptTimingStrobe   => timingBus.strobe,                    -- [in]
             promptTimingMessage  => timingBus.message,                   -- [in]
             promptXpmMessage     => xpmMessage,                          -- [in]
             alignedTimingstrobe  => alignedTimingStrobe,                 -- [in]
@@ -299,7 +299,7 @@ begin
             eventAxisMaster      => eventAxisMasters(i),                 -- [out]
             eventAxisSlave       => eventAxisSlaves(i),                  -- [in]
             eventAxisCtrl        => eventAxisCtrl(i),                    -- [in]
-            clearReadout         => clearReadout(i));                    -- [out]      
+            clearReadout         => clearReadout(i));                    -- [out]
    end generate GEN_DETECTORS;
 
 

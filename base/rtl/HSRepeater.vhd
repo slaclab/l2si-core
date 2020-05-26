@@ -1,7 +1,7 @@
 -------------------------------------------------------------------------------
 -- Company    : SLAC National Accelerator Laboratory
 -------------------------------------------------------------------------------
--- Description: 
+-- Description:
 -------------------------------------------------------------------------------
 -- This file is part of 'L2SI Core'. It is subject to
 -- the license terms in the LICENSE.txt file found in the top-level directory
@@ -73,7 +73,7 @@ architecture mapping of HSRepeater is
        addrBits     => 16,
        connectivity => x"FFFF") );
 
-  
+
    signal axilReadMasters  : AxiLiteReadMasterArray (5 downto 0);
    signal axilReadSlaves   : AxiLiteReadSlaveArray  (5 downto 0);
    signal axilWriteMasters : AxiLiteWriteMasterArray(5 downto 0);
@@ -97,7 +97,7 @@ begin
       mAxiWriteMasters    => axilWriteMasters,
       mAxiWriteSlaves     => axilWriteSlaves,
       mAxiReadMasters     => axilReadMasters,
-      mAxiReadSlaves      => axilReadSlaves);         
+      mAxiReadSlaves      => axilReadSlaves);
 
   GEN_AMC : for i in 0 to 1 generate
     GEN_I2C : for j in 0 to 2 generate

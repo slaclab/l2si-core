@@ -2,7 +2,7 @@
 -- Company    : SLAC National Accelerator Laboratory
 -------------------------------------------------------------------------------
 -- Description: Analysis Tag Insertion
--- 
+--
 -- Analysis tag bits are segregated into sets where only one bit in a set may be
 -- asserted at any time.  A set of tag bits represents a group of analysis nodes
 -- that work together and consequently receive exclusive events.  The bit groupings
@@ -12,7 +12,7 @@
 -- Requests to tag events for analysis are received through the programmable register
 -- interface via 'push'.  Tag bits for the next event are asserted on the 'tag'
 -- signal and incremented via the 'pop' input signal.
--- 
+--
 -------------------------------------------------------------------------------
 -- This file is part of 'L2SI Core'. It is subject to
 -- the license terms in the LICENSE.txt file found in the top-level directory

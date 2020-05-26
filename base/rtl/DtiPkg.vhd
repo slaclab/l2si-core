@@ -27,10 +27,10 @@ use l2si_core.XpmPkg.all;
 use surf.AxiStreamPkg.all;
 
 package DtiPkg is
-  
-   -- 
+
+   --
    constant AXI_CLK_FREQ_C   : real := 156.25E+6;                        -- In units of Hz
-   constant TIMEOUT_C          : real     := 1.0E-3;  -- In units of seconds   
+   constant TIMEOUT_C          : real     := 1.0E-3;  -- In units of seconds
    constant WINDOW_ADDR_SIZE_C : positive := 3;
    constant MAX_CUM_ACK_CNT_C  : positive := WINDOW_ADDR_SIZE_C;
    constant MAX_RETRANS_CNT_C  : positive := ite((WINDOW_ADDR_SIZE_C > 1), WINDOW_ADDR_SIZE_C-1, 1);
@@ -38,7 +38,7 @@ package DtiPkg is
    constant NUM_DTI_VC_C       : integer  := 2;
    constant VC_EVT             : integer  := 0;
    constant VC_CTL             : integer  := 1;
-   
+
    constant MaxUsLinks     : integer := 7;
 --   constant MaxDsLinks     : integer := 13;
    constant MaxDsLinks     : integer := 7;
@@ -51,7 +51,7 @@ package DtiPkg is
      TKEEP_MODE_C  => TKEEP_COMP_C,
      TUSER_BITS_C  => 2,
      TUSER_MODE_C  => TUSER_FIRST_LAST_C );
-   
+
    constant US_OB_CONFIG_C : AxiStreamConfigType := (
      TSTRB_EN_C    => false,
      TDATA_BYTES_C => 8,                -- 10Gbps
@@ -82,7 +82,7 @@ package DtiPkg is
 
    type QuadArray is array(natural range<>) of QuadType;
 --   type AmcQuadArray is array(natural range<>) of QuadArray(1 downto 0);
-   
+
    type DtiUsLinkConfigType is record
      enable     : sl;
      partition  : slv( 3 downto 0);
@@ -112,7 +112,7 @@ package DtiPkg is
 
    type DtiUsLinkConfigArray is array (natural range<>) of DtiUsLinkConfigType;
 
-   
+
    type DtiUsLinkStatusType is record
      linkUp     : sl;
      remLinkID  : slv(31 downto 0);
@@ -143,7 +143,7 @@ package DtiPkg is
      obL1R      => (others=>'0'),
      wrFifoD    => (others=>'0'),
      rdFifoD    => (others=>'0') );
-   
+
    type DtiUsLinkStatusArray is array (natural range<>) of DtiUsLinkStatusType;
 
    type DtiUsAppStatusType is record
@@ -154,9 +154,9 @@ package DtiPkg is
    constant DTI_US_APP_STATUS_INIT_C : DtiUsAppStatusType := (
      obReceived => (others=>'0'),
      obSent     => (others=>'0') );
-   
+
    type DtiUsAppStatusArray is array (natural range<>) of DtiUsAppStatusType;
-   
+
 
    type DtiDsLinkStatusType is record
      linkUp     : sl;
@@ -281,7 +281,7 @@ package body DtiPkg is
     assignRecord(i, v, cfg.l1Enable);
     return cfg;
   end function;
-    
+
    function dtiTimingFbId(ip : slv) return slv is
      variable id  : slv(31 downto 0);
    begin
