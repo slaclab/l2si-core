@@ -108,7 +108,7 @@ begin
 --          clk          => clk,                                      -- [in]
 --          delay        => TF_DELAY_SLV_C,                           -- [in]
 --          inputValid   => promptTimingStrobe,                       -- [in]
---          inputVector  => promptTimingMessageSlv,                   -- [in]         
+--          inputVector  => promptTimingMessageSlv,                   -- [in]
 --          inputAddr    => promptTimingMessage.pulseId(6 downto 0),  -- [in]
 --          outputValid  => alignedTimingStrobe,                      -- [out]
 --          outputVector => alignedTimingMessageSlv);                 -- [out]
@@ -166,7 +166,7 @@ begin
 --             delay                     => partitionDelays(i),      -- [in]
 --             inputValid                => promptTimingStrobe,      -- [in]
 --             inputVector(47 downto 0)  => promptXpmMessage.partitionWord(i),        -- [in]
---             inputVector(48)           => promptXpmMessage.valid,  -- [in]            
+--             inputVector(48)           => promptXpmMessage.valid,  -- [in]
 --             inputAddr                 => promptTimingMessage.pulseId(6 downto 0),  -- [in]
 --             outputValid               => open,  -- [in] (in theory will always be the same as alignedTimingStrobe
 --             outputVector(47 downto 0) => alignedXpmMessage.partitionWord(i),       -- [out]
@@ -192,7 +192,7 @@ begin
    -- Maybe zero this out?
    alignedXpmMessage.partitionAddr <= promptXpmMessage.partitionAddr;
 
-   -- This never happens during normal running but could happen breifly after switching delays   
+   -- This never happens during normal running but could happen breifly after switching delays
    alignedXpmMessage.valid <= uAnd(alignedXpmMessageValid);
 
    comb : process(axilReadMaster, axilWriteMaster, promptXpmMessage, promptTimingStrobe, r, rst) is

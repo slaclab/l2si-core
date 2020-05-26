@@ -102,7 +102,7 @@ package body L2SiPkg is
       -- Steal the top 8 bits of puslseId
       -- It is redundant to have these triggerInfo bits here
       -- but software expects it this way
-      assignSlv(i, vector, ite(eventHeader.triggerInfo(15) = '1', L1A_INFO_C, eventHeader.triggerInfo(14 downto 8))); 
+      assignSlv(i, vector, ite(eventHeader.triggerInfo(15) = '1', L1A_INFO_C, eventHeader.triggerInfo(14 downto 8)));
       i := i+1;                                                -- 63 - 8 - 1
       assignSlv(i, vector, eventHeader.timeStamp);             -- 127:64 - 64 - 8
       assignSlv(i, vector, eventHeader.partitions);            -- 135:128 - 8 - 1

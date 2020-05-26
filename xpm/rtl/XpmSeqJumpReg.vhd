@@ -1,7 +1,7 @@
 -------------------------------------------------------------------------------
 -- Company    : SLAC National Accelerator Laboratory
 -------------------------------------------------------------------------------
--- Description: 
+-- Description:
 -------------------------------------------------------------------------------
 -- This file is part of 'L2SI Core'. It is subject to
 -- the license terms in the LICENSE.txt file found in the top-level directory
@@ -40,7 +40,7 @@ entity XpmSeqJumpReg is
       axiReadSlave   : out AxiLiteReadSlaveType;
       axiWriteMaster : in  AxiLiteWriteMasterType;
       axiWriteSlave  : out AxiLiteWriteSlaveType;
-      -- EVR Interface      
+      -- EVR Interface
       status         : in  XpmSeqStatusType;
       config         : out XpmSeqConfigType;
       -- Clock and Reset
@@ -68,7 +68,7 @@ begin
 
    -------------------------------
    -- Configuration Register
-   -------------------------------  
+   -------------------------------
    comb : process (axiReadMaster, axiRst, axiWriteMaster, r, status) is
       variable v            : RegType;
       variable axiStatus    : AxiLiteStatusType;
@@ -93,7 +93,7 @@ begin
 
       -----------------------------
       -- AXI-Lite Write Logic
-      -----------------------------      
+      -----------------------------
       axiSlaveWaitWriteTxn(axiWriteMaster, v.axiWriteSlave, axiStatus.writeEnable);
 
       if (axiStatus.writeEnable = '1') then
@@ -135,7 +135,7 @@ begin
 
       -----------------------------
       -- AXI-Lite Read Logic
-      -----------------------------      
+      -----------------------------
 
       axiSlaveWaitReadTxn(axiReadMaster, v.axiReadSlave, axiStatus.readEnable);
 

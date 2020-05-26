@@ -35,7 +35,7 @@ end XpmLinkClocks;
 architecture rtl of XpmLinkClocks is
 
   signal clkRef : sl;
-  
+
 begin
    XPM_IBUFDS_GTE3 : IBUFDS_GTE3
       generic map (

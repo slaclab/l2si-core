@@ -1,7 +1,7 @@
 -------------------------------------------------------------------------------
 -- Company    : SLAC National Accelerator Laboratory
 -------------------------------------------------------------------------------
--- Description: 
+-- Description:
 -------------------------------------------------------------------------------
 -- This file is part of 'L2SI Core'. It is subject to
 -- the license terms in the LICENSE.txt file found in the top-level directory
@@ -89,7 +89,7 @@ begin
 
    --------------------------
    -- AXI-Lite: Crossbar Core
-   --------------------------  
+   --------------------------
    U_XBAR : entity surf.AxiLiteCrossbar
       generic map (
          TPD_G              => TPD_G,
@@ -143,7 +143,7 @@ begin
 
    -------------------------------
    -- Configuration Register
-   -------------------------------  
+   -------------------------------
    comb : process (mConfig) is
       variable v : XpmSeqConfigType;
    begin

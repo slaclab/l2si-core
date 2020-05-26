@@ -2,7 +2,7 @@
 -- Company    : SLAC National Accelerator Laboratory
 -------------------------------------------------------------------------------
 -- Description: DtiApp's Top Level
--- 
+--
 -- Note: Common-to-DtiApp interface defined here (see URL below)
 --       https://confluence.slac.stanford.edu/x/rLyMCw
 -------------------------------------------------------------------------------
@@ -66,7 +66,7 @@ architecture rtl of DtiPgpFb is
 
   signal r    : RegType := REG_INIT_C;
   signal r_in : RegType;
-  
+
 begin
 
   comb : process ( r, pgpRst, pgpRxOut ) is
@@ -75,20 +75,20 @@ begin
     v := r;
 
     v.tmo := r.tmo + 1;
-    
+
     if pgpRxOut.opCodeEn = '1' then
       v.opCodeFound := '1';
       case (pgpRxOut.opCode) is
         when NONE_AF_OPCODE =>
           v.rx_almost_full := '0';
           v.tx_almost_full := '0';
-        when RX_AF_OPCODE => 
+        when RX_AF_OPCODE =>
           v.rx_almost_full := '1';
           v.tx_almost_full := '0';
-        when TX_AF_OPCODE => 
+        when TX_AF_OPCODE =>
           v.rx_almost_full := '0';
           v.tx_almost_full := '1';
-        when BOTH_AF_OPCODE => 
+        when BOTH_AF_OPCODE =>
           v.rx_almost_full := '1';
           v.tx_almost_full := '1';
         when others =>
@@ -105,11 +105,11 @@ begin
       end if;
       v.opCodeFound := '0';
     end if;
-    
+
     if pgpRst = '1' then
       v := REG_INIT_C;
     end if;
-    
+
     r_in <= v;
 
     rxAlmostFull <= r.rx_almost_full or r.rx_full;
@@ -122,5 +122,5 @@ begin
       r <= r_in;
     end if;
   end process;
-  
+
 end rtl;

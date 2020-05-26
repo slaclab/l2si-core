@@ -215,7 +215,7 @@ begin
          v       := r;
          v.state := IDLE_S;
       end if;
-      
+
       if (rxRst = '1' or rxErr = '1') then
          v          := REG_INIT_C;
       end if;
@@ -232,7 +232,7 @@ begin
 
       v.pause    := v.pause and uconfig.groupMask;
       v.overflow := v.overflow and uconfig.groupMask;
-      
+
       rin <= v;
    end process comb;
 

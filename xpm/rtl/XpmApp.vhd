@@ -2,7 +2,7 @@
 -- Company    : SLAC National Accelerator Laboratory
 -------------------------------------------------------------------------------
 -- Description: XpmApp's Top Level
--- 
+--
 -- Note: Common-to-XpmApp interface defined here (see URL below)
 --       https://confluence.slac.stanford.edu/x/rLyMCw
 -------------------------------------------------------------------------------
@@ -71,7 +71,7 @@ entity XpmApp is
       bpTxDataK       : out slv(1 downto 0);
       bpStatus        : in  XpmBpLinkStatusArray(NUM_BP_LINKS_G downto 0);
       bpRxLinkPause   : in  Slv16Array (NUM_BP_LINKS_G-1 downto 0);
-      -- Timing Interface (timingClk domain) 
+      -- Timing Interface (timingClk domain)
       timingClk       : in  sl;
       timingRst       : in  sl;
 --      timingIn          : in  TimingRxType;
@@ -432,7 +432,7 @@ begin
 
    --
    -- timingStream carries its own 'advance' signal as well as fiducial.
-   -- 
+   --
    comb : process (advance, bpRxLinkPauseS, dsPause, dsOverflow, expWord, fstreams, paddr,
                    pdepth, pmaster, r, timingRst, timingStream) is
       variable v         : RegType;

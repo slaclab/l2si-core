@@ -442,7 +442,7 @@ package body XpmPkg is
       assignSlv(i, vector, s.trigword);
       return vector;
    end function;
-   
+
    function toL1Feedback(vector : slv) return XpmL1FeedbackType is
       variable s : XpmL1FeedbackType := XPM_L1_FEEDBACK_INIT_C;
       variable i : integer := 0;
