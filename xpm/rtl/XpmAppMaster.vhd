@@ -1,7 +1,7 @@
 -------------------------------------------------------------------------------
 -- Company    : SLAC National Accelerator Laboratory
 -------------------------------------------------------------------------------
--- Description: 
+-- Description:
 -------------------------------------------------------------------------------
 -- This file is part of 'L2SI Core'. It is subject to
 -- the license terms in the LICENSE.txt file found in the top-level directory
@@ -46,7 +46,7 @@ entity XpmAppMaster is
       update     : in  sl;
       config     : in  XpmPartitionConfigType;
       status     : out XpmPartitionStatusType;
-      -- Timing Interface (timingClk domain) 
+      -- Timing Interface (timingClk domain)
       timingClk  : in  sl;
       timingRst  : in  sl;
       --
@@ -250,7 +250,7 @@ begin
    --             tag            => open );
    l1Ack <= '1';
    l1AcceptTag <= (others=>'0');
-   
+
    --U_AnalysisTag : entity l2si_core.XpmAnalysisTag
    --  port map ( wrclk          => regclk,
    --             config         => config.analysis,

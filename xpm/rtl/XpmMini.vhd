@@ -2,7 +2,7 @@
 -- Company    : SLAC National Accelerator Laboratory
 -------------------------------------------------------------------------------
 -- Description: XpmMini's Top Level
--- 
+--
 -- Note: Common-to-XpmMini interface defined here (see URL below)
 --       https://confluence.slac.stanford.edu/x/rLyMCw
 -------------------------------------------------------------------------------
@@ -53,7 +53,7 @@ entity XpmMini is
       dsRxClk      : in  slv (NUM_DS_LINKS_G-1 downto 0);
       dsRxRst      : in  slv (NUM_DS_LINKS_G-1 downto 0);
       dsRx         : in  TimingRxArray (NUM_DS_LINKS_G-1 downto 0);
-      -- Timing Interface (timingClk domain) 
+      -- Timing Interface (timingClk domain)
       timingClk    : in  sl;
       timingRst    : in  sl;
       dsTx         : out TimingPhyArray (NUM_DS_LINKS_G-1 downto 0);

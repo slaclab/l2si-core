@@ -2,7 +2,7 @@
 -- Company    : SLAC National Accelerator Laboratory
 -------------------------------------------------------------------------------
 -- Description: Level-1 trigger select
--- 
+--
 -- Select events for sensor readout based upon event information from fast sensor
 -- feedback links.  Each link carries the tag (from XpmL0Tag) for the event and
 -- its bits, if any, of feedback information.  The programmable 'config' indicates

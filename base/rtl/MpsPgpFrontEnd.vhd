@@ -34,7 +34,7 @@ entity MpsPgpFrontEnd is
       PGP_TX_ENABLE_G   : boolean              := true;
       PAYLOAD_CNT_TOP_G : integer              := 7;  -- Top bit for payload counter
       VC_INTERLEAVE_G   : integer              := 1;  -- Interleave Frames
-      NUM_VC_EN_G       : integer range 1 to 4 := 4);      
+      NUM_VC_EN_G       : integer range 1 to 4 := 4);
    port (
       -- System Signals
       pgpClk       : in  sl;
@@ -137,7 +137,7 @@ architecture mapping of MpsPgpFrontEnd is
    signal phyTxLaneOut  : Pgp2bTxPhyLaneOutType;
    signal phyTxReady    : sl;
    signal gtTxOutClk    : sl;
-   
+
 begin
 
    gtRxUserReset <= phyRxInit or pgpRst or pgpRxIn.resetRx;
@@ -240,6 +240,6 @@ begin
          rxoutclk_out(0)                       => open,
          rxpmaresetdone_out(0)                 => open,
          txoutclk_out(0)                       => gtTxOutClk,
-         txpmaresetdone_out(0)                 => open);    
+         txpmaresetdone_out(0)                 => open);
 
 end mapping;

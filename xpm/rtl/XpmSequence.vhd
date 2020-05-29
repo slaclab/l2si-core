@@ -1,7 +1,7 @@
 -------------------------------------------------------------------------------
 -- Company    : SLAC National Accelerator Laboratory
 -------------------------------------------------------------------------------
--- Description: 
+-- Description:
 -------------------------------------------------------------------------------
 -- This file is part of 'L2SI Core'. It is subject to
 -- the license terms in the LICENSE.txt file found in the top-level directory
@@ -108,7 +108,7 @@ begin
    status.nexptseq    <= toSlv(XPM_SEQ_DEPTH_C,status.nexptseq'length);
    status.seqaddrlen  <= toSlv(SEQADDRLEN,status.seqaddrlen'length);
    status.countUpdate <= '0';
-                      
+
    U_FIFO : entity surf.AxiStreamFifoV2
       generic map (
          TPD_G               => TPD_G,

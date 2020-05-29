@@ -2,7 +2,7 @@
 -- Company    : SLAC National Accelerator Laboratory
 -------------------------------------------------------------------------------
 -- Description: Level-0 trigger select
--- 
+--
 -- Select events for sensor integration based upon timing frame information
 -- and programmed selection parameters.
 --

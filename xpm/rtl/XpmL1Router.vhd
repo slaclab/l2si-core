@@ -2,7 +2,7 @@
 -- Company    : SLAC National Accelerator Laboratory
 -------------------------------------------------------------------------------
 -- Description: XpmL1Router
--- 
+--
 -- Note: Common-to-XpmApp interface defined here (see URL below)
 --       https://confluence.slac.stanford.edu/x/rLyMCw
 -------------------------------------------------------------------------------
@@ -52,7 +52,7 @@ architecture top_level_app of XpmL1Router is
 
    signal valid : slv(XPM_PARTITIONS_C-1 downto 0);
 begin
-  
+
    comb : process ( l1FeedbacksIn, l1OutAcks, sel, valid ) is
       variable vreq : ReqArray(req'range);
    begin
@@ -61,7 +61,7 @@ begin
          vreq(conv_integer(l1FeedbacksIn(i).partition))(i) := l1FeedbacksIn(i).valid;
       end loop;
 
-      l1InAcks <= (others=>'0');  
+      l1InAcks <= (others=>'0');
 
       for i in 0 to XPM_PARTITIONS_C-1 loop
          l1FeedbacksOut(i) <= l1FeedbacksIn(conv_integer(sel(i)));
@@ -76,9 +76,9 @@ begin
       req <= vreq;
 
       l1FeedbacksOut(XPM_PARTITIONS_C) <= XPM_L1_FEEDBACK_INIT_C;
-        
+
    end process comb;
-  
+
    GEN_PARTITION : for i in 0 to XPM_PARTITIONS_C-1 generate
       U_Arbiter : entity surf.Arbiter
          generic map (
@@ -88,9 +88,9 @@ begin
             clk      => clk,
             rst      => rst,
             req      => req(i),
-            selected => sel(i), 
+            selected => sel(i),
             valid    => valid(i),
             ack      => open );
    end generate;
-  
+
 end top_level_app;

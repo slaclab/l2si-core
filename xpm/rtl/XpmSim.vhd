@@ -1,7 +1,7 @@
 -------------------------------------------------------------------------------
 -- Company    : SLAC National Accelerator Laboratory
 -------------------------------------------------------------------------------
--- Description: 
+-- Description:
 -------------------------------------------------------------------------------
 -- This file is part of 'L2SI Core'. It is subject to
 -- the license terms in the LICENSE.txt file found in the top-level directory
@@ -32,7 +32,7 @@ use l2si_core.XpmPkg.all;
 use l2si_core.XpmMiniPkg.all;
 use surf.AxiLitePkg.all;
 use surf.AxiStreamPkg.all;
- 
+
 library unisim;
 use unisim.vcomponents.all;
 
@@ -67,27 +67,27 @@ architecture top_level_app of XpmSim is
 
    constant GEN_CLEAR_G : boolean := false;
    constant SIM_ANALYSIS_TAG_G : boolean := false;
-   
+
    -- Reference Clocks and Resets
    signal recTimingClk : sl;
    signal recTimingRst : sl;
    signal regClk       : sl;
    signal regRst       : sl;
-   
+
    signal tpgConfig : TPGConfigType := TPG_CONFIG_INIT_C;
    signal xpmConfig : XpmConfigType := XPM_CONFIG_INIT_C;
    signal xpmStatus : XpmStatusType;
    signal linkStatus: XpmLinkStatusArray(XPM_MAX_DS_LINKS_C-1 downto 0) := (others=>XPM_LINK_STATUS_INIT_C);
-   
-   -- Timing Interface (timingClk domain) 
+
+   -- Timing Interface (timingClk domain)
 --   signal xData      : TimingRxType := TIMING_RX_INIT_C;
    signal xData      : XpmMiniStreamType := (
      fiducial => '0',
      streams  => (others=>TIMING_SERIAL_INIT_C),
      advance  => (others=>'0') );
-   
+
    signal pconfig : XpmPartitionConfigArray(XPM_PARTITIONS_C-1 downto 0) := (others=>XPM_PARTITION_CONFIG_INIT_C);
-   
+
 begin
 
   --  Generate clocks and resets
@@ -98,7 +98,7 @@ begin
     regRst <= '0';
     wait;
   end process;
-  
+
   process is
   begin
     regClk <= '1';
@@ -122,11 +122,11 @@ begin
       wait for 2.692 ns;
     end process;
   end generate;
-  
+
   dsTxClk <= (others=>recTimingClk);
   dsTxRst <= (others=>recTimingRst);
   bpTxClk <= recTimingClk;
-  
+
   U_TPG : entity lcls_timing_core.TPGMini
     port map ( txClk    => recTimingClk,
                txRst    => recTimingRst,
@@ -142,7 +142,7 @@ begin
   tpgConfig.FixedRateDivisors(RATE_SELECT_G) <= toSlv(RATE_DIV_G,20);
   tpgConfig.pulseIdWrEn                      <= '0';
   tpgConfig.timeStampWrEn                    <= '0';
-  
+
   xpmConfig.partition <= pconfig;
   xpmConfig.dsLink(0).txDelay <= toSlv(200,20);
   xpmConfig.dsLink(1).txDelay <= toSlv(200,20);
@@ -153,7 +153,7 @@ begin
       xpmConfig.dsLink(i).groupMask  <= x"ff";
     end generate;
   end generate;
-   
+
   GEN_BP_ENABLE : for i in 0 to XPM_MAX_BP_LINKS_C-1 generate
     GEN_ENABLE: if ENABLE_BP_LINKS_G(i)='1' generate
       xpmConfig.bpLink(i).enable     <= '1';
@@ -173,7 +173,7 @@ begin
      end loop;
 
      pconfig(0).master <= '1';
-     
+
      if SIM_ANALYSIS_TAG_G then
        pconfig(0).analysis.rst  <= x"f";
        pconfig(0).analysis.tag  <= x"00000000";
@@ -205,10 +205,10 @@ begin
        wait until regClk='0';
 
        wait for 10000 ns;
-   
+
        wait until regClk='1';
        wait until regClk='0';
-       
+
        for i in 0 to XPM_PARTITIONS_C-1 loop
          pconfig(i).message.insert  <= '0';
        end loop;
@@ -217,7 +217,7 @@ begin
      else
        wait for 20 us;
      end if;
-     
+
      pconfig(0).l0Select.enabled <= '1';
      pconfig(0).l0Select.rateSel <= toSlv(RATE_SELECT_G,16);
      pconfig(0).l0Select.destSel <= x"8000";
@@ -242,19 +242,19 @@ begin
          pconfig(i).message.header  <= MSG_CLEAR_FIFO;
          pconfig(i).message.insert  <= '1';
        end loop;
-       
+
        wait until regClk='1';
        wait until regClk='0';
-       
+
        for i in 0 to XPM_PARTITIONS_C-1 loop
          pconfig(i).message.insert  <= '0';
        end loop;
 
        wait for 100 ns;
      end if;
-     
+
      pconfig(0).l0Select.enabled <= '1';
-     
+
      wait;
    end process;
 
@@ -268,7 +268,7 @@ begin
                 advance   => xData.advance,
                 data      => open,
                 dataK     => open );
-     
+
    U_Application : entity l2si_core.XpmApp
       generic map ( NUM_DS_LINKS_G => linkStatus'length,
                     NUM_BP_LINKS_G => bpRxLinkUp'length )
@@ -302,7 +302,7 @@ begin
          axilWriteMaster => AXI_LITE_WRITE_MASTER_INIT_C,
          obAppMaster     => open,
          obAppSlave      => AXI_STREAM_SLAVE_INIT_C,
-         -- Timing Interface (timingClk domain) 
+         -- Timing Interface (timingClk domain)
          timingClk         => recTimingClk,
          timingRst         => recTimingRst,
          timingStream      => xData,
@@ -310,5 +310,5 @@ begin
          timingFbRst       => '1',
          timingFbId        => (others=>'0'),
          timingFb          => open );
-     
+
 end top_level_app;
