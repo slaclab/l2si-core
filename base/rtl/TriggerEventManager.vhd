@@ -75,7 +75,7 @@ entity TriggerEventManager is
       eventRst                 : in  sl;
       eventTimingMessagesValid : out slv(NUM_DETECTORS_G-1 downto 0);
       eventTimingMessages      : out TimingMessageArray(NUM_DETECTORS_G-1 downto 0);
-      eventTimingMessagesRd    : in  slv(NUM_DETECTORS_G-1 downto 0);
+      eventTimingMessagesRd    : in  slv(NUM_DETECTORS_G-1 downto 0) := (others=>'1');
       eventAxisMasters         : out AxiStreamMasterArray(NUM_DETECTORS_G-1 downto 0);
       eventAxisSlaves          : in  AxiStreamSlaveArray(NUM_DETECTORS_G-1 downto 0);
       eventAxisCtrl            : in  AxiStreamCtrlArray(NUM_DETECTORS_G-1 downto 0);
