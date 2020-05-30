@@ -69,12 +69,14 @@ entity TriggerEventBuffer is
       clear       : out sl;
 
       -- Event/Transition output
-      eventClk           : in  sl;
-      eventRst           : in  sl;
-      eventTimingMessage : out TimingMessageType;
-      eventAxisMaster    : out AxiStreamMasterType;
-      eventAxisSlave     : in  AxiStreamSlaveType;
-      eventAxisCtrl      : in  AxiStreamCtrlType);
+      eventClk                : in  sl;
+      eventRst                : in  sl;
+      eventTimingMessageValid : out sl;
+      eventTimingMessage      : out TimingMessageType;
+      eventTimingMessageRd    : in  sl;
+      eventAxisMaster         : out AxiStreamMasterType;
+      eventAxisSlave          : in  AxiStreamSlaveType;
+      eventAxisCtrl           : in  AxiStreamCtrlType);
 
 end entity TriggerEventBuffer;
 
@@ -107,7 +109,8 @@ architecture rtl of TriggerEventBuffer is
 
 
       fifoAxisMaster : AxiStreamMasterType;
-
+      msgFifoWr      : sl;
+      
       -- outputs
       triggerData    : XpmEventDataType;
       axilReadSlave  : AxiLiteReadSlaveType;
@@ -149,6 +152,8 @@ architecture rtl of TriggerEventBuffer is
       pause           => '0',
 
       fifoAxisMaster => axiStreamMasterInit(EVENT_AXIS_CONFIG_C),
+      msgFifoWr      => '0',
+      
       -- outputs     =>
       triggerData    => XPM_EVENT_DATA_INIT_C,
       axilReadSlave  => AXI_LITE_READ_SLAVE_INIT_C,
@@ -207,6 +212,7 @@ begin
 
       v.fifoAxisMaster.tValid := '0';
 
+      v.msgFifoWr := '0';
 
       --------------------------------------------
       -- Trigger output logic
@@ -236,10 +242,12 @@ begin
          -- Pass on events with l0Accept
          -- Pass on transitions
          v.streamValid := (v.eventData.valid and v.eventData.l0Accept) or v.transitionData.valid;
-
+         v.msgFifoWr   := (v.eventData.valid and v.eventData.l0Accept);
+         
          -- Don't pass data through when disabled
          if (r.enable = '0') then
             v.streamValid := '0';
+            v.msgFifoWr   := '0';
          end if;
 
          -- Create the EventHeader from timing and event data
@@ -485,10 +493,11 @@ begin
       port map (
          rst    => r.fifoRst,                -- [in]
          wr_clk => timingRxClk,              -- [in]
-         wr_en  => r.fifoAxisMaster.tValid,  -- [in]
+         wr_en  => r.msgFifoWr,              -- [in]
          din    => alignedTimingMessageSlv,  -- [in]
          rd_clk => eventClk,                 -- [in]
-         rd_en  => eventAxisSlave.tReady,    -- [in] -- This is probably wrong
+         rd_en  => eventTimingMessageRd,     -- [in]
+         valid  => eventTimingMessageValid,  -- [out]
          dout   => eventTimingMessageSlv);   -- [out]
    eventTimingMessage <= toTimingMessageType(eventTimingMessageSlv);
 

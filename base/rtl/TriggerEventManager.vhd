@@ -71,12 +71,14 @@ entity TriggerEventManager is
       l1Acks      : out slv(NUM_DETECTORS_G-1 downto 0);
 
       -- Output Streams
-      eventClk            : in  sl;
-      eventRst            : in  sl;
-      eventTimingMessages : out TimingMessageArray(NUM_DETECTORS_G-1 downto 0);
-      eventAxisMasters    : out AxiStreamMasterArray(NUM_DETECTORS_G-1 downto 0);
-      eventAxisSlaves     : in  AxiStreamSlaveArray(NUM_DETECTORS_G-1 downto 0);
-      eventAxisCtrl       : in  AxiStreamCtrlArray(NUM_DETECTORS_G-1 downto 0);
+      eventClk                 : in  sl;
+      eventRst                 : in  sl;
+      eventTimingMessagesValid : out slv(NUM_DETECTORS_G-1 downto 0);
+      eventTimingMessages      : out TimingMessageArray(NUM_DETECTORS_G-1 downto 0);
+      eventTimingMessagesRd    : in  slv(NUM_DETECTORS_G-1 downto 0);
+      eventAxisMasters         : out AxiStreamMasterArray(NUM_DETECTORS_G-1 downto 0);
+      eventAxisSlaves          : in  AxiStreamSlaveArray(NUM_DETECTORS_G-1 downto 0);
+      eventAxisCtrl            : in  AxiStreamCtrlArray(NUM_DETECTORS_G-1 downto 0);
 
       -- AXI-Lite
       axilClk         : in  sl;
@@ -275,31 +277,33 @@ begin
             TRIGGER_CLK_IS_TIMING_RX_CLK_G => TRIGGER_CLK_IS_TIMING_RX_CLK_G,
             EVENT_CLK_IS_TIMING_RX_CLK_G   => EVENT_CLK_IS_TIMING_RX_CLK_G)
          port map (
-            timingRxClk          => timingRxClk,                         -- [in]
-            timingRxRst          => timingRxRst,                         -- [in]
-            axilReadMaster       => locAxilReadMasters(AXIL_TEB_C(i)),   -- [in]
-            axilReadSlave        => locAxilReadSlaves(AXIL_TEB_C(i)),    -- [out]
-            axilWriteMaster      => locAxilWriteMasters(AXIL_TEB_C(i)),  -- [in]
-            axilWriteSlave       => locAxilWriteSlaves(AXIL_TEB_C(i)),   -- [out]
-            promptTimingStrobe   => timingBus.strobe,                    -- [in]            
-            promptTimingMessage  => timingBus.message,                   -- [in]
-            promptXpmMessage     => xpmMessage,                          -- [in]
-            alignedTimingstrobe  => alignedTimingStrobe,                 -- [in]
-            alignedTimingMessage => alignedTimingMessage,                -- [in]
-            alignedXpmMessage    => alignedXpmMessage,                   -- [in]
-            partition            => detectorPartitions(i),               -- [out]
-            pause                => pause(i),                            -- [out]
-            overflow             => overflow(i),                         -- [out]
-            triggerClk           => triggerClk,                          -- [in]
-            triggerRst           => triggerRst,                          -- [in]
-            triggerData          => triggerData(i),                      -- [out]
-            clear                => clear(i),                            -- [out]
-            eventClk             => eventClk,                            -- [in]
-            eventRst             => eventRst,                            -- [in]
-            eventTimingMessage   => eventTimingMessages(i),              -- [out]
-            eventAxisMaster      => eventAxisMasters(i),                 -- [out]
-            eventAxisSlave       => eventAxisSlaves(i),                  -- [in]
-            eventAxisCtrl        => eventAxisCtrl(i));                   -- [in]
+            timingRxClk             => timingRxClk,                         -- [in]
+            timingRxRst             => timingRxRst,                         -- [in]
+            axilReadMaster          => locAxilReadMasters(AXIL_TEB_C(i)),   -- [in]
+            axilReadSlave           => locAxilReadSlaves(AXIL_TEB_C(i)),    -- [out]
+            axilWriteMaster         => locAxilWriteMasters(AXIL_TEB_C(i)),  -- [in]
+            axilWriteSlave          => locAxilWriteSlaves(AXIL_TEB_C(i)),   -- [out]
+            promptTimingStrobe      => timingBus.strobe,                    -- [in]            
+            promptTimingMessage     => timingBus.message,                   -- [in]
+            promptXpmMessage        => xpmMessage,                          -- [in]
+            alignedTimingstrobe     => alignedTimingStrobe,                 -- [in]
+            alignedTimingMessage    => alignedTimingMessage,                -- [in]
+            alignedXpmMessage       => alignedXpmMessage,                   -- [in]
+            partition               => detectorPartitions(i),               -- [out]
+            pause                   => pause(i),                            -- [out]
+            overflow                => overflow(i),                         -- [out]
+            triggerClk              => triggerClk,                          -- [in]
+            triggerRst              => triggerRst,                          -- [in]
+            triggerData             => triggerData(i),                      -- [out]
+            clear                   => clear(i),                            -- [out]
+            eventClk                => eventClk,                            -- [in]
+            eventRst                => eventRst,                            -- [in]
+            eventTimingMessageValid => eventTimingMessagesValid(i),         -- [out]
+            eventTimingMessage      => eventTimingMessages(i),              -- [out]
+            eventTimingMessageRd    => eventTimingMessagesRd(i),            -- [in]
+            eventAxisMaster         => eventAxisMasters(i),                 -- [out]
+            eventAxisSlave          => eventAxisSlaves(i),                  -- [in]
+            eventAxisCtrl           => eventAxisCtrl(i));                   -- [in]
    end generate GEN_DETECTORS;
 
 
