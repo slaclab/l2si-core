@@ -1,7 +1,7 @@
 -------------------------------------------------------------------------------
 -- Company    : SLAC National Accelerator Laboratory
 -------------------------------------------------------------------------------
--- Description: 
+-- Description:
 -------------------------------------------------------------------------------
 -- This file is part of 'L2SI Core'. It is subject to
 -- the license terms in the LICENSE.txt file found in the top-level directory
@@ -110,7 +110,7 @@ architecture rtl of TriggerEventBuffer is
 
       fifoAxisMaster : AxiStreamMasterType;
       msgFifoWr      : sl;
-      
+
       -- outputs
       triggerData    : XpmEventDataType;
       axilReadSlave  : AxiLiteReadSlaveType;
@@ -153,7 +153,7 @@ architecture rtl of TriggerEventBuffer is
 
       fifoAxisMaster => axiStreamMasterInit(EVENT_AXIS_CONFIG_C),
       msgFifoWr      => '0',
-      
+
       -- outputs     =>
       triggerData    => XPM_EVENT_DATA_INIT_C,
       axilReadSlave  => AXI_LITE_READ_SLAVE_INIT_C,
@@ -243,7 +243,7 @@ begin
          -- Pass on transitions
          v.streamValid := (v.eventData.valid and v.eventData.l0Accept) or v.transitionData.valid;
          v.msgFifoWr   := (v.eventData.valid and v.eventData.l0Accept);
-         
+
          -- Don't pass data through when disabled
          if (r.enable = '0') then
             v.streamValid := '0';
@@ -502,4 +502,3 @@ begin
    eventTimingMessage <= toTimingMessageType(eventTimingMessageSlv);
 
 end architecture rtl;
-
