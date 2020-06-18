@@ -82,7 +82,7 @@ entity TriggerEventBuffer is
       eventTimingMessageRd    : in  sl := '1';
       eventAxisMaster         : out AxiStreamMasterType;
       eventAxisSlave          : in  AxiStreamSlaveType;
-      eventAxisCtrl           : in  AxiStreamCtrlType);
+      eventAxisCtrl           : in  AxiStreamCtrlType;
       clearReadout            : out sl);
 
 end entity TriggerEventBuffer;
