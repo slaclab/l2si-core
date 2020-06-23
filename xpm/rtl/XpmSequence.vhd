@@ -239,7 +239,7 @@ begin
       end loop;
 
       v.master.tLast := '1';
-      v.master.tKeep := genTKeep(XPM_SEQ_DEPTH_C*2+2);
+      v.master.tKeep := genTKeep(XPM_SEQ_DEPTH_C*2+4);
 
       if axisSlave.tReady = '1' then
          v.master.tValid := '0';
@@ -250,10 +250,10 @@ begin
          ssiSetUserSof (EMAC_AXIS_CONFIG_C, v.master, '1');
          ssiSetUserEofe(EMAC_AXIS_CONFIG_C, v.master, '0');
          v.master.tValid             := '1';
-         v.master.tData(15 downto 0) := resize(seqNotifyValid, 16);
+         v.master.tData(31 downto 0) := resize(seqNotifyValid, 16) & XPM_MESSAGE_SEQUENCE_DONE;
          for i in 0 to XPM_SEQ_DEPTH_C-1 loop
             if seqNotifyValid(i) = '1' then
-               v.master.tData(16*i+31 downto 16*i+16) := resize(slv(seqNotify(i)), 16);
+               v.master.tData(16*i+47 downto 16*i+32) := resize(slv(seqNotify(i)), 16);
             end if;
          end loop;
       end if;
