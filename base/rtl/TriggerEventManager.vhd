@@ -68,13 +68,15 @@ entity TriggerEventManager is
       l1Acks      : out slv(NUM_DETECTORS_G-1 downto 0);
 
       -- Output Streams
-      eventClk            : in  sl;
-      eventRst            : in  sl;
-      eventTimingMessages : out TimingMessageArray(NUM_DETECTORS_G-1 downto 0);
-      eventAxisMasters    : out AxiStreamMasterArray(NUM_DETECTORS_G-1 downto 0);
-      eventAxisSlaves     : in  AxiStreamSlaveArray(NUM_DETECTORS_G-1 downto 0);
-      eventAxisCtrl       : in  AxiStreamCtrlArray(NUM_DETECTORS_G-1 downto 0);
-      clearReadout        : out slv(NUM_DETECTORS_G-1 downto 0);
+      eventClk                 : in  sl;
+      eventRst                 : in  sl;
+      eventTimingMessagesValid : out slv(NUM_DETECTORS_G-1 downto 0);
+      eventTimingMessages      : out TimingMessageArray(NUM_DETECTORS_G-1 downto 0);
+      eventTimingMessagesRd    : in  slv(NUM_DETECTORS_G-1 downto 0) := (others=>'1');
+      eventAxisMasters         : out AxiStreamMasterArray(NUM_DETECTORS_G-1 downto 0);
+      eventAxisSlaves          : in  AxiStreamSlaveArray(NUM_DETECTORS_G-1 downto 0);
+      eventAxisCtrl            : in  AxiStreamCtrlArray(NUM_DETECTORS_G-1 downto 0);
+      clearReadout             : out slv(NUM_DETECTORS_G-1 downto 0);
 
       -- AXI-Lite
       axilClk         : in  sl;
@@ -363,7 +365,9 @@ begin
             triggerData          => triggerData(i),                      -- [out]
             eventClk             => eventClk,                            -- [in]
             eventRst             => eventRst,                            -- [in]
+            eventTimingMessageValid => eventTimingMessagesValid(i),      -- [out]
             eventTimingMessage   => eventTimingMessages(i),              -- [out]
+            eventTimingMessageRd => eventTimingMessagesRd(i),            -- [in]
             eventAxisMaster      => eventAxisMasters(i),                 -- [out]
             eventAxisSlave       => eventAxisSlaves(i),                  -- [in]
             eventAxisCtrl        => eventAxisCtrl(i),                    -- [in]

@@ -68,6 +68,7 @@ architecture rtl of XpmAppMaster is
       latch      : sl;
       insertMsg  : sl;
       strobeMsg  : sl;
+      inhibitMsg : sl;
       partStrobe : sl;
       timingBus  : TimingBusType;
       cuTiming   : CuTimingType;
@@ -78,6 +79,7 @@ architecture rtl of XpmAppMaster is
       latch      => '0',
       insertMsg  => '0',
       strobeMsg  => '0',
+      inhibitMsg => '0',
       partStrobe => '0',
       timingBus  => TIMING_BUS_INIT_C,
       cuTiming   => CU_TIMING_INIT_C,
@@ -311,7 +313,7 @@ begin
 
    comb : process (r, timingRst, frame, cuRx_frame, cuRx_valid,
                    timingBus_strobe, timingBus_valid, msgConfig,
-                   l0Tag, l0Accept, l0Reject) is
+                   l0Tag, l0Accept, l0Reject, inhibit) is
       variable v     : RegType;
       variable pword : XpmEventDataType      := XPM_EVENT_DATA_INIT_C;
       variable msg   : XpmTransitionDataType := XPM_TRANSITION_DATA_INIT_C;
@@ -321,6 +323,7 @@ begin
       v.partStrobe := r.timingBus.strobe;
       v.latch      := r.partStrobe;
       v.strobeMsg  := '0';
+      v.inhibitMsg := inhibit;
 
       if msgConfig.insert = '1' and r.timingBus.strobe = '1' then
          v.insertMsg := '1';
@@ -330,7 +333,11 @@ begin
          if r.insertMsg = '1' then
             v.insertMsg := '0';
             v.strobeMsg := '1';
-            msg.valid   := '1';
+            if msgConfig.header(7)='1' and r.inhibitMsg='1' then
+               msg.valid   := '0';
+            else
+               msg.valid   := '1';
+            end if;
             msg.l0tag   := l0Tag(msg.l0tag'range);
             msg.header  := msgConfig.header(6 downto 0);
             msg.count   := l0Tag(msg.count'range);
