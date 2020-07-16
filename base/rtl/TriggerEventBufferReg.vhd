@@ -247,7 +247,7 @@ begin
          generic map (
             TPD_G        => TPD_G,
             COMMON_CLK_G => COMMON_CLK_G,
-            DATA_WIDTH_G => 32)
+            DATA_WIDTH_G => 12)
          port map (
             rst    => timingRxRst,
             wr_clk => timingRxClk,
@@ -259,7 +259,7 @@ begin
          generic map (
             TPD_G        => TPD_G,
             COMMON_CLK_G => COMMON_CLK_G,
-            DATA_WIDTH_G => 32)
+            DATA_WIDTH_G => 12)
          port map (
             rst    => timingRxRst,
             wr_clk => timingRxClk,
