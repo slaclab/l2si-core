@@ -45,7 +45,7 @@ entity TriggerEventBuffer is
 
       -- AXI Lite bus for configuration and status
       axilClk         : in  sl;
-      axilRst         : in  sl;  
+      axilRst         : in  sl;
       axilReadMaster  : in  AxiLiteReadMasterType;
       axilReadSlave   : out AxiLiteReadSlaveType;
       axilWriteMaster : in  AxiLiteWriteMasterType;
@@ -116,7 +116,7 @@ architecture rtl of TriggerEventBuffer is
 
       fifoAxisMaster : AxiStreamMasterType;
       msgFifoWr      : sl;
-      
+
       -- outputs
       triggerData    : XpmEventDataType;
 
@@ -382,9 +382,9 @@ begin
          v.pauseToTrig    := (others => '0');
          v.notPauseToTrig := (others => '1');
       end if;
-      
+
       v.partition := partitionReg;
-      
+
       if (timingRxRst = '1') then
          v := REG_INIT_C;
       end if;
@@ -393,7 +393,7 @@ begin
 
       -- outputs
       fifoRst        <= r.fifoRst or fifoRstReg;
-      
+
       partition      <= r.partition;
       overflow       <= r.overflow;
       pause          <= r.pause;
@@ -444,7 +444,7 @@ begin
          axilReadSlave     => axilReadSlave,
          axilWriteMaster   => axilWriteMaster,
          axilWriteSlave    => axilWriteSlave);
-      
+
    -----------------------------------------------
    -- Delay triggerData according to AXI-Lite register
    -----------------------------------------------

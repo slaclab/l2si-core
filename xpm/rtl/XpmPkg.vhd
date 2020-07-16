@@ -44,7 +44,7 @@ package XpmPkg is
    --  Async ethernet message types
    constant XPM_MESSAGE_SEQUENCE_DONE : slv(15 downto 0) := toSlv(0,16);
    constant XPM_MESSAGE_STEP_DONE     : slv(15 downto 0) := toSlv(1,16);
-   
+
    -- This doesn't belong here but not sure where to move it
    constant NSTREAMS_C : integer := 3;
 

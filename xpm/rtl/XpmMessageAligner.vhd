@@ -42,7 +42,7 @@ entity XpmMessageAligner is
 
       -- Axi Lite bus for reading back current partitionDelays
       axilClk         : in  sl;
-      axilRst         : in  sl;      
+      axilRst         : in  sl;
       axilReadMaster  : in  AxiLiteReadMasterType;
       axilReadSlave   : out AxiLiteReadSlaveType;
       axilWriteMaster : in  AxiLiteWriteMasterType;
@@ -213,7 +213,7 @@ begin
             v.rxId := promptXpmMessage.partitionAddr;
          end if;
       end if;
-      
+
       if timingRxRst = '1' then
          v      := REG_INIT_C;
       end if;
@@ -245,5 +245,5 @@ begin
          axilReadSlave   => axilReadSlave,
          axilWriteMaster => axilWriteMaster,
          axilWriteSlave  => axilWriteSlave);
-      
+
 end rtl;
