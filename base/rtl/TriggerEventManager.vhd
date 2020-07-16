@@ -39,6 +39,7 @@ entity TriggerEventManager is
       NUM_DETECTORS_G                : integer range 1 to 8 := 8;
       AXIL_BASE_ADDR_G               : slv(31 downto 0)     := (others => '0');
       EVENT_AXIS_CONFIG_G            : AxiStreamConfigType  := EVENT_AXIS_CONFIG_C;
+      AXIL_CLK_IS_TIMING_RX_CLK_G    : boolean              := false;
       L1_CLK_IS_TIMING_TX_CLK_G      : boolean              := false;
       TRIGGER_CLK_IS_TIMING_RX_CLK_G : boolean              := false;
       EVENT_CLK_IS_TIMING_RX_CLK_G   : boolean              := false);
@@ -142,12 +143,6 @@ architecture rtl of TriggerEventManager is
          addrBits     => 8,
          connectivity => X"FFFF"));
 
-   -- Axi bus sync'd to timingClk
-   signal timingAxilReadMaster  : AxiLiteReadMasterType;
-   signal timingAxilReadSlave   : AxiLiteReadSlaveType;
-   signal timingAxilWriteMaster : AxiLiteWriteMasterType;
-   signal timingAxilWriteSlave  : AxiLiteWriteSlaveType;
-
    -- Fanned out Axi bus
    signal locAxilReadMasters  : AxiLiteReadMasterArray(AXIL_MASTERS_C-1 downto 0);
    signal locAxilReadSlaves   : AxiLiteReadSlaveArray(AXIL_MASTERS_C-1 downto 0)  := (others => AXI_LITE_READ_SLAVE_EMPTY_DECERR_C);
@@ -250,26 +245,6 @@ architecture rtl of TriggerEventManager is
 begin
 
    -----------------------------------------------
-   -- Synchronize AXI-Lite bus to timingRxClk
-   -----------------------------------------------
-   U_AxiLiteAsync_1 : entity surf.AxiLiteAsync
-      generic map (
-         TPD_G => TPD_G)
-      port map (
-         sAxiClk         => axilClk,                -- [in]
-         sAxiClkRst      => axilRst,                -- [in]
-         sAxiReadMaster  => axilReadMaster,         -- [in]
-         sAxiReadSlave   => axilReadSlave,          -- [out]
-         sAxiWriteMaster => axilWriteMaster,        -- [in]
-         sAxiWriteSlave  => axilWriteSlave,         -- [out]
-         mAxiClk         => timingRxClk,            -- [in]
-         mAxiClkRst      => timingRxRst,            -- [in]
-         mAxiReadMaster  => timingAxilReadMaster,   -- [out]
-         mAxiReadSlave   => timingAxilReadSlave,    -- [in]
-         mAxiWriteMaster => timingAxilWriteMaster,  -- [out]
-         mAxiWriteSlave  => timingAxilWriteSlave);  -- [in]
-
-   -----------------------------------------------
    -- Fan out AXI-Lite
    -----------------------------------------------
    U_AxiLiteCrossbar_1 : entity surf.AxiLiteCrossbar
@@ -279,12 +254,12 @@ begin
          NUM_MASTER_SLOTS_G => AXIL_MASTERS_C,
          MASTERS_CONFIG_G   => AXIL_XBAR_CONFIG_C)
       port map (
-         axiClk              => timingRxClk,            -- [in]
-         axiClkRst           => timingRxRst,            -- [in]
-         sAxiWriteMasters(0) => timingAxilWriteMaster,  -- [in]
-         sAxiWriteSlaves(0)  => timingAxilWriteSlave,   -- [out]
-         sAxiReadMasters(0)  => timingAxilReadMaster,   -- [in]
-         sAxiReadSlaves(0)   => timingAxilReadSlave,    -- [out]
+         axiClk              => axilClk,                -- [in]
+         axiClkRst           => axilRst,                -- [in]
+         sAxiWriteMasters(0) => axilWriteMaster,        -- [in]
+         sAxiWriteSlaves(0)  => axilWriteSlave,         -- [out]
+         sAxiReadMasters(0)  => axilReadMaster,         -- [in]
+         sAxiReadSlaves(0)   => axilReadSlave,          -- [out]
          mAxiWriteMasters    => locAxilWriteMasters,    -- [out]
          mAxiWriteSlaves     => locAxilWriteSlaves,     -- [in]
          mAxiReadMasters     => locAxilReadMasters,     -- [out]
@@ -301,12 +276,12 @@ begin
             NTRIGGERS_G     => NUM_DETECTORS_G,
             TRIG_DEPTH_G    => 28,
             TRIG_PIPE_G     => 0,
-            COMMON_CLK_G    => true,
+            COMMON_CLK_G    => AXIL_CLK_IS_TIMING_RX_CLK_G,
             EVR_CARD_G      => false,
             AXIL_BASEADDR_G => AXIL_XBAR_CONFIG_C(AXIL_EVR_C).baseAddr)
          port map (
-            axilClk         => timingRxClk,                      -- [in]
-            axilRst         => timingRxRst,                      -- [in]
+            axilClk         => axilClk,                          -- [in]
+            axilRst         => axilRst,                          -- [in]
             axilWriteMaster => locAxilWriteMasters(AXIL_EVR_C),  -- [in]
             axilWriteSlave  => locAxilWriteSlaves(AXIL_EVR_C),   -- [out]
             axilReadMaster  => locAxilReadMasters(AXIL_EVR_C),   -- [in]
@@ -328,11 +303,14 @@ begin
    XPM_ALIGN_GEN : if (EN_LCLS_II_TIMING_G) generate
       U_XpmMessageAligner_1 : entity l2si_core.XpmMessageAligner
          generic map (
-            TPD_G      => TPD_G,
-            TF_DELAY_G => 100)
+            TPD_G        => TPD_G,
+            COMMON_CLK_G => AXIL_CLK_IS_TIMING_RX_CLK_G,
+            TF_DELAY_G   => 100)
          port map (
-            clk                  => timingRxClk,                          -- [in]
-            rst                  => timingRxRst,                          -- [in]
+            timingRxClk          => timingRxClk,                          -- [in]
+            timingRxRst          => timingRxRst,                          -- [in]
+            axilClk              => axilClk,                              -- [in]
+            axilRst              => axilRst,                              -- [in]
             axilReadMaster       => locAxilReadMasters(AXIL_ALIGNER_C),   -- [in]
             axilReadSlave        => locAxilReadSlaves(AXIL_ALIGNER_C),    -- [out]
             axilWriteMaster      => locAxilWriteMasters(AXIL_ALIGNER_C),  -- [in]
@@ -357,11 +335,14 @@ begin
             EN_LCLS_I_TIMING_G             => EN_LCLS_I_TIMING_G,
             EN_LCLS_II_TIMING_G            => EN_LCLS_II_TIMING_G,
             EVENT_AXIS_CONFIG_G            => EVENT_AXIS_CONFIG_G,
+            AXIL_CLK_IS_TIMING_RX_CLK_G    => AXIL_CLK_IS_TIMING_RX_CLK_G,
             TRIGGER_CLK_IS_TIMING_RX_CLK_G => TRIGGER_CLK_IS_TIMING_RX_CLK_G,
             EVENT_CLK_IS_TIMING_RX_CLK_G   => EVENT_CLK_IS_TIMING_RX_CLK_G)
          port map (
             timingRxClk          => timingRxClk,                         -- [in]
             timingRxRst          => timingRxRst,                         -- [in]
+            axilClk              => axilClk,                             -- [in]
+            axilRst              => axilRst,                             -- [in]            
             axilReadMaster       => locAxilReadMasters(AXIL_TEB_C(i)),   -- [in]
             axilReadSlave        => locAxilReadSlaves(AXIL_TEB_C(i)),    -- [out]
             axilWriteMaster      => locAxilWriteMasters(AXIL_TEB_C(i)),  -- [in]
