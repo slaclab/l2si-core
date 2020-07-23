@@ -81,13 +81,14 @@ class EventHeader(PackedStruct):
         ('version', ctypes.c_uint8, 8)]
 
 
-def parseEventHeaderFrame(frame):
+def parseEventHeaderFrame(frame, enPrint=True):
     """Given a rogue Frame representing an Event Header or Transition, parse into a dictionary of fields"""
 
     frameSize = frame.getPayload()
     ba = bytearray(frameSize)
     channel = frame.getChannel()
-    print(f'Got Event Header frame with channel: {channel} and size: {frameSize}')
+    if (enPrint):
+        print(f'Got Event Header frame with channel: {channel} and size: {frameSize}')
     frame.read(ba, 0)
 
     return parseBa2(ba)
