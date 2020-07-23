@@ -159,7 +159,6 @@ begin
    begin
       v                                 := r;
       -- reset strobing signals
-      v.axilReadSlave.rdata             := (others => '0');
       v.config.partition.l0Select.reset := '0';
       v.config.partition.message.insert := '0';
 
@@ -175,7 +174,6 @@ begin
 
       -- Determine the transaction type
       axiSlaveWaitTxn(ep, axilWriteMaster, axilReadMaster, v.axilWriteSlave, v.axilReadSlave);
-      v.axilReadSlave.rdata := (others => '0');
 
       -- Read/write to the configuration registers
       -- Read only from status registers
