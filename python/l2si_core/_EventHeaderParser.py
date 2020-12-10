@@ -81,7 +81,7 @@ class EventHeader(PackedStruct):
         ('version', ctypes.c_uint8, 8)]
 
 
-def parseEventHeaderFrame(frame, enPrint=True):
+def parseEventHeaderFrame(frame, enPrint=False):
     """Given a rogue Frame representing an Event Header or Transition, parse into a dictionary of fields"""
 
     frameSize = frame.getPayload()
