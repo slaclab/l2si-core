@@ -31,6 +31,7 @@ use lcls_timing_core.TPGPkg.all;
 
 library l2si_core;
 use l2si_core.XpmSeqPkg.all;
+use l2si_core.XpmPkg.all;
 
 entity XpmSequence is
    generic (
