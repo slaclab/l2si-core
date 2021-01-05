@@ -33,13 +33,16 @@ use unisim.vcomponents.all;
 
 entity XpmMessageAligner is
    generic (
-      TPD_G      : time    := 1 ns;
-      TF_DELAY_G : integer := 100);
+      TPD_G        : time    := 1 ns;
+      COMMON_CLK_G : boolean := false;  -- true if axilClk = timingRxClk
+      TF_DELAY_G   : integer := 100);
    port (
-      clk : in sl;
-      rst : in sl;
+      timingRxClk       : in  sl;
+      timingRxRst       : in  sl;
 
       -- Axi Lite bus for reading back current partitionDelays
+      axilClk         : in  sl;
+      axilRst         : in  sl;
       axilReadMaster  : in  AxiLiteReadMasterType;
       axilReadSlave   : out AxiLiteReadSlaveType;
       axilWriteMaster : in  AxiLiteWriteMasterType;
@@ -104,8 +107,8 @@ begin
 --          RAM_ADDR_WIDTH_G => 7,
 --          MEMORY_TYPE_G    => "block")
 --       port map (
---          rst          => rst,                                      -- [in]
---          clk          => clk,                                      -- [in]
+--          rst          => timingRxRst,                              -- [in]
+--          clk          => timingRxClk,                              -- [in]
 --          delay        => TF_DELAY_SLV_C,                           -- [in]
 --          inputValid   => promptTimingStrobe,                       -- [in]
 --          inputVector  => promptTimingMessageSlv,                   -- [in]
@@ -121,7 +124,7 @@ begin
          REG_OUTPUT_G => false,
          WIDTH_G      => TIMING_MESSAGE_BITS_NO_BSA_C)
       port map (
-         clk  => clk,                       -- [in]
+         clk  => timingRxClk,               -- [in]
          en   => promptTimingStrobe,        -- [in]
 --         delay => delay,                -- [in]
          din  => promptTimingMessageSlv,    -- [in]
@@ -132,7 +135,7 @@ begin
          TPD_G   => TPD_G,
          WIDTH_G => 1)
       port map (
-         clk      => clk,                   -- [in]
+         clk      => timingRxClk,           -- [in]
          sig_i(0) => promptTimingStrobe,    -- [in]
          reg_o(0) => alignedTimingStrobe);  -- [out]
 
@@ -161,8 +164,8 @@ begin
 --             RAM_ADDR_WIDTH_G => 7,
 --             MEMORY_TYPE_G    => "block")
 --          port map (
---             rst                       => rst,   -- [in]
---             clk                       => clk,   -- [in]
+--             rst                       => timingRxRst,   -- [in]
+--             clk                       => timingRxClk,   -- [in]
 --             delay                     => partitionDelays(i),      -- [in]
 --             inputValid                => promptTimingStrobe,      -- [in]
 --             inputVector(47 downto 0)  => promptXpmMessage.partitionWord(i),        -- [in]
@@ -180,7 +183,7 @@ begin
             REG_OUTPUT_G => false,
             WIDTH_G      => 49)
          port map (
-            clk               => clk,                                 -- [in]
+            clk               => timingRxClk,                         -- [in]
             en                => promptTimingStrobe,                  -- [in]
             delay             => partitionDelays(i),                  -- [in]
             din(47 downto 0)  => promptXpmMessage.partitionWord(i),   -- [in]
@@ -195,9 +198,8 @@ begin
    -- This never happens during normal running but could happen breifly after switching delays
    alignedXpmMessage.valid <= uAnd(alignedXpmMessageValid);
 
-   comb : process(axilReadMaster, axilWriteMaster, promptXpmMessage, promptTimingStrobe, r, rst) is
+   comb : process(axilReadMaster, axilWriteMaster, promptXpmMessage, promptTimingStrobe, r, timingRxRst) is
       variable v                : RegType;
-      variable axilEp           : AxiLiteEndpointType;
       variable broadcastMessage : XpmBroadcastType;
    begin
       v := r;
@@ -212,35 +214,36 @@ begin
          end if;
       end if;
 
-      axiSlaveWaitTxn(axilEp, axilWriteMaster, axilReadMaster, v.axilWriteSlave, v.axilReadSlave);
-
-      for i in 0 to XPM_PARTITIONS_C-1 loop
-         axiSlaveRegisterR(axilEp, X"00"+ toSlv(i*4, 8), 0, r.partitionDelays(i));
-      end loop;
-
-      axiSlaveRegister(axilEp, X"20", 0, v.txId);
-
-      axiSlaveRegisterR(axilEp, X"24", 0, v.rxId);
-
-      axiSlaveDefault(axilEp, v.axilWriteSlave, v.axilReadSlave, AXI_RESP_DECERR_C);
-
-      if rst = '1' then
+      if timingRxRst = '1' then
          v      := REG_INIT_C;
-         v.txId := r.txId;    -- can this survive a reset
       end if;
-
-      axilWriteSlave <= r.axilWriteSlave;
-      axilReadSlave  <= r.axilReadSlave;
-      xpmId          <= r.txId;
 
       rin <= v;
    end process;
 
-   seq : process (clk) is
+   seq : process (timingRxClk) is
    begin
-      if rising_edge(clk) then
+      if rising_edge(timingRxClk) then
          r <= rin after TPD_G;
       end if;
    end process;
+
+   U_XpmMessageAlignerReg : entity l2si_core.XpmMessageAlignerReg
+      generic map (
+         TPD_G        => TPD_G,
+         COMMON_CLK_G => COMMON_CLK_G)
+      port map (
+         timingRxClk     => timingRxClk,
+         timingRxRst     => timingRxRst,
+         partitionDelays => r.partitionDelays,
+         rxId            => r.rxId,
+         txId            => xpmId,
+         -- Axi Lite bus for reading back current partitionDelays
+         axilClk         => axilClk,
+         axilRst         => axilRst,
+         axilReadMaster  => axilReadMaster,
+         axilReadSlave   => axilReadSlave,
+         axilWriteMaster => axilWriteMaster,
+         axilWriteSlave  => axilWriteSlave);
 
 end rtl;
