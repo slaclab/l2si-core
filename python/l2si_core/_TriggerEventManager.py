@@ -22,7 +22,9 @@ class TriggerEventManager(pr.Device):
 
         if enLclsI:
             self.add(LclsTimingCore.EvrV2CoreTriggers(
-                offset = 0x0000))
+                offset  = 0x0000,
+                numTrig = numDetectors,
+            ))
 
         if enLclsII:
             self.add(l2si_core.XpmMessageAligner(

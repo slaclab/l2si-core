@@ -36,6 +36,7 @@ entity TriggerEventBuffer is
       EN_LCLS_I_TIMING_G             : boolean             := false;
       EN_LCLS_II_TIMING_G            : boolean             := true;
       EVENT_AXIS_CONFIG_G            : AxiStreamConfigType := EVENT_AXIS_CONFIG_C;
+      AXIL_CLK_IS_TIMING_RX_CLK_G    : boolean             := false;
       TRIGGER_CLK_IS_TIMING_RX_CLK_G : boolean             := false;
       EVENT_CLK_IS_TIMING_RX_CLK_G   : boolean             := false);
    port (
@@ -43,7 +44,8 @@ entity TriggerEventBuffer is
       timingRxRst : in sl;
 
       -- AXI Lite bus for configuration and status
-      -- This needs to be sync'd to timingRxClk
+      axilClk         : in  sl;
+      axilRst         : in  sl;
       axilReadMaster  : in  AxiLiteReadMasterType;
       axilReadSlave   : out AxiLiteReadSlaveType;
       axilWriteMaster : in  AxiLiteWriteMasterType;
@@ -92,11 +94,8 @@ architecture rtl of TriggerEventBuffer is
    constant FIFO_ADDR_WIDTH_C : integer := 5;
 
    type RegType is record
-      enable          : sl;
       evrTrigLast     : sl;
       partition       : slv(2 downto 0);
-      fifoPauseThresh : slv(FIFO_ADDR_WIDTH_C-1 downto 0);
-      triggerDelay    : slv(31 downto 0);
       overflow        : sl;
       fifoRst         : sl;
       transitionCount : slv(31 downto 0);
@@ -105,7 +104,6 @@ architecture rtl of TriggerEventBuffer is
       l0Count         : slv(31 downto 0);
       l1AcceptCount   : slv(31 downto 0);
       l1RejectCount   : slv(31 downto 0);
-      resetCounters   : sl;
 
       fbTimer         : slv(11 downto 0);
       fbTimerOverflow : sl;
@@ -118,11 +116,9 @@ architecture rtl of TriggerEventBuffer is
 
       fifoAxisMaster : AxiStreamMasterType;
       msgFifoWr      : sl;
-      
+
       -- outputs
       triggerData    : XpmEventDataType;
-      axilReadSlave  : AxiLiteReadSlaveType;
-      axilWriteSlave : AxiLiteWriteSlaveType;
 
       -- debug
       partitionV     : integer;
@@ -136,11 +132,8 @@ architecture rtl of TriggerEventBuffer is
    end record RegType;
 
    constant REG_INIT_C : RegType := (
-      enable          => '0',
       evrTrigLast     => '0',
       partition       => (others => '0'),
-      fifoPauseThresh => toslv(16, FIFO_ADDR_WIDTH_C),
-      triggerDelay    => toSlv(42, 32),
       overflow        => '0',
       fifoRst         => '0',
 
@@ -150,7 +143,6 @@ architecture rtl of TriggerEventBuffer is
       l0Count         => (others => '0'),
       l1AcceptCount   => (others => '0'),
       l1RejectCount   => (others => '0'),
-      resetCounters   => '0',
 
       fbTimer         => (others => '0'),
       fbTimerOverflow => '0',
@@ -165,8 +157,6 @@ architecture rtl of TriggerEventBuffer is
 
       -- outputs     =>
       triggerData    => TRIGGER_EVENT_DATA_INIT_C,
-      axilReadSlave  => AXI_LITE_READ_SLAVE_INIT_C,
-      axilWriteSlave => AXI_LITE_WRITE_SLAVE_INIT_C,
 
       partitionV     => 0,
       eventData      => XPM_EVENT_DATA_INIT_C,
@@ -193,6 +183,14 @@ architecture rtl of TriggerEventBuffer is
 
    signal eventAxisCtrlPauseSync : sl;
 
+   signal partitionReg    : slv(2 downto 0);
+   signal triggerDelay    : slv(31 downto 0);
+   signal fifoPauseThresh : slv(FIFO_ADDR_WIDTH_C-1 downto 0);
+   signal resetCounters   : sl;
+   signal fifoRstReg      : sl;
+   signal fifoRst         : sl;
+   signal enable          : sl;
+
 begin
 
    -- Event AXIS bus pause is the application pause signal
@@ -208,8 +206,8 @@ begin
 
 
    comb : process (alignedTimingMessage, alignedTimingStrobe, alignedXpmMessage, axilReadMaster,
-                   axilWriteMaster, eventAxisCtrlPauseSync, evrTriggers, fifoAxisCtrl, fifoWrCnt,
-                   promptTimingStrobe, promptXpmMessage, r, timingMode, timingRxRst) is
+                   axilWriteMaster, eventAxisCtrlPauseSync, enable, evrTriggers, fifoAxisCtrl, fifoRstReg,
+                   partitionReg, promptTimingStrobe, promptXpmMessage, r, resetCounters, timingMode, timingRxRst) is
       variable v      : RegType;
       variable axilEp : AxiLiteEndpointType;
    begin
@@ -221,10 +219,9 @@ begin
          v.fifoAxisMaster.tValid := '0';
          v.triggerData.valid     := '0';
          v.triggerData.l0Accept  := '0';
-         v.resetCounters         := '0';
          v.evrTrigLast           := evrTriggers.trigPulse(TRIGGER_INDEX_G);
 
-         if (evrTriggers.trigPulse(TRIGGER_INDEX_G) = '1' and r.evrTrigLast = '0' and r.enable = '1') then
+         if (evrTriggers.trigPulse(TRIGGER_INDEX_G) = '1' and r.evrTrigLast = '0' and enable = '1') then
             v.triggerCount                        := r.triggerCount + 1;
             v.fifoAxisMaster.tValid               := '1';
             v.fifoAxisMaster.tdata(63 downto 0)   := (others => '0');
@@ -242,7 +239,7 @@ begin
             v.overflow := '1';
          end if;
 
-         if (r.resetCounters = '1') then
+         if (resetCounters = '1') then
             v.triggerCount := (others => '0');
          end if;
 
@@ -260,7 +257,7 @@ begin
          -- Output on triggerData interface
          --------------------------------------------
          v.triggerData := XPM_EVENT_DATA_INIT_C;
-         if (promptTimingStrobe = '1' and promptXpmMessage.valid = '1' and r.enable = '1') then
+         if (promptTimingStrobe = '1' and promptXpmMessage.valid = '1' and enable = '1') then
             v.triggerData := toXpmEventDataType(promptXpmMessage.partitionWord(v.partitionV));
             if (v.triggerData.valid = '1' and v.triggerData.l0Accept = '1') then
                v.triggerCount := r.triggerCount + 1;
@@ -286,7 +283,7 @@ begin
             v.msgFifoWr   := (v.eventData.valid and v.eventData.l0Accept);
 
             -- Don't pass data through when disabled
-            if (r.enable = '0') then
+            if (enable = '0') then
                v.streamValid := '0';
                v.msgFifoWr   := '0';
             end if;
@@ -313,7 +310,7 @@ begin
             end if;
 
             -- Special case - reset fifo, mask any tValid
-            -- Note that this logic is active even when the r.enable register = 0.
+            -- Note that this logic is active even when the enable register = 0.
             if (v.transitionData.valid = '1' and v.transitionData.header = MSG_CLEAR_FIFO_C) then
                v.overflow              := '0';
                v.fifoRst               := '1';
@@ -321,7 +318,7 @@ begin
             end if;
 
 
-            if (r.enable = '1') then
+            if (enable = '1') then
                v.validCount := r.validCount + 1;
             end if;
 
@@ -376,8 +373,7 @@ begin
 
       end if;
 
-      v.resetCounters := '0';           -- Pulsed for 1 cycle
-      if (r.resetCounters = '1') then
+      if (resetCounters = '1') then
          v.l0Count        := (others => '0');
          v.l1AcceptCount  := (others => '0');
          v.l1RejectCount  := (others => '0');
@@ -387,44 +383,7 @@ begin
          v.notPauseToTrig := (others => '1');
       end if;
 
-      --------------------------------------------
-      -- Axi lite interface
-      --------------------------------------------
-      -- Determine the transaction type
-      axiSlaveWaitTxn(axilEp, axilWriteMaster, axilReadMaster, v.axilWriteSlave, v.axilReadSlave);
-
-      -- Common Registers
-      axiSlaveRegister(axilEp, x"00", 0, v.enable);
-      axiSlaveRegisterR(axilEp, x"10", 0, r.overflow);
-      axiSlaveRegisterR(axilEp, X"10", 2, fifoAxisCtrl.overflow);
-      axiSlaveRegisterR(axilEp, X"10", 3, fifoAxisCtrl.pause);
-      axiSlaveRegisterR(axilEp, X"10", 4, fifoWrCnt);
-      axiSlaveRegisterR(axilEp, X"10", 16, timingMode);
-      axiSlaveRegisterR(axilEp, X"10", 17, toSl(EN_LCLS_I_TIMING_G));
-      axiSlaveRegisterR(axilEp, X"10", 18, toSl(EN_LCLS_II_TIMING_G));
-      axiSlaveRegister(axilEp, X"10", 31, v.fifoRst);
-      axiSlaveRegisterR(axilEp, X"28", 0, r.triggerCount);
-      axiSlaveRegister(axilEp, X"40", 0, v.resetCounters);
-
-      -- LCLS-II only registers
-      if (EN_LCLS_II_TIMING_G) then
-         axiSlaveRegister(axilEp, x"04", 0, v.partition);
-         axiSlaveRegister(axilEp, X"0C", 0, v.triggerDelay);
-         axiSlaveRegister(axilEp, X"08", 0, v.fifoPauseThresh);
-         axiSlaveRegisterR(axilEp, X"10", 1, r.pause);
-         axiSlaveRegisterR(axilEp, x"14", 0, r.l0Count);
-         axiSlaveRegisterR(axilEp, x"18", 0, r.l1AcceptCount);
-         axiSlaveRegisterR(axilEp, x"1C", 0, r.l1RejectCount);
-         axiSlaveRegisterR(axilEp, X"20", 0, r.transitionCount);
-         axiSlaveRegisterR(axilEp, X"24", 0, r.validCount);
-         axiSlaveRegisterR(axilEp, X"2C", 0, alignedXpmMessage.partitionAddr);
-         axiSlaveRegisterR(axilEp, X"30", 0, alignedXpmMessage.partitionWord(0));
-         axiSlaveRegisterR(axilEp, X"38", 0, r.pauseToTrig);
-         axiSlaveRegisterR(axilEp, X"3C", 0, r.notPauseToTrig);
-      end if;
-
-
-      axiSlaveDefault(axilEp, v.axilWriteSlave, v.axilReadSlave, AXI_RESP_DECERR_C);
+      v.partition := partitionReg;
 
       if (timingRxRst = '1') then
          v := REG_INIT_C;
@@ -433,8 +392,8 @@ begin
       rin <= v;
 
       -- outputs
-      axilWriteSlave <= r.axilWriteSlave;
-      axilReadSlave  <= r.axilReadSlave;
+      fifoRst        <= r.fifoRst or fifoRstReg;
+
       partition      <= r.partition;
       overflow       <= r.overflow;
       pause          <= r.pause;
@@ -447,6 +406,44 @@ begin
          r <= rin after TPD_G;
       end if;
    end process seq;
+
+   U_TriggerEventBufferReg : entity l2si_core.TriggerEventBufferReg
+      generic map (
+         TPD_G               => TPD_G,
+         COMMON_CLK_G        => AXIL_CLK_IS_TIMING_RX_CLK_G,
+         FIFO_ADDR_WIDTH_G   => FIFO_ADDR_WIDTH_C,
+         EN_LCLS_I_TIMING_G  => EN_LCLS_I_TIMING_G,
+         EN_LCLS_II_TIMING_G => EN_LCLS_II_TIMING_G)
+      port map (
+         timingRxClk       => timingRxClk,
+         timingRxRst       => timingRxRst,
+         overflow          => r.overflow,
+         fifoAxisCtrl      => fifoAxisCtrl,
+         fifoWrCnt         => fifoWrCnt,
+         timingMode        => timingMode,
+         triggerCount      => r.triggerCount,
+         pause             => r.pause,
+         l0Count           => r.l0Count,
+         l1AcceptCount     => r.l1AcceptCount,
+         l1RejectCount     => r.l1RejectCount,
+         transitionCount   => r.transitionCount,
+         validCount        => r.validCount,
+         alignedXpmMessage => alignedXpmMessage,
+         pauseToTrig       => r.pauseToTrig,
+         notPauseToTrig    => r.notPauseToTrig,
+         enable            => enable,
+         fifoRst           => fifoRstReg,
+         resetCounters     => resetCounters,
+         partition         => partitionReg,
+         triggerDelay      => triggerDelay,
+         fifoPauseThresh   => fifoPauseThresh,
+         -- AXI Lite bus for configuration and status
+         axilClk           => axilClk,
+         axilRst           => axilRst,
+         axilReadMaster    => axilReadMaster,
+         axilReadSlave     => axilReadSlave,
+         axilWriteMaster   => axilWriteMaster,
+         axilWriteSlave    => axilWriteSlave);
 
    -----------------------------------------------
    -- Delay triggerData according to AXI-Lite register
@@ -462,7 +459,7 @@ begin
       port map (
          clk         => timingRxClk,               -- [in]
          rst         => timingRxRst,               -- [in]
-         delay       => r.triggerDelay,            -- [in]
+         delay       => triggerDelay,              -- [in]
          inputData   => triggerDataSlv,            -- [in]
          inputValid  => r.triggerData.valid,       -- [in]
          outputData  => delayedTriggerDataSlv,     -- [out]
@@ -493,7 +490,7 @@ begin
             TPD_G => TPD_G)
          port map (
             clk     => eventClk,
-            dataIn  => r.fifoRst,
+            dataIn  => fifoRst,
             dataOut => clearReadout);
    end generate TRIGGER_SYNC_GEN;
 
@@ -519,11 +516,11 @@ begin
          MASTER_AXI_CONFIG_G => EVENT_AXIS_CONFIG_G)
       port map (
          sAxisClk        => timingRxClk,        -- [in]
-         sAxisRst        => r.fifoRst,          -- [in]
+         sAxisRst        => fifoRst,            -- [in]
          sAxisMaster     => r.fifoAxisMaster,   -- [in]
          sAxisSlave      => fifoAxisSlave,      -- [out]
          sAxisCtrl       => fifoAxisCtrl,       -- [out]
-         fifoPauseThresh => r.fifoPauseThresh,  -- [in]
+         fifoPauseThresh => fifoPauseThresh,    -- [in]
          fifoWrCnt       => fifoWrCnt,          -- [out]
          mAxisClk        => eventClk,           -- [in]
          mAxisRst        => eventRst,           -- [in]
@@ -545,7 +542,7 @@ begin
             DATA_WIDTH_G    => TIMING_MESSAGE_BITS_NO_BSA_C,
             ADDR_WIDTH_G    => FIFO_ADDR_WIDTH_C)
          port map (
-            rst    => r.fifoRst,                -- [in]
+            rst    => fifoRst,                  -- [in]
             wr_clk => timingRxClk,              -- [in]
             wr_en  => r.msgFifoWr,              -- [in]
             din    => alignedTimingMessageSlv,  -- [in]

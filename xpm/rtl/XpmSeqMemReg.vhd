@@ -139,7 +139,6 @@ begin
 
       if (axiStatus.readEnable = '1') then
          -- Reset the bus
-         v.axiReadSlave.rdata := (others => '0');
          regAddr              := axiReadMaster.araddr(regAddr'range);
          tmpRdData            := (others => '0');
          -- Check for alignment
