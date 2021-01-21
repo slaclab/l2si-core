@@ -67,8 +67,8 @@ architecture mapping of EventTimingMessage is
       return v;
    end function;
 
-   signal axisMasters : AxiStreamMasterType := axiStreamMasterInit(TIM_AXIS_CONFIG_C);
-   signal axisSlaves  : AxiStreamSlaveType;
+   signal axisMasters : AxiStreamMasterArray(NUM_DETECTORS_G-1 downto 0) := (others => axiStreamMasterInit(TIM_AXIS_CONFIG_C));
+   signal axisSlaves  : AxiStreamSlaveArray(NUM_DETECTORS_G-1 downto 0);
 
 begin
 
