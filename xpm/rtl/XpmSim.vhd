@@ -41,8 +41,7 @@ entity XpmSim is
             ENABLE_DS_LINKS_G : slv(XPM_MAX_DS_LINKS_C-1 downto 0) := (others=>'0');
             ENABLE_BP_LINKS_G : slv(XPM_MAX_BP_LINKS_C-1 downto 0) := (others=>'0');
             RATE_DIV_G        : integer := 4;
-            RATE_SELECT_G     : integer := 1;
-            PIPELINE_DEPTH_G  : integer := 200 );
+            RATE_SELECT_G     : integer := 1 );
   port ( txRefClk     : in  sl := '0';
          dsRxClk      : in  slv       (XPM_MAX_DS_LINKS_C-1 downto 0);
          dsRxRst      : in  slv       (XPM_MAX_DS_LINKS_C-1 downto 0);
@@ -60,7 +59,9 @@ entity XpmSim is
          bpRxClk      : in  sl;
          bpRxClkRst   : in  sl;
          bpRxLinkUp   : in  slv       (XPM_MAX_BP_LINKS_C-1 downto 0);
-         bpRxLinkFull : in  Slv16Array(XPM_MAX_BP_LINKS_C-1 downto 0) );
+         bpRxLinkFull : in  Slv16Array(XPM_MAX_BP_LINKS_C-1 downto 0);
+         --
+         msgConfig    : in  XpmPartMsgConfigType := XPM_PART_MSG_CONFIG_INIT_C );
 end XpmSim;
 
 architecture top_level_app of XpmSim is
@@ -81,13 +82,14 @@ architecture top_level_app of XpmSim is
 
    -- Timing Interface (timingClk domain)
 --   signal xData      : TimingRxType := TIMING_RX_INIT_C;
-   signal xData      : XpmMiniStreamType := (
+   signal xData      : XpmStreamType := (
      fiducial => '0',
      streams  => (others=>TIMING_SERIAL_INIT_C),
      advance  => (others=>'0') );
 
    signal pconfig : XpmPartitionConfigArray(XPM_PARTITIONS_C-1 downto 0) := (others=>XPM_PARTITION_CONFIG_INIT_C);
-
+   signal pconfigReady : sl;
+   
 begin
 
   --  Generate clocks and resets
@@ -143,7 +145,14 @@ begin
   tpgConfig.pulseIdWrEn                      <= '0';
   tpgConfig.timeStampWrEn                    <= '0';
 
-  xpmConfig.partition <= pconfig;
+  process (pconfig, msgConfig, pconfigReady) is
+  begin
+    xpmConfig.partition <= pconfig;
+    if pconfigReady = '1' then
+      xpmConfig.partition(0).message <= msgConfig;
+    end if;
+  end process;
+  
   xpmConfig.dsLink(0).txDelay <= toSlv(200,20);
   xpmConfig.dsLink(1).txDelay <= toSlv(200,20);
 
@@ -163,6 +172,8 @@ begin
 
   process is
   begin
+    pconfigReady <= '0';
+    
      for i in 0 to XPM_PARTITIONS_C-1 loop
        -- Realistic
        -- pconfig(i).pipeline.depth_clks <= toSlv((80+i)*200,16);
@@ -255,6 +266,8 @@ begin
 
      pconfig(0).l0Select.enabled <= '1';
 
+     pconfigReady <= '1';
+     
      wait;
    end process;
 
@@ -289,7 +302,7 @@ begin
          bpTxData        => bpTxData,
          bpTxDataK       => bpTxDataK,
          bpStatus        => (others=>XPM_BP_LINK_STATUS_INIT_C),
-         bpRxLinkFull    => (others=>x"0000"),
+         bpRxLinkPause   => (others=>x"0000"),
          ----------------------
          -- Top Level Interface
          ----------------------

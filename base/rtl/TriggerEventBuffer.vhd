@@ -221,6 +221,7 @@ begin
          v.fifoAxisMaster.tValid := '0';
          v.triggerData.valid     := '0';
          v.triggerData.l0Accept  := '0';
+         v.triggerData.l1Expect  := '0';
          v.resetCounters         := '0';
          v.evrTrigLast           := evrTriggers.trigPulse(TRIGGER_INDEX_G);
 
@@ -233,7 +234,10 @@ begin
 
             v.triggerData.valid    := '1';
             v.triggerData.l0Accept := '1';
-            v.triggerData.l0Tag    := v.triggerCount(4 downto 0);
+            v.triggerData.l0Tag    := evrTriggers.timeStamp(4 downto 0);
+            v.triggerData.l1Expect := '1';
+            v.triggerData.l1Accept := '1';
+            v.triggerData.l1Tag    := evrTriggers.timeStamp(4 downto 0);
             v.triggerData.count    := v.triggerCount(23 downto 0);
 
          end if;
@@ -354,15 +358,18 @@ begin
          end if;
 
          -- Monitor time between pause assertion and trigger arrival
-         v.fbTimer := r.fbTimer + 1;
          if uAnd(r.fbTimer) = '1' then
             v.fbTimerOverflow := '1';
+         else
+            v.fbTimer := r.fbTimer + 1;
          end if;
+
          v.pause := fifoAxisCtrl.pause or eventAxisCtrlPauseSync;
          if v.pause /= r.pause then
             v.fbTimer         := (others => '0');
             v.fbTimerOverflow := '0';
             v.fbTimerActive   := r.fbTimerOverflow;
+            v.fbTimerToTrig   := (others => '0');
             if (r.pause = '1' and r.fbTimerActive = '1' and r.fbTimerToTrig > r.pauseToTrig) then
                v.pauseToTrig := r.fbTimerToTrig;
             end if;
@@ -373,7 +380,6 @@ begin
                v.notPauseToTrig := r.fbTimer;
             end if;
          end if;
-
       end if;
 
       v.resetCounters := '0';           -- Pulsed for 1 cycle
@@ -499,6 +505,7 @@ begin
 
    NO_TRIGGER_SYNC_GEN : if (TRIGGER_CLK_IS_TIMING_RX_CLK_G) generate
       triggerData <= toXpmEventDataType(delayedTriggerDataSlv, delayedTriggerDataValid);
+      clearReadout <= r.fifoRst;
    end generate NO_TRIGGER_SYNC_GEN;
 
    -----------------------------------------------
