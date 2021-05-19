@@ -175,6 +175,7 @@ architecture rtl of TriggerEventBuffer is
    signal alignedTimingMessageSlv : slv(TIMING_MESSAGE_BITS_NO_BSA_C-1 downto 0);
    signal eventTimingMessageSlv   : slv(TIMING_MESSAGE_BITS_NO_BSA_C-1 downto 0);
 
+   signal triggerDataValid        : sl;
    signal triggerDataSlv          : slv(47 downto 0);
    signal delayedTriggerDataSlv   : slv(47 downto 0);
    signal delayedTriggerDataValid : sl;
@@ -449,6 +450,7 @@ begin
    -- Delay triggerData according to AXI-Lite register
    -----------------------------------------------
    triggerDataSlv <= toSlv(r.triggerData);
+   triggerDataValid <= r.triggerData.valid and r.triggerData.l0Accept;
    U_SlvDelayFifo_1 : entity surf.SlvDelayFifo
       generic map (
          TPD_G              => TPD_G,
@@ -461,7 +463,7 @@ begin
          rst         => timingRxRst,               -- [in]
          delay       => triggerDelay,              -- [in]
          inputData   => triggerDataSlv,            -- [in]
-         inputValid  => r.triggerData.valid,       -- [in]
+         inputValid  => triggerDataValid,          -- [in]
          outputData  => delayedTriggerDataSlv,     -- [out]
          outputValid => delayedTriggerDataValid);  -- [out]
 
