@@ -67,7 +67,6 @@ architecture rtl of XpmMessageAligner is
    constant TF_DELAY_SLV_C : slv(6 downto 0) := toSlv(TF_DELAY_G, 7);
 
    type RegType is record
-      txId            : slv(31 downto 0);
       rxId            : slv(31 downto 0);
       partitionDelays : Slv7Array(XPM_PARTITIONS_C-1 downto 0);
       axilWriteSlave  : AxiLiteWriteSlaveType;
@@ -75,7 +74,6 @@ architecture rtl of XpmMessageAligner is
    end record;
 
    constant REG_INIT_C : RegType := (
-      txId            => (others => '0'),
       rxId            => (others => '1'),
       partitionDelays => (others => (others => '0')),
       axilWriteSlave  => AXI_LITE_WRITE_SLAVE_INIT_C,

@@ -207,7 +207,7 @@ begin
 
 
    comb : process (alignedTimingMessage, alignedTimingStrobe, alignedXpmMessage, axilReadMaster,
-                   axilWriteMaster, eventAxisCtrlPauseSync, enable, evrTriggers, fifoAxisCtrl, fifoRstReg,
+                   eventAxisCtrlPauseSync, enable, evrTriggers, fifoAxisCtrl, fifoRstReg,
                    partitionReg, promptTimingStrobe, promptXpmMessage, r, resetCounters, timingMode, timingRxRst) is
       variable v      : RegType;
       variable axilEp : AxiLiteEndpointType;

@@ -81,7 +81,7 @@ architecture top_level_app of XpmSim is
 
    -- Timing Interface (timingClk domain)
 --   signal xData      : TimingRxType := TIMING_RX_INIT_C;
-   signal xData      : XpmMiniStreamType := (
+   signal xData      : XpmStreamType := (
      fiducial => '0',
      streams  => (others=>TIMING_SERIAL_INIT_C),
      advance  => (others=>'0') );
@@ -289,7 +289,7 @@ begin
          bpTxData        => bpTxData,
          bpTxDataK       => bpTxDataK,
          bpStatus        => (others=>XPM_BP_LINK_STATUS_INIT_C),
-         bpRxLinkFull    => (others=>x"0000"),
+         bpRxLinkPause   => (others=>x"0000"),
          ----------------------
          -- Top Level Interface
          ----------------------
