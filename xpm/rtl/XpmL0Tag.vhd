@@ -66,14 +66,13 @@ begin
    push_tag  <= r.tag;
    pop_frame <= XPM_ACCEPT_FRAME_INIT_C;
 
-   U_SYNC : entity surf.SynchronizerVector
+   U_SYNC : entity surf.SynchronizerOneShot
       generic map (
-         TPD_G   => TPD_G,
-         WIDTH_G => 1)
+         TPD_G   => TPD_G )
       port map (
          clk        => clk,
-         dataIn(0)  => clear,
-         dataOut(0) => uclear);
+         dataIn     => clear,
+         dataOut    => uclear);
 
    comb : process (push, r, skip, uclear) is
       variable v : RegType;
