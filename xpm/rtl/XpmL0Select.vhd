@@ -123,7 +123,7 @@ begin
          dataOut(32)           => uconfig.reset,
          dataOut(33)           => uconfig.enabled);
 
-   comb : process (r, inhibit, timingBus, cuTiming, cuTimingV, uconfig, strobe) is
+   comb : process (r, rst, inhibit, timingBus, cuTiming, cuTimingV, uconfig, strobe) is
       variable v        : RegType;
       variable m        : TimingMessageType;
       variable rateSel  : sl;
@@ -193,7 +193,7 @@ begin
       end if;
    end if;
 
-   if (uconfig.reset = '1') then
+   if (rst = '1') then
       v := REG_INIT_C;
    end if;
 

@@ -212,7 +212,7 @@ begin
          DEBUG_G => DEBUG_G)
       port map (
          clk       => timingClk,
-         rst       => timingRst,
+         rst       => l0Reset,
          config    => config.l0Select,
          timingBus => r.timingBus,
          cuTiming  => r.cuTiming,
