@@ -142,10 +142,10 @@ begin
       if (axiStatus.readEnable = '1') then
          -- Reset the bus
          regAddr              := axiReadMaster.araddr(regAddr'range);
-         tmpRdData            := (others => '0');
          -- Check for alignment
          if axiReadMaster.araddr(1 downto 0) = "00" then
             -- Address is aligned
+            tmpRdData   := (others=>'0');
             axiReadResp := AXI_RESP_OK_C;
             -- Decode the read address
             case rdPntr is

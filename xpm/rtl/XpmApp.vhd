@@ -173,11 +173,14 @@ begin
    linkstatp : process (bpStatus, dsLinkStatus, dsRxRcvs, isXpm, dsId) is
       variable linkStat : XpmLinkStatusType;
    begin
-      for i in 0 to NUM_DS_LINKS_G-1 loop
-         linkStat           := dsLinkStatus(i);
-         linkStat.rxRcvCnts := dsRxRcvs(i);
-         linkStat.rxIsXpm   := isXpm (i);
-         linkStat.rxId      := dsId (i);
+      for i in status.dsLink'range loop
+         linkStat := XPM_LINK_STATUS_INIT_C;
+         if i < NUM_DS_LINKS_G then
+            linkStat           := dsLinkStatus(i);
+            linkStat.rxRcvCnts := dsRxRcvs(i);
+            linkStat.rxIsXpm   := isXpm (i);
+            linkStat.rxId      := dsId (i);
+         end if;
          status.dsLink(i)   <= linkStat;
       end loop;
       status.bpLink(bpStatus'range) <= bpStatus;
