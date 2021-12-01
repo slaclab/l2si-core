@@ -263,7 +263,7 @@ begin
    --             tag            => analysisTag );
    status.anaRd    <= (others=>'0');
 
-   U_SyncMsgPayload : entity surf.FifoAsync
+   U_SyncMsgPayload : entity surf.FifoSync
       generic map (
          TPD_G        => TPD_G,
          DATA_WIDTH_G => config.message.header'length,
@@ -271,13 +271,12 @@ begin
          FWFT_EN_G    => true)
       port map (
          rst           => timingRst,
-         wr_clk        => regClk,
+         clk           => timingClk,
          wr_en         => config.message.insert,
          din           => config.message.header,
          --
-         rd_clk        => timingClk,
          rd_en         => fiducial,
-         rd_data_count => msgRdCount,
+         data_count    => msgRdCount,
          valid         => msgConfigInt.insert,
          dout          => msgConfigInt.header);
 

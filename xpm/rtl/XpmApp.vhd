@@ -168,6 +168,40 @@ architecture top_level_app of XpmApp is
    signal pausefb              : slv (XPM_PARTITIONS_C-1 downto 0);
    signal overflowfb           : slv (XPM_PARTITIONS_C-1 downto 0);
    signal paddr                : slv (XPM_PARTITION_ADDR_LENGTH_C-1 downto 0);
+
+   constant MSG_CONFIG_LEN_C : integer := XPM_PARTITIONS_C*9;
+   signal msgConfig        : slv(MSG_CONFIG_LEN_C-1 downto 0);
+   signal msgConfigS       : slv(MSG_CONFIG_LEN_C-1 downto 0);
+   signal msgValid         : sl;
+   signal configS          : XpmConfigType;
+
+   function extractMsgConfig (c : XpmConfigType) return slv is
+     variable vector : slv(MSG_CONFIG_LEN_C-1 downto 0) := (others=>'0');
+     variable i : integer := 0;
+   begin
+     for j in 0 to XPM_PARTITIONS_C-1 loop
+       assignSlv(i, vector, c.partition(j).message.insert);
+       assignSlv(i, vector, c.partition(j).message.header);
+     end loop;  -- j
+     return vector;
+   end function;
+   
+   function insertMsgConfig (c : XpmConfigType;
+                             r : slv;
+                             v : sl) return XpmConfigType is
+     variable o : XpmConfigType;
+     variable u : sl;
+     variable i : integer := 0;
+   begin
+     o := c;
+     for j in 0 to XPM_PARTITIONS_C-1 loop
+       u := o.partition(j).message.insert and v;
+       assignRecord(i, r, u);
+       assignRecord(i, r, o.partition(j).message.header);
+     end loop;  -- j
+     return o;
+   end function;
+   
 begin
 
    linkstatp : process (bpStatus, dsLinkStatus, dsRxRcvs, isXpm, dsId) is
@@ -380,6 +414,22 @@ begin
       fstreams(i).last   <= timingStream.streams(i).last;
    end generate;
 
+   --  Need to cross clock domains once for all group messages
+   msgConfig <= extractMsgConfig(config);
+   configS   <= insertMsgConfig (config, msgConfigS, msgValid);
+   U_SyncMsg : entity surf.SynchronizerFifo
+     generic map (
+       DATA_WIDTH_G => MSG_CONFIG_LEN_C )
+     port map (
+       rst    => timingRst,
+       -- Write Ports (wr_clk domain)
+       wr_clk => regclk,
+       din    => msgConfig,
+       -- Read Ports (rd_clk domain)
+       rd_clk => timingClk,
+       valid  => msgValid,
+       dout   => msgConfigS );
+     
    GEN_PART : for i in 0 to XPM_PARTITIONS_C-1 generate
       --
       --  Get the result word (trigger/message) for each partition
@@ -393,7 +443,7 @@ begin
          port map (
             regclk     => regclk,
             update     => update (i),
-            config     => config.partition(i),
+            config     => configS.partition(i),
             status     => status.partition(i),
             timingClk  => timingClk,
             timingRst  => timingRst,
