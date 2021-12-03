@@ -47,7 +47,7 @@ package XpmSeqPkg is
       seqRdData    => (others => (others => '0')),
       seqState     => (others => SEQUENCER_STATE_INIT_C));
 
-   constant XPM_SEQ_STATUS_BITS_C : integer := 13 + XPM_SEQ_DEPTH_C*(96+SEQCOUNT_DEPTH+SEQADDRLEN);
+   constant XPM_SEQ_STATUS_BITS_C : integer := 13 + XPM_SEQ_DEPTH_C*(96+SEQCOUNTDEPTH+SEQADDRLEN);
    
    function toSlv(s : XpmSeqStatusType) return slv;
    function toXpmSeqStatusType (v : slv) return XpmSeqStatusType;
@@ -72,7 +72,7 @@ package XpmSeqPkg is
       seqJumpConfig => (others => TPG_JUMPCONFIG_INIT_C)
       );
 
-   constant XPM_SEQ_CONFIG_BITS_C : integer := 39 + SEQADDRLEN + XPM_SEQ_DEPTH_C*(3+24+(MPS_CHAN+2)*SEQADDRLEN+MPSCHAN*4);
+   constant XPM_SEQ_CONFIG_BITS_C : integer := 39 + SEQADDRLEN + XPM_SEQ_DEPTH_C*(3+24+(MPSCHAN+2)*SEQADDRLEN+MPSCHAN*4);
 
    function toSlv(c : XpmSeqConfigType) return slv;
    function toXpmSeqConfigType (v : slv) return XpmSeqConfigType;
