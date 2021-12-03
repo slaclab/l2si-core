@@ -223,7 +223,7 @@ begin
          strobe    => r.partStrobe(1),
          accept    => l0Accept,
          ireject   => lreject,
-         ureject   => greject);
+         ureject   => greject,
          rejecc    => l0Reject,
          status    => status.l0Select);
 
