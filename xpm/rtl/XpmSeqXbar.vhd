@@ -31,7 +31,8 @@ use l2si_core.XpmSeqPkg.all;
 entity XpmSeqXbar is
    generic (
       TPD_G            : time             := 1 ns;
-      AXIL_BASEADDR_G  : slv(31 downto 0) := (others=>'0') );
+      AXIL_BASEADDR_G  : slv(31 downto 0) := (others=>'0');
+      AXIL_ASYNC_G     : boolean          := false );
    port (
       -- AXI-Lite Interface (on axiClk domain)
       axiClk          : in  sl;
@@ -66,26 +67,18 @@ architecture xbar of XpmSeqXbar is
    signal syncReadMaster  : AxiLiteReadMasterType;
    signal syncReadSlave   : AxiLiteReadSlaveType;
 
-   signal mConfig : XpmSeqConfigArray(NUM_AXI_MASTERS_C-1 downto 0);
+   signal statusS    : XpmSeqStatusType;
+   signal statusSlv  : slv(XPM_SEQ_STATUS_BITS_C-1 downto 0);
+   signal statusSlvS : slv(XPM_SEQ_STATUS_BITS_C-1 downto 0);
+   
+   signal mConfig     : XpmSeqConfigArray(NUM_AXI_MASTERS_C-1 downto 0);
+   signal mConfigS    : XpmSeqConfigArray(NUM_AXI_MASTERS_C-1 downto 0);
+   signal mConfigSlv  : slv(XPM_SEQ_CONFIG_BITS_C-1 downto 0);
+   signal mConfigSlvS : slv(XPM_SEQ_CONFIG_BITS_C-1 downto 0);
 
+   signal regclk : sl;
+   signal regrst : sl;
 begin
-
-  U_AxiLiteAsync : entity surf.AxiLiteAsync
-    generic map (
-      TPD_G => TPD_G)
-    port map (
-      sAxiClk         => axiClk,
-      sAxiClkRst      => axiRst,
-      sAxiReadMaster  => axiReadMaster,
-      sAxiReadSlave   => axiReadSlave,
-      sAxiWriteMaster => axiWriteMaster,
-      sAxiWriteSlave  => axiWriteSlave,
-      mAxiClk         => clk,
-      mAxiClkRst      => rst,
-      mAxiReadMaster  => syncReadMaster,
-      mAxiReadSlave   => syncReadSlave,
-      mAxiWriteMaster => syncWriteMaster,
-      mAxiWriteSlave  => syncWriteSlave );
 
    --------------------------
    -- AXI-Lite: Crossbar Core
@@ -97,8 +90,8 @@ begin
          NUM_MASTER_SLOTS_G => NUM_AXI_MASTERS_C,
          MASTERS_CONFIG_G   => AXI_CROSSBAR_MASTERS_CONFIG_C)
       port map (
-         axiClk              => clk,
-         axiClkRst           => rst,
+         axiClk              => regclk,
+         axiClkRst           => regrst,
          sAxiWriteMasters(0) => syncWriteMaster,
          sAxiWriteSlaves(0)  => syncWriteSlave,
          sAxiReadMasters(0)  => syncReadMaster,
@@ -114,10 +107,10 @@ begin
          axiReadSlave   => mAxilReadSlaves  (SEQJUMP_INDEX_C),
          axiWriteMaster => mAxilWriteMasters(SEQJUMP_INDEX_C),
          axiWriteSlave  => mAxilWriteSlaves (SEQJUMP_INDEX_C),
-         status         => status,
-         config         => mConfig          (SEQJUMP_INDEX_C),
-         axiClk         => clk,
-         axiRst         => rst);
+         status         => statusS,
+         config         => mConfigS         (SEQJUMP_INDEX_C),
+         axiClk         => regclk,
+         axiRst         => regrst);
 
    U_SeqStateReg : entity l2si_core.XpmSeqStateReg
       port map (
@@ -125,10 +118,10 @@ begin
          axiReadSlave   => mAxilReadSlaves  (SEQSTATE_INDEX_C),
          axiWriteMaster => mAxilWriteMasters(SEQSTATE_INDEX_C),
          axiWriteSlave  => mAxilWriteSlaves (SEQSTATE_INDEX_C),
-         status         => status,
-         config         => mConfig          (SEQSTATE_INDEX_C),
-         axiClk         => clk,
-         axiRst         => rst);
+         status         => statusS,
+         config         => mConfigS         (SEQSTATE_INDEX_C),
+         axiClk         => regclk,
+         axiRst         => regrst);
 
    U_SeqMemReg : entity l2si_core.XpmSeqMemReg
       port map (
@@ -136,11 +129,68 @@ begin
          axiReadSlave   => mAxilReadSlaves  (SEQMEM_INDEX_C),
          axiWriteMaster => mAxilWriteMasters(SEQMEM_INDEX_C),
          axiWriteSlave  => mAxilWriteSlaves (SEQMEM_INDEX_C),
-         status         => status,
-         config         => mConfig          (SEQMEM_INDEX_C),
-         axiClk         => clk,
-         axiRst         => rst);
+         status         => statusS,
+         config         => mConfigS         (SEQMEM_INDEX_C),
+         axiClk         => regclk,
+         axiRst         => regrst);
 
+   GEN_ASYNC : if AXIL_ASYNC generate
+     regclk     <= clk;
+     regrst     <= rst;
+     statusS    <= status;
+     mConfig    <= mConfigS;
+
+     U_AxiLiteAsync : entity surf.AxiLiteAsync
+       generic map (
+         TPD_G        => TPD_G,
+         COMMON_CLK_G => not AXIL_ASYNC_G)
+       port map (
+         sAxiClk         => axiClk,
+         sAxiClkRst      => axiRst,
+         sAxiReadMaster  => axiReadMaster,
+         sAxiReadSlave   => axiReadSlave,
+         sAxiWriteMaster => axiWriteMaster,
+         sAxiWriteSlave  => axiWriteSlave,
+         mAxiClk         => clk,
+         mAxiClkRst      => rst,
+         mAxiReadMaster  => syncReadMaster,
+         mAxiReadSlave   => syncReadSlave,
+         mAxiWriteMaster => syncWriteMaster,
+         mAxiWriteSlave  => syncWriteSlave );
+   end generate;
+   
+   GEN_SYNC : if not AXIL_ASYNC generate
+     regclk     <= axiClk;
+     regrst     <= axiRst;
+     
+     syncReadMaster  <= axiReadMaster;
+     axiReadSlave    <= syncReadSlave;
+     syncWriteMaster <= axiWriteMaster;
+     axiWriteSlave   <= syncWriteSlave;
+     
+     statusSlv  <= toSlv(status);
+     statusS    <= toXpmSeqStatusType(statusSlvS);
+
+     U_StatusSync : entity surf.SynchronizerVector
+       generic map (
+         WIDTH_G => XPM_SEQ_STATUS_BITS_C)
+       port map (
+         clk     => axilClk,
+         dataIn  => statusSlv,
+         dataOut => statusSlvS);
+     
+     mConfigSlvS <= toSlv(mConfigS);
+     mConfig     <= toXpmSeqConfigType(mConfigSlv);
+
+     U_ConfigSync : entity surf.SynchronizerVector
+       generic map (
+         WIDTH_G => XPM_SEQ_CONFIG_BITS_C)
+       port map (
+         clk     => clk,
+         dataIn  => mConfigSlvS,
+         dataOut => mConfigSlv);
+   end generate;
+   
    -------------------------------
    -- Configuration Register
    -------------------------------

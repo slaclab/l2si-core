@@ -48,9 +48,11 @@ entity XpmL0Select is
       cuTimingV : in  sl;
       -- state of the deadtime assertion
       inhibit   : in  sl;
+      ureject   : in  slv(XPM_PARTITIONS_C-1 downto 0);
       -- strobe cycle when decision needs to be made
       strobe    : in  sl;
       -- event selection decision
+      ireject   : out sl;
       accept    : out sl;
       rejecc    : out sl;
       -- monitoring statistics
@@ -62,6 +64,8 @@ architecture rtl of XpmL0Select is
       strobeRdy : sl;
       accept    : sl;
       rejecc    : sl;
+      rateSel   : sl;
+      destSel   : sl;
       seqWord   : slv(15 downto 0);
       evtWord   : slv(15 downto 0);
       status    : XpmL0SelectStatusType;
@@ -70,6 +74,8 @@ architecture rtl of XpmL0Select is
       strobeRdy => '0',
       accept    => '0',
       rejecc    => '0',
+      rateSel   => '0',
+      destSel   => '0',
       seqWord   => (others => '0'),
       evtWord   => (others => '0'),
       status    => XPM_L0_SELECT_STATUS_INIT_C);
@@ -123,7 +129,7 @@ begin
          dataOut(32)           => uconfig.reset,
          dataOut(33)           => uconfig.enabled);
 
-   comb : process (r, inhibit, timingBus, cuTiming, cuTimingV, uconfig, strobe) is
+   comb : process (r, inhibit, timingBus, cuTiming, cuTimingV, uconfig, strobe, ureject) is
       variable v        : RegType;
       variable m        : TimingMessageType;
       variable rateSel  : sl;
@@ -135,6 +141,7 @@ begin
 
       v.accept := '0';
       v.rejecc := '0';
+      v.ireject := '0';
 
       m := timingBus.message;           -- shorthand
 
@@ -152,8 +159,7 @@ begin
          v.strobeRdy := '1';
    end if;
 
-   if (strobe = '1' and r.strobeRdy = '1') then
-      v.strobeRdy := '0';
+   if (r.strobeRdy = '1') then
       -- calculate rateSel
       case uconfig.rateSel(15 downto 14) is
          when "00" => rateSel := m.fixedRates(conv_integer(uconfig.rateSel(3 downto 0)));
@@ -175,14 +181,28 @@ begin
       else
          destSel := '0';
       end if;
+
+      v.rateSel := rateSel;
+      v.destSel := destSel;
+
+      if uconfig.enabled = '1' then
+         if (rateSel = '1' and destSel = '1' and inhibit = '1') then
+           v.ireject       := '1';
+         end if;
+      end if;
+      
+   end if;
+   
+   if (strobe = '1' and r.strobeRdy = '1') then
+      v.strobeRdy := '0';
       if uconfig.enabled = '1' then
          v.status.enabled := r.status.enabled+1;
          if (inhibit = '1') then
             v.status.inhibited := r.status.inhibited+1;
          end if;
-         if (rateSel = '1' and destSel = '1') then
+         if (r.rateSel = '1' and r.destSel = '1') then
             v.status.num := r.status.num+1;
-            if (inhibit = '1') then
+            if (r.ireject = '1' or (uconfig.pmask and ureject)/=0) then
                v.rejecc        := '1';
                v.status.numInh := r.status.numInh+1;
             else
