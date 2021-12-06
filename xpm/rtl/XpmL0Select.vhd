@@ -120,7 +120,7 @@ begin
    U_SYNC : entity surf.SynchronizerVector
       generic map (
          TPD_G   => TPD_G,
-         WIDTH_G => 34)
+         WIDTH_G => 42)
       port map (
          clk                   => clk,
          dataIn(15 downto 0)   => config.rateSel,
