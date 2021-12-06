@@ -127,10 +127,12 @@ begin
          dataIn(31 downto 16)  => config.destSel,
          dataIn(32)            => config.reset,
          dataIn(33)            => config.enabled,
+         dataIn(41 downto 34)  => config.groups,
          dataOut(15 downto 0)  => uconfig.rateSel,
          dataOut(31 downto 16) => uconfig.destSel,
          dataOut(32)           => uconfig.reset,
-         dataOut(33)           => uconfig.enabled);
+         dataOut(33)           => uconfig.enabled,
+         dataOut(41 downto 34) => uconfig.groups);
 
    comb : process (r, inhibit, timingBus, cuTiming, cuTimingV, uconfig, strobe, ureject) is
       variable v        : RegType;
