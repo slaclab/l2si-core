@@ -32,7 +32,7 @@ entity XpmSeqXbar is
    generic (
       TPD_G            : time             := 1 ns;
       AXIL_BASEADDR_G  : slv(31 downto 0) := (others=>'0');
-      AXIL_ASYNC_G     : boolean          := false );
+      AXIL_ASYNC_G     : boolean          := true );
    port (
       -- AXI-Lite Interface (on axiClk domain)
       axiClk          : in  sl;
@@ -73,9 +73,11 @@ architecture xbar of XpmSeqXbar is
    
    signal mConfig     : XpmSeqConfigArray(NUM_AXI_MASTERS_C-1 downto 0);
    signal mConfigS    : XpmSeqConfigArray(NUM_AXI_MASTERS_C-1 downto 0);
-   signal mConfigSlv  : slv(XPM_SEQ_CONFIG_BITS_C-1 downto 0);
-   signal mConfigSlvS : slv(XPM_SEQ_CONFIG_BITS_C-1 downto 0);
 
+   type XpmSeqConfigSlvArray is array (natural range <>) of slv(XPM_SEQ_CONFIG_BITS_C-1 downto 0);   
+   signal mConfigSlv  : XpmSeqConfigSlvArray(NUM_AXI_MASTERS_C-1 downto 0);
+   signal mConfigSlvS : XpmSeqConfigSlvArray(NUM_AXI_MASTERS_C-1 downto 0);
+   
    signal regclk : sl;
    signal regrst : sl;
 begin
@@ -134,7 +136,7 @@ begin
          axiClk         => regclk,
          axiRst         => regrst);
 
-   GEN_ASYNC : if AXIL_ASYNC generate
+   GEN_ASYNC : if AXIL_ASYNC_G generate
      regclk     <= clk;
      regrst     <= rst;
      statusS    <= status;
@@ -142,8 +144,7 @@ begin
 
      U_AxiLiteAsync : entity surf.AxiLiteAsync
        generic map (
-         TPD_G        => TPD_G,
-         COMMON_CLK_G => not AXIL_ASYNC_G)
+         TPD_G        => TPD_G )
        port map (
          sAxiClk         => axiClk,
          sAxiClkRst      => axiRst,
@@ -159,7 +160,7 @@ begin
          mAxiWriteSlave  => syncWriteSlave );
    end generate;
    
-   GEN_SYNC : if not AXIL_ASYNC generate
+   GEN_SYNC : if not AXIL_ASYNC_G generate
      regclk     <= axiClk;
      regrst     <= axiRst;
      
@@ -175,20 +176,21 @@ begin
        generic map (
          WIDTH_G => XPM_SEQ_STATUS_BITS_C)
        port map (
-         clk     => axilClk,
+         clk     => regclk,
          dataIn  => statusSlv,
          dataOut => statusSlvS);
-     
-     mConfigSlvS <= toSlv(mConfigS);
-     mConfig     <= toXpmSeqConfigType(mConfigSlv);
 
-     U_ConfigSync : entity surf.SynchronizerVector
-       generic map (
-         WIDTH_G => XPM_SEQ_CONFIG_BITS_C)
-       port map (
-         clk     => clk,
-         dataIn  => mConfigSlvS,
-         dataOut => mConfigSlv);
+     GEN_MEMCONFIG: for i in 0 to NUM_AXI_MASTERS_C-1 generate
+       mConfigSlvS(i) <= toSlv(mConfigS(i));
+       mConfig    (i) <= toXpmSeqConfigType(mConfigSlv(i));
+       U_ConfigSync : entity surf.SynchronizerVector
+         generic map (
+           WIDTH_G => XPM_SEQ_CONFIG_BITS_C)
+         port map (
+           clk     => clk,
+           dataIn  => mConfigSlvS(i),
+           dataOut => mConfigSlv (i));
+     end generate GEN_MEMCONFIG;
    end generate;
    
    -------------------------------

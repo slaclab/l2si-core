@@ -63,6 +63,7 @@ architecture rtl of XpmL0Select is
    type RegType is record
       strobeRdy : sl;
       accept    : sl;
+      ireject   : sl;
       rejecc    : sl;
       rateSel   : sl;
       destSel   : sl;
@@ -73,6 +74,7 @@ architecture rtl of XpmL0Select is
    constant REG_INIT_C : RegType := (
       strobeRdy => '0',
       accept    => '0',
+      ireject   => '0',
       rejecc    => '0',
       rateSel   => '0',
       destSel   => '0',
@@ -110,10 +112,11 @@ begin
             probe0(255 downto 23) => (others => '0'));
    end generate;
 
+   ireject <= r.ireject;
    accept <= r.accept;
    rejecc <= r.rejecc;
    status <= r.status;
-
+   
    U_SYNC : entity surf.SynchronizerVector
       generic map (
          TPD_G   => TPD_G,
@@ -202,7 +205,7 @@ begin
          end if;
          if (r.rateSel = '1' and r.destSel = '1') then
             v.status.num := r.status.num+1;
-            if (r.ireject = '1' or (uconfig.pmask and ureject)/=0) then
+            if (r.ireject = '1' or (uconfig.groups and ureject)/=0) then
                v.rejecc        := '1';
                v.status.numInh := r.status.numInh+1;
             else

@@ -56,7 +56,7 @@ entity XpmAppMaster is
       fiducial   : in  sl;
       pause      : in  slv(26 downto 0);
       overflow   : in  slv(26 downto 0);
-      greject    : in  slv(XPM_PARTITIONS_C-1 downto 0);
+      greject    : in  slv(XPM_PARTITIONS_C-1 downto 0) := (others=>'0');
       lreject    : out sl;
       l1Feedback : in  XpmL1FeedbackType      := XPM_L1_FEEDBACK_INIT_C;
       l1Ack      : out sl;

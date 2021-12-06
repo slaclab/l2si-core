@@ -196,8 +196,8 @@ architecture top_level_app of XpmApp is
    begin
      o := c;
      for j in 0 to XPM_PARTITIONS_C-1 loop
-       u := o.partition(j).message.insert and v;
        assignRecord(i, r, u);
+       o.partition(j).message.insert := u and v;
        assignRecord(i, r, o.partition(j).message.header);
      end loop;  -- j
      return o;
