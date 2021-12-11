@@ -36,7 +36,8 @@ use l2si_core.XpmExtensionPkg.all;
 
 entity XpmRxLink is
    generic (
-      TPD_G : time := 1 ns);
+     TPD_G : time := 1 ns;
+     DEBUG_G : boolean := false);
    port (
       clk        : in  sl;
       rst        : in  sl;
@@ -95,10 +96,43 @@ architecture rtl of XpmRxLink is
 
    signal uconfig : XpmLinkConfigType := XPM_LINK_CONFIG_INIT_C;
 
+   component ila_0
+     port ( clk    : in sl;
+            probe0 : in slv(255 downto 0) );
+   end component;
+
+   signal r_state     : slv(2 downto 0);
+   signal r_partition : slv(2 downto 0);
+   
 begin
 
+  GEN_DBUG : if DEBUG_G generate
+    r_state <= "000" when r.state = IDLE_S else
+               "001" when r.state = PAUSE_S else
+               "010" when r.state = ID1_S else
+               "011" when r.state = ID2_S else
+               "100" when r.state = PDATA1_S else
+               "101" when r.state = PDATA2_S else
+               "111";
+    r_partition <= toSlv(r.partition,3);
+    
+     U_ILA : ila_0
+       port map ( clk       => rxClk,
+                  probe0(2 downto 0)   => r_state,
+                  probe0(5 downto 3)   => r_partition,
+                  probe0(6)            => r.isXpm,
+                  probe0(10 downto  7) => r.rxRcvs(3 downto 0),
+                  probe0(18 downto 11) => r.pause,
+                  probe0(26 downto 19) => r.overflow,
+                  probe0(35 downto 27) => r.timeout,
+                  probe0(51 downto 36) => rxData,
+                  probe0(53 downto 52) => rxDataK,
+                  probe0(54)           => rxErr,
+                  probe0(55)           => rxRst,
+                  probe0(255 downto 56) => (others=>'0') );
+   end generate;
+  
    isXpm  <= r.isXpm;
-   id     <= r.id;
    rxRcvs <= r.rxRcvs;
 
    U_ASync : entity surf.FifoAsync

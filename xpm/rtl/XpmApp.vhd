@@ -150,7 +150,9 @@ architecture top_level_app of XpmApp is
    signal dsPause        : PauseArray (NUM_DS_LINKS_G-1 downto 0);
    signal dsOverflow     : PauseArray (NUM_DS_LINKS_G-1 downto 0);
    signal dsRxRcvs       : Slv32Array (NUM_DS_LINKS_G-1 downto 0);
+   signal dsRxRcvsS      : Slv32Array (NUM_DS_LINKS_G-1 downto 0);
    signal dsId           : Slv32Array (NUM_DS_LINKS_G-1 downto 0);
+   signal dsIdS          : Slv32Array (NUM_DS_LINKS_G-1 downto 0);
    signal bpRxLinkPauseS : Slv16Array (NUM_BP_LINKS_G-1 downto 0);
 
    signal timingStream_streams : TimingSerialArray(NSTREAMS_C-1 downto 0);
@@ -205,14 +207,14 @@ architecture top_level_app of XpmApp is
    
 begin
 
-   linkstatp : process (bpStatus, dsLinkStatus, dsRxRcvs, isXpm, dsId) is
+   linkstatp : process (bpStatus, dsLinkStatus, dsRxRcvsS, isXpm, dsIdS) is
       variable linkStat : XpmLinkStatusType;
    begin
       for i in 0 to NUM_DS_LINKS_G-1 loop
          linkStat           := dsLinkStatus(i);
-         linkStat.rxRcvCnts := dsRxRcvs(i);
-         linkStat.rxIsXpm   := isXpm (i);
-         linkStat.rxId      := dsId (i);
+         linkStat.rxRcvCnts := dsRxRcvsS   (i);
+         linkStat.rxIsXpm   := isXpm       (i);
+         linkStat.rxId      := dsIdS       (i);
          status.dsLink(i)   <= linkStat;
       end loop;
       status.bpLink(bpStatus'range) <= bpStatus;
@@ -291,8 +293,7 @@ begin
          generic map (
             TPD_G     => TPD_G,
             ADDR_G    => i,
-            STREAMS_G => 3,
-            DEBUG_G   => false)
+            STREAMS_G => 3)
          port map (
             clk         => timingClk,
             rst         => timingRst,
@@ -307,7 +308,7 @@ begin
 
       U_RxLink : entity l2si_core.XpmRxLink
          generic map (
-            TPD_G => TPD_G)
+           TPD_G   => TPD_G)
          port map (
             clk        => timingClk,
             rst        => timingRst,
@@ -324,6 +325,19 @@ begin
             isXpm      => isXpm (i),
             id         => dsId (i),
             rxRcvs     => dsRxRcvs (i));
+
+      U_SyncId : entity surf.SynchronizerVector
+        generic map ( WIDTH_G => 32 )
+        port map ( clk     => regclk,
+                   dataIn  => dsId(i),
+                   dataOut => dsIdS(i) );
+      
+      U_RxRcvs : entity surf.SynchronizerVector
+        generic map ( WIDTH_G => 32 )
+        port map ( clk     => regclk,
+                   dataIn  => dsRxRcvs(i),
+                   dataOut => dsRxRcvsS(i) );
+      
    end generate GEN_DSLINK;
 
    U_BpTx : entity l2si_core.XpmTxLink
