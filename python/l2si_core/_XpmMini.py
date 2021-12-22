@@ -31,20 +31,22 @@ class XpmMini(pr.Device):
             mode         = 'RW',
         ))
 
-        self.add(pr.RemoteCommand(
-            name         = "TxPllReset",
+        self.add(pr.RemoteVariable(
+            name         = "TxPllRst",
             offset       = 0x04,
             bitSize      = 1,
             bitOffset    = 18,
-            function     = pr.RemoteCommand.toggle
+            base         = pr.Bool,
+            mode         = 'RW',
         ))
 
-        self.add(pr.RemoteCommand(
-            name         = "RxPllReset",
+        self.add(pr.RemoteVariable(
+            name         = "RxPllRst",
             offset       = 0x04,
             bitSize      = 1,
             bitOffset    = 19,
-            function     = pr.RemoteCommand.toggle
+            base         = pr.Bool,
+            mode         = 'RW',
         ))
 
         self.add(pr.RemoteVariable(
@@ -56,20 +58,22 @@ class XpmMini(pr.Device):
             mode         = 'RW',
         ))
 
-        self.add(pr.RemoteCommand(
-            name         = "TxReset",
+        self.add(pr.RemoteVariable(
+            name         = "TxRst",
             offset       = 0x04,
             bitSize      = 1,
             bitOffset    = 29,
-            function     = pr.RemoteCommand.toggle
+            base         = pr.Bool,
+            mode         = 'RW',
         ))
 
-        self.add(pr.RemoteCommand(
-            name         = "RxReset",
+        self.add(pr.RemoteVariable(
+            name         = "RxRst",
             offset       = 0x04,
             bitSize      = 1,
             bitOffset    = 30,
-            function     = pr.RemoteCommand.toggle
+            base         = pr.Bool,
+            mode         = 'RW',
         ))
 
         self.add(pr.RemoteVariable(
@@ -264,7 +268,30 @@ class XpmMini(pr.Device):
             hidden       = True,
         ))
 
-
         @self.command()
         def SendTransition(arg):
             self.PartitionMessage_Hdr.set(arg | (1<<15))
+
+        @self.command()
+        def TxPllReset():
+            self.TxPllRst.set(0x1)
+            self.Link.set(self.Link.get())
+            self.TxPllRst.set(0x0)
+
+        @self.command()
+        def RxPllReset():
+            self.RxPllRst.set(0x1)
+            self.Link.set(self.Link.get())
+            self.RxPllRst.set(0x0)
+
+        @self.command()
+        def TxReset():
+            self.TxRst.set(0x1)
+            self.Link.set(self.Link.get())
+            self.TxRst.set(0x0)
+
+        @self.command()
+        def RxReset():
+            self.RxRst.set(0x1)
+            self.Link.set(self.Link.get())
+            self.RxRst.set(0x0)
