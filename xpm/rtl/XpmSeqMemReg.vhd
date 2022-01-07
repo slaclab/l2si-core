@@ -52,17 +52,15 @@ architecture rtl of XpmSeqMemReg is
 
    type RegType is record
       config        : XpmSeqConfigType;
-      seqRd         : sl;
       seqRdSeq      : slv(3 downto 0);
       seqState      : SequencerState;
       axiReadSlave  : AxiLiteReadSlaveType;
       axiWriteSlave : AxiLiteWriteSlaveType;
-      axiRdEn       : slv(1 downto 0);
+      axiRdEn       : slv(2 downto 0);
    end record RegType;
 
    constant REG_INIT_C : RegType := (
       config        => XPM_SEQ_CONFIG_INIT_C,
-      seqRd         => '0',
       seqRdSeq      => (others => '0'),
       seqState      => SEQUENCER_STATE_INIT_C,
       axiReadSlave  => AXI_LITE_READ_SLAVE_INIT_C,
@@ -71,7 +69,7 @@ architecture rtl of XpmSeqMemReg is
 
    signal r   : RegType := REG_INIT_C;
    signal rin : RegType;
-
+   
 begin
 
    -------------------------------
@@ -99,7 +97,6 @@ begin
 
       -- Reset strobing signals
       v.config.seqWrEn := (others => '0');
-      v.seqRd          := '0';
       v.seqRdSeq       := (others => '0');
       v.axiRdEn        := (others => '0');
 
@@ -148,17 +145,19 @@ begin
             -- Address is aligned
             axiReadResp      := AXI_RESP_OK_C;
             -- BRAM 2 cycles read delay
-            v.axiRdEn        := r.axiRdEn(0) & '1';
+            v.axiRdEn        := r.axiRdEn(1 downto 0) & '1';
             -- Check if BRAM is valid
             if r.axiRdEn(1) = '1' then
-
+              v.seqRdSeq := resize(regAddr(ADDR_BITS_G-1 downto SEQADDRLEN+2),
+                                   r.seqRdSeq'length);
+            end if;
+            if r.axiRdEn(2) = '1' then
                -- Decode the read address
                case rdPntr is
                   when 0 to XPM_SEQ_DEPTH_C*2048-1 =>
-                     iseq       := conv_integer(regAddr(ADDR_BITS_G-1 downto SEQADDRLEN+2));
-                     v.seqRd    := '1';
-                     v.seqRdSeq := std_logic_vector(conv_unsigned(iseq, v.seqRdSeq'length));
-                  when others => tmpRdData := x"DEAD" & regAddr(15 downto 2) & "00";
+                    tmpRdData := status.seqRdData(conv_integer(r.seqRdSeq));
+                  when others =>
+                    tmpRdData := x"DEAD" & regAddr(15 downto 2) & "00";
                end case;
                v.axiReadSlave.rdata := tmpRdData;
                -- Send AXI response
@@ -175,9 +174,6 @@ begin
       -- Outputs
       axiWriteSlave <= r.axiWriteSlave;
       axiReadSlave  <= r.axiReadSlave;
-      if r.seqRd = '1' then
-         axiReadSlave.rdata <= status.seqRdData(conv_integer(r.seqRdSeq));
-      end if;
 
       config         <= r.config;
       config.seqAddr <= v.config.seqAddr;
