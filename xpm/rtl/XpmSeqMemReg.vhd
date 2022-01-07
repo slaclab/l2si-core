@@ -85,7 +85,6 @@ begin
       variable iseq         : natural;
       variable ichn         : natural;
       variable regWrData    : slv(31 downto 0);
-      variable tmpRdData    : slv(31 downto 0);
       variable regAddr      : slv(31 downto 2);
    begin
       -- Latch the current value
@@ -98,7 +97,7 @@ begin
       -- Reset strobing signals
       v.config.seqWrEn := (others => '0');
       v.seqRdSeq       := (others => '0');
-      v.axiRdEn        := (others => '0');
+      v.axiRdEn        := r.axiRdEn(0) & '0';
 
       -----------------------------
       -- AXI-Lite Write Logic
@@ -137,7 +136,6 @@ begin
       if (axiStatus.readEnable = '1') then
          -- Reset the bus
          regAddr              := axiReadMaster.araddr(regAddr'range);
-         tmpRdData            := (others => '0');
          -- Check for alignment
          if axiReadMaster.araddr(1 downto 0) = "00" then
             -- Update external data/address buses
@@ -155,17 +153,21 @@ begin
                -- Decode the read address
                case rdPntr is
                   when 0 to XPM_SEQ_DEPTH_C*2048-1 =>
-                    tmpRdData := status.seqRdData(conv_integer(r.seqRdSeq));
-                  when others =>
-                    tmpRdData := x"DEAD" & regAddr(15 downto 2) & "00";
+                     iseq       := conv_integer(regAddr(ADDR_BITS_G-1 downto SEQADDRLEN+2));
+                     v.seqRd    := '1';
+                     v.seqRdSeq := std_logic_vector(conv_unsigned(iseq, v.seqRdSeq'length));
+                  when others => v.axiReadSlave.rdata := x"DEAD" & regAddr(15 downto 2) & "00";
                end case;
-               v.axiReadSlave.rdata := tmpRdData;
                -- Send AXI response
                axiSlaveReadResponse(v.axiReadSlave, axiReadResp);
             end if;
          else
             axiSlaveReadResponse(v.axiReadSlave, AXI_ERROR_RESP_G);
          end if;
+      end if;
+
+      if r.seqRd = '1' then
+         v.axiReadSlave.rdata := status.seqRdData(conv_integer(r.seqRdSeq));
       end if;
 
       -- Register the variable for next clock cycle
