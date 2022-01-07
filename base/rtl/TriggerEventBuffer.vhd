@@ -220,6 +220,8 @@ begin
          v.fifoAxisMaster.tValid := '0';
          v.triggerData.valid     := '0';
          v.triggerData.l0Accept  := '0';
+         v.triggerData.l1Expect  := '0';
+         v.triggerData.l1Accept  := '0';
          v.evrTrigLast           := evrTriggers.trigPulse(TRIGGER_INDEX_G);
 
          if (evrTriggers.trigPulse(TRIGGER_INDEX_G) = '1' and r.evrTrigLast = '0' and enable = '1') then
@@ -231,6 +233,8 @@ begin
 
             v.triggerData.valid    := '1';
             v.triggerData.l0Accept := '1';
+            v.triggerData.l1Expect := '1';
+            v.triggerData.l1Accept := '1';
             v.triggerData.l0Tag    := v.triggerCount(4 downto 0);
             v.triggerData.count    := v.triggerCount(23 downto 0);
 
