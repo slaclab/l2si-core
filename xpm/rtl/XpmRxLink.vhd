@@ -133,6 +133,7 @@ begin
    end generate;
   
    isXpm  <= r.isXpm;
+   id     <= r.id;
    rxRcvs <= r.rxRcvs;
 
    U_ASync : entity surf.FifoAsync
