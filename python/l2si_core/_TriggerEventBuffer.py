@@ -64,7 +64,7 @@ class TriggerEventBuffer(pr.Device):
                     0: 'XPM',
                     1: 'EVR'}
             ))
-            
+
 
             self.add(pr.RemoteVariable(
                 name        = 'PauseThreshold',
