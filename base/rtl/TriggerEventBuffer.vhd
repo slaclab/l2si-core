@@ -207,9 +207,10 @@ begin
          dataOut => eventAxisCtrlPauseSync);  -- [out]
 
 
-   comb : process (alignedTimingMessage, alignedTimingStrobe, alignedXpmMessage, axilReadMaster,
-                   axilWriteMaster, eventAxisCtrlPauseSync, enable, evrTriggers, fifoAxisCtrl, fifoRstReg,
-                   partitionReg, promptTimingStrobe, promptXpmMessage, r, resetCounters, timingMode, timingRxRst) is
+   comb : process (alignedTimingMessage, alignedTimingStrobe, alignedXpmMessage, enable,
+                   eventAxisCtrlPauseSync, evrTriggers, fifoAxisCtrl, fifoRstReg, partitionReg,
+                   promptTimingStrobe, promptXpmMessage, r, resetCounters, timingMode, timingRxRst,
+                   triggerSource) is
       variable v      : RegType;
       variable axilEp : AxiLiteEndpointType;
    begin
