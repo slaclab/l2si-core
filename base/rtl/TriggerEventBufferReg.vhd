@@ -309,7 +309,7 @@ begin
       -- LCLS-II only registers
       if (EN_LCLS_II_TIMING_G) then
          axiSlaveRegister(axilEp, x"04", 0, v.partition);
-         axiSlaveRegister(axilEp, x"04", 15, v.triggerSource);
+         axiSlaveRegister(axilEp, x"04", 16, v.triggerSource);
          axiSlaveRegister(axilEp, X"0C", 0, v.triggerDelay);
          axiSlaveRegister(axilEp, X"08", 0, v.fifoPauseThresh);
          axiSlaveRegisterR(axilEp, X"10", 1, pauseSync);

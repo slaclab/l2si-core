@@ -53,6 +53,20 @@ class TriggerEventBuffer(pr.Device):
             ))
 
             self.add(pr.RemoteVariable(
+                name        = 'TriggerSource',
+                description = 'Source of trigger',
+                offset      = 0x04,
+                bitSize     = 1,
+                bitOffset   = 16,
+                base        = pr.UInt,
+                mode        = 'RW',
+                enum = {
+                    0: 'XPM',
+                    1: 'EVR'}
+            ))
+            
+
+            self.add(pr.RemoteVariable(
                 name        = 'PauseThreshold',
                 description = 'Buffer level at which Pause is asserted',
                 offset      = 0x08,
