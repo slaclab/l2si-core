@@ -134,7 +134,7 @@ begin
          dataOut(33)           => uconfig.enabled,
          dataOut(41 downto 34) => uconfig.groups);
 
-   comb : process (r, rst, inhibit, timingBus, cuTiming, cuTimingV, uconfig, strobe) is
+   comb : process (cuTiming, inhibit, r, rst, strobe, timingBus, uconfig, ureject) is
       variable v        : RegType;
       variable m        : TimingMessageType;
       variable rateSel  : sl;
