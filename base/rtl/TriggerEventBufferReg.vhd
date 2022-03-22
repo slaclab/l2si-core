@@ -57,6 +57,7 @@ entity TriggerEventBufferReg is
       resetCounters     : out sl;
       partition         : out slv(2 downto 0);
       triggerDelay      : out slv(31 downto 0);
+      triggerSource     : out sl;
       fifoPauseThresh   : out slv(FIFO_ADDR_WIDTH_G-1 downto 0);
       -- AXI Lite bus for configuration and status
       axilClk           : in  sl;
@@ -75,6 +76,7 @@ architecture rtl of TriggerEventBufferReg is
       resetCounters   : sl;
       partition       : slv(2 downto 0);
       triggerDelay    : slv(31 downto 0);
+      triggerSource   : sl;
       fifoPauseThresh : slv(FIFO_ADDR_WIDTH_G-1 downto 0);
       axilReadSlave   : AxiLiteReadSlaveType;
       axilWriteSlave  : AxiLiteWriteSlaveType;
@@ -86,6 +88,7 @@ architecture rtl of TriggerEventBufferReg is
       resetCounters   => '0',
       partition       => (others => '0'),
       triggerDelay    => toSlv(42, 32),
+      triggerSource   => XPM_TRIGGER_SOURCE_C,
       fifoPauseThresh => toslv(16, FIFO_ADDR_WIDTH_G),
       axilReadSlave   => AXI_LITE_READ_SLAVE_INIT_C,
       axilWriteSlave  => AXI_LITE_WRITE_SLAVE_INIT_C);
@@ -306,6 +309,7 @@ begin
       -- LCLS-II only registers
       if (EN_LCLS_II_TIMING_G) then
          axiSlaveRegister(axilEp, x"04", 0, v.partition);
+         axiSlaveRegister(axilEp, x"04", 16, v.triggerSource);
          axiSlaveRegister(axilEp, X"0C", 0, v.triggerDelay);
          axiSlaveRegister(axilEp, X"08", 0, v.fifoPauseThresh);
          axiSlaveRegisterR(axilEp, X"10", 1, pauseSync);
@@ -318,6 +322,7 @@ begin
          axiSlaveRegisterR(axilEp, X"30", 0, partitionWord0Sync);
          axiSlaveRegisterR(axilEp, X"38", 0, pauseToTrigSync);
          axiSlaveRegisterR(axilEp, X"3C", 0, notPauseToTrigSync);
+
       end if;
 
       axiSlaveDefault(axilEp, v.axilWriteSlave, v.axilReadSlave, AXI_RESP_DECERR_C);
@@ -345,11 +350,13 @@ begin
       generic map (
          TPD_G         => TPD_G,
          BYPASS_SYNC_G => COMMON_CLK_G,
-         WIDTH_G       => 1)
+         WIDTH_G       => 2)
       port map (
          clk        => timingRxClk,
          dataIn(0)  => r.enable,
-         dataOut(0) => enable);
+         dataIn(1)  => r.triggerSource,
+         dataOut(0) => enable,
+         dataOut(1) => triggerSource);
 
    U_fifoRst : entity surf.SynchronizerOneShot
       generic map (
