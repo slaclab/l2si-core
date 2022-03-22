@@ -113,10 +113,10 @@ begin
    end generate;
 
    ireject <= r.ireject;
-   accept <= r.accept;
-   rejecc <= r.rejecc;
-   status <= r.status;
-   
+   accept  <= r.accept;
+   rejecc  <= r.rejecc;
+   status  <= r.status;
+
    U_SYNC : entity surf.SynchronizerVector
       generic map (
          TPD_G   => TPD_G,
@@ -144,8 +144,8 @@ begin
    begin
       v := r;
 
-      v.accept := '0';
-      v.rejecc := '0';
+      v.accept  := '0';
+      v.rejecc  := '0';
       v.ireject := '0';
 
       m := timingBus.message;           -- shorthand
@@ -162,73 +162,73 @@ begin
 
       if (timingBus.strobe = '1') then
          v.strobeRdy := '1';
-   end if;
-
-   if (r.strobeRdy = '1') then
-      -- calculate rateSel
-      case uconfig.rateSel(15 downto 14) is
-         when "00" => rateSel := m.fixedRates(conv_integer(uconfig.rateSel(3 downto 0)));
-         when "01" =>
-            if (uconfig.rateSel(conv_integer(m.acTimeSlot)+3-1) = '0') then
-               rateSel := '0';
-            else
-               rateSel := m.acRates(conv_integer(uconfig.rateSel(2 downto 0)));
-            end if;
-         when "10"   => rateSel := r.seqWord(conv_integer(uconfig.rateSel(3 downto 0)));
-         when "11"   => rateSel := r.evtWord(conv_integer(uconfig.rateSel(3 downto 0)));
-         when others => rateSel := '0';
-      end case;
-      -- calculate destSel
-      if (uconfig.destSel(15) = '1' or
-          ((uconfig.destSel(conv_integer(m.beamRequest(7 downto 4))) = '1') and
-           (m.beamRequest(0) = '1'))) then
-         destSel := '1';
-      else
-         destSel := '0';
       end if;
 
-      v.rateSel := rateSel;
-      v.destSel := destSel;
+      if (r.strobeRdy = '1') then
+         -- calculate rateSel
+         case uconfig.rateSel(15 downto 14) is
+            when "00" => rateSel := m.fixedRates(conv_integer(uconfig.rateSel(3 downto 0)));
+            when "01" =>
+               if (uconfig.rateSel(conv_integer(m.acTimeSlot)+3-1) = '0') then
+                  rateSel := '0';
+               else
+                  rateSel := m.acRates(conv_integer(uconfig.rateSel(2 downto 0)));
+               end if;
+            when "10"   => rateSel := r.seqWord(conv_integer(uconfig.rateSel(3 downto 0)));
+            when "11"   => rateSel := r.evtWord(conv_integer(uconfig.rateSel(3 downto 0)));
+            when others => rateSel := '0';
+         end case;
+         -- calculate destSel
+         if (uconfig.destSel(15) = '1' or
+             ((uconfig.destSel(conv_integer(m.beamRequest(7 downto 4))) = '1') and
+              (m.beamRequest(0) = '1'))) then
+            destSel := '1';
+         else
+            destSel := '0';
+         end if;
 
-      if uconfig.enabled = '1' then
-         if (rateSel = '1' and destSel = '1' and inhibit = '1') then
-           v.ireject       := '1';
-         end if;
-      end if;
-      
-   end if;
-   
-   if (strobe = '1' and r.strobeRdy = '1') then
-      v.strobeRdy := '0';
-      if uconfig.enabled = '1' then
-         v.status.enabled := r.status.enabled+1;
-         if (inhibit = '1') then
-            v.status.inhibited := r.status.inhibited+1;
-         end if;
-         if (r.rateSel = '1' and r.destSel = '1') then
-            v.status.num := r.status.num+1;
-            if (r.ireject = '1' or (uconfig.groups and ureject)/=0) then
-               v.rejecc        := '1';
-               v.status.numInh := r.status.numInh+1;
-            else
-               v.accept        := '1';
-               v.status.numAcc := r.status.numAcc+1;
+         v.rateSel := rateSel;
+         v.destSel := destSel;
+
+         if uconfig.enabled = '1' then
+            if (rateSel = '1' and destSel = '1' and inhibit = '1') then
+               v.ireject := '1';
             end if;
          end if;
+
       end if;
-   end if;
 
-   if (rst = '1') then
-      v := REG_INIT_C;
-   end if;
+      if (strobe = '1' and r.strobeRdy = '1') then
+         v.strobeRdy := '0';
+         if uconfig.enabled = '1' then
+            v.status.enabled := r.status.enabled+1;
+            if (inhibit = '1') then
+               v.status.inhibited := r.status.inhibited+1;
+            end if;
+            if (r.rateSel = '1' and r.destSel = '1') then
+               v.status.num := r.status.num+1;
+               if (r.ireject = '1' or (uconfig.groups and ureject) /= 0) then
+                  v.rejecc        := '1';
+                  v.status.numInh := r.status.numInh+1;
+               else
+                  v.accept        := '1';
+                  v.status.numAcc := r.status.numAcc+1;
+               end if;
+            end if;
+         end if;
+      end if;
 
-   rin <= v;
-end process comb;
+      if (rst = '1') then
+         v := REG_INIT_C;
+      end if;
 
-seq : process (clk) is
-begin
-   if rising_edge(clk) then
-      r <= rin after TPD_G;
-   end if;
-end process seq;
+      rin <= v;
+   end process comb;
+
+   seq : process (clk) is
+   begin
+      if rising_edge(clk) then
+         r <= rin after TPD_G;
+      end if;
+   end process seq;
 end rtl;
