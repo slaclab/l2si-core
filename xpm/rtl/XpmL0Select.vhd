@@ -48,9 +48,11 @@ entity XpmL0Select is
       cuTimingV : in  sl;
       -- state of the deadtime assertion
       inhibit   : in  sl;
+      ureject   : in  slv(XPM_PARTITIONS_C-1 downto 0);
       -- strobe cycle when decision needs to be made
       strobe    : in  sl;
       -- event selection decision
+      ireject   : out sl;
       accept    : out sl;
       rejecc    : out sl;
       -- monitoring statistics
@@ -61,7 +63,10 @@ architecture rtl of XpmL0Select is
    type RegType is record
       strobeRdy : sl;
       accept    : sl;
+      ireject   : sl;
       rejecc    : sl;
+      rateSel   : sl;
+      destSel   : sl;
       seqWord   : slv(15 downto 0);
       evtWord   : slv(15 downto 0);
       status    : XpmL0SelectStatusType;
@@ -69,7 +74,10 @@ architecture rtl of XpmL0Select is
    constant REG_INIT_C : RegType := (
       strobeRdy => '0',
       accept    => '0',
+      ireject   => '0',
       rejecc    => '0',
+      rateSel   => '0',
+      destSel   => '0',
       seqWord   => (others => '0'),
       evtWord   => (others => '0'),
       status    => XPM_L0_SELECT_STATUS_INIT_C);
@@ -104,26 +112,29 @@ begin
             probe0(255 downto 23) => (others => '0'));
    end generate;
 
-   accept <= r.accept;
-   rejecc <= r.rejecc;
-   status <= r.status;
+   ireject <= r.ireject;
+   accept  <= r.accept;
+   rejecc  <= r.rejecc;
+   status  <= r.status;
 
    U_SYNC : entity surf.SynchronizerVector
       generic map (
          TPD_G   => TPD_G,
-         WIDTH_G => 34)
+         WIDTH_G => 42)
       port map (
          clk                   => clk,
          dataIn(15 downto 0)   => config.rateSel,
          dataIn(31 downto 16)  => config.destSel,
          dataIn(32)            => config.reset,
          dataIn(33)            => config.enabled,
+         dataIn(41 downto 34)  => config.groups,
          dataOut(15 downto 0)  => uconfig.rateSel,
          dataOut(31 downto 16) => uconfig.destSel,
          dataOut(32)           => uconfig.reset,
-         dataOut(33)           => uconfig.enabled);
+         dataOut(33)           => uconfig.enabled,
+         dataOut(41 downto 34) => uconfig.groups);
 
-   comb : process (r, rst, inhibit, timingBus, cuTiming, cuTimingV, uconfig, strobe) is
+   comb : process (cuTiming, inhibit, r, rst, strobe, timingBus, uconfig, ureject) is
       variable v        : RegType;
       variable m        : TimingMessageType;
       variable rateSel  : sl;
@@ -133,8 +144,9 @@ begin
    begin
       v := r;
 
-      v.accept := '0';
-      v.rejecc := '0';
+      v.accept  := '0';
+      v.rejecc  := '0';
+      v.ireject := '0';
 
       m := timingBus.message;           -- shorthand
 
@@ -150,60 +162,73 @@ begin
 
       if (timingBus.strobe = '1') then
          v.strobeRdy := '1';
-   end if;
-
-   if (strobe = '1' and r.strobeRdy = '1') then
-      v.strobeRdy := '0';
-      -- calculate rateSel
-      case uconfig.rateSel(15 downto 14) is
-         when "00" => rateSel := m.fixedRates(conv_integer(uconfig.rateSel(3 downto 0)));
-         when "01" =>
-            if (uconfig.rateSel(conv_integer(m.acTimeSlot)+3-1) = '0') then
-               rateSel := '0';
-            else
-               rateSel := m.acRates(conv_integer(uconfig.rateSel(2 downto 0)));
-            end if;
-         when "10"   => rateSel := r.seqWord(conv_integer(uconfig.rateSel(3 downto 0)));
-         when "11"   => rateSel := r.evtWord(conv_integer(uconfig.rateSel(3 downto 0)));
-         when others => rateSel := '0';
-      end case;
-      -- calculate destSel
-      if (uconfig.destSel(15) = '1' or
-          ((uconfig.destSel(conv_integer(m.beamRequest(7 downto 4))) = '1') and
-           (m.beamRequest(0) = '1'))) then
-         destSel := '1';
-      else
-         destSel := '0';
       end if;
-      if uconfig.enabled = '1' then
-         v.status.enabled := r.status.enabled+1;
-         if (inhibit = '1') then
-            v.status.inhibited := r.status.inhibited+1;
+
+      if (r.strobeRdy = '1') then
+         -- calculate rateSel
+         case uconfig.rateSel(15 downto 14) is
+            when "00" => rateSel := m.fixedRates(conv_integer(uconfig.rateSel(3 downto 0)));
+            when "01" =>
+               if (uconfig.rateSel(conv_integer(m.acTimeSlot)+3-1) = '0') then
+                  rateSel := '0';
+               else
+                  rateSel := m.acRates(conv_integer(uconfig.rateSel(2 downto 0)));
+               end if;
+            when "10"   => rateSel := r.seqWord(conv_integer(uconfig.rateSel(3 downto 0)));
+            when "11"   => rateSel := r.evtWord(conv_integer(uconfig.rateSel(3 downto 0)));
+            when others => rateSel := '0';
+         end case;
+         -- calculate destSel
+         if (uconfig.destSel(15) = '1' or
+             ((uconfig.destSel(conv_integer(m.beamRequest(7 downto 4))) = '1') and
+              (m.beamRequest(0) = '1'))) then
+            destSel := '1';
+         else
+            destSel := '0';
          end if;
-         if (rateSel = '1' and destSel = '1') then
-            v.status.num := r.status.num+1;
+
+         v.rateSel := rateSel;
+         v.destSel := destSel;
+
+         if uconfig.enabled = '1' then
+            if (rateSel = '1' and destSel = '1' and inhibit = '1') then
+               v.ireject := '1';
+            end if;
+         end if;
+
+      end if;
+
+      if (strobe = '1' and r.strobeRdy = '1') then
+         v.strobeRdy := '0';
+         if uconfig.enabled = '1' then
+            v.status.enabled := r.status.enabled+1;
             if (inhibit = '1') then
-               v.rejecc        := '1';
-               v.status.numInh := r.status.numInh+1;
-            else
-               v.accept        := '1';
-               v.status.numAcc := r.status.numAcc+1;
+               v.status.inhibited := r.status.inhibited+1;
+            end if;
+            if (r.rateSel = '1' and r.destSel = '1') then
+               v.status.num := r.status.num+1;
+               if (r.ireject = '1' or (uconfig.groups and ureject) /= 0) then
+                  v.rejecc        := '1';
+                  v.status.numInh := r.status.numInh+1;
+               else
+                  v.accept        := '1';
+                  v.status.numAcc := r.status.numAcc+1;
+               end if;
             end if;
          end if;
       end if;
-   end if;
 
-   if (rst = '1') then
-      v := REG_INIT_C;
-   end if;
+      if (rst = '1') then
+         v := REG_INIT_C;
+      end if;
 
-   rin <= v;
-end process comb;
+      rin <= v;
+   end process comb;
 
-seq : process (clk) is
-begin
-   if rising_edge(clk) then
-      r <= rin after TPD_G;
-   end if;
-end process seq;
+   seq : process (clk) is
+   begin
+      if rising_edge(clk) then
+         r <= rin after TPD_G;
+      end if;
+   end process seq;
 end rtl;

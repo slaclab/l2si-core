@@ -118,7 +118,7 @@ architecture rtl of TriggerEventBuffer is
       msgFifoWr      : sl;
 
       -- outputs
-      triggerData    : XpmEventDataType;
+      triggerData : XpmEventDataType;
 
       -- debug
       partitionV     : integer;
@@ -132,10 +132,10 @@ architecture rtl of TriggerEventBuffer is
    end record RegType;
 
    constant REG_INIT_C : RegType := (
-      evrTrigLast     => '0',
-      partition       => (others => '0'),
-      overflow        => '0',
-      fifoRst         => '0',
+      evrTrigLast => '0',
+      partition   => (others => '0'),
+      overflow    => '0',
+      fifoRst     => '0',
 
       transitionCount => (others => '0'),
       validCount      => (others => '0'),
@@ -156,7 +156,7 @@ architecture rtl of TriggerEventBuffer is
       msgFifoWr      => '0',
 
       -- outputs     =>
-      triggerData    => TRIGGER_EVENT_DATA_INIT_C,
+      triggerData => TRIGGER_EVENT_DATA_INIT_C,
 
       partitionV     => 0,
       eventData      => XPM_EVENT_DATA_INIT_C,
@@ -186,6 +186,7 @@ architecture rtl of TriggerEventBuffer is
 
    signal partitionReg    : slv(2 downto 0);
    signal triggerDelay    : slv(31 downto 0);
+   signal triggerSource   : sl;
    signal fifoPauseThresh : slv(FIFO_ADDR_WIDTH_C-1 downto 0);
    signal resetCounters   : sl;
    signal fifoRstReg      : sl;
@@ -206,16 +207,20 @@ begin
          dataOut => eventAxisCtrlPauseSync);  -- [out]
 
 
-   comb : process (alignedTimingMessage, alignedTimingStrobe, alignedXpmMessage, axilReadMaster,
-                   axilWriteMaster, eventAxisCtrlPauseSync, enable, evrTriggers, fifoAxisCtrl, fifoRstReg,
-                   partitionReg, promptTimingStrobe, promptXpmMessage, r, resetCounters, timingMode, timingRxRst) is
+   comb : process (alignedTimingMessage, alignedTimingStrobe, alignedXpmMessage, enable,
+                   eventAxisCtrlPauseSync, evrTriggers, fifoAxisCtrl, fifoRstReg, partitionReg,
+                   promptTimingStrobe, promptXpmMessage, r, resetCounters, timingMode, timingRxRst,
+                   triggerSource) is
       variable v      : RegType;
       variable axilEp : AxiLiteEndpointType;
    begin
       v := r;
 
-      if (EN_LCLS_I_TIMING_G and timingMode = '0') then
-         -- LCLS-I EVR Trigger buffer logic
+      if ((EN_LCLS_I_TIMING_G and timingMode = '0') or
+          (EN_LCLS_II_TIMING_G and timingMode = '1' and triggerSource = EVR_TRIGGER_SOURCE_C)) then
+
+         -- EVR trigger logic
+         -- Mislabled as "EVR", can come in LCLS-II timing
          v.fifoRst               := '0';
          v.fifoAxisMaster.tValid := '0';
          v.triggerData.valid     := '0';
@@ -240,17 +245,9 @@ begin
 
          end if;
 
-         if (fifoAxisCtrl.overflow = '1') then
-            v.overflow := '1';
-         end if;
+      elsif (EN_LCLS_II_TIMING_G and timingMode = '1' and triggerSource = XPM_TRIGGER_SOURCE_C) then
 
-         if (resetCounters = '1') then
-            v.triggerCount := (others => '0');
-         end if;
-
-      elsif (EN_LCLS_II_TIMING_G and timingMode = '1') then
          -- LCLS-II XPM Trigger Buffer Logic
-
          v.partitionV            := conv_integer(r.partition);
          v.fifoRst               := '0';
          v.fifoAxisMaster.tValid := '0';
@@ -329,10 +326,6 @@ begin
 
          end if;
 
-         -- Latch FIFO overflow if seen
-         if (fifoAxisCtrl.overflow = '1') then
-            v.overflow := '1';
-         end if;
 
          -- Count stuff
          if (r.streamValid = '1') then
@@ -376,6 +369,11 @@ begin
             end if;
          end if;
 
+      end if;  -- LCLS-II XPM logic 
+
+      -- Latch FIFO overflow if seen
+      if (fifoAxisCtrl.overflow = '1') then
+         v.overflow := '1';
       end if;
 
       if (resetCounters = '1') then
@@ -397,11 +395,11 @@ begin
       rin <= v;
 
       -- outputs
-      fifoRst        <= r.fifoRst or fifoRstReg;
+      fifoRst <= r.fifoRst or fifoRstReg;
 
-      partition      <= r.partition;
-      overflow       <= r.overflow;
-      pause          <= r.pause;
+      partition <= r.partition;
+      overflow  <= r.overflow;
+      pause     <= r.pause;
 
    end process comb;
 
@@ -441,6 +439,7 @@ begin
          resetCounters     => resetCounters,
          partition         => partitionReg,
          triggerDelay      => triggerDelay,
+         triggerSource     => triggerSource,
          fifoPauseThresh   => fifoPauseThresh,
          -- AXI Lite bus for configuration and status
          axilClk           => axilClk,
@@ -453,7 +452,7 @@ begin
    -----------------------------------------------
    -- Delay triggerData according to AXI-Lite register
    -----------------------------------------------
-   triggerDataSlv <= toSlv(r.triggerData);
+   triggerDataSlv   <= toSlv(r.triggerData);
    triggerDataValid <= r.triggerData.valid and r.triggerData.l0Accept;
    U_SlvDelayFifo_1 : entity surf.SlvDelayFifo
       generic map (
@@ -521,17 +520,17 @@ begin
          SLAVE_AXI_CONFIG_G  => EVENT_AXIS_CONFIG_C,
          MASTER_AXI_CONFIG_G => EVENT_AXIS_CONFIG_G)
       port map (
-         sAxisClk        => timingRxClk,        -- [in]
-         sAxisRst        => fifoRst,            -- [in]
-         sAxisMaster     => r.fifoAxisMaster,   -- [in]
-         sAxisSlave      => fifoAxisSlave,      -- [out]
-         sAxisCtrl       => fifoAxisCtrl,       -- [out]
-         fifoPauseThresh => fifoPauseThresh,    -- [in]
-         fifoWrCnt       => fifoWrCnt,          -- [out]
-         mAxisClk        => eventClk,           -- [in]
-         mAxisRst        => eventRst,           -- [in]
-         mAxisMaster     => eventAxisMaster,    -- [out]
-         mAxisSlave      => eventAxisSlave);    -- [in]
+         sAxisClk        => timingRxClk,       -- [in]
+         sAxisRst        => fifoRst,           -- [in]
+         sAxisMaster     => r.fifoAxisMaster,  -- [in]
+         sAxisSlave      => fifoAxisSlave,     -- [out]
+         sAxisCtrl       => fifoAxisCtrl,      -- [out]
+         fifoPauseThresh => fifoPauseThresh,   -- [in]
+         fifoWrCnt       => fifoWrCnt,         -- [out]
+         mAxisClk        => eventClk,          -- [in]
+         mAxisRst        => eventRst,          -- [in]
+         mAxisMaster     => eventAxisMaster,   -- [out]
+         mAxisSlave      => eventAxisSlave);   -- [in]
 
    -----------------------------------------------
    -- Buffer TimingMessage that corresponds to each event placed in event fifo

@@ -242,12 +242,14 @@ package XpmPkg is
       destSel : slv(15 downto 0);
    -- 15:15 = DONT_CARE
    --  3:0  = Destination
+      groups  : slv(XPM_PARTITIONS_C-1 downto 0);
    end record;
    constant XPM_L0_SELECT_CONFIG_INIT_C : XpmL0SelectConfigType := (
       reset   => '0',
       enabled => '0',
       rateSel => (others => '0'),
-      destSel => x"8000");
+      destSel => x"8000",
+      groups  => (others => '0'));
 
    type XpmL1SelectConfigType is record
       clear    : slv(XPM_NUM_L1_TRIGGERS_C-1 downto 0);

@@ -54,8 +54,10 @@ entity XpmAppMaster is
       streamIds  : in  Slv4Array (2 downto 0) := (x"2", x"1", x"0");
       advance    : in  slv (2 downto 0);
       fiducial   : in  sl;
-      pause      : in  slv (26 downto 0);
+      pause      : in  slv(26 downto 0);
       overflow   : in  slv(26 downto 0);
+      greject    : in  slv(XPM_PARTITIONS_C-1 downto 0) := (others=>'0');
+      lreject    : out sl;
       l1Feedback : in  XpmL1FeedbackType      := XPM_L1_FEEDBACK_INIT_C;
       l1Ack      : out sl;
       result     : out slv (47 downto 0));
@@ -69,7 +71,7 @@ architecture rtl of XpmAppMaster is
       insertMsg  : sl;
       strobeMsg  : sl;
       inhibitMsg : sl;
-      partStrobe : sl;
+      partStrobe : slv(1 downto 0);
       timingBus  : TimingBusType;
       cuTiming   : CuTimingType;
       cuTimingV  : sl;
@@ -80,7 +82,7 @@ architecture rtl of XpmAppMaster is
       insertMsg  => '0',
       strobeMsg  => '0',
       inhibitMsg => '0',
-      partStrobe => '0',
+      partStrobe => "00",
       timingBus  => TIMING_BUS_INIT_C,
       cuTiming   => CU_TIMING_INIT_C,
       cuTimingV  => '0');
@@ -218,8 +220,10 @@ begin
          cuTiming  => r.cuTiming,
          cuTimingV => r.cuTimingV,
          inhibit   => inhibit,
-         strobe    => r.partStrobe,
+         strobe    => r.partStrobe(1),
          accept    => l0Accept,
+         ireject   => lreject,
+         ureject   => greject,
          rejecc    => l0Reject,
          status    => status.l0Select);
 
@@ -263,7 +267,7 @@ begin
    --             tag            => analysisTag );
    status.anaRd    <= (others=>'0');
 
-   U_SyncMsgPayload : entity surf.FifoAsync
+   U_SyncMsgPayload : entity surf.FifoSync
       generic map (
          TPD_G        => TPD_G,
          DATA_WIDTH_G => config.message.header'length,
@@ -271,13 +275,12 @@ begin
          FWFT_EN_G    => true)
       port map (
          rst           => timingRst,
-         wr_clk        => regClk,
+         clk           => timingClk,
          wr_en         => config.message.insert,
          din           => config.message.header,
          --
-         rd_clk        => timingClk,
          rd_en         => fiducial,
-         rd_data_count => msgRdCount,
+         data_count    => msgRdCount,
          valid         => msgConfigInt.insert,
          dout          => msgConfigInt.header);
 
@@ -320,8 +323,8 @@ begin
    begin
       v := r;
 
-      v.partStrobe := r.timingBus.strobe;
-      v.latch      := r.partStrobe;
+      v.partStrobe := r.partStrobe(0) & r.timingBus.strobe;
+      v.latch      := r.partStrobe(1);
       v.strobeMsg  := '0';
       v.inhibitMsg := inhibit;
 

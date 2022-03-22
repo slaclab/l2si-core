@@ -72,7 +72,7 @@ entity TriggerEventManager is
       eventRst                 : in  sl;
       eventTimingMessagesValid : out slv(NUM_DETECTORS_G-1 downto 0);
       eventTimingMessages      : out TimingMessageArray(NUM_DETECTORS_G-1 downto 0);
-      eventTimingMessagesRd    : in  slv(NUM_DETECTORS_G-1 downto 0) := (others=>'1');
+      eventTimingMessagesRd    : in  slv(NUM_DETECTORS_G-1 downto 0) := (others => '1');
       eventAxisMasters         : out AxiStreamMasterArray(NUM_DETECTORS_G-1 downto 0);
       eventAxisSlaves          : in  AxiStreamSlaveArray(NUM_DETECTORS_G-1 downto 0);
       eventAxisCtrl            : in  AxiStreamCtrlArray(NUM_DETECTORS_G-1 downto 0);
@@ -256,44 +256,43 @@ begin
          NUM_MASTER_SLOTS_G => AXIL_MASTERS_C,
          MASTERS_CONFIG_G   => AXIL_XBAR_CONFIG_C)
       port map (
-         axiClk              => axilClk,                -- [in]
-         axiClkRst           => axilRst,                -- [in]
-         sAxiWriteMasters(0) => axilWriteMaster,        -- [in]
-         sAxiWriteSlaves(0)  => axilWriteSlave,         -- [out]
-         sAxiReadMasters(0)  => axilReadMaster,         -- [in]
-         sAxiReadSlaves(0)   => axilReadSlave,          -- [out]
-         mAxiWriteMasters    => locAxilWriteMasters,    -- [out]
-         mAxiWriteSlaves     => locAxilWriteSlaves,     -- [in]
-         mAxiReadMasters     => locAxilReadMasters,     -- [out]
-         mAxiReadSlaves      => locAxilReadSlaves);     -- [in]
+         axiClk              => axilClk,              -- [in]
+         axiClkRst           => axilRst,              -- [in]
+         sAxiWriteMasters(0) => axilWriteMaster,      -- [in]
+         sAxiWriteSlaves(0)  => axilWriteSlave,       -- [out]
+         sAxiReadMasters(0)  => axilReadMaster,       -- [in]
+         sAxiReadSlaves(0)   => axilReadSlave,        -- [out]
+         mAxiWriteMasters    => locAxilWriteMasters,  -- [out]
+         mAxiWriteSlaves     => locAxilWriteSlaves,   -- [in]
+         mAxiReadMasters     => locAxilReadMasters,   -- [out]
+         mAxiReadSlaves      => locAxilReadSlaves);   -- [in]
 
    -------------------------------------------------------------------------------------------------
    -- LCLS-I timing uses EvrV2CoreTrigers to decode triggers from the EVR timing stream
+   -- LCLS-II timing uses EvrV2CoreTrigers to decode triggers from the LCLS-II timing stream
    -------------------------------------------------------------------------------------------------
-   EVR_GEN : if (EN_LCLS_I_TIMING_G) generate
-      U_EvrV2CoreTriggers_1 : entity lcls_timing_core.EvrV2CoreTriggers
-         generic map (
-            TPD_G           => TPD_G,
-            NCHANNELS_G     => NUM_DETECTORS_G,
-            NTRIGGERS_G     => NUM_DETECTORS_G,
-            TRIG_DEPTH_G    => 28,
-            TRIG_PIPE_G     => 0,
-            COMMON_CLK_G    => AXIL_CLK_IS_TIMING_RX_CLK_G,
-            EVR_CARD_G      => false,
-            AXIL_BASEADDR_G => AXIL_XBAR_CONFIG_C(AXIL_EVR_C).baseAddr)
-         port map (
-            axilClk         => axilClk,                          -- [in]
-            axilRst         => axilRst,                          -- [in]
-            axilWriteMaster => locAxilWriteMasters(AXIL_EVR_C),  -- [in]
-            axilWriteSlave  => locAxilWriteSlaves(AXIL_EVR_C),   -- [out]
-            axilReadMaster  => locAxilReadMasters(AXIL_EVR_C),   -- [in]
-            axilReadSlave   => locAxilReadSlaves(AXIL_EVR_C),    -- [out]
-            evrClk          => timingRxClk,                      -- [in]
-            evrRst          => timingRxRst,                      -- [in]
-            evrBus          => timingBus,                        -- [in]
-            trigOut         => evrTriggers,                      -- [out]
-            evrModeSel      => '0');                             -- [in]
-   end generate EVR_GEN;
+   U_EvrV2CoreTriggers_1 : entity lcls_timing_core.EvrV2CoreTriggers
+      generic map (
+         TPD_G           => TPD_G,
+         NCHANNELS_G     => NUM_DETECTORS_G,
+         NTRIGGERS_G     => NUM_DETECTORS_G,
+         TRIG_DEPTH_G    => 28,
+         TRIG_PIPE_G     => 0,
+         COMMON_CLK_G    => AXIL_CLK_IS_TIMING_RX_CLK_G,
+         EVR_CARD_G      => false,
+         AXIL_BASEADDR_G => AXIL_XBAR_CONFIG_C(AXIL_EVR_C).baseAddr)
+      port map (
+         axilClk         => axilClk,                          -- [in]
+         axilRst         => axilRst,                          -- [in]
+         axilWriteMaster => locAxilWriteMasters(AXIL_EVR_C),  -- [in]
+         axilWriteSlave  => locAxilWriteSlaves(AXIL_EVR_C),   -- [out]
+         axilReadMaster  => locAxilReadMasters(AXIL_EVR_C),   -- [in]
+         axilReadSlave   => locAxilReadSlaves(AXIL_EVR_C),    -- [out]
+         evrClk          => timingRxClk,                      -- [in]
+         evrRst          => timingRxRst,                      -- [in]
+         evrBus          => timingBus,                        -- [in]
+         trigOut         => evrTriggers,                      -- [out]
+         evrModeSel      => '0');                             -- [in]
 
    -------------------------------------------------------------------------------------------------
    -- LCLS-II uses the XPM extension stream
@@ -341,37 +340,37 @@ begin
             TRIGGER_CLK_IS_TIMING_RX_CLK_G => TRIGGER_CLK_IS_TIMING_RX_CLK_G,
             EVENT_CLK_IS_TIMING_RX_CLK_G   => EVENT_CLK_IS_TIMING_RX_CLK_G)
          port map (
-            timingRxClk          => timingRxClk,                         -- [in]
-            timingRxRst          => timingRxRst,                         -- [in]
-            axilClk              => axilClk,                             -- [in]
-            axilRst              => axilRst,                             -- [in]
-            axilReadMaster       => locAxilReadMasters(AXIL_TEB_C(i)),   -- [in]
-            axilReadSlave        => locAxilReadSlaves(AXIL_TEB_C(i)),    -- [out]
-            axilWriteMaster      => locAxilWriteMasters(AXIL_TEB_C(i)),  -- [in]
-            axilWriteSlave       => locAxilWriteSlaves(AXIL_TEB_C(i)),   -- [out]
-            timingMode           => timingMode,                          -- [in]
-            evrTriggers          => evrTriggers,                         -- [out]
-            promptTimingStrobe   => timingBus.strobe,                    -- [in]
-            promptTimingMessage  => timingBus.message,                   -- [in]
-            promptXpmMessage     => xpmMessage,                          -- [in]
-            alignedTimingstrobe  => alignedTimingStrobe,                 -- [in]
-            alignedTimingMessage => alignedTimingMessage,                -- [in]
-            alignedXpmMessage    => alignedXpmMessage,                   -- [in]
-            partition            => detectorPartitions(i),               -- [out]
-            pause                => pause(i),                            -- [out]
-            overflow             => overflow(i),                         -- [out]
-            triggerClk           => triggerClk,                          -- [in]
-            triggerRst           => triggerRst,                          -- [in]
-            triggerData          => triggerData(i),                      -- [out]
-            eventClk             => eventClk,                            -- [in]
-            eventRst             => eventRst,                            -- [in]
-            eventTimingMessageValid => eventTimingMessagesValid(i),      -- [out]
-            eventTimingMessage   => eventTimingMessages(i),              -- [out]
-            eventTimingMessageRd => eventTimingMessagesRd(i),            -- [in]
-            eventAxisMaster      => eventAxisMasters(i),                 -- [out]
-            eventAxisSlave       => eventAxisSlaves(i),                  -- [in]
-            eventAxisCtrl        => eventAxisCtrl(i),                    -- [in]
-            clearReadout         => clearReadout(i));                    -- [out]
+            timingRxClk             => timingRxClk,                         -- [in]
+            timingRxRst             => timingRxRst,                         -- [in]
+            axilClk                 => axilClk,                             -- [in]
+            axilRst                 => axilRst,                             -- [in]
+            axilReadMaster          => locAxilReadMasters(AXIL_TEB_C(i)),   -- [in]
+            axilReadSlave           => locAxilReadSlaves(AXIL_TEB_C(i)),    -- [out]
+            axilWriteMaster         => locAxilWriteMasters(AXIL_TEB_C(i)),  -- [in]
+            axilWriteSlave          => locAxilWriteSlaves(AXIL_TEB_C(i)),   -- [out]
+            timingMode              => timingMode,                          -- [in]
+            evrTriggers             => evrTriggers,                         -- [out]
+            promptTimingStrobe      => timingBus.strobe,                    -- [in]
+            promptTimingMessage     => timingBus.message,                   -- [in]
+            promptXpmMessage        => xpmMessage,                          -- [in]
+            alignedTimingstrobe     => alignedTimingStrobe,                 -- [in]
+            alignedTimingMessage    => alignedTimingMessage,                -- [in]
+            alignedXpmMessage       => alignedXpmMessage,                   -- [in]
+            partition               => detectorPartitions(i),               -- [out]
+            pause                   => pause(i),                            -- [out]
+            overflow                => overflow(i),                         -- [out]
+            triggerClk              => triggerClk,                          -- [in]
+            triggerRst              => triggerRst,                          -- [in]
+            triggerData             => triggerData(i),                      -- [out]
+            eventClk                => eventClk,                            -- [in]
+            eventRst                => eventRst,                            -- [in]
+            eventTimingMessageValid => eventTimingMessagesValid(i),         -- [out]
+            eventTimingMessage      => eventTimingMessages(i),              -- [out]
+            eventTimingMessageRd    => eventTimingMessagesRd(i),            -- [in]
+            eventAxisMaster         => eventAxisMasters(i),                 -- [out]
+            eventAxisSlave          => eventAxisSlaves(i),                  -- [in]
+            eventAxisCtrl           => eventAxisCtrl(i),                    -- [in]
+            clearReadout            => clearReadout(i));                    -- [out]
    end generate GEN_DETECTORS;
 
 
