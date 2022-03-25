@@ -292,7 +292,7 @@ begin
          evrRst          => timingRxRst,                      -- [in]
          evrBus          => timingBus,                        -- [in]
          trigOut         => evrTriggers,                      -- [out]
-         evrModeSel      => '0');                             -- [in]
+         evrModeSel      => timingMode);                      -- [in]
 
    -------------------------------------------------------------------------------------------------
    -- LCLS-II uses the XPM extension stream
