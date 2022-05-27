@@ -52,6 +52,7 @@ architecture rtl of XpmSeqMemReg is
 
    type RegType is record
       config        : XpmSeqConfigType;
+      seqRd         : sl;
       seqRdSeq      : slv(3 downto 0);
       seqState      : SequencerState;
       axiReadSlave  : AxiLiteReadSlaveType;
@@ -61,6 +62,7 @@ architecture rtl of XpmSeqMemReg is
 
    constant REG_INIT_C : RegType := (
       config        => XPM_SEQ_CONFIG_INIT_C,
+      seqRd         => '0',
       seqRdSeq      => (others => '0'),
       seqState      => SEQUENCER_STATE_INIT_C,
       axiReadSlave  => AXI_LITE_READ_SLAVE_INIT_C,
@@ -96,8 +98,9 @@ begin
 
       -- Reset strobing signals
       v.config.seqWrEn := (others => '0');
+      v.seqRd          := '0';
       v.seqRdSeq       := (others => '0');
-      v.axiRdEn        := r.axiRdEn(0) & '0';
+      v.axiRdEn        := r.axiRdEn(1 downto 0) & '0';
 
       -----------------------------
       -- AXI-Lite Write Logic
