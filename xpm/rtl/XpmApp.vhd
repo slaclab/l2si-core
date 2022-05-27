@@ -168,9 +168,10 @@ architecture top_level_app of XpmApp is
    signal pausefb              : slv (XPM_PARTITIONS_C-1 downto 0);
    signal overflowfb           : slv (XPM_PARTITIONS_C-1 downto 0);
    signal paddr                : slv (XPM_PARTITION_ADDR_LENGTH_C-1 downto 0);
-   signal greject              : slv (XPM_PARTITIONS_C-1 downto 0);
+   signal grejectL0            : slv (XPM_PARTITIONS_C-1 downto 0);
+   signal grejectMsg           : slv (XPM_PARTITIONS_C-1 downto 0);
    
-   constant MSG_CONFIG_LEN_C : integer := XPM_PARTITIONS_C*9;
+   constant MSG_CONFIG_LEN_C : integer := XPM_PARTITIONS_C*(XpmPartitionConfigType.message.header'length+1);
    signal msgConfig        : slv(MSG_CONFIG_LEN_C-1 downto 0);
    signal msgConfigS       : slv(MSG_CONFIG_LEN_C-1 downto 0);
    signal msgValid         : sl;
@@ -457,8 +458,10 @@ begin
             fiducial   => timingStream.fiducial,
             pause      => r.pause (i),
             overflow   => r.overflow(i),
-            greject    => greject,
-            lreject    => greject(i),
+            greject    => grejectL0,
+            lreject    => grejectL0(i),
+            grejectMsg => grejectMsg,
+            lrejectMsg => grejectMsg(i),
             l1Feedback => l1Partitions(i),
             l1Ack      => l1PartitionAcks(i),
             result     => expWord (i));

@@ -290,7 +290,7 @@ package XpmPkg is
 
    type XpmPartMsgConfigType is record
       insert : sl;
-      header : slv(7 downto 0);
+      header : slv(8 downto 0);
    end record;
    constant XPM_PART_MSG_CONFIG_INIT_C : XpmPartMsgConfigType := (
       insert => '0',
