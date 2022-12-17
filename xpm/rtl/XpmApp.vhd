@@ -29,6 +29,7 @@ use lcls_timing_core.TimingPkg.all;
 
 library l2si_core;
 use l2si_core.XpmPkg.all;
+use l2si_core.XpmSeqPkg.all;
 use l2si_core.XpmExtensionPkg.all;
 use l2si_core.XpmMiniPkg.all;
 
@@ -79,7 +80,8 @@ entity XpmApp is
       timingFbClk     : in  sl;
       timingFbRst     : in  sl;
       timingFbId      : in  slv(31 downto 0);
-      timingFb        : out TimingPhyType);
+      timingFb        : out TimingPhyType;
+      seqCount        : out Slv128Array(XPM_SEQ_DEPTH_C-1 downto 0));
 end XpmApp;
 
 architecture top_level_app of XpmApp is
@@ -381,7 +383,8 @@ begin
 --               fiducial        => timingStream.fiducial,
          timingAdvance   => timingStream.advance(0),
          timingDataIn    => timingStream.streams(0).data,
-         timingDataOut   => stream0_data);
+         timingDataOut   => stream0_data,
+         seqCount        => seqCount );
 
    streams_p : process (timingStream, stream0_data) is
    begin

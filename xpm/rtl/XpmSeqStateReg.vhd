@@ -90,13 +90,13 @@ begin
             v.seqState := status.seqState(i);
          end if;
 
+         -- for j in 0 to 3 loop
+         --   axiSlaveRegisterR(ep, toSlv(i*32+j*4+128, 12), 0, status.countRequest(i)(j*32+19 downto j*32));
+         -- end loop;
+         axiSlaveRegisterR(ep, toSlv(i*16+132, 12), 0, status.countInvalid(i));
+         axiSlaveRegisterR(ep, toSlv(i*16+136, 12), 0, slv(status.seqState(i).index));
          for j in 0 to 3 loop
-           axiSlaveRegisterR(ep, toSlv(i*32+j*4+128, 12), 0, status.countRequest(i)(j*32+19 downto j*32));
-         end loop;
-         axiSlaveRegisterR(ep, toSlv(i*32+144, 12), 0, status.countInvalid(i));
-         axiSlaveRegisterR(ep, toSlv(i*32+148, 12), 0, slv(status.seqState(i).index));
-         for j in 0 to 3 loop
-            axiSlaveRegisterR(ep, toSlv(i*32+152, 12), j*4, r.seqState.count(j));
+            axiSlaveRegisterR(ep, toSlv(i*16+140, 12), j*4, r.seqState.count(j));
          end loop;
       end loop;
 

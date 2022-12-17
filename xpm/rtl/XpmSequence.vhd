@@ -52,7 +52,8 @@ entity XpmSequence is
       timingRst       : in  sl;
       timingAdvance   : in  sl;
       timingDataIn    : in  slv(15 downto 0);
-      timingDataOut   : out slv(15 downto 0));
+      timingDataOut   : out slv(15 downto 0);
+      seqCount        : out Slv128Array(XPM_SEQ_DEPTH_C-1 downto 0) );
 end XpmSequence;
 
 architecture mapping of XpmSequence is
@@ -60,7 +61,6 @@ architecture mapping of XpmSequence is
    signal status       : XpmSeqStatusType;
    signal config       : XpmSeqConfigType;
    signal seqData      : Slv17Array (XPM_SEQ_DEPTH_C-1 downto 0);
-   signal seqDataValid : slv (XPM_SEQ_DEPTH_C-1 downto 0);
    signal seqReset     : slv (XPM_SEQ_DEPTH_C-1 downto 0);
    signal seqJump      : slv (XPM_SEQ_DEPTH_C-1 downto 0);
    signal seqJumpAddr  : SeqAddrArray(XPM_SEQ_DEPTH_C-1 downto 0);
@@ -109,7 +109,8 @@ begin
    status.nexptseq    <= toSlv(XPM_SEQ_DEPTH_C,status.nexptseq'length);
    status.seqaddrlen  <= toSlv(SEQADDRLEN,status.seqaddrlen'length);
    status.countUpdate <= '0';
-
+   seqCount           <= status.countRequest;
+   
    U_FIFO : entity surf.AxiStreamFifoV2
       generic map (
          TPD_G               => TPD_G,
@@ -200,7 +201,6 @@ begin
             seqNotifyWr  => seqNotifyValid (i),
             seqNotifyAck => r.ack (i),
             dataO        => seqData (i),
-            dataValid    => seqDataValid (i),
             monReset     => seqReset (i),
             monCount     => status.countRequest(i));
    end generate;
@@ -210,7 +210,7 @@ begin
    --  in the frame, since it will be done on transmission.
    --
    comb : process (timingRst, r, config, timingDataIn, timingAdvance,
-                   seqReset, seqData, seqDataValid, seqNotify, seqNotifyValid, axisSlave) is
+                   seqData, seqNotify, seqNotifyValid, axisSlave) is
       variable v : RegType;
    begin
       v := r;
@@ -229,12 +229,6 @@ begin
          if (config.seqEnable(i) = '1' and
              r.strobe(SN-XPM_SEQ_DEPTH_C+i) = '1') then
             v.data := seqData(i)(15 downto 0);
-            if seqDataValid(i) = '0' then
-               v.invalid(i) := r.invalid(i)+1;
-            end if;
-         end if;
-         if seqReset(i) = '1' then
-            v.invalid(i) := (others => '0');
          end if;
          status.countInvalid(i) <= r.invalid(i);
       end loop;
