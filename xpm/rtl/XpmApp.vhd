@@ -81,6 +81,7 @@ entity XpmApp is
       timingFbRst     : in  sl;
       timingFbId      : in  slv(31 downto 0);
       timingFb        : out TimingPhyType;
+      seqCountRst     : in  sl := '0';
       seqCount        : out Slv128Array(XPM_SEQ_DEPTH_C-1 downto 0));
 end XpmApp;
 
@@ -384,6 +385,7 @@ begin
          timingAdvance   => timingStream.advance(0),
          timingDataIn    => timingStream.streams(0).data,
          timingDataOut   => stream0_data,
+         seqCountRst     => seqCountRst,
          seqCount        => seqCount );
 
    streams_p : process (timingStream, stream0_data) is

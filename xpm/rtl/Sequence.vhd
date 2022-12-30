@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver  <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-09-15
--- Last update: 2022-07-27
+-- Last update: 2022-12-20
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -127,6 +127,8 @@ architecture ISequence of Sequence is
 
    signal istate : slv(2 downto 0);
    signal icount : slv(1 downto 0);
+
+   signal monResetS : sl;
    
    component ila_0
      port ( clk    : in  sl;
@@ -192,7 +194,13 @@ begin
          addrb => rin.index,
          doutb => rdStepB);
 
-   process (r, seqReset, rdStepB, fixedRate, acRate, acTS, rdEnB, waitB, startAddr, seqNotifyAck, monReset)
+   U_MonReset : entity surf.RstSync
+     port map (
+       clk      => clkB,
+       asyncRst => monReset,
+       syncRst  => monResetS );
+     
+   process (r, seqReset, rdStepB, fixedRate, acRate, acTS, rdEnB, waitB, startAddr, seqNotifyAck, monResetS)
       variable v : RegType;
       variable rateI, acTSI : integer;
    begin  -- process
@@ -281,7 +289,7 @@ begin
          v.data := (others => '0');
       end if;
 
-      if monReset = '1' then
+      if monResetS = '1' then
          v.monCount := (others=>(others => '0'));
       end if;
 
