@@ -36,6 +36,7 @@ entity TriggerEventManager is
       TPD_G                          : time                 := 1 ns;
       EN_LCLS_I_TIMING_G             : boolean              := false;
       EN_LCLS_II_TIMING_G            : boolean              := true;
+      EN_LCLS_II_INHIBIT_COUNTS_G    : boolean              := false;
       NUM_DETECTORS_G                : integer range 1 to 8 := 8;
       AXIL_BASE_ADDR_G               : slv(31 downto 0)     := (others => '0');
       EVENT_AXIS_CONFIG_G            : AxiStreamConfigType  := EVENT_AXIS_CONFIG_C;
@@ -73,6 +74,9 @@ entity TriggerEventManager is
       eventTimingMessagesValid : out slv(NUM_DETECTORS_G-1 downto 0);
       eventTimingMessages      : out TimingMessageArray(NUM_DETECTORS_G-1 downto 0);
       eventTimingMessagesRd    : in  slv(NUM_DETECTORS_G-1 downto 0) := (others => '1');
+      eventInhibitCountsValid  : out slv(NUM_DETECTORS_G-1 downto 0);
+      eventInhibitCounts       : out TriggerInhibitCountsArray(NUM_DETECTORS_G-1 downto 0);
+      eventInhibitCountsRd     : in  slv(NUM_DETECTORS_G-1 downto 0) := (others => '1');
       eventAxisMasters         : out AxiStreamMasterArray(NUM_DETECTORS_G-1 downto 0);
       eventAxisSlaves          : in  AxiStreamSlaveArray(NUM_DETECTORS_G-1 downto 0);
       eventAxisCtrl            : in  AxiStreamCtrlArray(NUM_DETECTORS_G-1 downto 0);
@@ -335,6 +339,7 @@ begin
             TRIGGER_INDEX_G                => i,
             EN_LCLS_I_TIMING_G             => EN_LCLS_I_TIMING_G,
             EN_LCLS_II_TIMING_G            => EN_LCLS_II_TIMING_G,
+            EN_LCLS_II_INHIBIT_COUNTS_G    => EN_LCLS_II_INHIBIT_COUNTS_G,
             EVENT_AXIS_CONFIG_G            => EVENT_AXIS_CONFIG_G,
             AXIL_CLK_IS_TIMING_RX_CLK_G    => AXIL_CLK_IS_TIMING_RX_CLK_G,
             TRIGGER_CLK_IS_TIMING_RX_CLK_G => TRIGGER_CLK_IS_TIMING_RX_CLK_G,
@@ -367,6 +372,9 @@ begin
             eventTimingMessageValid => eventTimingMessagesValid(i),         -- [out]
             eventTimingMessage      => eventTimingMessages(i),              -- [out]
             eventTimingMessageRd    => eventTimingMessagesRd(i),            -- [in]
+            eventInhibitCountsValid => eventInhibitCountsValid(i),          -- [out]
+            eventInhibitCounts      => eventInhibitCounts(i),               -- [out]
+            eventInhibitCountsRd    => eventInhibitCountsRd(i),             -- [in]
             eventAxisMaster         => eventAxisMasters(i),                 -- [out]
             eventAxisSlave          => eventAxisSlaves(i),                  -- [in]
             eventAxisCtrl           => eventAxisCtrl(i),                    -- [in]
