@@ -203,7 +203,8 @@ architecture rtl of TriggerEventBuffer is
    signal fifoRst         : sl;
    signal enable          : sl;
 
-   signal eventInhibitCountsSlv : slv(XPM_INHIBIT_COUNTS_LEN_C-1 downto 0);
+   signal triggerInhibitCountsSlv : slv(XPM_INHIBIT_COUNTS_LEN_C-1 downto 0);
+   signal eventInhibitCountsSlv   : slv(XPM_INHIBIT_COUNTS_LEN_C-1 downto 0);
    
 begin
 
@@ -588,7 +589,7 @@ begin
    end generate GEN_EVENT_TIMING_MESSAGE;
    
    GEN_INHIBIT_COUNTS : if (EN_LCLS_II_INHIBIT_COUNTS_G) generate
-      eventInhibitCountsSlv <= toSlv(r.l0RejectCounts);
+      triggerInhibitCountsSlv <= toSlv(r.l0RejectCounts);
       U_Fifo_2 : entity surf.Fifo
          generic map (
             TPD_G           => TPD_G,
@@ -602,7 +603,7 @@ begin
             rst    => fifoRst,                  -- [in]
             wr_clk => timingRxClk,              -- [in]
             wr_en  => r.streamValid,            -- [in]
-            din    => eventInhibitCountsSlv,    -- [in]
+            din    => triggerInhibitCountsSlv,  -- [in]
             rd_clk => eventClk,                 -- [in]
             rd_en  => eventInhibitCountsRd,     -- [in]
             valid  => eventInhibitCountsValid,  -- [out]
