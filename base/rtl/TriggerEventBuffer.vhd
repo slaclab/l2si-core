@@ -120,6 +120,7 @@ architecture rtl of TriggerEventBuffer is
 
       fifoAxisMaster : AxiStreamMasterType;
       msgFifoWr      : sl;
+      inhFifoWr      : sl;
 
       l0Rejects      : slv       (XPM_PARTITIONS_C-1 downto 0);
       l0RejectCounts : XpmInhibitCountsType;
@@ -161,6 +162,7 @@ architecture rtl of TriggerEventBuffer is
 
       fifoAxisMaster => axiStreamMasterInit(EVENT_AXIS_CONFIG_C),
       msgFifoWr      => '0',
+      inhFifoWr      => '0',
 
       l0Rejects      => (others=>'0'),
       l0RejectCounts => XPM_INHIBIT_COUNTS_INIT_C,
@@ -287,6 +289,8 @@ begin
          --------------------------------------------
          v.streamValid := '0';
          v.msgFifoWr   := '0';
+         v.inhFifoWr   := r.streamValid;
+         v.l0Rejects   := (others=>'0');
          if (alignedTimingStrobe = '1' and alignedXpmMessage.valid = '1') then
             -- Decode event data from configured partitionWord
             -- Decode as both event and transition and use the .valid field to determine which one to use
@@ -296,8 +300,6 @@ begin
                eventData     := toXpmEventDataType(alignedXpmMessage.partitionWord(i));
                if (eventData.valid = '1' and eventData.l0Reject = '1') then
                   v.l0Rejects(i) := '1';
-               else
-                  v.l0Rejects(i) := '0';
                end if;
             end loop;
             
@@ -368,7 +370,9 @@ begin
             if (r.transitionData.valid = '1') then
                v.transitionCount := r.transitionCount + 1;
             end if;
+         end if;
 
+         if r.inhFifoWr = '1' then
             v.l0RejectCounts := XPM_INHIBIT_COUNTS_INIT_C;
          else
             for i in 0 to XPM_PARTITIONS_C-1 loop
@@ -377,7 +381,7 @@ begin
                end if;
             end loop;
          end if;
-
+           
          -- Monitor time between pause assertion and trigger arrival
          v.fbTimer := r.fbTimer + 1;
          if uAnd(r.fbTimer) = '1' then
@@ -602,7 +606,7 @@ begin
          port map (
             rst    => fifoRst,                  -- [in]
             wr_clk => timingRxClk,              -- [in]
-            wr_en  => r.streamValid,            -- [in]
+            wr_en  => r.inhFifoWr,              -- [in]
             din    => triggerInhibitCountsSlv,  -- [in]
             rd_clk => eventClk,                 -- [in]
             rd_en  => eventInhibitCountsRd,     -- [in]
