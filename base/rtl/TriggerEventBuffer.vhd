@@ -289,7 +289,11 @@ begin
          --------------------------------------------
          v.streamValid := '0';
          v.msgFifoWr   := '0';
-         v.inhFifoWr   := r.streamValid;
+         v.inhFifoWr   := r.msgFifoWr;
+         if (r.streamValid = '1' and r.transitionData.header/=toSlv(10,6)) then
+           v.inhFifoWr := '1';
+         end if;
+         
          v.l0Rejects   := (others=>'0');
          if (alignedTimingStrobe = '1' and alignedXpmMessage.valid = '1') then
             -- Decode event data from configured partitionWord
