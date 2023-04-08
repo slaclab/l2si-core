@@ -314,7 +314,7 @@ begin
       port map (
          clk              => timingClk,                 -- [in]
          rst              => timingRst,
-         en               => timingBus.strobe,          -- [in]
+         en               => r.timingBus.strobe,        -- [in]
          delay            => depth_fids_7,
          din (0)          => config.l0Select.enabled,
          dout(0)          => l0Enabled );
