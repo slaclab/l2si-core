@@ -330,7 +330,7 @@ begin
          din (0)          => config.l0Select.enabled,
          dout(0)          => l0Enabled );
 
-   L0Enb: process (config) is
+   L0Enb: process (config,l0Enabled) is
    begin
      config_l0Select         <= config.l0Select;
      config_l0Select.enabled <= l0Enabled;
