@@ -123,6 +123,9 @@ architecture rtl of XpmAppMaster is
    signal depth_clks_20 : slv(19 downto 0);
    signal depth_fids_7  : slv( 6 downto 0);
 
+   signal config_l0Select    : XpmL0SelectConfigType;
+   signal l0Enabled          : sl;
+   
    signal pauseOrOverflow : slv(26 downto 0);
 
    component ila_0
@@ -215,7 +218,7 @@ begin
       port map (
          clk       => timingClk,
          rst       => l0Reset,
-         config    => config.l0Select,
+         config    => config_l0Select,
          timingBus => r.timingBus,
          cuTiming  => r.cuTiming,
          cuTimingV => r.cuTimingV,
@@ -302,6 +305,26 @@ begin
          dout(7 downto 0) => msgConfig.header,
          dout(8)          => msgConfig.insert );
 
+   U_L0EnDelay : entity surf.SlvDelay
+      generic map (
+         TPD_G        => TPD_G,
+         DELAY_G      => 128,
+         REG_OUTPUT_G => false,
+         WIDTH_G      => 1 )
+      port map (
+         clk              => timingClk,                 -- [in]
+         rst              => timingRst,
+         en               => timingBus.strobe,          -- [in]
+         delay            => depth_fids_7,
+         din (0)          => config.l0Select.enabled,
+         dout(0)          => l0Enabled );
+
+   L0Enb: process (config) is
+   begin
+     config_l0Select         <= config.l0Select;
+     config_l0Select.enabled <= l0Enabled;
+   end process;
+   
    U_SyncReset : entity surf.RstSync
       generic map (
          TPD_G => TPD_G)
