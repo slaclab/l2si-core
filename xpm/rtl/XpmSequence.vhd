@@ -52,7 +52,9 @@ entity XpmSequence is
       timingRst       : in  sl;
       timingAdvance   : in  sl;
       timingDataIn    : in  slv(15 downto 0);
-      timingDataOut   : out slv(15 downto 0));
+      timingDataOut   : out slv(15 downto 0);
+      seqCountRst     : in  sl := '0';
+      seqCount        : out Slv128Array(XPM_SEQ_DEPTH_C-1 downto 0) );
 end XpmSequence;
 
 architecture mapping of XpmSequence is
@@ -60,7 +62,6 @@ architecture mapping of XpmSequence is
    signal status       : XpmSeqStatusType;
    signal config       : XpmSeqConfigType;
    signal seqData      : Slv17Array (XPM_SEQ_DEPTH_C-1 downto 0);
-   signal seqDataValid : slv (XPM_SEQ_DEPTH_C-1 downto 0);
    signal seqReset     : slv (XPM_SEQ_DEPTH_C-1 downto 0);
    signal seqJump      : slv (XPM_SEQ_DEPTH_C-1 downto 0);
    signal seqJumpAddr  : SeqAddrArray(XPM_SEQ_DEPTH_C-1 downto 0);
@@ -72,7 +73,8 @@ architecture mapping of XpmSequence is
 
    constant S0 : integer := 12;
    constant SN : integer := S0+46;
-
+   constant SEQBITS : integer := 16 / XPM_SEQ_DEPTH_C;
+   
    type RegType is record
       advance : sl;
       frame   : slv(207 downto 0);      -- Really 64b
@@ -109,7 +111,8 @@ begin
    status.nexptseq    <= toSlv(XPM_SEQ_DEPTH_C,status.nexptseq'length);
    status.seqaddrlen  <= toSlv(SEQADDRLEN,status.seqaddrlen'length);
    status.countUpdate <= '0';
-
+   seqCount           <= status.countRequest;
+   
    U_FIFO : entity surf.AxiStreamFifoV2
       generic map (
          TPD_G               => TPD_G,
@@ -179,7 +182,9 @@ begin
             jumpAddr => seqJumpAddr(i));
 
       U_Seq : entity l2si_core.Sequence
-         port map (
+          generic map (
+            MON_SUM_G => false )
+          port map (
             clkA         => timingClk,
             rstA         => timingRst,
             wrEnA        => config.seqWrEn (i),
@@ -200,8 +205,7 @@ begin
             seqNotifyWr  => seqNotifyValid (i),
             seqNotifyAck => r.ack (i),
             dataO        => seqData (i),
-            dataValid    => seqDataValid (i),
-            monReset     => seqReset (i),
+            monReset     => seqCountRst,
             monCount     => status.countRequest(i));
    end generate;
 
@@ -210,7 +214,7 @@ begin
    --  in the frame, since it will be done on transmission.
    --
    comb : process (timingRst, r, config, timingDataIn, timingAdvance,
-                   seqReset, seqData, seqDataValid, seqNotify, seqNotifyValid, axisSlave) is
+                   seqData, seqNotify, seqNotifyValid, axisSlave) is
       variable v : RegType;
    begin
       v := r;
@@ -225,19 +229,13 @@ begin
 
       v.data := timingDataIn;
 
-      for i in 0 to XPM_SEQ_DEPTH_C-1 loop
-         if (config.seqEnable(i) = '1' and
-             r.strobe(SN-XPM_SEQ_DEPTH_C+i) = '1') then
-            v.data := seqData(i)(15 downto 0);
-            if seqDataValid(i) = '0' then
-               v.invalid(i) := r.invalid(i)+1;
+      if r.strobe(SN-1) = '1' then
+         for i in 0 to XPM_SEQ_DEPTH_C-1 loop
+            if config.seqEnable(i) = '1' then
+              v.data((i+1)*SEQBITS-1 downto i*SEQBITS) := seqData(i)(SEQBITS-1 downto 0);
             end if;
-         end if;
-         if seqReset(i) = '1' then
-            v.invalid(i) := (others => '0');
-         end if;
-         status.countInvalid(i) <= r.invalid(i);
-      end loop;
+         end loop;
+      end if;        
 
       v.master.tLast := '1';
       v.master.tKeep := genTKeep(XPM_SEQ_DEPTH_C*2+4);

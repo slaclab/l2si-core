@@ -31,20 +31,21 @@ entity XpmInhibit is
       TPD_G : time := 1 ns);
    port (
       -- register clock domain
-      regclk   : in  sl;
-      update   : in  sl;
-      clear    : in  sl;                    -- clear statistics
-      config   : in  XpmPartInhConfigType;  -- programmable parameters
-      status   : out XpmInhibitStatusType;  -- statistics
+      regclk     : in  sl;
+      update     : in  sl;
+      clear      : in  sl;                    -- clear statistics
+      config     : in  XpmPartInhConfigType;  -- programmable parameters
+      status     : out XpmInhibitStatusType;  -- statistics
       --  timing clock domain
-      clk      : in  sl;
-      rst      : in  sl;
-      pause    : in  slv(27 downto 0);      -- status from downstream links
-      fiducial : in  sl;
-      l0Accept : in  sl;
-      l1Accept : in  sl;
-      rejecc   : in  sl;                    -- L0 rejected due to inhibit
-      inhibit  : out sl);                   -- trigger inhibit status
+      clk        : in  sl;
+      rst        : in  sl;
+      pause      : in  slv(27 downto 0);      -- status from downstream links
+      fiducial   : in  sl;
+      l0Accept   : in  sl;
+      l1Accept   : in  sl;
+      rejecc     : in  sl;                    -- L0 rejected due to inhibit
+      inhibit    : out sl;                    -- trigger inhibit status
+      inhibitMsg : out sl);                   -- message inhibit status
 end XpmInhibit;
 
 architecture rtl of XpmInhibit is
@@ -66,8 +67,9 @@ architecture rtl of XpmInhibit is
    signal tmcounts : SlVectorArray(31 downto 0, 31 downto 0);
 
 begin
-   status  <= r.status;
-   inhibit <= uOr(pauseb) or uOr(proginhb);
+   status     <= r.status;
+   inhibit    <= uOr(pauseb) or uOr(proginhb);
+   inhibitMsg <= uOr(pauseb(26 downto 0)) or uOr(proginhb);
 
    inhSrc <= (proginhb & pauseb) when rejecc = '1' else
              (others => '0');

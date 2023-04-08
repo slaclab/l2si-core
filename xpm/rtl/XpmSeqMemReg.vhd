@@ -62,7 +62,7 @@ architecture rtl of XpmSeqMemReg is
 
    constant REG_INIT_C : RegType := (
       config        => XPM_SEQ_CONFIG_INIT_C,
-      seqrd         => '0',
+      seqRd         => '0',
       seqRdSeq      => (others => '0'),
       seqState      => SEQUENCER_STATE_INIT_C,
       axiReadSlave  => AXI_LITE_READ_SLAVE_INIT_C,
@@ -100,7 +100,7 @@ begin
       v.config.seqWrEn := (others => '0');
       v.seqRd          := '0';
       v.seqRdSeq       := (others => '0');
-      v.axiRdEn        := r.axiRdEn(0) & '0';
+      v.axiRdEn        := r.axiRdEn(1 downto 0) & '0';
 
       -----------------------------
       -- AXI-Lite Write Logic
