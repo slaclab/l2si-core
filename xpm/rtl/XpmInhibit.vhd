@@ -127,12 +127,12 @@ begin
    begin
       v := r;
 
-      if update = '1' then
+--      if update = '1' then
          for i in 0 to 31 loop
             v.status.evcounts(i) := muxSlVectorArray(evcounts, i);
             v.status.tmcounts(i) := muxSlVectorArray(tmcounts, i);
          end loop;
-      end if;
+ --     end if;
 
       if clear = '1' then
          v := REG_INIT_C;
