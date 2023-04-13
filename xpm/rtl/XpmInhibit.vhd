@@ -77,12 +77,6 @@ begin
    dtSrc <= (proginhb & pauseb) when fiducial = '1' else
             (others => '0');
 
-   --U_SyncPause : entity surf.SynchronizerVector
-   --  generic map ( WIDTH_G => 28 )
-   --  port map ( clk     => clk,
-   --             dataIn  => pause,
-   --             dataOut => pauseb );
-   --  Already synchronous
    pauseb <= pause;
 
    U_Status : entity surf.SyncStatusVector
@@ -127,16 +121,10 @@ begin
    begin
       v := r;
 
---      if update = '1' then
-         for i in 0 to 31 loop
-            v.status.evcounts(i) := muxSlVectorArray(evcounts, i);
-            v.status.tmcounts(i) := muxSlVectorArray(tmcounts, i);
-         end loop;
- --     end if;
-
-      if clear = '1' then
-         v := REG_INIT_C;
-      end if;
+      for i in 0 to 31 loop
+        v.status.evcounts(i) := muxSlVectorArray(evcounts, i);
+        v.status.tmcounts(i) := muxSlVectorArray(tmcounts, i);
+      end loop;
 
       r_in <= v;
    end process;
