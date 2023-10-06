@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver  <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-09-15
--- Last update: 2022-12-20
+-- Last update: 2023-10-06
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -27,6 +27,9 @@
 --       (10:0)=address
 --    (31:29)="100" Request
 --       (15:0)  Value
+--    (31:29)="101" Call/Return
+--       (11)=return from call
+--       (10:0)=address
 --
 -------------------------------------------------------------------------------
 -- This file is part of 'LCLS2 Timing Core'.
@@ -103,6 +106,7 @@ architecture ISequence of Sequence is
       jump       : sl;
       notify     : sl;
       notifyaddr : slv(SEQADDRLEN-1 downto 0);
+      returnaddr : slv(SEQADDRLEN-1 downto 0); -- a one-deep stack
       state      : SEQ_STATE;
       monCount   : Slv32Array(MON_DEPTH_G-1 downto 0);
    end record RegType;
@@ -117,6 +121,7 @@ architecture ISequence of Sequence is
       jump       => '0',
       notify     => '0',
       notifyaddr => (others => '0'),
+      returnaddr => (others => '0'),
       state      => SEQ_STOPPED,
       monCount   => (others=>(others => '0')));
 
@@ -255,6 +260,15 @@ begin
                   v.index      := r.index+1;
                   v.data       := '1' & rdStepB(15 downto 0);
                   v.state      := SEQ_LOAD;
+                when "101" =>                                    -- Call/Return
+                  if rdStepB(12) = '1' then  -- return
+                     v.index := r.returnaddr;
+                     v.returnaddr := (others=>'0');  -- some stack safety
+                  else
+                     v.index := rdStepB(v.index'range);
+                     v.returnaddr := r.index+1;
+                  end if;
+                  v.state := SEQ_STEP_LOAD;
                when others =>                                   -- Sync
                   v.state := SEQ_TEST_OCC;
             end case;
