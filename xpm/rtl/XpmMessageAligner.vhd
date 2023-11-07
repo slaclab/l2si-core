@@ -34,7 +34,8 @@ use unisim.vcomponents.all;
 entity XpmMessageAligner is
    generic (
       TPD_G        : time    := 1 ns;
-      COMMON_CLK_G : boolean := false); -- true if axilClk = timingRxClk
+      COMMON_CLK_G : boolean := false;  -- true if axilClk = timingRxClk
+      TF_DELAY_G   : integer := 100);   -- this is defunct
    port (
       timingRxClk       : in  sl;
       timingRxRst       : in  sl;
@@ -63,7 +64,7 @@ end XpmMessageAligner;
 
 architecture rtl of XpmMessageAligner is
 
-   constant MAX_DELAY_C : integer := 100;
+   constant MAX_DELAY_C : integer := 120;
 
    type RegType is record
       txId            : slv(31 downto 0);
