@@ -34,8 +34,7 @@ use unisim.vcomponents.all;
 entity XpmMessageAligner is
    generic (
       TPD_G        : time    := 1 ns;
-      COMMON_CLK_G : boolean := false;  -- true if axilClk = timingRxClk
-      TF_DELAY_G   : integer := 100);
+      COMMON_CLK_G : boolean := false); -- true if axilClk = timingRxClk
    port (
       timingRxClk       : in  sl;
       timingRxRst       : in  sl;
@@ -64,11 +63,13 @@ end XpmMessageAligner;
 
 architecture rtl of XpmMessageAligner is
 
-   constant TF_DELAY_SLV_C : slv(6 downto 0) := toSlv(TF_DELAY_G, 7);
+   constant MAX_DELAY_C : integer := 100;
 
    type RegType is record
       txId            : slv(31 downto 0);
       rxId            : slv(31 downto 0);
+      delayRst        : slv( 3 downto 0);
+      timingMsgDelay  : slv( 6 downto 0);
       partitionDelays : Slv7Array(XPM_PARTITIONS_C-1 downto 0);
       axilWriteSlave  : AxiLiteWriteSlaveType;
       axilReadSlave   : AxiLiteReadSlaveType;
@@ -77,6 +78,8 @@ architecture rtl of XpmMessageAligner is
    constant REG_INIT_C : RegType := (
       txId            => (others => '0'),
       rxId            => (others => '1'),
+      delayRst        => (others => '1'),
+      timingMsgDelay  => toSlv(MAX_DELAY_C,7),
       partitionDelays => (others => (others => '0')),
       axilWriteSlave  => AXI_LITE_WRITE_SLAVE_INIT_C,
       axilReadSlave   => AXI_LITE_READ_SLAVE_INIT_C);
@@ -120,15 +123,16 @@ begin
       generic map (
          TPD_G        => TPD_G,
          SRL_EN_G     => true,
-         DELAY_G      => TF_DELAY_G+1,
+         DELAY_G      => MAX_DELAY_C+1,
          REG_OUTPUT_G => false,
          WIDTH_G      => TIMING_MESSAGE_BITS_NO_BSA_C)
       port map (
-         clk  => timingRxClk,               -- [in]
-         en   => promptTimingStrobe,        -- [in]
---         delay => delay,                -- [in]
-         din  => promptTimingMessageSlv,    -- [in]
-         dout => alignedTimingMessageSlv);  -- [out]
+         clk   => timingRxClk,               -- [in]
+         rst   => r.delayRst(0),             -- [in]
+         en    => promptTimingStrobe,        -- [in]
+         delay => r.timingMsgDelay,          -- [in]
+         din   => promptTimingMessageSlv,    -- [in]
+         dout  => alignedTimingMessageSlv);  -- [out]
 
    U_RegisterVector_1 : entity surf.RegisterVector
       generic map (
@@ -151,39 +155,19 @@ begin
    -----------------------------------------------
 
    GEN_PART : for i in 0 to XPM_PARTITIONS_C-1 generate
---       partitionDelays(i) <= ite(r.partitionDelays(i) = 0,
---                                 (TF_DELAY_SLV_C -1),
---                                 TF_DELAY_SLV_C -1 - (r.partitionDelays(i) -1));
 
-      partitionDelays(i) <= TF_DELAY_SLV_C - r.partitionDelays(i);
-
---       U_SlvDelayRam_2 : entity surf.SlvDelayRam
---          generic map (
---             TPD_G            => TPD_G,
---             VECTOR_WIDTH_G   => 49,
---             RAM_ADDR_WIDTH_G => 7,
---             MEMORY_TYPE_G    => "block")
---          port map (
---             rst                       => timingRxRst,   -- [in]
---             clk                       => timingRxClk,   -- [in]
---             delay                     => partitionDelays(i),      -- [in]
---             inputValid                => promptTimingStrobe,      -- [in]
---             inputVector(47 downto 0)  => promptXpmMessage.partitionWord(i),        -- [in]
---             inputVector(48)           => promptXpmMessage.valid,  -- [in]
---             inputAddr                 => promptTimingMessage.pulseId(6 downto 0),  -- [in]
---             outputValid               => open,  -- [in] (in theory will always be the same as alignedTimingStrobe
---             outputVector(47 downto 0) => alignedXpmMessage.partitionWord(i),       -- [out]
---             outputVector(48)          => alignedXpmMessageValid(i));               -- [out]
+      partitionDelays(i) <= r.timingMsgDelay - r.partitionDelays(i);
 
       U_SlvDelay_2 : entity surf.SlvDelay
          generic map (
             TPD_G        => TPD_G,
             SRL_EN_G     => true,
-            DELAY_G      => 128, --TF_DELAY_G+1,
+            DELAY_G      => MAX_DELAY_C+1,
             REG_OUTPUT_G => false,
             WIDTH_G      => 49)
          port map (
             clk               => timingRxClk,                         -- [in]
+            rst               => r.delayRst(0),                       -- [in]
             en                => promptTimingStrobe,                  -- [in]
             delay             => partitionDelays(i),                  -- [in]
             din(47 downto 0)  => promptXpmMessage.partitionWord(i),   -- [in]
@@ -192,28 +176,41 @@ begin
             dout(48)          => alignedXpmMessageValid(i));          -- [out]
    end generate;
 
-   -- Maybe zero this out?
    alignedXpmMessage.partitionAddr <= promptXpmMessage.partitionAddr;
 
    -- This never happens during normal running but could happen breifly after switching delays
    alignedXpmMessage.valid <= uAnd(alignedXpmMessageValid);
 
-   comb : process(axilReadMaster, axilWriteMaster, promptXpmMessage, promptTimingStrobe, r, timingRxRst) is
+   comb : process(axilReadMaster, axilWriteMaster,
+                  promptXpmMessage, promptTimingStrobe,
+                  r, timingRxRst) is
       variable v                : RegType;
       variable broadcastMessage : XpmBroadcastType;
    begin
       v := r;
 
+      v.delayRst := '0' & r.delayRst(r.delayRst'left downto 1);
+      
       if promptTimingStrobe = '1' then
          -- Update partitionDelays values when partitionAddr indicates new PDELAYs
          broadcastMessage := toXpmBroadcastType(promptXpmMessage.partitionAddr);
          if (broadcastMessage.btype = XPM_BROADCAST_PDELAY_C) then
             v.partitionDelays(broadcastMessage.index) := broadcastMessage.value;
+            if (r.partitionDelays(broadcastMessage.index) /= broadcastMessage.value) then
+               v.delayRst := (others=>'1');
+            end if;
          elsif (broadcastMessage.btype = XPM_BROADCAST_XADDR_C) then
             v.rxId := promptXpmMessage.partitionAddr;
          end if;
       end if;
 
+      v.timingMsgDelay := (others=>'0');
+      for i in 0 to XPM_PARTITIONS_C-1 loop
+         if (r.partitionDelays(i) > v.timingMsgDelay) then
+           v.timingMsgDelay := r.partitionDelays(i);
+         end if;
+      end loop;
+      
       if timingRxRst = '1' then
          v      := REG_INIT_C;
       end if;
