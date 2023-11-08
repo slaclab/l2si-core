@@ -369,7 +369,7 @@ begin
             end if;
          end if;
 
-      end if;  -- LCLS-II XPM logic 
+      end if;  -- LCLS-II XPM logic
 
       -- Latch FIFO overflow if seen
       if (fifoAxisCtrl.overflow = '1') then
