@@ -296,6 +296,12 @@ package XpmPkg is
       insert => '0',
       header => (others => '0'));
 
+   -- constants for header(8:7)
+   constant XPM_PART_MSG_DEFAULT_C   : slv(1 downto 0) := "00";
+   constant XPM_PART_MSG_DROP_FULL_C : slv(1 downto 0) := "01";
+   constant XPM_PART_MSG_WAIT_FULL_C : slv(1 downto 0) := "11";
+   constant XPM_PART_MSG_LOW_PRIO_C  : slv(1 downto 0) := "10";
+   
    --  Clear event header -> event data match fifos
    constant MSG_CLEAR_FIFO  : slv(7 downto 0) := toSlv(0, 8);
    --  Communicate delay of pword

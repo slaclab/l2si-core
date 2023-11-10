@@ -24,7 +24,7 @@ use lcls_timing_core.TPGPkg.all;
 
 package XpmSeqPkg is
 
-   constant XPM_SEQ_DEPTH_C : integer := 4;
+   constant XPM_SEQ_DEPTH_C : integer := 8;
 
    type XpmSeqStatusType is record
       -- implemented resources

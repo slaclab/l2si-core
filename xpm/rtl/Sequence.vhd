@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver  <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-09-15
--- Last update: 2023-10-06
+-- Last update: 2023-11-08
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -28,7 +28,7 @@
 --    (31:29)="100" Request
 --       (15:0)  Value
 --    (31:29)="101" Call/Return
---       (11)=return from call
+--       (12)=return from call
 --       (10:0)=address
 --
 -------------------------------------------------------------------------------
@@ -268,7 +268,7 @@ begin
                      v.index := rdStepB(v.index'range);
                      v.returnaddr := r.index+1;
                   end if;
-                  v.state := SEQ_STEP_LOAD;
+                  v.state      := SEQ_LOAD;
                when others =>                                   -- Sync
                   v.state := SEQ_TEST_OCC;
             end case;

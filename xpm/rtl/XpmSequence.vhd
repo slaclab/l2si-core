@@ -65,7 +65,6 @@ architecture mapping of XpmSequence is
    signal seqReset     : slv (XPM_SEQ_DEPTH_C-1 downto 0);
    signal seqJump      : slv (XPM_SEQ_DEPTH_C-1 downto 0);
    signal seqJumpAddr  : SeqAddrArray(XPM_SEQ_DEPTH_C-1 downto 0);
-   signal seqAddr      : SeqAddrArray(XPM_SEQ_DEPTH_C-1 downto 0);
    signal frameSlv     : slv(TIMING_MESSAGE_BITS_C-1 downto 0);
    signal frame        : TimingMessageType;
    signal tframeSlv    : slv(TIMING_MESSAGE_BITS_C-1 downto 0);
@@ -73,7 +72,7 @@ architecture mapping of XpmSequence is
 
    constant S0 : integer := 12;
    constant SN : integer := S0+46;
-   constant SEQBITS : integer := 16 / XPM_SEQ_DEPTH_C;
+   constant SEQBITS : integer := 4;
    
    type RegType is record
       advance : sl;
@@ -216,6 +215,8 @@ begin
    comb : process (timingRst, r, config, timingDataIn, timingAdvance,
                    seqData, seqNotify, seqNotifyValid, axisSlave) is
       variable v : RegType;
+      variable iword : integer;
+      variable ibit  : integer;
    begin
       v := r;
 
@@ -229,16 +230,18 @@ begin
 
       v.data := timingDataIn;
 
-      if r.strobe(SN-1) = '1' then
-         for i in 0 to XPM_SEQ_DEPTH_C-1 loop
+      for i in 0 to XPM_SEQ_DEPTH_C-1 loop
+        iword := SN - (XPM_SEQ_DEPTH_C + SEQBITS -1 -i)/SEQBITS;
+        ibit  := i mod (16/SEQBITS);
+        if r.strobe(iword) = '1' then
             if config.seqEnable(i) = '1' then
-              v.data((i+1)*SEQBITS-1 downto i*SEQBITS) := seqData(i)(SEQBITS-1 downto 0);
+              v.data((ibit+1)*SEQBITS-1 downto ibit*SEQBITS) := seqData(i)(SEQBITS-1 downto 0);
             end if;
-         end loop;
-      end if;        
+         end if;        
+      end loop;
 
       v.master.tLast := '1';
-      v.master.tKeep := genTKeep(XPM_SEQ_DEPTH_C*2+4);
+--      v.master.tKeep := genTKeep(16);
 
       if axisSlave.tReady = '1' then
          v.master.tValid := '0';
@@ -252,7 +255,7 @@ begin
          v.master.tData(31 downto 0) := resize(seqNotifyValid, 16) & XPM_MESSAGE_SEQUENCE_DONE;
          for i in 0 to XPM_SEQ_DEPTH_C-1 loop
             if seqNotifyValid(i) = '1' then
-               v.master.tData(16*i+47 downto 16*i+32) := resize(slv(seqNotify(i)), 16);
+               v.master.tData(12*i+43 downto 12*i+32) := resize(slv(seqNotify(i)), 12);
             end if;
          end loop;
       end if;

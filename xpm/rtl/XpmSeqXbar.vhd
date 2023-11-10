@@ -62,8 +62,8 @@ architecture xbar of XpmSeqXbar is
       1                  => (baseAddr     => X"00004000" + AXIL_BASEADDR_G,
                              addrBits     => 14,
                              connectivity => X"FFFF"),
-      2                  => (baseAddr     => X"00008000" + AXIL_BASEADDR_G,
-                             addrBits     => 15,
+      2                  => (baseAddr     => X"00010000" + AXIL_BASEADDR_G,
+                             addrBits     => 16,
                              connectivity => X"FFFF"));
 
    signal mAxilWriteMasters : AxiLiteWriteMasterArray(NUM_AXI_MASTERS_C-1 downto 0);
@@ -136,7 +136,7 @@ begin
 
    U_SeqMemReg : entity l2si_core.XpmSeqMemReg
       generic map (
-         ADDR_BITS_G => 15 )
+         ADDR_BITS_G => 16 )
       port map (
          axiReadMaster  => mAxilReadMasters (SEQMEM_INDEX_C),
          axiReadSlave   => mAxilReadSlaves  (SEQMEM_INDEX_C),

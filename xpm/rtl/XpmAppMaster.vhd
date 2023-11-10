@@ -71,6 +71,7 @@ architecture rtl of XpmAppMaster is
       result     : slv(result'range);
       latch      : sl;
       advanceMsg : sl;
+      msgReady   : sl;
       reserveMsg : sl;
       allocTag   : sl;
       inhibitMsg : sl;
@@ -83,6 +84,7 @@ architecture rtl of XpmAppMaster is
       result     => toSlv(XPM_TRANSITION_DATA_INIT_C),
       latch      => '0',
       advanceMsg => '1',
+      msgReady   => '0',
       reserveMsg => '0',
       allocTag   => '0',
       inhibitMsg => '0',
@@ -367,6 +369,22 @@ begin
    begin
       v := r;
 
+      --  Prepare the partition message
+      msg.valid   := '0';
+      msg.l0tag   := l0Tag(msg.l0tag'range);
+      msg.header  := msgConfig.header(6 downto 0);
+      msg.count   := l0Tag(msg.count'range);
+      
+      --  Prepare the L0/L1
+      pword.valid    := '1';
+      pword.l0Accept := l0Accept;
+      pword.l0Reject := l0Reject;
+      pword.l1Accept := l0Accept;
+      pword.l1Expect := l0Accept;
+      pword.l0tag    := l0Tag(pword.l0tag'range);
+      pword.l1tag    := l0Tag(pword.l1tag'range);
+      pword.count    := l0Tag(pword.count'range);
+      
       v.partStrobe := r.partStrobe(0) & r.timingBus.strobe;
       v.latch      := r.partStrobe(1);
       v.allocTag   := '0';
@@ -377,37 +395,44 @@ begin
       end if;
       
       if msgConfig.insert = '1' and r.timingBus.strobe = '1' then
-         v.reserveMsg:= '1';
+         v.msgReady   := '1';
+         v.reserveMsg := '1';
+         if msgConfig.header(8 downto 7)=XPM_PART_MSG_LOW_PRIO_C then
+           v.reserveMsg := '0';
+         end if;
       end if;
 
-      if r.latch = '1' then
-         if r.reserveMsg= '1' then  -- message waiting
+      if r.latch = '1' then  -- its time to insert a transition or L0
+         if r.msgReady= '1' then  -- message waiting
+            v.msgReady   := '0';  -- default is to consume the message
             v.reserveMsg := '0';
             v.advanceMsg := '1';
-            if (msgConfig.header(7)='1' and r.inhibitMsg='1') then -- obey inhibit
-               msg.valid   := '0';
-               if msgConfig.header(8)='1' then -- remain queued
-                 v.reserveMsg := '1';
-                 v.advanceMsg := '0';
-               end if;
-            else
-               msg.valid   := '1';
-               v.allocTag  := '1';
-            end if;
-            msg.l0tag   := l0Tag(msg.l0tag'range);
-            msg.header  := msgConfig.header(6 downto 0);
-            msg.count   := l0Tag(msg.count'range);
-            v.result    := toSlv(msg);
+            msg.valid    := '1';
+            case (msgConfig.header(8 downto 7)) is
+               when XPM_PART_MSG_DROP_FULL_C =>
+                  if r.inhibitMsg='1' then
+                     msg.valid := '0';
+                  end if;
+               when XPM_PART_MSG_WAIT_FULL_C =>
+                 if r.inhibitMsg='1' then
+                    msg.valid    := '0';  -- Queue the message again.
+                    v.msgReady   := '1';  -- This could displace the message
+                    v.reserveMsg := '1';  -- with respect to other groups.
+                    v.advanceMsg := '0';
+                 end if;
+               when XPM_PART_MSG_LOW_PRIO_C =>
+                 if r.inhibitMsg='1' or l0Accept='1' or l0Reject='1' then
+                    msg.valid    := '0';
+                 end if;
+               when others => null;
+            end case;
+         end if;
+            
+         v.allocTag := msg.valid;
+         if msg.valid='1' then
+            v.result   := toSlv(msg);
          else
-            pword.valid    := '1';
-            pword.l0Accept := l0Accept;
-            pword.l0Reject := l0Reject;
-            pword.l1Accept := l0Accept;
-            pword.l1Expect := l0Accept;
-            pword.l0tag    := l0Tag(pword.l0tag'range);
-            pword.l1tag    := l0Tag(pword.l1tag'range);
-            pword.count    := l0Tag(pword.count'range);
-            v.result       := toSlv(pword);
+            v.result   := toSlv(pword);
          end if;
       end if;
 
