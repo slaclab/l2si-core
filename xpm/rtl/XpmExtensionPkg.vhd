@@ -115,6 +115,19 @@ package XpmExtensionPkg is
    function toXpmBroadcastType (partitionAddr : slv(31 downto 0)) return XpmBroadcastType;
    function toXpmPartitionAddress (broadcast  : XpmBroadcastType) return slv;
 
+   type XpmInhibitCountsType is record
+     inhibits : Slv32Array(XPM_PARTITIONS_C-1 downto 0);
+   end record;
+
+   type XpmInhibitCountsArray is array (integer range<>) of XpmInhibitCountsType;
+
+   constant XPM_INHIBIT_COUNTS_INIT_C : XpmInhibitCountsType := (
+     inhibits => (others=>(others=>'0')) );
+
+   constant XPM_INHIBIT_COUNTS_LEN_C : integer := 32*XPM_PARTITIONS_C;
+   
+   function toSlv(a : XpmInhibitCountsType) return slv;
+   function toXpmInhibitCountsType(a : slv) return XpmInhibitCountsType;
 
 end package XpmExtensionPkg;
 package body XpmExtensionPkg is
@@ -239,4 +252,27 @@ package body XpmExtensionPkg is
       return partitionAddr;
    end function;
 
+   function toSlv(a : XpmInhibitCountsType) return slv is
+      variable i,j           : integer;
+      variable ret           : slv(XPM_INHIBIT_COUNTS_LEN_C-1 downto 0);
+   begin
+      i := 0;
+      for j in 0 to XPM_PARTITIONS_C-1 loop
+         assignSlv(i, ret, a.inhibits(j));
+      end loop;
+      return ret;
+   end function;
+     
+   function toXpmInhibitCountsType(a : slv) return XpmInhibitCountsType is
+      variable i,j           : integer;
+      variable ret           : XpmInhibitCountsType;
+   begin
+      i := 0;
+      for j in 0 to XPM_PARTITIONS_C-1 loop
+         assignRecord(i, a, ret.inhibits(j));
+      end loop;
+      return ret;
+   end function;
+
+   
 end package body XpmExtensionPkg;

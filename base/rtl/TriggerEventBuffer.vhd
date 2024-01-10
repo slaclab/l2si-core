@@ -35,6 +35,7 @@ entity TriggerEventBuffer is
       TRIGGER_INDEX_G                : integer             := 0;
       EN_LCLS_I_TIMING_G             : boolean             := false;
       EN_LCLS_II_TIMING_G            : boolean             := true;
+      EN_LCLS_II_INHIBIT_COUNTS_G    : boolean             := false;
       EVENT_AXIS_CONFIG_G            : AxiStreamConfigType := EVENT_AXIS_CONFIG_C;
       AXIL_CLK_IS_TIMING_RX_CLK_G    : boolean             := false;
       TRIGGER_CLK_IS_TIMING_RX_CLK_G : boolean             := false;
@@ -82,6 +83,9 @@ entity TriggerEventBuffer is
       eventTimingMessageValid : out sl;
       eventTimingMessage      : out TimingMessageType;
       eventTimingMessageRd    : in  sl := '1';
+      eventInhibitCountsValid : out sl;
+      eventInhibitCounts      : out TriggerInhibitCountsType;
+      eventInhibitCountsRd    : in  sl := '1';
       eventAxisMaster         : out AxiStreamMasterType;
       eventAxisSlave          : in  AxiStreamSlaveType;
       eventAxisCtrl           : in  AxiStreamCtrlType;
@@ -116,7 +120,11 @@ architecture rtl of TriggerEventBuffer is
 
       fifoAxisMaster : AxiStreamMasterType;
       msgFifoWr      : sl;
+      inhFifoWr      : sl;
 
+      l0Rejects      : slv       (XPM_PARTITIONS_C-1 downto 0);
+      l0RejectCounts : XpmInhibitCountsType;
+      
       -- outputs
       triggerData : XpmEventDataType;
 
@@ -154,7 +162,11 @@ architecture rtl of TriggerEventBuffer is
 
       fifoAxisMaster => axiStreamMasterInit(EVENT_AXIS_CONFIG_C),
       msgFifoWr      => '0',
+      inhFifoWr      => '0',
 
+      l0Rejects      => (others=>'0'),
+      l0RejectCounts => XPM_INHIBIT_COUNTS_INIT_C,
+      
       -- outputs     =>
       triggerData => TRIGGER_EVENT_DATA_INIT_C,
 
@@ -193,6 +205,9 @@ architecture rtl of TriggerEventBuffer is
    signal fifoRst         : sl;
    signal enable          : sl;
 
+   signal triggerInhibitCountsSlv : slv(XPM_INHIBIT_COUNTS_LEN_C-1 downto 0);
+   signal eventInhibitCountsSlv   : slv(XPM_INHIBIT_COUNTS_LEN_C-1 downto 0);
+   
 begin
 
    -- Event AXIS bus pause is the application pause signal
@@ -213,6 +228,7 @@ begin
                    triggerSource) is
       variable v      : RegType;
       variable axilEp : AxiLiteEndpointType;
+      variable eventData : XpmEventDataType;
    begin
       v := r;
 
@@ -273,12 +289,24 @@ begin
          --------------------------------------------
          v.streamValid := '0';
          v.msgFifoWr   := '0';
+         v.inhFifoWr   := r.msgFifoWr;
+         if (r.streamValid = '1' and r.transitionData.header/=toSlv(10,6)) then
+           v.inhFifoWr := '1';
+         end if;
+         
+         v.l0Rejects   := (others=>'0');
          if (alignedTimingStrobe = '1' and alignedXpmMessage.valid = '1') then
             -- Decode event data from configured partitionWord
             -- Decode as both event and transition and use the .valid field to determine which one to use
             v.eventData      := toXpmEventDataType(alignedXpmMessage.partitionWord(v.partitionV));
             v.transitionData := toXpmTransitionDataType(alignedXpmMessage.partitionWord(v.partitionV));
-
+            for i in 0 to XPM_PARTITIONS_C-1 loop
+               eventData     := toXpmEventDataType(alignedXpmMessage.partitionWord(i));
+               if (eventData.valid = '1' and eventData.l0Reject = '1') then
+                  v.l0Rejects(i) := '1';
+               end if;
+            end loop;
+            
             -- Pass on events with l0Accept
             -- Pass on transitions
             v.streamValid := (v.eventData.valid and v.eventData.l0Accept) or v.transitionData.valid;
@@ -296,7 +324,7 @@ begin
             v.eventHeader.count       := v.eventData.count;
             v.eventHeader.triggerInfo := alignedXpmMessage.partitionWord(v.partitionV)(15 downto 0);
             v.eventHeader.partitions  := (others => '0');
-            for i in 0 to 7 loop
+            for i in 0 to XPM_PARTITIONS_C-1 loop
                v.tmpEventData              := toXpmEventDataType(alignedXpmMessage.partitionWord(i));
                v.eventHeader.partitions(i) := v.tmpEventData.l0Accept or not v.tmpEventData.valid;
             end loop;
@@ -348,6 +376,16 @@ begin
             end if;
          end if;
 
+         if r.inhFifoWr = '1' then
+            v.l0RejectCounts := XPM_INHIBIT_COUNTS_INIT_C;
+         else
+            for i in 0 to XPM_PARTITIONS_C-1 loop
+               if r.l0Rejects(i) = '1' then
+                 v.l0RejectCounts.inhibits(i) := r.l0RejectCounts.inhibits(i) + 1;
+               end if;
+            end loop;
+         end if;
+           
          -- Monitor time between pause assertion and trigger arrival
          v.fbTimer := r.fbTimer + 1;
          if uAnd(r.fbTimer) = '1' then
@@ -557,6 +595,29 @@ begin
             dout   => eventTimingMessageSlv);   -- [out]
       eventTimingMessage <= toTimingMessageType(eventTimingMessageSlv);
    end generate GEN_EVENT_TIMING_MESSAGE;
+   
+   GEN_INHIBIT_COUNTS : if (EN_LCLS_II_INHIBIT_COUNTS_G) generate
+      triggerInhibitCountsSlv <= toSlv(r.l0RejectCounts);
+      U_Fifo_2 : entity surf.Fifo
+         generic map (
+            TPD_G           => TPD_G,
+            GEN_SYNC_FIFO_G => EVENT_CLK_IS_TIMING_RX_CLK_G,
+            MEMORY_TYPE_G   => "block",
+            FWFT_EN_G       => true,
+            PIPE_STAGES_G   => 1,               -- make sure this lines up right with event fifo
+            DATA_WIDTH_G    => eventInhibitCountsSlv'length,
+            ADDR_WIDTH_G    => FIFO_ADDR_WIDTH_C)
+         port map (
+            rst    => fifoRst,                  -- [in]
+            wr_clk => timingRxClk,              -- [in]
+            wr_en  => r.inhFifoWr,              -- [in]
+            din    => triggerInhibitCountsSlv,  -- [in]
+            rd_clk => eventClk,                 -- [in]
+            rd_en  => eventInhibitCountsRd,     -- [in]
+            valid  => eventInhibitCountsValid,  -- [out]
+            dout   => eventInhibitCountsSlv);   -- [out]
+      eventInhibitCounts <= toXpmInhibitCountsType(eventInhibitCountsSlv);
+end generate GEN_INHIBIT_COUNTS;
 
 end architecture rtl;
 
