@@ -54,6 +54,7 @@ package XpmExtensionPkg is
       valid    : sl;
       l0Accept : sl;                    -- l0 accept
       l0Tag    : slv(4 downto 0);
+      l0Raw    : sl;                    -- record raw data
       l0Reject : sl;                    -- l0 reject
       l1Expect : sl;                    -- l1 expexted
       l1Accept : sl;                    -- l1 accepted
@@ -65,6 +66,7 @@ package XpmExtensionPkg is
       valid    => '0',
       l0Accept => '0',
       l0Tag    => (others => '0'),
+      l0Raw    => '0',
       l0Reject => '0',
       l1Expect => '0',
       l1Accept => '0',
@@ -140,7 +142,7 @@ package body XpmExtensionPkg is
    begin
       assignSlv(i, vector, xpmEvent.l0Accept);
       assignSlv(i, vector, xpmEvent.l0Tag);
-      assignSlv(i, vector, "0");
+      assignSlv(i, vector, xpmEvent.l0Raw);
       assignSlv(i, vector, xpmEvent.l0Reject);
       assignSlv(i, vector, xpmEvent.l1Expect);
       assignSlv(i, vector, xpmEvent.l1Accept);
@@ -157,7 +159,7 @@ package body XpmExtensionPkg is
    begin
       assignRecord(i, partitionWord, xpmEvent.l0Accept);  -- 0
       assignRecord(i, partitionWord, xpmEvent.l0Tag);     -- 5:1
-      i := i+1;                                           -- 6
+      assignRecord(i, partitionWord, xpmEvent.l0Raw);     -- 6
       assignRecord(i, partitionWord, xpmEvent.l0Reject);  -- 7
       assignRecord(i, partitionWord, xpmEvent.l1Expect);  -- 8
       assignRecord(i, partitionWord, xpmEvent.l1Accept);  -- 9

@@ -62,13 +62,15 @@ entity XpmAppMaster is
       lrejectMsg : out sl;
       l1Feedback : in  XpmL1FeedbackType      := XPM_L1_FEEDBACK_INIT_C;
       l1Ack      : out sl;
-      result     : out slv (47 downto 0));
+      result     : out slv (47 downto 0);
+      resultValid: out sl);
 end XpmAppMaster;
 
 architecture rtl of XpmAppMaster is
 
    type RegType is record
       result     : slv(result'range);
+      resultValid: sl;
       latch      : sl;
       advanceMsg : sl;
       msgReady   : sl;
@@ -82,6 +84,7 @@ architecture rtl of XpmAppMaster is
    end record;
    constant REG_INIT_C : RegType := (
       result     => toSlv(XPM_TRANSITION_DATA_INIT_C),
+      resultValid=> '0',
       latch      => '0',
       advanceMsg => '1',
       msgReady   => '0',
@@ -162,6 +165,7 @@ begin
    end generate;
 
    result          <= r.result;
+   resultValid     <= r.resultValid;
    status.l1Select <= XPM_L1_SELECT_STATUS_INIT_C;
    lrejectMsg      <= msgInhibit;
 
@@ -388,7 +392,8 @@ begin
       v.partStrobe := r.partStrobe(0) & r.timingBus.strobe;
       v.latch      := r.partStrobe(1);
       v.allocTag   := '0';
-
+      v.resultValid:= r.latch;
+      
       v.inhibitMsg := msgInhibit;
       if (msgGroups and grejectMsg)/=0 then
         v.inhibitMsg := '1';

@@ -167,7 +167,8 @@ architecture top_level_app of XpmApp is
    signal pmaster              : slv (XPM_PARTITIONS_C-1 downto 0);
    signal pdepthI              : Slv8Array (XPM_PARTITIONS_C-1 downto 0);
    signal pdepth               : Slv8Array (XPM_PARTITIONS_C-1 downto 0);
-   signal expWord              : Slv48Array(XPM_PARTITIONS_C-1 downto 0);
+   signal expWord,expWordQ     : Slv48Array(XPM_PARTITIONS_C-1 downto 0);
+   signal expWordValid         : slv (XPM_PARTITIONS_C-1 downto 0);
    signal pausefb              : slv (XPM_PARTITIONS_C-1 downto 0);
    signal overflowfb           : slv (XPM_PARTITIONS_C-1 downto 0);
    signal paddr                : slv (XPM_PARTITION_ADDR_LENGTH_C-1 downto 0);
@@ -469,7 +470,8 @@ begin
             lrejectMsg => grejectMsg(i),
             l1Feedback => l1Partitions(i),
             l1Ack      => l1PartitionAcks(i),
-            result     => expWord (i));
+            result     => expWord (i),
+            resultValid=> expWordValid(i));
 
       U_SyncMaster : entity surf.Synchronizer
          generic map(
@@ -494,10 +496,22 @@ begin
             dataOut => pdepth(i));
    end generate;
 
+   U_RawInsert : entity l2si_core.XpmRawInsert
+     generic map (
+       TPD_G => TPD_G)
+     port map (
+       clk       => timingClk,
+       rst       => timingRst,
+       config    => configS,
+       start     => expWordValid(0),
+       shift     => r.streamReset,
+       data_in   => expWord,
+       data_out  => expWordQ);
+
    --
    -- timingStream carries its own 'advance' signal as well as fiducial.
    --
-   comb : process (advance, bpRxLinkPauseS, dsPause, dsOverflow, expWord, fstreams, paddr,
+   comb : process (advance, bpRxLinkPauseS, dsPause, dsOverflow, expWordQ, fstreams, paddr,
                    pdepth, pmaster, r, timingRst, timingStream) is
       variable v         : RegType;
       variable tidx      : integer;
@@ -548,7 +562,7 @@ begin
             end if;
          when EWORD_S =>
             if r.source = '1' or pmaster(r.ipart) = '1' then
-               v.stream.data := expWord(r.ipart)(r.eword*16+15 downto r.eword*16);
+               v.stream.data := expWordQ(r.ipart)(r.eword*16+15 downto r.eword*16);
             else
                v.stream.data := fstreams(2).data;
             end if;
