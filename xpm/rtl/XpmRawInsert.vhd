@@ -73,7 +73,7 @@ architecture rtl of XpmRawInsert is
     ramValid  => (others=>'0'),
     state     => IDLE_S,
     data_out  => (others=>toSlv(XPM_TRANSITION_DATA_INIT_C)),
-    rawCount  => (others=>(others=>'0')),
+    rawCount  => (others=>(others=>'1')),
     clearData => (others=>'0') );
 
    signal r   : RegType := REG_INIT_C;
@@ -129,7 +129,7 @@ begin
         if start = '1' then -- fiducial
           for i in 0 to XPM_PARTITIONS_C-1 loop
             -- Default is to count down
-            if r.rawCount(i) /= 0 then
+            if config.partition(i).l0Select.enabled='1' and r.rawCount(i) /= 0 then
               v.rawCount(i) := r.rawCount(i)-1;
             end if;
             -- Check for L0Accept
@@ -157,8 +157,8 @@ begin
             else
               v.data_out(i) := data_in(i);
               trans := toXpmTransitionDataType(data_in(i));
-              --  Reset the counter on the Enable transition
-              if trans.valid = '1' and trans.header(5 downto 0) = toSlv(2,6) then
+              --  Reset the counter on transition
+              if trans.valid = '1' and trans.header(7 downto 0) = MSG_CLEAR_FIFO_C then
                 v.rawCount(i) := (others=>'0');
               end if; 
             end if;
