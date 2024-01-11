@@ -184,7 +184,7 @@ begin
             v.data_out(i) := data_in(i);
             trans := toXpmTransitionDataType(data_in(i));
             --  Reset the counter on transition
-            if trans.valid = '1' and trans.header(7 downto 0) = MSG_CLEAR_FIFO_C then
+            if trans.valid = '1' and trans.header(6 downto 0) = MSG_CLEAR_FIFO(6 downto 0) then
               v.rawCount(i) := (others=>'0');
             end if; 
           end if;
