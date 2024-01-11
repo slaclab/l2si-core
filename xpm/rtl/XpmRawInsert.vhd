@@ -48,11 +48,15 @@ end XpmRawInsert;
 
 architecture rtl of XpmRawInsert is
 
-  type StateType is (IDLE_S,ASSERT_S,READ1_S,WRITE_S,CLEAR_S,READ2_S);
+  type StateType is (IDLE_S,CALC_S,ASSERT_S,READ1_S,WRITE_S,CLEAR_S,READ2_S);
 
   type RegType is record
     rog       : integer range 0 to XPM_PARTITIONS_C-1;
     index     : slv(7 downto 0);
+    rawCoinc  : Slv8Array(XPM_PARTITIONS_C-1 downto 0);
+    rawGroups : Slv8Array(XPM_PARTITIONS_C-1 downto 0);
+    rawValid  : slv(XPM_PARTITIONS_C-1 downto 0);
+    rawValue  : slv(XPM_PARTITIONS_C-1 downto 0);
     ramAddr   : slv(7 downto 0);
     ramWrEn   : sl;
     ramWrData : slv(XPM_PARTITIONS_C*2-1 downto 0);
@@ -66,6 +70,10 @@ architecture rtl of XpmRawInsert is
   constant REG_INIT_C : RegType := (
     rog       => 0,
     index     => (others=>'0'),
+    rawCoinc  => (others=>(others=>'0')),
+    rawGroups => (others=>(others=>'0')),
+    rawValid  => (others=>'0'),
+    rawValue  => (others=>'0'),
     ramAddr   => (others=>'0'),
     ramWrEn   => '0',
     ramWrData => (others=>'0'),
@@ -124,47 +132,64 @@ begin
 
     v.ramWrEn := '0';
 
+    v.rawValid := (others=>'0');
+    v.rawValue := (others=>'0');
+    
     case r.state is
       when IDLE_S =>
+        -- Calculate what each group would do without intervention
+        -- and use that result in the next phase
         if start = '1' then -- fiducial
           for i in 0 to XPM_PARTITIONS_C-1 loop
-            -- Default is to count down
-            if config.partition(i).l0Select.enabled='1' and r.rawCount(i) /= 0 then
-              v.rawCount(i) := r.rawCount(i)-1;
-            end if;
             -- Check for L0Accept
             event := toXpmEventDataType(data_in(i));
             if event.valid = '1' and event.l0Accept = '1' then
-              -- Slower group set the flag
-              if r.ramValid(i) = '1' then
-                event.l0Raw := r.ramValue(i);
-                if r.ramValue(i) = '1' then
-                  v.rawCount(i) := config.partition(i).l0Select.rawPeriod-1;
-                end if;
-              -- No flag set and our timer expired
-              elsif r.rawCount(i) = 0 then
-                event.l0Raw := '1';
-                v.ramValue(i) := '1';
-                v.ramValid(i) := '1';
-                v.rawCount(i) := config.partition(i).l0Select.rawPeriod-1;
-              -- No flag set and our timer hasn't expired
-              else
-                event.l0Raw := '0';
-                v.ramValue(i) := '0';
-                v.ramValid(i) := '1';
+              v.rawValid(i) := '1';
+              if r.rawCount(i) = 0 then
+                v.rawValue(i) := '1';
               end if;
-              v.data_out(i) := toSlv(event);
-            else
-              v.data_out(i) := data_in(i);
-              trans := toXpmTransitionDataType(data_in(i));
-              --  Reset the counter on transition
-              if trans.valid = '1' and trans.header(7 downto 0) = MSG_CLEAR_FIFO_C then
-                v.rawCount(i) := (others=>'0');
-              end if; 
             end if;
           end loop;
-          v.state := ASSERT_S;
+          v.state := CALC_S;
         end if;
+      when CALC_S =>
+        for i in 0 to XPM_PARTITIONS_C-1 loop
+          -- Default is to count down
+          if config.partition(i).l0Select.enabled='1' and r.rawCount(i) /= 0 then
+            v.rawCount(i) := r.rawCount(i)-1;
+          end if;
+          -- Check for L0Accept
+          event := toXpmEventDataType(data_in(i));
+          if event.valid = '1' and event.l0Accept = '1' then
+            -- Slower group set the flag
+            if r.ramValid(i) = '1' then
+              event.l0Raw := r.ramValue(i);
+              if r.ramValue(i) = '1' then
+                v.rawCount(i) := config.partition(i).l0Select.rawPeriod-1;
+              end if;
+            -- A coincident group set the flag
+            elsif (r.rawValue and r.rawGroups(i))/=0 then
+              event.l0Raw := '1';
+              v.ramValue(i) := '1';
+              v.ramValid(i) := '1';
+              v.rawCount(i) := config.partition(i).l0Select.rawPeriod-1;
+            -- No flag set
+            else
+              event.l0Raw := '0';
+              v.ramValue(i) := '0';
+              v.ramValid(i) := '1';
+            end if;
+            v.data_out(i) := toSlv(event);
+          else
+            v.data_out(i) := data_in(i);
+            trans := toXpmTransitionDataType(data_in(i));
+            --  Reset the counter on transition
+            if trans.valid = '1' and trans.header(7 downto 0) = MSG_CLEAR_FIFO_C then
+              v.rawCount(i) := (others=>'0');
+            end if; 
+          end if;
+        end loop;
+        v.state := ASSERT_S;
       when ASSERT_S =>
         if shift = '1' then  -- transmission complete
           v.rog     := 0;
@@ -211,6 +236,19 @@ begin
       when others => null;
     end case;
 
+    -- Intermediate calculation for coincident group determination
+    for i in 0 to XPM_PARTITIONS_C-1 loop
+      v.rawCoinc(i) := (others=>'0');
+      for j in 0 to XPM_PARTITIONS_C-1 loop
+        if i = j then
+          v.rawCoinc(i)(j) := '1';
+        elsif (config.partition(i).pipeline.depth_fids = config.partition(j).pipeline.depth_fids) then
+          v.rawCoinc(i)(j) := '1';
+        end if;
+      end loop;
+      v.rawGroups(i) := config.partition(i).l0Select.groups and r.rawCoinc(i);
+    end loop;
+    
     if rst = '1' then
       v := REG_INIT_C;
     end if;
