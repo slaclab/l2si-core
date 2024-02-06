@@ -46,7 +46,7 @@ package L2SiPkg is
 
    subtype TriggerInhibitCountsType is XpmInhibitCountsType;
    subtype TriggerInhibitCountsArray is XpmInhibitCountsArray;
-   
+
    constant XPM_TRIGGER_SOURCE_C : sl := '0';
    constant EVR_TRIGGER_SOURCE_C : sl := '1';
 

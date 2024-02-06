@@ -191,7 +191,7 @@ begin
       v := r;
 
       v.delayRst := '0' & r.delayRst(r.delayRst'left downto 1);
-      
+
       if promptTimingStrobe = '1' then
          -- Update partitionDelays values when partitionAddr indicates new PDELAYs
          broadcastMessage := toXpmBroadcastType(promptXpmMessage.partitionAddr);
@@ -211,7 +211,7 @@ begin
            v.timingMsgDelay := r.partitionDelays(i);
          end if;
       end loop;
-      
+
       if timingRxRst = '1' then
          v      := REG_INIT_C;
       end if;

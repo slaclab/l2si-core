@@ -73,7 +73,7 @@ architecture mapping of XpmSequence is
    constant S0 : integer := 12;
    constant SN : integer := S0+46;
    constant SEQBITS : integer := 4;
-   
+
    type RegType is record
       advance : sl;
       frame   : slv(207 downto 0);      -- Really 64b
@@ -111,7 +111,7 @@ begin
    status.seqaddrlen  <= toSlv(SEQADDRLEN,status.seqaddrlen'length);
    status.countUpdate <= '0';
    seqCount           <= status.countRequest;
-   
+
    U_FIFO : entity surf.AxiStreamFifoV2
       generic map (
          TPD_G               => TPD_G,
@@ -237,7 +237,7 @@ begin
             if config.seqEnable(i) = '1' then
               v.data((ibit+1)*SEQBITS-1 downto ibit*SEQBITS) := seqData(i)(SEQBITS-1 downto 0);
             end if;
-         end if;        
+         end if;
       end loop;
 
       v.master.tLast := '1';

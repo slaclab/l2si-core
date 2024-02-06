@@ -105,7 +105,7 @@ architecture rtl of XpmAppMaster is
    signal msgInhibit   : sl;
    signal msgAdvance   : sl;
    signal msgGroups    : slv(XPM_PARTITIONS_C-1 downto 0);
-   
+
    --  feedback data from sensor links
    --  L0 inhibit decision
    signal l0Reset       : sl;
@@ -137,7 +137,7 @@ architecture rtl of XpmAppMaster is
 
    signal config_l0Select    : XpmL0SelectConfigType;
    signal l0Enabled          : sl;
-   
+
    signal pauseOrOverflow : slv(26 downto 0);
 
    component ila_0
@@ -286,7 +286,7 @@ begin
    status.anaRd    <= (others=>'0');
 
    msgAdvance      <= fiducial and r.advanceMsg;
-   
+
    U_SyncMsgPayload : entity surf.FifoSync
       generic map (
          TPD_G        => TPD_G,
@@ -341,7 +341,7 @@ begin
      config_l0Select         <= config.l0Select;
      config_l0Select.enabled <= l0Enabled;
    end process;
-   
+
    U_SyncReset : entity surf.RstSync
       generic map (
          TPD_G => TPD_G)
@@ -357,7 +357,7 @@ begin
        clk        => timingClk,
        dataIn     => config.l0Select.groups,
        dataOut    => msgGroups );
-       
+
    --
    --  Unimplemented L1 trigger
    --
@@ -378,7 +378,7 @@ begin
       msg.l0tag   := l0Tag(msg.l0tag'range);
       msg.header  := msgConfig.header(6 downto 0);
       msg.count   := l0Tag(msg.count'range);
-      
+
       --  Prepare the L0/L1
       pword.valid    := '1';
       pword.l0Accept := l0Accept;
@@ -388,17 +388,17 @@ begin
       pword.l0tag    := l0Tag(pword.l0tag'range);
       pword.l1tag    := l0Tag(pword.l1tag'range);
       pword.count    := l0Tag(pword.count'range);
-      
+
       v.partStrobe := r.partStrobe(0) & r.timingBus.strobe;
       v.latch      := r.partStrobe(1);
       v.allocTag   := '0';
       v.resultValid:= r.latch;
-      
+
       v.inhibitMsg := msgInhibit;
       if (msgGroups and grejectMsg)/=0 then
         v.inhibitMsg := '1';
       end if;
-      
+
       if msgConfig.insert = '1' and r.timingBus.strobe = '1' then
          v.msgReady   := '1';
          v.reserveMsg := '1';
@@ -432,7 +432,7 @@ begin
                when others => null;
             end case;
          end if;
-            
+
          v.allocTag := msg.valid;
          if msg.valid='1' then
             v.result   := toSlv(msg);

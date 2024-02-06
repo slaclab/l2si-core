@@ -174,7 +174,7 @@ architecture top_level_app of XpmApp is
    signal paddr                : slv (XPM_PARTITION_ADDR_LENGTH_C-1 downto 0);
    signal grejectL0            : slv (XPM_PARTITIONS_C-1 downto 0);
    signal grejectMsg           : slv (XPM_PARTITIONS_C-1 downto 0);
-   
+
    constant MSG_CONFIG_LEN_C : integer := XPM_PARTITIONS_C*(XpmPartitionConfigType.message.header'length+1);
    signal msgConfig        : slv(MSG_CONFIG_LEN_C-1 downto 0);
    signal msgConfigS       : slv(MSG_CONFIG_LEN_C-1 downto 0);

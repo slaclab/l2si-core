@@ -124,7 +124,7 @@ architecture rtl of TriggerEventBuffer is
 
       l0Rejects      : slv       (XPM_PARTITIONS_C-1 downto 0);
       l0RejectCounts : XpmInhibitCountsType;
-      
+
       -- outputs
       triggerData : XpmEventDataType;
 
@@ -166,7 +166,7 @@ architecture rtl of TriggerEventBuffer is
 
       l0Rejects      => (others=>'0'),
       l0RejectCounts => XPM_INHIBIT_COUNTS_INIT_C,
-      
+
       -- outputs     =>
       triggerData => TRIGGER_EVENT_DATA_INIT_C,
 
@@ -207,7 +207,7 @@ architecture rtl of TriggerEventBuffer is
 
    signal triggerInhibitCountsSlv : slv(XPM_INHIBIT_COUNTS_LEN_C-1 downto 0);
    signal eventInhibitCountsSlv   : slv(XPM_INHIBIT_COUNTS_LEN_C-1 downto 0);
-   
+
 begin
 
    -- Event AXIS bus pause is the application pause signal
@@ -293,7 +293,7 @@ begin
          if (r.streamValid = '1' and r.transitionData.header/=toSlv(10,6)) then
            v.inhFifoWr := '1';
          end if;
-         
+
          v.l0Rejects   := (others=>'0');
          if (alignedTimingStrobe = '1' and alignedXpmMessage.valid = '1') then
             -- Decode event data from configured partitionWord
@@ -306,7 +306,7 @@ begin
                   v.l0Rejects(i) := '1';
                end if;
             end loop;
-            
+
             -- Pass on events with l0Accept
             -- Pass on transitions
             v.streamValid := (v.eventData.valid and v.eventData.l0Accept) or v.transitionData.valid;
@@ -385,7 +385,7 @@ begin
                end if;
             end loop;
          end if;
-           
+
          -- Monitor time between pause assertion and trigger arrival
          v.fbTimer := r.fbTimer + 1;
          if uAnd(r.fbTimer) = '1' then
@@ -595,7 +595,7 @@ begin
             dout   => eventTimingMessageSlv);   -- [out]
       eventTimingMessage <= toTimingMessageType(eventTimingMessageSlv);
    end generate GEN_EVENT_TIMING_MESSAGE;
-   
+
    GEN_INHIBIT_COUNTS : if (EN_LCLS_II_INHIBIT_COUNTS_G) generate
       triggerInhibitCountsSlv <= toSlv(r.l0RejectCounts);
       U_Fifo_2 : entity surf.Fifo

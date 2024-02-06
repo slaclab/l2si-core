@@ -6,7 +6,7 @@
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-09-15
 -- Last update: 2023-11-08
--- Platform   : 
+-- Platform   :
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
 -- Description: Sequence engine for timing generator.
@@ -33,11 +33,11 @@
 --
 -------------------------------------------------------------------------------
 -- This file is part of 'LCLS2 Timing Core'.
--- It is subject to the license terms in the LICENSE.txt file found in the 
--- top-level directory of this distribution and at: 
---    https://confluence.slac.stanford.edu/display/ppareg/LICENSE.html. 
--- No part of 'LCLS2 Timing Core', including this file, 
--- may be copied, modified, propagated, or distributed except according to 
+-- It is subject to the license terms in the LICENSE.txt file found in the
+-- top-level directory of this distribution and at:
+--    https://confluence.slac.stanford.edu/display/ppareg/LICENSE.html.
+-- No part of 'LCLS2 Timing Core', including this file,
+-- may be copied, modified, propagated, or distributed except according to
 -- the terms contained in the LICENSE.txt file.
 -------------------------------------------------------------------------------
 library ieee;
@@ -134,7 +134,7 @@ architecture ISequence of Sequence is
    signal icount : slv(1 downto 0);
 
    signal monResetS : sl;
-   
+
    component ila_0
      port ( clk    : in  sl;
             probe0 : in slv(255 downto 0) );
@@ -166,7 +166,7 @@ begin
                   probe0(120)            => rdEnB,
                   probe0(255 downto 121) => (others=>'0') );
    end generate GEN_DEBUG;
-     
+
    dataO          <= r.data;
    seqState.index <= SeqAddrType(r.index);
    GEN_COUNT : for i in r.count'range generate
@@ -204,7 +204,7 @@ begin
        clk      => clkB,
        asyncRst => monReset,
        syncRst  => monResetS );
-     
+
    process (r, seqReset, rdStepB, fixedRate, acRate, acTS, rdEnB, waitB, startAddr, seqNotifyAck, monResetS)
       variable v : RegType;
       variable rateI, acTSI : integer;

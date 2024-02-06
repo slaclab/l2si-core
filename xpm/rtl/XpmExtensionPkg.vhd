@@ -125,7 +125,7 @@ package XpmExtensionPkg is
      inhibits => (others=>(others=>'0')) );
 
    constant XPM_INHIBIT_COUNTS_LEN_C : integer := 32*XPM_PARTITIONS_C;
-   
+
    function toSlv(a : XpmInhibitCountsType) return slv;
    function toXpmInhibitCountsType(a : slv) return XpmInhibitCountsType;
 
@@ -262,7 +262,7 @@ package body XpmExtensionPkg is
       end loop;
       return ret;
    end function;
-     
+
    function toXpmInhibitCountsType(a : slv) return XpmInhibitCountsType is
       variable i,j           : integer;
       variable ret           : XpmInhibitCountsType;
@@ -274,5 +274,5 @@ package body XpmExtensionPkg is
       return ret;
    end function;
 
-   
+
 end package body XpmExtensionPkg;

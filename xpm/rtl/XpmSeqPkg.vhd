@@ -48,7 +48,7 @@ package XpmSeqPkg is
       seqState     => (others => SEQUENCER_STATE_INIT_C));
 
    constant XPM_SEQ_STATUS_BITS_C : integer := 13 + XPM_SEQ_DEPTH_C*(192+8*SEQCOUNTDEPTH+SEQADDRLEN);
-   
+
    function toSlv(s : XpmSeqStatusType) return slv;
    function toXpmSeqStatusType (vector : slv) return XpmSeqStatusType;
 

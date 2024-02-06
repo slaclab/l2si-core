@@ -90,11 +90,11 @@ architecture rtl of XpmRawInsert is
    signal ramValid  : slv(XPM_PARTITIONS_C-1 downto 0);
    signal ramValue  : slv(XPM_PARTITIONS_C-1 downto 0);
    signal ramRdData : slv(XPM_PARTITIONS_C*2-1 downto 0);
-  
+
 begin
 
   data_out <= r.data_out;
-  
+
   --
   --  When a readout group is ready to generate an L0 trigger,
   --  check if the raw data retention flag was set by a prior
@@ -119,10 +119,10 @@ begin
       rstb    => rst,
       addrb   => rin.ramAddr,
       doutb   => ramRdData );
-  
+
   ramValid    <= ramRdData(2*XPM_PARTITIONS_C-1 downto XPM_PARTITIONS_C);
   ramValue    <= ramRdData(XPM_PARTITIONS_C-1 downto 0);
-  
+
   comb : process( r, rst, config, start, shift, data_in, ramValid, ramValue ) is
     variable v : RegType;
     variable event : XpmEventDataType;
@@ -134,7 +134,7 @@ begin
 
     v.rawValid := (others=>'0');
     v.rawValue := (others=>'0');
-    
+
     case r.state is
       when IDLE_S =>
         -- Calculate what each group would do without intervention
@@ -186,7 +186,7 @@ begin
             --  Reset the counter on transition
             if trans.valid = '1' and trans.header(6 downto 0) = MSG_CLEAR_FIFO(6 downto 0) then
               v.rawCount(i) := (others=>'0');
-            end if; 
+            end if;
           end if;
         end loop;
         v.state := ASSERT_S;
@@ -248,15 +248,15 @@ begin
       end loop;
       v.rawGroups(i) := config.partition(i).l0Select.groups and r.rawCoinc(i);
     end loop;
-    
+
     if rst = '1' then
       v := REG_INIT_C;
     end if;
 
     rin <= v;
-    
+
   end process comb;
-  
+
    seq : process (clk) is
    begin
       if rising_edge(clk) then
