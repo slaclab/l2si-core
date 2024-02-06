@@ -32,7 +32,7 @@ entity XpmSeqJumpReg is
    generic (
       TPD_G            : time            := 1 ns;
       USE_WSTRB_G      : boolean         := false;
-      ADDR_BITS_G      : natural         := 8;
+      ADDR_BITS_G      : natural         := 12;
       AXI_ERROR_RESP_G : slv(1 downto 0) := AXI_RESP_OK_C);
    port (
       -- AXI-Lite Interface
@@ -107,20 +107,7 @@ begin
                when 0 to XPM_SEQ_DEPTH_C*16-1 =>
                   iseq                             := conv_integer(regAddr(ADDR_BITS_G-1 downto 6));
                   ichn                             := conv_integer(regAddr(5 downto 2));
-                  if (iseq >= Allow'right and iseq <= Allow'left) then
-                     case ichn is
-                        when 14 =>
-                           v.config.seqJumpConfig(iseq).bcsClass := regWrData(15 downto 12);
-                           v.config.seqJumpConfig(iseq).bcsJump  := SeqAddrType(regWrData(SeqAddrType'range));
-                        when 15 =>
-                           v.config.seqJumpConfig(iseq).syncSel   := regWrData(31 downto 16);
-                           v.config.seqJumpConfig(iseq).syncClass := regWrData(15 downto 12);
-                           v.config.seqJumpConfig(iseq).syncJump  := SeqAddrType(regWrData(SeqAddrType'range));
-                        when others =>
-                           v.config.seqJumpConfig(iseq).mpsClass(ichn) := regWrData(15 downto 12);
-                           v.config.seqJumpConfig(iseq).mpsJump (ichn) := SeqAddrType(regWrData(SeqAddrType'range));
-                     end case;
-                  elsif (ichn = 15) then
+                  if (ichn = 15) then
                      v.config.seqJumpConfig(iseq).syncSel   := regWrData(31 downto 16);
                      v.config.seqJumpConfig(iseq).syncClass := regWrData(15 downto 12);
                      v.config.seqJumpConfig(iseq).syncJump  := SeqAddrType(regWrData(SeqAddrType'range));
@@ -152,20 +139,7 @@ begin
                when 0 to XPM_SEQ_DEPTH_C*16-1 =>
                   iseq                             := conv_integer(regAddr(ADDR_BITS_G-1 downto 6));
                   ichn                             := conv_integer(regAddr(5 downto 2));
-                  if (iseq >= Allow'right and iseq <= Allow'left) then
-                     case ichn is
-                        when 14 =>
-                           tmpRdData(15 downto 12)      := r.config.seqJumpConfig(iseq).bcsClass;
-                           tmpRdData(SeqAddrType'range) := slv(r.config.seqJumpConfig(iseq).bcsJump);
-                        when 15 =>
-                           tmpRdData(31 downto 16)      := r.config.seqJumpConfig(iseq).syncSel;
-                           tmpRdData(15 downto 12)      := r.config.seqJumpConfig(iseq).syncClass;
-                           tmpRdData(SeqAddrType'range) := slv(r.config.seqJumpConfig(iseq).syncJump);
-                        when others =>
-                           tmpRdData(15 downto 12)      := r.config.seqJumpConfig(iseq).mpsClass(ichn);
-                           tmpRdData(SeqAddrType'range) := slv(r.config.seqJumpConfig(iseq).mpsJump(ichn));
-                     end case;
-                  elsif (ichn = 15) then
+                  if (ichn = 15) then
                      tmpRdData(31 downto 16)      := r.config.seqJumpConfig(iseq).syncSel;
                      tmpRdData(15 downto 12)      := r.config.seqJumpConfig(iseq).syncClass;
                      tmpRdData(SeqAddrType'range) := slv(r.config.seqJumpConfig(iseq).syncJump);

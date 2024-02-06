@@ -58,18 +58,24 @@ entity XpmAppMaster is
       overflow   : in  slv(26 downto 0);
       greject    : in  slv(XPM_PARTITIONS_C-1 downto 0) := (others=>'0');
       lreject    : out sl;
+      grejectMsg : in  slv(XPM_PARTITIONS_C-1 downto 0) := (others=>'0');
+      lrejectMsg : out sl;
       l1Feedback : in  XpmL1FeedbackType      := XPM_L1_FEEDBACK_INIT_C;
       l1Ack      : out sl;
-      result     : out slv (47 downto 0));
+      result     : out slv (47 downto 0);
+      resultValid: out sl);
 end XpmAppMaster;
 
 architecture rtl of XpmAppMaster is
 
    type RegType is record
       result     : slv(result'range);
+      resultValid: sl;
       latch      : sl;
-      insertMsg  : sl;
-      strobeMsg  : sl;
+      advanceMsg : sl;
+      msgReady   : sl;
+      reserveMsg : sl;
+      allocTag   : sl;
       inhibitMsg : sl;
       partStrobe : slv(1 downto 0);
       timingBus  : TimingBusType;
@@ -78,9 +84,12 @@ architecture rtl of XpmAppMaster is
    end record;
    constant REG_INIT_C : RegType := (
       result     => toSlv(XPM_TRANSITION_DATA_INIT_C),
+      resultValid=> '0',
       latch      => '0',
-      insertMsg  => '0',
-      strobeMsg  => '0',
+      advanceMsg => '1',
+      msgReady   => '0',
+      reserveMsg => '0',
+      allocTag   => '0',
       inhibitMsg => '0',
       partStrobe => "00",
       timingBus  => TIMING_BUS_INIT_C,
@@ -92,12 +101,15 @@ architecture rtl of XpmAppMaster is
 
    signal msgConfig    : XpmPartMsgConfigType;
    signal msgConfigInt : XpmPartMsgConfigType;
-   signal msgRdCount : slv(3 downto 0);
-
+   signal msgRdCount   : slv(3 downto 0);
+   signal msgInhibit   : sl;
+   signal msgAdvance   : sl;
+   signal msgGroups    : slv(XPM_PARTITIONS_C-1 downto 0);
+   
    --  feedback data from sensor links
    --  L0 inhibit decision
    signal l0Reset       : sl;
-   signal inhibit       : sl;
+   signal l0Inhibit     : sl;
    --  L0 trigger output
    signal l0Accept      : sl;
    signal l0Reject      : sl;
@@ -123,6 +135,9 @@ architecture rtl of XpmAppMaster is
    signal depth_clks_20 : slv(19 downto 0);
    signal depth_fids_7  : slv( 6 downto 0);
 
+   signal config_l0Select    : XpmL0SelectConfigType;
+   signal l0Enabled          : sl;
+   
    signal pauseOrOverflow : slv(26 downto 0);
 
    component ila_0
@@ -142,15 +157,17 @@ begin
             probe0(3)             => timingBus_valid,
             probe0(4)             => config.message.insert,
             probe0(5)             => '0',
-            probe0(6)             => r.insertMsg,
-            probe0(7)             => r.strobeMsg,
+            probe0(6)             => r.reserveMsg,
+            probe0(7)             => r.allocTag,
             probe0(15 downto 8)   => l0Tag (7 downto 0),
             probe0(19 downto 16)  => msgRdCount,
             probe0(255 downto 20) => (others => '0'));
    end generate;
 
    result          <= r.result;
+   resultValid     <= r.resultValid;
    status.l1Select <= XPM_L1_SELECT_STATUS_INIT_C;
+   lrejectMsg      <= msgInhibit;
 
    depth_clks_20 <= resize(config.pipeline.depth_clks, 20);
    U_TimingDelay : entity lcls_timing_core.TimingSerialDelay
@@ -201,12 +218,13 @@ begin
          clk                => timingClk,
          rst                => timingRst,
          pause(26 downto 0) => pauseOrOverflow,
-         pause(27)          => r.insertMsg,
+         pause(27)          => r.reserveMsg,
          fiducial           => fiducial,
          l0Accept           => l0Accept,
          l1Accept           => l1Accept,
          rejecc             => l0Reject,
-         inhibit            => inhibit);
+         inhibit            => l0Inhibit,
+         inhibitMsg         => msgInhibit);
 
    U_L0Select : entity l2si_core.XpmL0Select
       generic map (
@@ -215,11 +233,11 @@ begin
       port map (
          clk       => timingClk,
          rst       => l0Reset,
-         config    => config.l0Select,
+         config    => config_l0Select,
          timingBus => r.timingBus,
          cuTiming  => r.cuTiming,
          cuTimingV => r.cuTimingV,
-         inhibit   => inhibit,
+         inhibit   => l0Inhibit,
          strobe    => r.partStrobe(1),
          accept    => l0Accept,
          ireject   => lreject,
@@ -238,7 +256,7 @@ begin
          clear     => config.l0Select.reset,
          timingBus => r.timingBus,
          push      => l0Accept,         -- allocate a tag for a trigger
-         skip      => r.strobeMsg,      -- allocate a tag for a message
+         skip      => r.allocTag,       -- allocate a tag for a message
          push_tag  => l0Tag,
          pop       => l1Accept,
          pop_tag   => l1AcceptTag,
@@ -267,6 +285,8 @@ begin
    --             tag            => analysisTag );
    status.anaRd    <= (others=>'0');
 
+   msgAdvance      <= fiducial and r.advanceMsg;
+   
    U_SyncMsgPayload : entity surf.FifoSync
       generic map (
          TPD_G        => TPD_G,
@@ -279,7 +299,7 @@ begin
          wr_en         => config.message.insert,
          din           => config.message.header,
          --
-         rd_en         => fiducial,
+         rd_en         => msgAdvance,
          data_count    => msgRdCount,
          valid         => msgConfigInt.insert,
          dout          => msgConfigInt.header);
@@ -289,19 +309,39 @@ begin
    U_MsgDelay : entity surf.SlvDelay
       generic map (
          TPD_G        => TPD_G,
-         SRL_EN_G     => true,
          DELAY_G      => 128,
          REG_OUTPUT_G => false,
-         WIDTH_G      => 9 )
+         WIDTH_G      => msgConfigInt.header'length+1 )
       port map (
          clk              => timingClk,                 -- [in]
-         en               => fiducial,                  -- [in]
+         rst              => timingRst,
+         en               => msgAdvance,                -- [in]
          delay            => depth_fids_7,
-         din (7 downto 0) => msgConfigInt.header,
-         din (8)          => msgConfigInt.insert,
-         dout(7 downto 0) => msgConfig.header,
-         dout(8)          => msgConfig.insert );
+         din (msgConfigInt.header'range)  => msgConfigInt.header,
+         din (msgConfigInt.header'length) => msgConfigInt.insert,
+         dout(msgConfigInt.header'range)  => msgConfig.header,
+         dout(msgConfigInt.header'length) => msgConfig.insert );
 
+   U_L0EnDelay : entity surf.SlvDelay
+      generic map (
+         TPD_G        => TPD_G,
+         DELAY_G      => 128,
+         REG_OUTPUT_G => false,
+         WIDTH_G      => 1 )
+      port map (
+         clk              => timingClk,                 -- [in]
+         rst              => timingRst,
+         en               => r.timingBus.strobe,        -- [in]
+         delay            => depth_fids_7,
+         din (0)          => config.l0Select.enabled,
+         dout(0)          => l0Enabled );
+
+   L0Enb: process (config,l0Enabled) is
+   begin
+     config_l0Select         <= config.l0Select;
+     config_l0Select.enabled <= l0Enabled;
+   end process;
+   
    U_SyncReset : entity surf.RstSync
       generic map (
          TPD_G => TPD_G)
@@ -309,6 +349,15 @@ begin
          clk      => timingClk,
          asyncRst => config.l0Select.reset,
          syncRst  => l0Reset);
+
+   U_SyncGroups : entity surf.SynchronizerVector
+     generic map (
+       WIDTH_G => msgGroups'length )
+     port map (
+       clk        => timingClk,
+       dataIn     => config.l0Select.groups,
+       dataOut    => msgGroups );
+       
    --
    --  Unimplemented L1 trigger
    --
@@ -316,45 +365,79 @@ begin
 
    comb : process (r, timingRst, frame, cuRx_frame, cuRx_valid,
                    timingBus_strobe, timingBus_valid, msgConfig,
-                   l0Tag, l0Accept, l0Reject, inhibit) is
+                   l0Tag, l0Accept, l0Reject, msgInhibit,
+                   grejectMsg, msgGroups) is
       variable v     : RegType;
       variable pword : XpmEventDataType      := XPM_EVENT_DATA_INIT_C;
       variable msg   : XpmTransitionDataType := XPM_TRANSITION_DATA_INIT_C;
    begin
       v := r;
 
+      --  Prepare the partition message
+      msg.valid   := '0';
+      msg.l0tag   := l0Tag(msg.l0tag'range);
+      msg.header  := msgConfig.header(6 downto 0);
+      msg.count   := l0Tag(msg.count'range);
+      
+      --  Prepare the L0/L1
+      pword.valid    := '1';
+      pword.l0Accept := l0Accept;
+      pword.l0Reject := l0Reject;
+      pword.l1Accept := l0Accept;
+      pword.l1Expect := l0Accept;
+      pword.l0tag    := l0Tag(pword.l0tag'range);
+      pword.l1tag    := l0Tag(pword.l1tag'range);
+      pword.count    := l0Tag(pword.count'range);
+      
       v.partStrobe := r.partStrobe(0) & r.timingBus.strobe;
       v.latch      := r.partStrobe(1);
-      v.strobeMsg  := '0';
-      v.inhibitMsg := inhibit;
-
+      v.allocTag   := '0';
+      v.resultValid:= r.latch;
+      
+      v.inhibitMsg := msgInhibit;
+      if (msgGroups and grejectMsg)/=0 then
+        v.inhibitMsg := '1';
+      end if;
+      
       if msgConfig.insert = '1' and r.timingBus.strobe = '1' then
-         v.insertMsg := '1';
+         v.msgReady   := '1';
+         v.reserveMsg := '1';
+         if msgConfig.header(8 downto 7)=XPM_PART_MSG_LOW_PRIO_C then
+           v.reserveMsg := '0';
+         end if;
       end if;
 
-      if r.latch = '1' then
-         if r.insertMsg = '1' then
-            v.insertMsg := '0';
-            v.strobeMsg := '1';
-            if msgConfig.header(7)='1' and r.inhibitMsg='1' then
-               msg.valid   := '0';
-            else
-               msg.valid   := '1';
-            end if;
-            msg.l0tag   := l0Tag(msg.l0tag'range);
-            msg.header  := msgConfig.header(6 downto 0);
-            msg.count   := l0Tag(msg.count'range);
-            v.result    := toSlv(msg);
+      if r.latch = '1' then  -- its time to insert a transition or L0
+         if r.msgReady= '1' then  -- message waiting
+            v.msgReady   := '0';  -- default is to consume the message
+            v.reserveMsg := '0';
+            v.advanceMsg := '1';
+            msg.valid    := '1';
+            case (msgConfig.header(8 downto 7)) is
+               when XPM_PART_MSG_DROP_FULL_C =>
+                  if r.inhibitMsg='1' then
+                     msg.valid := '0';
+                  end if;
+               when XPM_PART_MSG_WAIT_FULL_C =>
+                 if r.inhibitMsg='1' then
+                    msg.valid    := '0';  -- Queue the message again.
+                    v.msgReady   := '1';  -- This could displace the message
+                    v.reserveMsg := '1';  -- with respect to other groups.
+                    v.advanceMsg := '0';
+                 end if;
+               when XPM_PART_MSG_LOW_PRIO_C =>
+                 if r.inhibitMsg='1' or l0Accept='1' or l0Reject='1' then
+                    msg.valid    := '0';
+                 end if;
+               when others => null;
+            end case;
+         end if;
+            
+         v.allocTag := msg.valid;
+         if msg.valid='1' then
+            v.result   := toSlv(msg);
          else
-            pword.valid    := '1';
-            pword.l0Accept := l0Accept;
-            pword.l0Reject := l0Reject;
-            pword.l1Accept := l0Accept;
-            pword.l1Expect := l0Accept;
-            pword.l0tag    := l0Tag(pword.l0tag'range);
-            pword.l1tag    := l0Tag(pword.l1tag'range);
-            pword.count    := l0Tag(pword.count'range);
-            v.result       := toSlv(pword);
+            v.result   := toSlv(pword);
          end if;
       end if;
 

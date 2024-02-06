@@ -55,7 +55,16 @@ architecture xbar of XpmSeqXbar is
    constant SEQMEM_INDEX_C    : natural := 2;
    constant NUM_AXI_MASTERS_C : natural := 3;
 
-   constant AXI_CROSSBAR_MASTERS_CONFIG_C : AxiLiteCrossbarMasterConfigArray(NUM_AXI_MASTERS_C-1 downto 0) := genAxiLiteConfig( 3, AXIL_BASEADDR_G, 16, 14 );
+   constant AXI_CROSSBAR_MASTERS_CONFIG_C : AxiLiteCrossbarMasterConfigArray(0 to 2) := (
+      0                  => (baseAddr     => X"00000000" + AXIL_BASEADDR_G,
+                             addrBits     => 14,
+                             connectivity => X"FFFF"),
+      1                  => (baseAddr     => X"00004000" + AXIL_BASEADDR_G,
+                             addrBits     => 14,
+                             connectivity => X"FFFF"),
+      2                  => (baseAddr     => X"00010000" + AXIL_BASEADDR_G,
+                             addrBits     => 16,
+                             connectivity => X"FFFF"));
 
    signal mAxilWriteMasters : AxiLiteWriteMasterArray(NUM_AXI_MASTERS_C-1 downto 0);
    signal mAxilWriteSlaves  : AxiLiteWriteSlaveArray (NUM_AXI_MASTERS_C-1 downto 0);
@@ -126,6 +135,8 @@ begin
          axiRst         => regrst);
 
    U_SeqMemReg : entity l2si_core.XpmSeqMemReg
+      generic map (
+         ADDR_BITS_G => 16 )
       port map (
          axiReadMaster  => mAxilReadMasters (SEQMEM_INDEX_C),
          axiReadSlave   => mAxilReadSlaves  (SEQMEM_INDEX_C),

@@ -29,6 +29,7 @@ use lcls_timing_core.TimingPkg.all;
 
 library l2si_core;
 use l2si_core.XpmPkg.all;
+use l2si_core.XpmSeqPkg.all;
 use l2si_core.XpmExtensionPkg.all;
 use l2si_core.XpmMiniPkg.all;
 
@@ -79,7 +80,9 @@ entity XpmApp is
       timingFbClk     : in  sl;
       timingFbRst     : in  sl;
       timingFbId      : in  slv(31 downto 0);
-      timingFb        : out TimingPhyType);
+      timingFb        : out TimingPhyType;
+      seqCountRst     : in  sl := '0';
+      seqCount        : out Slv128Array(XPM_SEQ_DEPTH_C-1 downto 0));
 end XpmApp;
 
 architecture top_level_app of XpmApp is
@@ -164,13 +167,15 @@ architecture top_level_app of XpmApp is
    signal pmaster              : slv (XPM_PARTITIONS_C-1 downto 0);
    signal pdepthI              : Slv8Array (XPM_PARTITIONS_C-1 downto 0);
    signal pdepth               : Slv8Array (XPM_PARTITIONS_C-1 downto 0);
-   signal expWord              : Slv48Array(XPM_PARTITIONS_C-1 downto 0);
+   signal expWord,expWordQ     : Slv48Array(XPM_PARTITIONS_C-1 downto 0);
+   signal expWordValid         : slv (XPM_PARTITIONS_C-1 downto 0);
    signal pausefb              : slv (XPM_PARTITIONS_C-1 downto 0);
    signal overflowfb           : slv (XPM_PARTITIONS_C-1 downto 0);
    signal paddr                : slv (XPM_PARTITION_ADDR_LENGTH_C-1 downto 0);
-   signal greject              : slv (XPM_PARTITIONS_C-1 downto 0);
-
-   constant MSG_CONFIG_LEN_C : integer := XPM_PARTITIONS_C*9;
+   signal grejectL0            : slv (XPM_PARTITIONS_C-1 downto 0);
+   signal grejectMsg           : slv (XPM_PARTITIONS_C-1 downto 0);
+   
+   constant MSG_CONFIG_LEN_C : integer := XPM_PARTITIONS_C*(XpmPartitionConfigType.message.header'length+1);
    signal msgConfig        : slv(MSG_CONFIG_LEN_C-1 downto 0);
    signal msgConfigS       : slv(MSG_CONFIG_LEN_C-1 downto 0);
    signal msgValid         : sl;
@@ -380,7 +385,9 @@ begin
 --               fiducial        => timingStream.fiducial,
          timingAdvance   => timingStream.advance(0),
          timingDataIn    => timingStream.streams(0).data,
-         timingDataOut   => stream0_data);
+         timingDataOut   => stream0_data,
+         seqCountRst     => seqCountRst,
+         seqCount        => seqCount );
 
    streams_p : process (timingStream, stream0_data) is
    begin
@@ -457,11 +464,14 @@ begin
             fiducial   => timingStream.fiducial,
             pause      => r.pause (i),
             overflow   => r.overflow(i),
-            greject    => greject,
-            lreject    => greject(i),
+            greject    => grejectL0,
+            lreject    => grejectL0(i),
+            grejectMsg => grejectMsg,
+            lrejectMsg => grejectMsg(i),
             l1Feedback => l1Partitions(i),
             l1Ack      => l1PartitionAcks(i),
-            result     => expWord (i));
+            result     => expWord (i),
+            resultValid=> expWordValid(i));
 
       U_SyncMaster : entity surf.Synchronizer
          generic map(
@@ -486,10 +496,22 @@ begin
             dataOut => pdepth(i));
    end generate;
 
+   U_RawInsert : entity l2si_core.XpmRawInsert
+     generic map (
+       TPD_G => TPD_G)
+     port map (
+       clk       => timingClk,
+       rst       => timingRst,
+       config    => configS,
+       start     => expWordValid(0),
+       shift     => r.streamReset,
+       data_in   => expWord,
+       data_out  => expWordQ);
+
    --
    -- timingStream carries its own 'advance' signal as well as fiducial.
    --
-   comb : process (advance, bpRxLinkPauseS, dsPause, dsOverflow, expWord, fstreams, paddr,
+   comb : process (advance, bpRxLinkPauseS, dsPause, dsOverflow, expWordQ, fstreams, paddr,
                    pdepth, pmaster, r, timingRst, timingStream) is
       variable v         : RegType;
       variable tidx      : integer;
@@ -540,7 +562,7 @@ begin
             end if;
          when EWORD_S =>
             if r.source = '1' or pmaster(r.ipart) = '1' then
-               v.stream.data := expWord(r.ipart)(r.eword*16+15 downto r.eword*16);
+               v.stream.data := expWordQ(r.ipart)(r.eword*16+15 downto r.eword*16);
             else
                v.stream.data := fstreams(2).data;
             end if;

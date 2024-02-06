@@ -230,26 +230,28 @@ package XpmPkg is
       groupMask  => (others => '0'),
       trigsrc    => (others => '0'));
    type XpmL0SelectConfigType is record
-      reset   : sl;
-      enabled : sl;
+      reset     : sl;
+      enabled   : sl;
       -- EventSelection
-      rateSel : slv(15 downto 0);
+      rateSel   : slv(15 downto 0);
       -- Bits(15:14)=(fixed,AC,seq,Cu)
       -- fixed:  marker = 3:0
       -- AC   :  marker = 2:0;  TS = 8:3 (mask)
       -- seq  :  bit    = 4:0;  seq = 12:8
       -- cu   :  event  = 7:0
-      destSel : slv(15 downto 0);
+      destSel   : slv(15 downto 0);
    -- 15:15 = DONT_CARE
    --  3:0  = Destination
-      groups  : slv(XPM_PARTITIONS_C-1 downto 0);
+      groups    : slv(XPM_PARTITIONS_C-1 downto 0);
+      rawPeriod : slv(19 downto 0);
    end record;
    constant XPM_L0_SELECT_CONFIG_INIT_C : XpmL0SelectConfigType := (
-      reset   => '0',
-      enabled => '0',
-      rateSel => (others => '0'),
-      destSel => x"8000",
-      groups  => (others => '0'));
+      reset     => '0',
+      enabled   => '0',
+      rateSel   => (others => '0'),
+      destSel   => x"8000",
+      groups    => (others => '0'),
+      rawPeriod => (others => '1'));
 
    type XpmL1SelectConfigType is record
       clear    : slv(XPM_NUM_L1_TRIGGERS_C-1 downto 0);
@@ -290,12 +292,18 @@ package XpmPkg is
 
    type XpmPartMsgConfigType is record
       insert : sl;
-      header : slv(7 downto 0);
+      header : slv(8 downto 0);
    end record;
    constant XPM_PART_MSG_CONFIG_INIT_C : XpmPartMsgConfigType := (
       insert => '0',
       header => (others => '0'));
 
+   -- constants for header(8:7)
+   constant XPM_PART_MSG_DEFAULT_C   : slv(1 downto 0) := "00";
+   constant XPM_PART_MSG_DROP_FULL_C : slv(1 downto 0) := "01";
+   constant XPM_PART_MSG_WAIT_FULL_C : slv(1 downto 0) := "11";
+   constant XPM_PART_MSG_LOW_PRIO_C  : slv(1 downto 0) := "10";
+   
    --  Clear event header -> event data match fifos
    constant MSG_CLEAR_FIFO  : slv(7 downto 0) := toSlv(0, 8);
    --  Communicate delay of pword

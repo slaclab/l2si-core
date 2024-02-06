@@ -54,6 +54,7 @@ package XpmExtensionPkg is
       valid    : sl;
       l0Accept : sl;                    -- l0 accept
       l0Tag    : slv(4 downto 0);
+      l0Raw    : sl;                    -- record raw data
       l0Reject : sl;                    -- l0 reject
       l1Expect : sl;                    -- l1 expexted
       l1Accept : sl;                    -- l1 accepted
@@ -65,6 +66,7 @@ package XpmExtensionPkg is
       valid    => '0',
       l0Accept => '0',
       l0Tag    => (others => '0'),
+      l0Raw    => '0',
       l0Reject => '0',
       l1Expect => '0',
       l1Accept => '0',
@@ -113,6 +115,19 @@ package XpmExtensionPkg is
    function toXpmBroadcastType (partitionAddr : slv(31 downto 0)) return XpmBroadcastType;
    function toXpmPartitionAddress (broadcast  : XpmBroadcastType) return slv;
 
+   type XpmInhibitCountsType is record
+     inhibits : Slv32Array(XPM_PARTITIONS_C-1 downto 0);
+   end record;
+
+   type XpmInhibitCountsArray is array (integer range<>) of XpmInhibitCountsType;
+
+   constant XPM_INHIBIT_COUNTS_INIT_C : XpmInhibitCountsType := (
+     inhibits => (others=>(others=>'0')) );
+
+   constant XPM_INHIBIT_COUNTS_LEN_C : integer := 32*XPM_PARTITIONS_C;
+   
+   function toSlv(a : XpmInhibitCountsType) return slv;
+   function toXpmInhibitCountsType(a : slv) return XpmInhibitCountsType;
 
 end package XpmExtensionPkg;
 package body XpmExtensionPkg is
@@ -140,7 +155,7 @@ package body XpmExtensionPkg is
    begin
       assignSlv(i, vector, xpmEvent.l0Accept);
       assignSlv(i, vector, xpmEvent.l0Tag);
-      assignSlv(i, vector, "0");
+      assignSlv(i, vector, xpmEvent.l0Raw);
       assignSlv(i, vector, xpmEvent.l0Reject);
       assignSlv(i, vector, xpmEvent.l1Expect);
       assignSlv(i, vector, xpmEvent.l1Accept);
@@ -157,7 +172,7 @@ package body XpmExtensionPkg is
    begin
       assignRecord(i, partitionWord, xpmEvent.l0Accept);  -- 0
       assignRecord(i, partitionWord, xpmEvent.l0Tag);     -- 5:1
-      i := i+1;                                           -- 6
+      assignRecord(i, partitionWord, xpmEvent.l0Raw);     -- 6
       assignRecord(i, partitionWord, xpmEvent.l0Reject);  -- 7
       assignRecord(i, partitionWord, xpmEvent.l1Expect);  -- 8
       assignRecord(i, partitionWord, xpmEvent.l1Accept);  -- 9
@@ -237,4 +252,27 @@ package body XpmExtensionPkg is
       return partitionAddr;
    end function;
 
+   function toSlv(a : XpmInhibitCountsType) return slv is
+      variable i,j           : integer;
+      variable ret           : slv(XPM_INHIBIT_COUNTS_LEN_C-1 downto 0);
+   begin
+      i := 0;
+      for j in 0 to XPM_PARTITIONS_C-1 loop
+         assignSlv(i, ret, a.inhibits(j));
+      end loop;
+      return ret;
+   end function;
+     
+   function toXpmInhibitCountsType(a : slv) return XpmInhibitCountsType is
+      variable i,j           : integer;
+      variable ret           : XpmInhibitCountsType;
+   begin
+      i := 0;
+      for j in 0 to XPM_PARTITIONS_C-1 loop
+         assignRecord(i, a, ret.inhibits(j));
+      end loop;
+      return ret;
+   end function;
+
+   
 end package body XpmExtensionPkg;
