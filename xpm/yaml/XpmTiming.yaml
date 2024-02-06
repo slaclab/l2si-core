@@ -1,10 +1,10 @@
 ##############################################################################
 ## This file is part of 'L2SI Core'.
-## It is subject to the license terms in the LICENSE.txt file found in the 
-## top-level directory of this distribution and at: 
-##    https://confluence.slac.stanford.edu/display/ppareg/LICENSE.html. 
-## No part of 'L2SI Core', including this file, 
-## may be copied, modified, propagated, or distributed except according to 
+## It is subject to the license terms in the LICENSE.txt file found in the
+## top-level directory of this distribution and at:
+##    https://confluence.slac.stanford.edu/display/ppareg/LICENSE.html.
+## No part of 'L2SI Core', including this file,
+## may be copied, modified, propagated, or distributed except according to
 ## the terms contained in the LICENSE.txt file.
 ##############################################################################
 #schemaversion 3.0.0
@@ -12,7 +12,7 @@
 #include TimingFrameRx.yaml
 #include GthRxAlignCheck.yaml
 
-XpmTiming: &XpmTiming 
+XpmTiming: &XpmTiming
   name: XpmTiming
   class: MMIODev
   configPrio: 1
@@ -30,4 +30,4 @@ XpmTiming: &XpmTiming
       <<: *GthRxAlignCheck
       at:
         offset: 0x00800000
-    ##################################################    
+    ##################################################

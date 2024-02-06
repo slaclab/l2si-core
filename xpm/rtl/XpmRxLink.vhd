@@ -182,8 +182,10 @@ begin
       case (r.state) is
          when IDLE_S =>
             v.timeout := r.timeout+1;
-            if (rxDataK = "01") then
-               if (rxData = (D_215_C & K_SOF_C)) then
+            -- if (rxDataK = "01") then
+            --    if (rxData = (D_215_C & K_SOF_C)) then
+            if (rxDataK(0) = '1') then
+               if (rxData(7 downto 0) = K_SOF_C) then
                   v.rxRcvs := r.rxRcvs+1;
                   v.state  := ID1_S;
                end if;

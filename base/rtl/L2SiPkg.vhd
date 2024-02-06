@@ -44,6 +44,9 @@ package L2SiPkg is
    subtype TriggerL1FeedbackArray is XpmL1FeedbackArray;
    constant TRIGGER_L1_FEEDBACK_INIT_C : TriggerL1FeedbackType := XPM_L1_FEEDBACK_INIT_C;
 
+   subtype TriggerInhibitCountsType is XpmInhibitCountsType;
+   subtype TriggerInhibitCountsArray is XpmInhibitCountsArray;
+
    constant XPM_TRIGGER_SOURCE_C : sl := '0';
    constant EVR_TRIGGER_SOURCE_C : sl := '1';
 

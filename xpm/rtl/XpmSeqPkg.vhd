@@ -24,14 +24,14 @@ use lcls_timing_core.TPGPkg.all;
 
 package XpmSeqPkg is
 
-   constant XPM_SEQ_DEPTH_C : integer := 1;
+   constant XPM_SEQ_DEPTH_C : integer := 8;
 
    type XpmSeqStatusType is record
       -- implemented resources
       nexptseq     : slv (7 downto 0);
       seqaddrlen   : slv (3 downto 0);
       --
-      countRequest : Slv32Array(XPM_SEQ_DEPTH_C-1 downto 0);
+      countRequest : Slv128Array(XPM_SEQ_DEPTH_C-1 downto 0);
       countInvalid : Slv32Array(XPM_SEQ_DEPTH_C-1 downto 0);
       countUpdate  : sl;                -- single sysclk pulse
       seqRdData    : Slv32Array(XPM_SEQ_DEPTH_C-1 downto 0);
@@ -47,11 +47,11 @@ package XpmSeqPkg is
       seqRdData    => (others => (others => '0')),
       seqState     => (others => SEQUENCER_STATE_INIT_C));
 
-   constant XPM_SEQ_STATUS_BITS_C : integer := 13 + XPM_SEQ_DEPTH_C*(96+8*SEQCOUNTDEPTH+SEQADDRLEN);
-   
+   constant XPM_SEQ_STATUS_BITS_C : integer := 13 + XPM_SEQ_DEPTH_C*(192+8*SEQCOUNTDEPTH+SEQADDRLEN);
+
    function toSlv(s : XpmSeqStatusType) return slv;
    function toXpmSeqStatusType (vector : slv) return XpmSeqStatusType;
-   
+
    type XpmSeqConfigType is record
       seqEnable     : slv(XPM_SEQ_DEPTH_C-1 downto 0);
       seqRestart    : slv(XPM_SEQ_DEPTH_C-1 downto 0);
@@ -89,7 +89,7 @@ package XpmSeqPkg is
 end XpmSeqPkg;
 
 package body XpmSeqPkg is
-  
+
    function toSlv(s : XpmSeqStatusType) return slv
    is
      variable vector : slv(XPM_SEQ_STATUS_BITS_C-1 downto 0) := (others => '0');
@@ -112,7 +112,7 @@ package body XpmSeqPkg is
       assert (i=XPM_SEQ_STATUS_BITS_C) report "toSlv(XpmSeqState) incomplete" severity error;
       return vector;
    end function;
-     
+
    function toXpmSeqStatusType (vector : slv) return XpmSeqStatusType
    is
      variable s : XpmSeqStatusType;
@@ -167,7 +167,7 @@ package body XpmSeqPkg is
       assert (i=XPM_SEQ_CONFIG_BITS_C) report "toSlv(XpmSeqConfig) incomplete" severity error;
       return vector;
    end function;
-     
+
    function toXpmSeqConfigType (vector : slv) return XpmSeqConfigType
    is
      variable s : XpmSeqConfigType;

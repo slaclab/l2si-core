@@ -216,7 +216,21 @@ begin
    partitionConfig.l0Tag    <= XPM_L0_TAG_CONFIG_INIT_C;
    partitionConfig.pipeline <= config.partition.pipeline;
    partitionConfig.inhibit  <= XPM_PART_INH_CONFIG_INIT_C;
-   partitionConfig.message  <= config.partition.message;
+
+   --  Need to cross to the timingClk domain (XpmApp uses one FIFO for all partitions)
+   U_SyncMsg : entity surf.SynchronizerFifo
+     generic map (
+       DATA_WIDTH_G => config.partition.message.header'length )
+     port map (
+       rst    => timingRst,
+       -- Write Ports (wr_clk domain)
+       wr_clk => regclk,
+       wr_en  => config.partition.message.insert,
+       din    => config.partition.message.header,
+       -- Read Ports (rd_clk domain)
+       rd_clk => timingClk,
+       valid  => partitionConfig.message.insert,
+       dout   => partitionConfig.message.header );
 
    status.partition.l0Select <= partitionStatus.l0Select;
 
