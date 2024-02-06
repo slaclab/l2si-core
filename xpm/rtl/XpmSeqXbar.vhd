@@ -79,14 +79,14 @@ architecture xbar of XpmSeqXbar is
    signal statusS    : XpmSeqStatusType;
    signal statusSlv  : slv(XPM_SEQ_STATUS_BITS_C-1 downto 0);
    signal statusSlvS : slv(XPM_SEQ_STATUS_BITS_C-1 downto 0);
-   
+
    signal mConfig     : XpmSeqConfigArray(NUM_AXI_MASTERS_C-1 downto 0);
    signal mConfigS    : XpmSeqConfigArray(NUM_AXI_MASTERS_C-1 downto 0);
 
-   type XpmSeqConfigSlvArray is array (natural range <>) of slv(XPM_SEQ_CONFIG_BITS_C-1 downto 0);   
+   type XpmSeqConfigSlvArray is array (natural range <>) of slv(XPM_SEQ_CONFIG_BITS_C-1 downto 0);
    signal mConfigSlv  : XpmSeqConfigSlvArray(NUM_AXI_MASTERS_C-1 downto 0);
    signal mConfigSlvS : XpmSeqConfigSlvArray(NUM_AXI_MASTERS_C-1 downto 0);
-   
+
    signal regclk : sl;
    signal regrst : sl;
 begin
@@ -170,16 +170,16 @@ begin
          mAxiWriteMaster => syncWriteMaster,
          mAxiWriteSlave  => syncWriteSlave );
    end generate;
-   
+
    GEN_SYNC : if not AXIL_ASYNC_G generate
      regclk     <= axiClk;
      regrst     <= axiRst;
-     
+
      syncReadMaster  <= axiReadMaster;
      axiReadSlave    <= syncReadSlave;
      syncWriteMaster <= axiWriteMaster;
      axiWriteSlave   <= syncWriteSlave;
-     
+
      statusSlv  <= toSlv(status);
      statusS    <= toXpmSeqStatusType(statusSlvS);
 
@@ -203,7 +203,7 @@ begin
            dataOut => mConfigSlv (i));
      end generate GEN_MEMCONFIG;
    end generate;
-   
+
    -------------------------------
    -- Configuration Register
    -------------------------------

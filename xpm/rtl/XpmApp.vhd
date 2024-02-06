@@ -191,7 +191,7 @@ architecture top_level_app of XpmApp is
      end loop;  -- j
      return vector;
    end function;
-   
+
    function insertMsgConfig (c : XpmConfigType;
                              r : slv;
                              v : sl) return XpmConfigType is
@@ -207,7 +207,7 @@ architecture top_level_app of XpmApp is
      end loop;  -- j
      return o;
    end function;
-   
+
 begin
 
    linkstatp : process (bpStatus, dsLinkStatus, dsRxRcvs, isXpm, dsId) is
@@ -440,7 +440,7 @@ begin
        rd_clk => timingClk,
        valid  => msgValid,
        dout   => msgConfigS );
-     
+
    GEN_PART : for i in 0 to XPM_PARTITIONS_C-1 generate
       --
       --  Get the result word (trigger/message) for each partition

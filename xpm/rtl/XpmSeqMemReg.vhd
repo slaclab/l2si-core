@@ -71,7 +71,7 @@ architecture rtl of XpmSeqMemReg is
 
    signal r   : RegType := REG_INIT_C;
    signal rin : RegType;
-   
+
 begin
 
    -------------------------------
