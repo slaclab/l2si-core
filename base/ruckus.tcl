@@ -14,6 +14,7 @@ source -quiet $::env(RUCKUS_DIR)/vivado_proc.tcl
 loadSource -lib l2si_core -dir "$::DIR_PATH/rtl/"
 loadSource -lib l2si_core -dir "$::DIR_PATH/coregen/"
 loadIpCore -path "$::DIR_PATH/coregen/ila_0.xci"
+#loadSource -path "$::DIR_PATH/coregen/ila_0.dcp"
 loadIpCore -path "$::DIR_PATH/coregen/debug_bridge_0.xci"
 #loadIpCore -path "$::DIR_PATH/coregen/bd_54be_0_bsip_0.xci"
 loadIpCore -path "$::DIR_PATH/coregen/jtag_bridge.xci"

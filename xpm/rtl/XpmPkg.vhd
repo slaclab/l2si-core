@@ -94,6 +94,12 @@ package XpmPkg is
       rxRcvCnts   : slv(31 downto 0);
       rxIsXpm     : sl;
       rxId        : slv(31 downto 0);
+      rxcdrlock   : sl;
+      gtpowergood : sl;
+      rxpmarstdone: sl;
+      txpmarstdone: sl;
+      rxGTHWordCnts : slv(31 downto 0);
+      rxGTHErrCnts  : slv(31 downto 0);
    end record;
    type XpmLinkStatusArray is array (natural range<>) of XpmLinkStatusType;
    constant XPM_LINK_STATUS_INIT_C : XpmLinkStatusType := (
@@ -104,8 +110,14 @@ package XpmPkg is
       rxErr       => '0',
       rxErrCnts   => (others => '0'),
       rxRcvCnts   => (others => '0'),
+      rxGTHWordCnts => (others => '0'),
+      rxGTHErrCnts  => (others => '0'),
       rxIsXpm     => '0',
-      rxId        => (others => '0'));
+      rxId        => (others => '0'),
+      rxcdrlock   => '0',
+      gtpowergood => '0',
+      rxpmarstdone=> '0',
+      txpmarstdone=> '0');
 
    type XpmBpLinkStatusType is record
       linkUp : sl;
@@ -211,10 +223,13 @@ package XpmPkg is
       txPllReset : sl;
       rxPllReset : sl;
       txDelayRst : sl;
+      eyescanrst : sl;
+      rxpmarst   : sl;
       txDelay    : slv(8 downto 0);
       rxTimeOut  : slv(8 downto 0);
       groupMask  : slv(XPM_PARTITIONS_C-1 downto 0);
       trigsrc    : slv(3 downto 0);
+      rstGthCnter: sl;
    end record;
    type XpmLinkConfigArray is array (natural range<>) of XpmLinkConfigType;
    constant XPM_LINK_CONFIG_INIT_C : XpmLinkConfigType := (
@@ -225,6 +240,9 @@ package XpmPkg is
       txPllReset => '0',
       rxPllReset => '0',
       txDelayRst => '0',
+      eyescanrst => '0',
+      rxpmarst   => '0',
+      rstGthCnter => '0',
       txDelay    => (others => '0'),
       rxTimeOut  => toSlv(200, 9),
       groupMask  => (others => '0'),
