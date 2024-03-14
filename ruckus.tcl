@@ -21,5 +21,5 @@ if { [info exists ::env(OVERRIDE_SUBMODULE_LOCKS)] != 1 || $::env(OVERRIDE_SUBMO
 # Load ruckus files
 loadRuckusTcl "$::DIR_PATH/base"  "quiet"
 loadRuckusTcl "$::DIR_PATH/xpm" "quiet"
-loadRuckusTcl "$::DIR_PATH/gthUltraScale" "quiet"
+#loadRuckusTcl "$::DIR_PATH/gthUltraScale" "quiet"
 
