@@ -41,8 +41,9 @@ entity TriggerEventBuffer is
       TRIGGER_CLK_IS_TIMING_RX_CLK_G : boolean             := false;
       EVENT_CLK_IS_TIMING_RX_CLK_G   : boolean             := false);
    port (
-      timingRxClk : in sl;
-      timingRxRst : in sl;
+      timingRxClk    : in sl;
+      timingRxRst    : in sl;
+      standAloneMode : in sl := '0'; -- 1 when using l2si_core.XpmMiniWrapper (locally)
 
       -- AXI Lite bus for configuration and status
       axilClk         : in  sl;
@@ -204,6 +205,7 @@ architecture rtl of TriggerEventBuffer is
    signal fifoRstReg      : sl;
    signal fifoRst         : sl;
    signal enable          : sl;
+   signal enableTmp       : sl;
 
    signal triggerInhibitCountsSlv : slv(XPM_INHIBIT_COUNTS_LEN_C-1 downto 0);
    signal eventInhibitCountsSlv   : slv(XPM_INHIBIT_COUNTS_LEN_C-1 downto 0);
@@ -472,7 +474,7 @@ begin
          alignedXpmMessage => alignedXpmMessage,
          pauseToTrig       => r.pauseToTrig,
          notPauseToTrig    => r.notPauseToTrig,
-         enable            => enable,
+         enable            => enableTmp,
          fifoRst           => fifoRstReg,
          resetCounters     => resetCounters,
          partition         => partitionReg,
@@ -486,6 +488,8 @@ begin
          axilReadSlave     => axilReadSlave,
          axilWriteMaster   => axilWriteMaster,
          axilWriteSlave    => axilWriteSlave);
+
+   enable <= '0' when( (standAloneMode = '1') and (eventAxisCtrlPauseSync = '1') ) else enableTmp;
 
    -----------------------------------------------
    -- Delay triggerData according to AXI-Lite register

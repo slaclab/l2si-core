@@ -49,8 +49,9 @@ entity TriggerEventManager is
       timingRxClk : in sl;
       timingRxRst : in sl;
 
-      timingBus  : in TimingBusType;
-      timingMode : in sl;
+      timingBus      : in TimingBusType;
+      timingMode     : in sl;
+      standAloneMode : in sl := '0'; -- 1 when using l2si_core.XpmMiniWrapper (locally)
 
       -- Timing Tx Feedback
       timingTxClk : in  sl;
@@ -347,6 +348,7 @@ begin
          port map (
             timingRxClk             => timingRxClk,                         -- [in]
             timingRxRst             => timingRxRst,                         -- [in]
+            standAloneMode          => standAloneMode,                      -- [in]
             axilClk                 => axilClk,                             -- [in]
             axilRst                 => axilRst,                             -- [in]
             axilReadMaster          => locAxilReadMasters(AXIL_TEB_C(i)),   -- [in]
