@@ -528,18 +528,19 @@ begin
             dout   => syncTriggerDataSlv);      -- [out]
       triggerData <= toXpmEventDataType(syncTriggerDataSlv, syncTriggerDataValid);
 
-      U_SynchronizerClearReadout : entity surf.SynchronizerOneShot
-         generic map (
-            TPD_G => TPD_G)
-         port map (
-            clk     => eventClk,
-            dataIn  => fifoRst,
-            dataOut => clearReadout);
    end generate TRIGGER_SYNC_GEN;
 
    NO_TRIGGER_SYNC_GEN : if (TRIGGER_CLK_IS_TIMING_RX_CLK_G) generate
       triggerData <= toXpmEventDataType(delayedTriggerDataSlv, delayedTriggerDataValid);
    end generate NO_TRIGGER_SYNC_GEN;
+
+   U_SynchronizerClearReadout : entity surf.SynchronizerOneShot
+     generic map (
+       TPD_G => TPD_G)
+     port map (
+       clk     => eventClk,
+       dataIn  => fifoRst,
+       dataOut => clearReadout);
 
    -----------------------------------------------
    -- Buffer event data in a fifo
