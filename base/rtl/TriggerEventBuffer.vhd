@@ -189,8 +189,10 @@ architecture rtl of TriggerEventBuffer is
 
    signal triggerDataValid        : sl;
    signal triggerDataSlv          : slv(47 downto 0);
-   signal delayedTriggerDataSlv   : slv(47 downto 0);
+   signal xpmTriggerDataValid     : sl;
+   signal xpmTriggerDataSlv       : slv(47 downto 0);
    signal delayedTriggerDataValid : sl;
+   signal delayedTriggerDataSlv   : slv(47 downto 0);
    signal syncTriggerDataValid    : sl;
    signal syncTriggerDataSlv      : slv(47 downto 0);
 
@@ -225,7 +227,7 @@ begin
    comb : process (alignedTimingMessage, alignedTimingStrobe, alignedXpmMessage, enable,
                    eventAxisCtrlPauseSync, evrTriggers, fifoAxisCtrl, fifoRstReg, partitionReg,
                    promptTimingStrobe, promptXpmMessage, r, resetCounters, timingMode, timingRxRst,
-                   triggerSource) is
+                   triggerSource, xpmTriggerDataSlv, xpmTriggerDataValid) is
       variable v      : RegType;
       variable axilEp : AxiLiteEndpointType;
       variable eventData : XpmEventDataType;
@@ -261,6 +263,9 @@ begin
 
          end if;
 
+         delayedTriggerDataSlv   <= toSlv(r.triggerData);
+         delayedTriggerDataValid <= r.triggerData.valid and r.triggerData.l0Accept;
+         
       elsif (EN_LCLS_II_TIMING_G and timingMode = '1' and triggerSource = XPM_TRIGGER_SOURCE_C) then
 
          -- LCLS-II XPM Trigger Buffer Logic
@@ -407,6 +412,8 @@ begin
             end if;
          end if;
 
+         delayedTriggerDataSlv   <= xpmTriggerDataSlv;
+         delayedTriggerDataValid <= xpmTriggerDataValid;
       end if;  -- LCLS-II XPM logic
 
       -- Latch FIFO overflow if seen
@@ -505,8 +512,8 @@ begin
          delay       => triggerDelay,              -- [in]
          inputData   => triggerDataSlv,            -- [in]
          inputValid  => triggerDataValid,          -- [in]
-         outputData  => delayedTriggerDataSlv,     -- [out]
-         outputValid => delayedTriggerDataValid);  -- [out]
+         outputData  => xpmTriggerDataSlv,     -- [out]
+         outputValid => xpmTriggerDataValid);  -- [out]
 
    -----------------------------------------------
    -- Synchronize trigger data to trigger clock
@@ -528,18 +535,19 @@ begin
             dout   => syncTriggerDataSlv);      -- [out]
       triggerData <= toXpmEventDataType(syncTriggerDataSlv, syncTriggerDataValid);
 
-      U_SynchronizerClearReadout : entity surf.SynchronizerOneShot
-         generic map (
-            TPD_G => TPD_G)
-         port map (
-            clk     => eventClk,
-            dataIn  => fifoRst,
-            dataOut => clearReadout);
    end generate TRIGGER_SYNC_GEN;
 
    NO_TRIGGER_SYNC_GEN : if (TRIGGER_CLK_IS_TIMING_RX_CLK_G) generate
       triggerData <= toXpmEventDataType(delayedTriggerDataSlv, delayedTriggerDataValid);
    end generate NO_TRIGGER_SYNC_GEN;
+
+   U_SynchronizerClearReadout : entity surf.SynchronizerOneShot
+     generic map (
+       TPD_G => TPD_G)
+     port map (
+       clk     => eventClk,
+       dataIn  => fifoRst,
+       dataOut => clearReadout);
 
    -----------------------------------------------
    -- Buffer event data in a fifo

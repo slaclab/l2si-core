@@ -71,6 +71,7 @@ architecture rtl of XpmMessageAligner is
       rxId            : slv(31 downto 0);
       delayRst        : slv( 3 downto 0);
       timingMsgDelay  : slv( 6 downto 0);
+      timingMsgIndex  : integer;
       partitionDelays : Slv7Array(XPM_PARTITIONS_C-1 downto 0);
       axilWriteSlave  : AxiLiteWriteSlaveType;
       axilReadSlave   : AxiLiteReadSlaveType;
@@ -80,7 +81,8 @@ architecture rtl of XpmMessageAligner is
       txId            => (others => '0'),
       rxId            => (others => '1'),
       delayRst        => (others => '1'),
-      timingMsgDelay  => toSlv(MAX_DELAY_C,7),
+      timingMsgDelay  => toSlv(0,7),
+      timingMsgIndex  => 0,
       partitionDelays => (others => (others => '0')),
       axilWriteSlave  => AXI_LITE_WRITE_SLAVE_INIT_C,
       axilReadSlave   => AXI_LITE_READ_SLAVE_INIT_C);
@@ -200,17 +202,15 @@ begin
             if (r.partitionDelays(broadcastMessage.index) /= broadcastMessage.value) then
                v.delayRst := (others=>'1');
             end if;
+            if (broadcastMessage.value > v.timingMsgDelay or
+                broadcastMessage.index = v.timingMsgIndex) then
+               v.timingMsgIndex := broadcastMessage.index;
+               v.timingMsgDelay := broadcastMessage.value;
+            end if;
          elsif (broadcastMessage.btype = XPM_BROADCAST_XADDR_C) then
             v.rxId := promptXpmMessage.partitionAddr;
          end if;
       end if;
-
-      v.timingMsgDelay := (others=>'0');
-      for i in 0 to XPM_PARTITIONS_C-1 loop
-         if (r.partitionDelays(i) > v.timingMsgDelay) then
-           v.timingMsgDelay := r.partitionDelays(i);
-         end if;
-      end loop;
 
       if timingRxRst = '1' then
          v      := REG_INIT_C;

@@ -116,7 +116,7 @@ begin
    accept  <= r.accept;
    rejecc  <= r.rejecc;
    status  <= r.status;
-
+   
    U_SYNC : entity surf.SynchronizerVector
       generic map (
          TPD_G   => TPD_G,
@@ -158,7 +158,11 @@ begin
       end if;
 
       eventI    := conv_integer(uconfig.rateSel(12 downto 8));
-      v.evtWord := cuTiming.eventCodes(eventI*16+15 downto eventI*16);
+      if (eventI < cuTiming.eventCodes'length/16) then
+         v.evtWord := cuTiming.eventCodes(eventI*16+15 downto eventI*16);
+      else
+         v.evtWord := (others=>'0');
+      end if;
 
       if (timingBus.strobe = '1') then
          v.strobeRdy := '1';

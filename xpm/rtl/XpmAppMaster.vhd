@@ -275,16 +275,6 @@ begin
    l1Ack <= '1';
    l1AcceptTag <= (others=>'0');
 
-   --U_AnalysisTag : entity l2si_core.XpmAnalysisTag
-   --  port map ( wrclk          => regclk,
-   --             config         => config.analysis,
-   --             rdclk          => timingClk,
-   --             rden           => l1Accept,
-   --             rddone         => r.partStrobe,
-   --             rdvalid        => status.anaRd,
-   --             tag            => analysisTag );
-   status.anaRd    <= (others=>'0');
-
    msgAdvance      <= fiducial and r.advanceMsg;
 
    U_SyncMsgPayload : entity surf.FifoSync
