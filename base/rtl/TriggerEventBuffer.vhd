@@ -265,7 +265,7 @@ begin
 
          delayedTriggerDataSlv   <= toSlv(r.triggerData);
          delayedTriggerDataValid <= r.triggerData.valid and r.triggerData.l0Accept;
-         
+
       elsif (EN_LCLS_II_TIMING_G and timingMode = '1' and triggerSource = XPM_TRIGGER_SOURCE_C) then
 
          -- LCLS-II XPM Trigger Buffer Logic
