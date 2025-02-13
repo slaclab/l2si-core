@@ -43,7 +43,8 @@ entity TriggerEventManager is
       AXIL_CLK_IS_TIMING_RX_CLK_G    : boolean              := false;
       L1_CLK_IS_TIMING_TX_CLK_G      : boolean              := false;
       TRIGGER_CLK_IS_TIMING_RX_CLK_G : boolean              := false;
-      EVENT_CLK_IS_TIMING_RX_CLK_G   : boolean              := false);
+      EVENT_CLK_IS_TIMING_RX_CLK_G   : boolean              := false;
+      TRIGGER_PIPELINE_DEPTH_G       : integer              := 0);
    port (
       -- Timing Rx interface
       timingRxClk : in sl;
@@ -281,7 +282,7 @@ begin
          NCHANNELS_G     => NUM_DETECTORS_G,
          NTRIGGERS_G     => NUM_DETECTORS_G,
          TRIG_DEPTH_G    => 28,
-         TRIG_PIPE_G     => 0,
+         TRIG_PIPE_G     => TRIGGER_PIPELINE_DEPTH_G,
          COMMON_CLK_G    => AXIL_CLK_IS_TIMING_RX_CLK_G,
          EVR_CARD_G      => false,
          AXIL_BASEADDR_G => AXIL_XBAR_CONFIG_C(AXIL_EVR_C).baseAddr)
