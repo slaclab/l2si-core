@@ -116,7 +116,7 @@ begin
    accept  <= r.accept;
    rejecc  <= r.rejecc;
    status  <= r.status;
-   
+
    U_SYNC : entity surf.SynchronizerVector
       generic map (
          TPD_G   => TPD_G,
