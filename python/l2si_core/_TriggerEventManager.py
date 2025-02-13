@@ -20,11 +20,10 @@ class TriggerEventManager(pr.Device):
             **kwargs):
         super().__init__(**kwargs)
 
-        if enLclsI:
-            self.add(LclsTimingCore.EvrV2CoreTriggers(
-                offset  = 0x0000,
-                numTrig = numDetectors,
-            ))
+        self.add(LclsTimingCore.EvrV2CoreTriggers(
+            offset  = 0x0000,
+            numTrig = numDetectors,
+        ))
 
         if enLclsII:
             self.add(l2si_core.XpmMessageAligner(
