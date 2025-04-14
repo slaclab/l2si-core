@@ -238,8 +238,8 @@ architecture rtl of TriggerEventManager is
       TDEST_BITS_C  => 4,
       TID_BITS_C    => 0,
       TKEEP_MODE_C  => TKEEP_NORMAL_C,
-      TUSER_BITS_C  => 0,
-      TUSER_MODE_C  => TUSER_NORMAL_C);
+      TUSER_BITS_C  => 1,
+      TUSER_MODE_C  => TUSER_NONE_C);
 
    signal l1Masters    : AxiStreamMasterArray(NUM_DETECTORS_G-1 downto 0) := (others => axiStreamMasterInit(L1_AXI_CONFIG_C));
    signal l1Slaves     : AxiStreamSlaveArray (NUM_DETECTORS_G-1 downto 0);
