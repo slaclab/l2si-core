@@ -88,7 +88,7 @@ package L2SiPkg is
       TDEST_BITS_C  => 1,
       TID_BITS_C    => 0,
       TKEEP_MODE_C  => TKEEP_FIXED_C,
-      TUSER_BITS_C  => 0,
+      TUSER_BITS_C  => 1,
       TUSER_MODE_C  => TUSER_NONE_C);
 
 

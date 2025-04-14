@@ -49,8 +49,8 @@ architecture mapping of EventTimingMessage is
       TDEST_BITS_C  => 0,
       TID_BITS_C    => 0,
       TKEEP_MODE_C  => TKEEP_NORMAL_C,
-      TUSER_BITS_C  => 0,
-      TUSER_MODE_C  => TUSER_NORMAL_C);
+      TUSER_BITS_C  => 1,
+      TUSER_MODE_C  => TUSER_NONE_C);
 
    function toSlvFormatted(msg : TimingMessageType) return slv is
       variable v : slv(383 downto 0) := (others => '0');
