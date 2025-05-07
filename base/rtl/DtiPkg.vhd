@@ -216,7 +216,7 @@ package DtiPkg is
      usApp      : DtiUsAppStatusArray    (MaxUsLinks-1 downto 0);
      qplllock   : slv                    (3 downto 0);
      amcPll     : XpmPllStatusArray      (1 downto 0);
-     msgDelaySet: Slv7Array              (XPM_PARTITIONS_G-1 downto 0);
+     msgDelaySet: Slv7Array              (XPM_PARTITIONS_C-1 downto 0);
      msgDelayGet: Slv7Array              (MaxUsLinks-1 downto 0);
    end record;
 
