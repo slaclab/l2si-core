@@ -1,8 +1,6 @@
 
 XPM Rx serial link formats
 
-    From DTI    :          (Encapsulated on Bp link [SALT])
-         Full(15 downto 0)
     From XPM    :          (AMC Link)
          D_215_C & K_EOS_C
          Full(15 downto 0) 
@@ -16,7 +14,3 @@ XPM Rx serial link formats
          D_215_C & K_EOF_C
          (partition#, trigsrc must be configured)
 
-DTI
-
-    From DS (DRP):
-         
