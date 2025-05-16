@@ -327,16 +327,6 @@ package XpmPkg is
    --  Communicate delay of pword
    constant MSG_DELAY_PWORD : slv(7 downto 0) := toSlv(1, 8);
 
-   type XpmAnalysisConfigType is record
-      rst  : slv(XPM_NUM_TAG_BYTES_C-1 downto 0);
-      tag  : slv(8*XPM_NUM_TAG_BYTES_C-1 downto 0);
-      push : slv(XPM_NUM_TAG_BYTES_C-1 downto 0);
-   end record;
-   constant XPM_ANALYSIS_CONFIG_INIT_C : XpmAnalysisConfigType := (
-      rst  => (others => '0'),
-      tag  => (others => '0'),
-      push => (others => '0'));
-
    type XpmPipelineConfigType is record
       depth_clks : slv(15 downto 0);
       depth_fids : slv(7 downto 0);
