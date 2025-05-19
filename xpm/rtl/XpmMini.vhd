@@ -212,6 +212,7 @@ begin
    partitionConfig.master   <= '1';
    partitionConfig.l0Select <= config.partition.l0Select;
    partitionConfig.l1Select <= XPM_L1_SELECT_CONFIG_INIT_C;
+--   partitionConfig.analysis <= XPM_ANALYSIS_CONFIG_INIT_C; Remove AnalysisTag references and unused XpmLinkClocks in e26d1183f2bb3537e1f910a55174edf29d8edaef
    partitionConfig.l0Tag    <= XPM_L0_TAG_CONFIG_INIT_C;
    partitionConfig.pipeline <= config.partition.pipeline;
    partitionConfig.inhibit  <= XPM_PART_INH_CONFIG_INIT_C;

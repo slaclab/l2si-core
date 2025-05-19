@@ -351,6 +351,7 @@ package XpmPkg is
       master   : sl;
       l0Select : XpmL0SelectConfigType;
       l1Select : XpmL1SelectConfigType;
+--      analysis : XpmAnalysisConfigType; Remove AnalysisTag references and unused XpmLinkClocks in e26d1183f2bb3537e1f910a55174edf29d8edaef
       l0Tag    : XpmL0TagConfigType;
       pipeline : XpmPipelineConfigType;
       inhibit  : XpmPartInhConfigType;
@@ -360,6 +361,7 @@ package XpmPkg is
       master   => '0',
       l0Select => XPM_L0_SELECT_CONFIG_INIT_C,
       l1Select => XPM_L1_SELECT_CONFIG_INIT_C,
+--      analysis => XPM_ANALYSIS_CONFIG_INIT_C, Remove AnalysisTag references and unused XpmLinkClocks in e26d1183f2bb3537e1f910a55174edf29d8edaef
       l0Tag    => XPM_L0_TAG_CONFIG_INIT_C,
       pipeline => XPM_PIPELINE_CONFIG_INIT_C,
       inhibit  => XPM_PART_INH_CONFIG_INIT_C,
