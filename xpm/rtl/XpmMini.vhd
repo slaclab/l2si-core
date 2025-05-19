@@ -212,7 +212,6 @@ begin
    partitionConfig.master   <= '1';
    partitionConfig.l0Select <= config.partition.l0Select;
    partitionConfig.l1Select <= XPM_L1_SELECT_CONFIG_INIT_C;
-   partitionConfig.analysis <= XPM_ANALYSIS_CONFIG_INIT_C;
    partitionConfig.l0Tag    <= XPM_L0_TAG_CONFIG_INIT_C;
    partitionConfig.pipeline <= config.partition.pipeline;
    partitionConfig.inhibit  <= XPM_PART_INH_CONFIG_INIT_C;
