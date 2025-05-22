@@ -151,7 +151,7 @@ begin
       U_Sync_dslink_rxId : entity surf.SynchronizerFifo
          generic map (
             TPD_G        => TPD_G,
-            DATA_WIDTH_G => XPM_LCTR_DEPTH_C)
+            DATA_WIDTH_G => 32)
          port map (
             wr_clk => staClk,
             wr_en  => staUpdate,
@@ -163,7 +163,7 @@ begin
       U_Sync_dslink_rxRcvCnts : entity surf.SynchronizerFifo
          generic map (
             TPD_G        => TPD_G,
-            DATA_WIDTH_G => XPM_LCTR_DEPTH_C)
+            DATA_WIDTH_G => 32)
          port map (
             wr_clk => staClk,
             wr_en  => staUpdate,
