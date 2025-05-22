@@ -273,8 +273,8 @@ begin
             cnt       := (others => '0');
             staUpdate <= '1' after TPD_G;
          else
-            cnt       := cnt+1 after TPD_G;
-            staUpdate <= '0'   after TPD_G;
+            cnt       := cnt+1;
+            staUpdate <= '0' after TPD_G;
          end if;
       end if;
    end process rseq;
