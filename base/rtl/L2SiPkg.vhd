@@ -84,7 +84,7 @@ package L2SiPkg is
 
    constant EVENT_AXIS_CONFIG_C : AxiStreamConfigType := (
       TSTRB_EN_C    => false,
-      TDATA_BYTES_C => 32,              -- 192 bits
+      TDATA_BYTES_C => 32,              -- 24B (192 bits data width) + 8B padding
       TDEST_BITS_C  => 1,
       TID_BITS_C    => 0,
       TKEEP_MODE_C  => TKEEP_FIXED_C,

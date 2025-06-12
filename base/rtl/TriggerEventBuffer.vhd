@@ -414,6 +414,9 @@ begin
 
          delayedTriggerDataSlv   <= xpmTriggerDataSlv;
          delayedTriggerDataValid <= xpmTriggerDataValid;
+      else
+         delayedTriggerDataSlv <= (others => '0');
+         delayedTriggerDataValid <= '0';
       end if;  -- LCLS-II XPM logic
 
       -- Latch FIFO overflow if seen

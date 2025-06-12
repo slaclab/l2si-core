@@ -327,16 +327,6 @@ package XpmPkg is
    --  Communicate delay of pword
    constant MSG_DELAY_PWORD : slv(7 downto 0) := toSlv(1, 8);
 
-   type XpmAnalysisConfigType is record
-      rst  : slv(XPM_NUM_TAG_BYTES_C-1 downto 0);
-      tag  : slv(8*XPM_NUM_TAG_BYTES_C-1 downto 0);
-      push : slv(XPM_NUM_TAG_BYTES_C-1 downto 0);
-   end record;
-   constant XPM_ANALYSIS_CONFIG_INIT_C : XpmAnalysisConfigType := (
-      rst  => (others => '0'),
-      tag  => (others => '0'),
-      push => (others => '0'));
-
    type XpmPipelineConfigType is record
       depth_clks : slv(15 downto 0);
       depth_fids : slv(7 downto 0);
@@ -361,7 +351,7 @@ package XpmPkg is
       master   : sl;
       l0Select : XpmL0SelectConfigType;
       l1Select : XpmL1SelectConfigType;
-      analysis : XpmAnalysisConfigType;
+--      analysis : XpmAnalysisConfigType; Remove AnalysisTag references and unused XpmLinkClocks in e26d1183f2bb3537e1f910a55174edf29d8edaef
       l0Tag    : XpmL0TagConfigType;
       pipeline : XpmPipelineConfigType;
       inhibit  : XpmPartInhConfigType;
@@ -371,7 +361,7 @@ package XpmPkg is
       master   => '0',
       l0Select => XPM_L0_SELECT_CONFIG_INIT_C,
       l1Select => XPM_L1_SELECT_CONFIG_INIT_C,
-      analysis => XPM_ANALYSIS_CONFIG_INIT_C,
+--      analysis => XPM_ANALYSIS_CONFIG_INIT_C, Remove AnalysisTag references and unused XpmLinkClocks in e26d1183f2bb3537e1f910a55174edf29d8edaef
       l0Tag    => XPM_L0_TAG_CONFIG_INIT_C,
       pipeline => XPM_PIPELINE_CONFIG_INIT_C,
       inhibit  => XPM_PART_INH_CONFIG_INIT_C,
