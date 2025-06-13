@@ -41,6 +41,7 @@ entity XpmMiniReg is
       axilUpdate      : out sl;
       --
       staClk          : in  sl;
+      staRst          : in  sl;
       status          : in  XpmMiniStatusType;
       config          : out XpmMiniConfigType);
 end XpmMiniReg;
@@ -146,16 +147,36 @@ begin
          din    => status.partition.l0Select.numAcc,
          dout   => s.partition.l0Select.numAcc);
 
-   comb : process (axilReadMaster, axilRst, axilWriteMaster, r, s, status) is
+   GEN_LINKSTAT_SYNC : for i in XPM_MAX_DS_LINKS_C-1 downto 0 generate
+      U_Sync_dslink_rxId : entity surf.SynchronizerFifo
+         generic map (
+            TPD_G        => TPD_G,
+            DATA_WIDTH_G => 32)
+         port map (
+            wr_clk => staClk,
+            wr_en  => staUpdate,
+            rd_clk => axilClk,
+            rd_en  => r.axilRdEn,
+            din    => status.dsLink(i).rxId,
+            dout   => s.dsLink(i).rxId);
+
+      U_Sync_dslink_rxRcvCnts : entity surf.SynchronizerFifo
+         generic map (
+            TPD_G        => TPD_G,
+            DATA_WIDTH_G => 32)
+         port map (
+            wr_clk => staClk,
+            wr_en  => staUpdate,
+            rd_clk => axilClk,
+            rd_en  => r.axilRdEn,
+            din    => status.dsLink(i).rxRcvCnts,
+            dout   => s.dsLink(i).rxRcvCnts);
+   end generate GEN_LINKSTAT_SYNC;
+
+   comb : process (axilReadMaster, axilRst, axilWriteMaster, r, s) is
       variable v  : RegType;
       variable ep : AxiLiteEndPointType;
       variable il : integer;
-   -- Shorthand procedures for read/write register
---       procedure axilRegR64 (addr : in slv; reg : in slv) is
---       begin
---          axiSlaveRegisterR(ep, addr+0, 0, reg(31 downto 0));
---          axiSlaveRegisterR(ep, addr+4, 0, resize(reg(reg'left downto 32), 32));
---       end procedure;
    begin
       v                                 := r;
       -- reset strobing signals
@@ -170,7 +191,7 @@ begin
          v.config.dsLink (il) := r.linkCfg;
       end if;
 
-      v.linkStat := status.dsLink (il);  -- clock-domain?
+      v.linkStat := s.dsLink (il);
 
       -- Determine the transaction type
       axiSlaveWaitTxn(ep, axilWriteMaster, axilReadMaster, v.axilWriteSlave, v.axilReadSlave);
@@ -178,46 +199,46 @@ begin
       -- Read/write to the configuration registers
       -- Read only from status registers
 
-      axiSlaveRegister(ep, X"000", 0, v.link);
+      axiSlaveRegister(ep, X"00", 0, v.link);
 
       v.load := '0';
-      axiWrDetect(ep, X"000", v.load);
+      axiWrDetect(ep, X"00", v.load);
 
-      axiSlaveRegister(ep, X"004", 18, v.linkCfg.txPllReset);
-      axiSlaveRegister(ep, X"004", 19, v.linkCfg.rxPllReset);
-      axiSlaveRegister(ep, X"004", 28, v.linkCfg.loopback);
-      axiSlaveRegister(ep, X"004", 29, v.linkCfg.txReset);
-      axiSlaveRegister(ep, X"004", 30, v.linkCfg.rxReset);
-      axiSlaveRegister(ep, X"004", 31, v.linkCfg.enable);
+      axiSlaveRegister(ep, X"04", 18, v.linkCfg.txPllReset);
+      axiSlaveRegister(ep, X"04", 19, v.linkCfg.rxPllReset);
+      axiSlaveRegister(ep, X"04", 28, v.linkCfg.loopback);
+      axiSlaveRegister(ep, X"04", 29, v.linkCfg.txReset);
+      axiSlaveRegister(ep, X"04", 30, v.linkCfg.rxReset);
+      axiSlaveRegister(ep, X"04", 31, v.linkCfg.enable);
 
-      axiSlaveRegisterR(ep, X"008", 0, r.linkStat.rxErrCnts);
-      axiSlaveRegisterR(ep, X"008", 16, r.linkStat.txResetDone);
-      axiSlaveRegisterR(ep, X"008", 17, r.linkStat.txReady);
-      axiSlaveRegisterR(ep, X"008", 18, r.linkStat.rxResetDone);
-      axiSlaveRegisterR(ep, X"008", 19, r.linkStat.rxReady);
-      axiSlaveRegisterR(ep, X"008", 20, r.linkStat.rxIsXpm);
+      axiSlaveRegisterR(ep, X"08", 0, r.linkStat.rxErrCnts);
+      axiSlaveRegisterR(ep, X"08", 16, r.linkStat.txResetDone);
+      axiSlaveRegisterR(ep, X"08", 17, r.linkStat.txReady);
+      axiSlaveRegisterR(ep, X"08", 18, r.linkStat.rxResetDone);
+      axiSlaveRegisterR(ep, X"08", 19, r.linkStat.rxReady);
+      axiSlaveRegisterR(ep, X"08", 20, r.linkStat.rxIsXpm);
 
-      axiSlaveRegisterR(ep, X"00C", 0, r.linkStat.rxId);
-      axiSlaveRegisterR(ep, X"010", 0, r.linkStat.rxRcvCnts);
+      axiSlaveRegisterR(ep, X"0C", 0, r.linkStat.rxId);
+      axiSlaveRegisterR(ep, X"10", 0, r.linkStat.rxRcvCnts);
 
-      axiSlaveRegister (ep, X"014", 0, v.config.partition.l0Select.reset);
-      axiSlaveRegister (ep, X"014", 16, v.config.partition.l0Select.enabled);
-      axiSlaveRegister (ep, X"014", 31, v.axilRdEn);
+      axiSlaveRegister (ep, X"14", 0, v.config.partition.l0Select.reset);
+      axiSlaveRegister (ep, X"14", 16, v.config.partition.l0Select.enabled);
+      axiSlaveRegister (ep, X"14", 31, v.axilRdEn);
 
-      axiSlaveRegister (ep, X"018", 0, v.config.partition.l0Select.rateSel);
-      axiSlaveRegister (ep, X"018", 16, v.config.partition.l0Select.destSel);
+      axiSlaveRegister (ep, X"18", 0, v.config.partition.l0Select.rateSel);
+      axiSlaveRegister (ep, X"18", 16, v.config.partition.l0Select.destSel);
 
-      axiSlaveRegisterR(ep, X"020", 0, s.partition.l0Select.enabled);
-      axiSlaveRegisterR(ep, X"028", 0, s.partition.l0Select.inhibited);
-      axiSlaveRegisterR(ep, X"030", 0, s.partition.l0Select.num);
-      axiSlaveRegisterR(ep, X"038", 0, s.partition.l0Select.numInh);
-      axiSlaveRegisterR(ep, X"040", 0, s.partition.l0Select.numAcc);
+      axiSlaveRegisterR(ep, X"20", 0, s.partition.l0Select.enabled);
+      axiSlaveRegisterR(ep, X"28", 0, s.partition.l0Select.inhibited);
+      axiSlaveRegisterR(ep, X"30", 0, s.partition.l0Select.num);
+      axiSlaveRegisterR(ep, X"38", 0, s.partition.l0Select.numInh);
+      axiSlaveRegisterR(ep, X"40", 0, s.partition.l0Select.numAcc);
 
-      axiSlaveRegister (ep, X"048", 0, v.config.partition.pipeline.depth_clks);
-      axiSlaveRegister (ep, X"048", 16, v.config.partition.pipeline.depth_fids);
+      axiSlaveRegister (ep, X"48", 0, v.config.partition.pipeline.depth_clks);
+      axiSlaveRegister (ep, X"48", 16, v.config.partition.pipeline.depth_fids);
 
-      axiSlaveRegister (ep, X"04C", 15, v.config.partition.message.insert);
-      axiSlaveRegister (ep, X"04C", 0, v.config.partition.message.header);
+      axiSlaveRegister (ep, X"4C", 15, v.config.partition.message.insert);
+      axiSlaveRegister (ep, X"4C", 0, v.config.partition.message.header);
 
       -- Set the status
       axiSlaveDefault(ep, v.axilWriteSlave, v.axilReadSlave);
@@ -239,13 +260,14 @@ begin
       end if;
    end process;
 
-   rseq : process (staClk, axilRst) is
+
+   rseq : process (staClk, staRst) is
       constant STATUS_INTERVAL_C : slv(19 downto 0) := toSlv(910000-1, 20);
       variable cnt               : slv(19 downto 0) := (others => '0');
    begin
-      if axilRst = '1' then
+      if staRst = '1' then
          cnt       := (others => '0');
-         staUpdate <= '0';
+         staUpdate <= '0' after TPD_G;
       elsif rising_edge(staClk) then
          if cnt = STATUS_INTERVAL_C then
             cnt       := (others => '0');

@@ -174,6 +174,7 @@ begin
          axilWriteSlave  => mAxilWriteSlaves(XPM_MINI_INDEX_C),
          axilUpdate      => update,
          staClk          => timingClk,
+         staRst          => timingRst,
          status          => xpmStatus,
          config          => xpmConfig);
 
