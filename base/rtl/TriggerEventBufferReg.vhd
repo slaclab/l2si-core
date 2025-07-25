@@ -50,6 +50,7 @@ entity TriggerEventBufferReg is
       transitionCount   : in  slv(31 downto 0);
       validCount        : in  slv(31 downto 0);
       alignedXpmMessage : in  XpmMessageType;
+      pingId            : in  slv(31 downto 0);
       pauseToTrig       : in  slv(11 downto 0);
       notPauseToTrig    : in  slv(11 downto 0);
       enable            : out sl;
@@ -107,7 +108,7 @@ architecture rtl of TriggerEventBufferReg is
    signal l1RejectCountSync   : slv(31 downto 0);
    signal transitionCountSync : slv(31 downto 0);
    signal validCountSync      : slv(31 downto 0);
-   signal partitionAddrSync   : slv(XPM_PARTITION_ADDR_LENGTH_C-1 downto 0);
+   signal pingIdSync          : slv(31 downto 0);
    signal partitionWord0Sync  : slv(47 downto 0);
    signal pauseToTrigSync     : slv(11 downto 0);
    signal notPauseToTrigSync  : slv(11 downto 0);
@@ -224,14 +225,13 @@ begin
          generic map (
             TPD_G        => TPD_G,
             COMMON_CLK_G => COMMON_CLK_G,
-            DATA_WIDTH_G => XPM_PARTITION_ADDR_LENGTH_C)
+            DATA_WIDTH_G => 32)
          port map (
             rst    => timingRxRst,
             wr_clk => timingRxClk,
-            wr_en  => alignedXpmMessage.valid,
-            din    => alignedXpmMessage.partitionAddr,
+            din    => pingId,
             rd_clk => axilClk,
-            dout   => partitionAddrSync);
+            dout   => pingIdSync);
 
       U_partitionWord0 : entity surf.SynchronizerFifo
          generic map (
@@ -275,7 +275,7 @@ begin
    comb : process (axilReadMaster, axilRst, axilWriteMaster, fifoAxisCtrlSync,
                    fifoWrCntSync, l0CountSync, l1AcceptCountSync,
                    l1RejectCountSync, notPauseToTrigSync, overflowSync,
-                   partitionAddrSync, partitionWord0Sync, pauseSync,
+                   pingIdSync, partitionWord0Sync, pauseSync,
                    pauseToTrigSync, r, timingModeSync, transitionCountSync,
                    triggerCountSync, validCountSync) is
       variable v      : RegType;
@@ -318,7 +318,7 @@ begin
          axiSlaveRegisterR(axilEp, x"1C", 0, l1RejectCountSync);
          axiSlaveRegisterR(axilEp, X"20", 0, transitionCountSync);
          axiSlaveRegisterR(axilEp, X"24", 0, validCountSync);
-         axiSlaveRegisterR(axilEp, X"2C", 0, partitionAddrSync);
+         axiSlaveRegisterR(axilEp, X"2C", 0, pingIdSync);
          axiSlaveRegisterR(axilEp, X"30", 0, partitionWord0Sync);
          axiSlaveRegisterR(axilEp, X"38", 0, pauseToTrigSync);
          axiSlaveRegisterR(axilEp, X"3C", 0, notPauseToTrigSync);

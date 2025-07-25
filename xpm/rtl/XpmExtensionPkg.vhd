@@ -95,7 +95,7 @@ package XpmExtensionPkg is
    --  Clear event buffers (transition data header)
    constant MSG_CLEAR_FIFO_C  : slv(7 downto 0) := toSlv(0, 8);
    --  Communicate delay of pword
-   constant MSG_DELAY_PWORD_C : slv(7 downto 0) := toSlv(1, 8);  -- Not used!!
+   constant MSG_PING_C : slv(7 downto 0) := toSlv(1, 8);
 
    function toSlv (xpmTransition                  : XpmTransitionDataType) return slv;
    function toXpmTransitionDataType(partitionWord : slv(47 downto 0)) return XpmTransitionDataType;

@@ -207,7 +207,7 @@ class TriggerEventBuffer(pr.Device):
 
 
             self.add(pr.RemoteVariable(
-                name        = 'LastPartitionAddr',
+                name        = 'LastPingId',
                 offset      = 0x2C,
                 bitSize     = 32,
                 bitOffset   = 0,

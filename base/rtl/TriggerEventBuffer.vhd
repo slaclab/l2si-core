@@ -135,7 +135,7 @@ architecture rtl of TriggerEventBuffer is
       tmpEventData   : XpmEventDataType;
       eventHeader    : EventHeaderType;
       streamValid    : sl;
-
+      pingId         : slv(31 downto 0);
 
    end record RegType;
 
@@ -175,7 +175,8 @@ architecture rtl of TriggerEventBuffer is
       transitionData => XPM_TRANSITION_DATA_INIT_C,
       tmpEventData   => XPM_EVENT_DATA_INIT_C,
       eventHeader    => EVENT_HEADER_INIT_C,
-      streamValid    => '0');
+      streamValid    => '0',
+      pingId         => (others=>'0') );
 
    signal r   : RegType := REG_INIT_C;
    signal rin : RegType;
@@ -341,10 +342,15 @@ begin
 
             -- Special case - reset fifo, mask any tValid
             -- Note that this logic is active even when the enable register = 0.
-            if (v.transitionData.valid = '1' and v.transitionData.header = MSG_CLEAR_FIFO_C) then
-               v.overflow              := '0';
-               v.fifoRst               := '1';
-               v.fifoAxisMaster.tValid := '0';
+            if v.transitionData.valid = '1' then
+              if v.transitionData.header = MSG_CLEAR_FIFO_C then
+                v.overflow              := '0';
+                v.fifoRst               := '1';
+                v.fifoAxisMaster.tValid := '0';
+              elsif v.transitionData.header = MSG_PING_C then
+                v.fifoAxisMaster.tValid := '0';
+                v.pingId                := alignedTimingMessage.pulseId(31 downto 0);
+              end if;
             end if;
 
 
@@ -470,6 +476,7 @@ begin
          transitionCount   => r.transitionCount,
          validCount        => r.validCount,
          alignedXpmMessage => alignedXpmMessage,
+         pingId            => r.pingId,
          pauseToTrig       => r.pauseToTrig,
          notPauseToTrig    => r.notPauseToTrig,
          enable            => enable,
