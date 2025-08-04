@@ -296,6 +296,7 @@ begin
       -- Common Registers
       axiSlaveRegister(axilEp, x"00", 0, v.enable);
       axiSlaveRegisterR(axilEp, x"10", 0, overflowSync);
+      axiSlaveRegisterR(axilEp, x"10", 1, pauseSync);
       axiSlaveRegisterR(axilEp, X"10", 2, fifoAxisCtrlSync.overflow);
       axiSlaveRegisterR(axilEp, X"10", 3, fifoAxisCtrlSync.pause);
       axiSlaveRegisterR(axilEp, X"10", 4, fifoWrCntSync);
