@@ -208,7 +208,7 @@ architecture rtl of TriggerEventBuffer is
    signal fifoRstReg      : sl;
    signal fifoRst         : sl;
    signal enable          : sl;
-   
+
    signal triggerInhibitCountsSlv : slv(XPM_INHIBIT_COUNTS_LEN_C-1 downto 0);
    signal eventInhibitCountsSlv   : slv(XPM_INHIBIT_COUNTS_LEN_C-1 downto 0);
 
@@ -555,13 +555,13 @@ begin
        dataOut => clearReadout);
 
    eventAxisRst <= eventRst or fifoRst;
-   
+
    U_EventAxisRst : entity surf.RstSync
      port map (
        clk       => eventClk,
        asyncRst  => eventAxisRst,
        syncRst   => eventAxisRstSync );
-   
+
    -----------------------------------------------
    -- Buffer event data in a fifo
    -----------------------------------------------
