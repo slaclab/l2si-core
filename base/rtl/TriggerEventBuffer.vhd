@@ -83,7 +83,7 @@ entity TriggerEventBuffer is
       eventTimingMessageValid : out sl;
       eventTimingMessage      : out TimingMessageType;
       eventTimingMessageRd    : in  sl := '1';
-      eventInhibitCountsValid : out sl;
+      eventInhibitCountsValid : out sl := '0';
       eventInhibitCounts      : out TriggerInhibitCountsType;
       eventInhibitCountsRd    : in  sl := '1';
       eventAxisMaster         : out AxiStreamMasterType;
@@ -180,37 +180,37 @@ architecture rtl of TriggerEventBuffer is
    signal r   : RegType := REG_INIT_C;
    signal rin : RegType;
 
-   signal fifoAxisSlave : AxiStreamSlaveType;
-   signal fifoAxisCtrl  : AxiStreamCtrlType;
-   signal fifoWrCnt     : slv(FIFO_ADDR_WIDTH_C-1 downto 0);
+   signal fifoAxisSlave : AxiStreamSlaveType                := AXI_STREAM_SLAVE_INIT_C;
+   signal fifoAxisCtrl  : AxiStreamCtrlType                 := AXI_STREAM_CTRL_INIT_C;
+   signal fifoWrCnt     : slv(FIFO_ADDR_WIDTH_C-1 downto 0) := (others => '0');
 
-   signal alignedTimingMessageSlv : slv(TIMING_MESSAGE_BITS_NO_BSA_C-1 downto 0);
-   signal eventTimingMessageSlv   : slv(TIMING_MESSAGE_BITS_NO_BSA_C-1 downto 0);
+   signal alignedTimingMessageSlv : slv(TIMING_MESSAGE_BITS_NO_BSA_C-1 downto 0) := (others => '0');
+   signal eventTimingMessageSlv   : slv(TIMING_MESSAGE_BITS_NO_BSA_C-1 downto 0) := (others => '0');
 
-   signal triggerDataValid        : sl;
-   signal triggerDataSlv          : slv(47 downto 0);
-   signal xpmTriggerDataValid     : sl;
-   signal xpmTriggerDataSlv       : slv(47 downto 0);
-   signal delayedTriggerDataValid : sl;
-   signal delayedTriggerDataSlv   : slv(47 downto 0);
-   signal syncTriggerDataValid    : sl;
-   signal syncTriggerDataSlv      : slv(47 downto 0);
+   signal triggerDataValid        : sl               := '0';
+   signal triggerDataSlv          : slv(47 downto 0) := (others => '0');
+   signal xpmTriggerDataValid     : sl               := '0';
+   signal xpmTriggerDataSlv       : slv(47 downto 0) := (others => '0');
+   signal delayedTriggerDataValid : sl               := '0';
+   signal delayedTriggerDataSlv   : slv(47 downto 0) := (others => '0');
+   signal syncTriggerDataValid    : sl               := '0';
+   signal syncTriggerDataSlv      : slv(47 downto 0) := (others => '0');
 
-   signal eventAxisCtrlPauseSync : sl;
-   signal eventAxisRst           : sl;
-   signal eventAxisRstSync       : sl;
+   signal eventAxisCtrlPauseSync : sl := '0';
+   signal eventAxisRst           : sl := '0';
+   signal eventAxisRstSync       : sl := '0';
 
-   signal partitionReg    : slv(2 downto 0);
-   signal triggerDelay    : slv(31 downto 0);
-   signal triggerSource   : sl;
-   signal fifoPauseThresh : slv(FIFO_ADDR_WIDTH_C-1 downto 0);
-   signal resetCounters   : sl;
-   signal fifoRstReg      : sl;
-   signal fifoRst         : sl;
-   signal enable          : sl;
+   signal partitionReg    : slv(2 downto 0)                   := (others => '0');
+   signal triggerDelay    : slv(31 downto 0)                  := (others => '0');
+   signal triggerSource   : sl                                := '0';
+   signal fifoPauseThresh : slv(FIFO_ADDR_WIDTH_C-1 downto 0) := (others => '0');
+   signal resetCounters   : sl                                := '0';
+   signal fifoRstReg      : sl                                := '0';
+   signal fifoRst         : sl                                := '0';
+   signal enable          : sl                                := '0';
 
-   signal triggerInhibitCountsSlv : slv(XPM_INHIBIT_COUNTS_LEN_C-1 downto 0);
-   signal eventInhibitCountsSlv   : slv(XPM_INHIBIT_COUNTS_LEN_C-1 downto 0);
+   signal triggerInhibitCountsSlv : slv(XPM_INHIBIT_COUNTS_LEN_C-1 downto 0) := (others => '0');
+   signal eventInhibitCountsSlv   : slv(XPM_INHIBIT_COUNTS_LEN_C-1 downto 0) := (others => '0');
 
 begin
 
