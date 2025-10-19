@@ -87,7 +87,7 @@ begin
    phy.control.polarity    <= '0';
    phy.control.bufferByRst <= '0';
 
-   comb : process (pause, id, l1Feedback, overflow, r, rst) is
+   comb : process (id, l1Feedback, overflow, pause, r, rst) is
       variable v : RegType;
    begin
       v := r;

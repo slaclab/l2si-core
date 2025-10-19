@@ -129,7 +129,7 @@ architecture top_level_app of XpmMini is
 
 begin
 
-   linkstatp : process (dsRxRcvs, isXpm, dsId) is
+   linkstatp : process (dsId, dsRxRcvs, isXpm) is
       variable linkStat : XpmLinkStatusType;
    begin
       for i in 0 to NUM_DS_LINKS_G-1 loop
@@ -219,18 +219,18 @@ begin
 
    --  Need to cross to the timingClk domain (XpmApp uses one FIFO for all partitions)
    U_SyncMsg : entity surf.SynchronizerFifo
-     generic map (
-       DATA_WIDTH_G => config.partition.message.header'length )
-     port map (
-       rst    => timingRst,
-       -- Write Ports (wr_clk domain)
-       wr_clk => regclk,
-       wr_en  => config.partition.message.insert,
-       din    => config.partition.message.header,
-       -- Read Ports (rd_clk domain)
-       rd_clk => timingClk,
-       valid  => partitionConfig.message.insert,
-       dout   => partitionConfig.message.header );
+      generic map (
+         DATA_WIDTH_G => config.partition.message.header'length)
+      port map (
+         rst    => timingRst,
+         -- Write Ports (wr_clk domain)
+         wr_clk => regclk,
+         wr_en  => config.partition.message.insert,
+         din    => config.partition.message.header,
+         -- Read Ports (rd_clk domain)
+         rd_clk => timingClk,
+         valid  => partitionConfig.message.insert,
+         dout   => partitionConfig.message.header);
 
    status.partition.l0Select <= partitionStatus.l0Select;
 
@@ -298,8 +298,8 @@ begin
    pdepth(2) <= pdepth(0);
    pdepth(1) <= pdepth(0);
 
-   comb : process (advance, dsPause, dsOverflow, expWord, fstreams, pdepth, r, timingRst,
-                   timingStream) is
+   comb : process (advance, dsOverflow, dsPause, expWord, fstreams, pdepth, r,
+                   timingRst, timingStream) is
       variable v    : RegType;
       variable tidx : integer;
 --      constant pd   : XpmBroadcastType := PDELAY;

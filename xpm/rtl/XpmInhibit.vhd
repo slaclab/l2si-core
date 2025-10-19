@@ -116,14 +116,14 @@ begin
             inhibit  => proginhb (i));
    end generate;
 
-   process (r, clear, evcounts, tmcounts, update) is
+   process (evcounts, r, tmcounts) is
       variable v : RegType;
    begin
       v := r;
 
       for i in 0 to 31 loop
-        v.status.evcounts(i) := muxSlVectorArray(evcounts, i);
-        v.status.tmcounts(i) := muxSlVectorArray(tmcounts, i);
+         v.status.evcounts(i) := muxSlVectorArray(evcounts, i);
+         v.status.tmcounts(i) := muxSlVectorArray(tmcounts, i);
       end loop;
 
       r_in <= v;

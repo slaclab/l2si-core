@@ -159,9 +159,9 @@ begin
          valid             => valid_msg,
          overflow          => full_msg);
 
-   process (r, rst, delay, delayRst, valid_cnt, valid_msg,
-            dout_cnt, dout_msg, dout_offset, dout_last, dout_rdy,
-            firstW, fiducial_i, advance_i) is
+   process (advance_i, delay, delayRst, dout_cnt, dout_last, dout_msg,
+            dout_offset, dout_rdy, fiducial_i, firstW, r, rst, valid_cnt,
+            valid_msg) is
       variable v : RegType;
    begin
       v := r;

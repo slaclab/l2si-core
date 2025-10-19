@@ -125,7 +125,7 @@ begin
                when others => axiWriteResp := AXI_ERROR_RESP_G;
             end case;
             axiSlaveWriteResponse(v.axiWriteSlave, axiWriteResp);
-         else                           -- if axiWriteMaster.awaddr(1 downto 0) = "00"
+         else  -- if axiWriteMaster.awaddr(1 downto 0) = "00"
             axiSlaveWriteResponse(v.axiWriteSlave, AXI_ERROR_RESP_G);
          end if;
       end if;
@@ -138,7 +138,7 @@ begin
 
       if (axiStatus.readEnable = '1') then
          -- Reset the bus
-         regAddr              := axiReadMaster.araddr(regAddr'range);
+         regAddr := axiReadMaster.araddr(regAddr'range);
          -- Check for alignment
          if axiReadMaster.araddr(1 downto 0) = "00" then
             -- Update external data/address buses
@@ -149,8 +149,8 @@ begin
             v.axiRdEn        := r.axiRdEn(1 downto 0) & '1';
             -- Check if BRAM is valid
             if r.axiRdEn(1) = '1' then
-              v.seqRdSeq := resize(regAddr(ADDR_BITS_G-1 downto SEQADDRLEN+2),
-                                   r.seqRdSeq'length);
+               v.seqRdSeq := resize(regAddr(ADDR_BITS_G-1 downto SEQADDRLEN+2),
+                                    r.seqRdSeq'length);
             end if;
             if r.axiRdEn(2) = '1' then
                -- Decode the read address

@@ -97,7 +97,7 @@ begin
    txDataK   <= itxDataK;
    advance_o <= advance;
 
-   streams_p : process (streams, rin) is
+   streams_p : process (rin, streams) is
    begin
       fstreams         <= streams;
       fstreams(2).data <= rin.word;
@@ -116,7 +116,7 @@ begin
          data      => itxData,
          dataK     => itxDataK);
 
-   comb : process (rst, r, paddrStrobe, advance, paddr, streams) is
+   comb : process (advance, paddr, paddrStrobe, r, rst, streams) is
       variable v : RegType;
    begin
       v := r;

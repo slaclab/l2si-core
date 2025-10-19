@@ -84,7 +84,7 @@ package L2SiPkg is
 
    constant EVENT_AXIS_CONFIG_C : AxiStreamConfigType := (
       TSTRB_EN_C    => false,
-      TDATA_BYTES_C => 32,              -- 24B (192 bits data width) + 8B padding
+      TDATA_BYTES_C => 32,  -- 24B (192 bits data width) + 8B padding
       TDEST_BITS_C  => 1,
       TID_BITS_C    => 0,
       TKEEP_MODE_C  => TKEEP_FIXED_C,
@@ -109,13 +109,13 @@ package body L2SiPkg is
       -- It is redundant to have these triggerInfo bits here
       -- but software expects it this way
       assignSlv(i, vector, ite(eventHeader.triggerInfo(15) = '1', L1A_INFO_C, eventHeader.triggerInfo(14 downto 8)));
-      i := i+1;                                                -- 63 - 8 - 1
-      assignSlv(i, vector, eventHeader.timeStamp);             -- 127:64 - 64 - 8
-      assignSlv(i, vector, eventHeader.partitions);            -- 135:128 - 8 - 1
+      i := i+1;                         -- 63 - 8 - 1
+      assignSlv(i, vector, eventHeader.timeStamp);    -- 127:64 - 64 - 8
+      assignSlv(i, vector, eventHeader.partitions);   -- 135:128 - 8 - 1
       i := i +8;                        -- 8 - 1
-      assignSlv(i, vector, eventHeader.triggerInfo);           -- 151:144 - 16 - 2
-      assignSlv(i, vector, eventHeader.count);                 -- 183:160 - 24 - 3
-      assignSlv(i, vector, eventHeader.version);               -- 191:184 - 8 - 1
+      assignSlv(i, vector, eventHeader.triggerInfo);  -- 151:144 - 16 - 2
+      assignSlv(i, vector, eventHeader.count);        -- 183:160 - 24 - 3
+      assignSlv(i, vector, eventHeader.version);      -- 191:184 - 8 - 1
       return vector;
    end function;
 
