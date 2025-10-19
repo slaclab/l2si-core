@@ -69,7 +69,7 @@ begin
    -------------------------------
    -- Configuration Register
    -------------------------------
-   comb : process (axiReadMaster, axiRst, axiWriteMaster, r, status) is
+   comb : process (axiReadMaster, axiWriteMaster, r, status) is
       variable v  : RegType;
       variable ep : AxiLiteEndpointType;
    begin

@@ -83,7 +83,7 @@ entity TriggerEventBuffer is
       eventTimingMessageValid : out sl;
       eventTimingMessage      : out TimingMessageType;
       eventTimingMessageRd    : in  sl := '1';
-      eventInhibitCountsValid : out sl;
+      eventInhibitCountsValid : out sl := '0';
       eventInhibitCounts      : out TriggerInhibitCountsType;
       eventInhibitCountsRd    : in  sl := '1';
       eventAxisMaster         : out AxiStreamMasterType;
@@ -122,7 +122,7 @@ architecture rtl of TriggerEventBuffer is
       msgFifoWr      : sl;
       inhFifoWr      : sl;
 
-      l0Rejects      : slv       (XPM_PARTITIONS_C-1 downto 0);
+      l0Rejects      : slv (XPM_PARTITIONS_C-1 downto 0);
       l0RejectCounts : XpmInhibitCountsType;
 
       -- outputs
@@ -164,7 +164,7 @@ architecture rtl of TriggerEventBuffer is
       msgFifoWr      => '0',
       inhFifoWr      => '0',
 
-      l0Rejects      => (others=>'0'),
+      l0Rejects      => (others => '0'),
       l0RejectCounts => XPM_INHIBIT_COUNTS_INIT_C,
 
       -- outputs     =>
@@ -180,37 +180,37 @@ architecture rtl of TriggerEventBuffer is
    signal r   : RegType := REG_INIT_C;
    signal rin : RegType;
 
-   signal fifoAxisSlave : AxiStreamSlaveType;
-   signal fifoAxisCtrl  : AxiStreamCtrlType;
-   signal fifoWrCnt     : slv(FIFO_ADDR_WIDTH_C-1 downto 0);
+   signal fifoAxisSlave : AxiStreamSlaveType                := AXI_STREAM_SLAVE_INIT_C;
+   signal fifoAxisCtrl  : AxiStreamCtrlType                 := AXI_STREAM_CTRL_INIT_C;
+   signal fifoWrCnt     : slv(FIFO_ADDR_WIDTH_C-1 downto 0) := (others => '0');
 
-   signal alignedTimingMessageSlv : slv(TIMING_MESSAGE_BITS_NO_BSA_C-1 downto 0);
-   signal eventTimingMessageSlv   : slv(TIMING_MESSAGE_BITS_NO_BSA_C-1 downto 0);
+   signal alignedTimingMessageSlv : slv(TIMING_MESSAGE_BITS_NO_BSA_C-1 downto 0) := (others => '0');
+   signal eventTimingMessageSlv   : slv(TIMING_MESSAGE_BITS_NO_BSA_C-1 downto 0) := (others => '0');
 
-   signal triggerDataValid        : sl;
-   signal triggerDataSlv          : slv(47 downto 0);
-   signal xpmTriggerDataValid     : sl;
-   signal xpmTriggerDataSlv       : slv(47 downto 0);
-   signal delayedTriggerDataValid : sl;
-   signal delayedTriggerDataSlv   : slv(47 downto 0);
-   signal syncTriggerDataValid    : sl;
-   signal syncTriggerDataSlv      : slv(47 downto 0);
+   signal triggerDataValid        : sl               := '0';
+   signal triggerDataSlv          : slv(47 downto 0) := (others => '0');
+   signal xpmTriggerDataValid     : sl               := '0';
+   signal xpmTriggerDataSlv       : slv(47 downto 0) := (others => '0');
+   signal delayedTriggerDataValid : sl               := '0';
+   signal delayedTriggerDataSlv   : slv(47 downto 0) := (others => '0');
+   signal syncTriggerDataValid    : sl               := '0';
+   signal syncTriggerDataSlv      : slv(47 downto 0) := (others => '0');
 
-   signal eventAxisCtrlPauseSync : sl;
-   signal eventAxisRst           : sl;
-   signal eventAxisRstSync       : sl;
+   signal eventAxisCtrlPauseSync : sl := '0';
+   signal eventAxisRst           : sl := '0';
+   signal eventAxisRstSync       : sl := '0';
 
-   signal partitionReg    : slv(2 downto 0);
-   signal triggerDelay    : slv(31 downto 0);
-   signal triggerSource   : sl;
-   signal fifoPauseThresh : slv(FIFO_ADDR_WIDTH_C-1 downto 0);
-   signal resetCounters   : sl;
-   signal fifoRstReg      : sl;
-   signal fifoRst         : sl;
-   signal enable          : sl;
+   signal partitionReg    : slv(2 downto 0)                   := (others => '0');
+   signal triggerDelay    : slv(31 downto 0)                  := (others => '0');
+   signal triggerSource   : sl                                := '0';
+   signal fifoPauseThresh : slv(FIFO_ADDR_WIDTH_C-1 downto 0) := (others => '0');
+   signal resetCounters   : sl                                := '0';
+   signal fifoRstReg      : sl                                := '0';
+   signal fifoRst         : sl                                := '0';
+   signal enable          : sl                                := '0';
 
-   signal triggerInhibitCountsSlv : slv(XPM_INHIBIT_COUNTS_LEN_C-1 downto 0);
-   signal eventInhibitCountsSlv   : slv(XPM_INHIBIT_COUNTS_LEN_C-1 downto 0);
+   signal triggerInhibitCountsSlv : slv(XPM_INHIBIT_COUNTS_LEN_C-1 downto 0) := (others => '0');
+   signal eventInhibitCountsSlv   : slv(XPM_INHIBIT_COUNTS_LEN_C-1 downto 0) := (others => '0');
 
 begin
 
@@ -226,12 +226,14 @@ begin
          dataOut => eventAxisCtrlPauseSync);  -- [out]
 
 
-   comb : process (alignedTimingMessage, alignedTimingStrobe, alignedXpmMessage, enable,
-                   eventAxisCtrlPauseSync, evrTriggers, fifoAxisCtrl, fifoRstReg, partitionReg,
-                   promptTimingStrobe, promptXpmMessage, r, resetCounters, timingMode, timingRxRst,
-                   triggerSource, xpmTriggerDataSlv, xpmTriggerDataValid) is
-      variable v      : RegType;
-      variable axilEp : AxiLiteEndpointType;
+   comb : process (alignedTimingMessage, alignedTimingStrobe,
+                   alignedXpmMessage, enable, eventAxisCtrlPauseSync,
+                   evrTriggers, fifoAxisCtrl, fifoRstReg, partitionReg,
+                   promptTimingStrobe, promptXpmMessage, r, resetCounters,
+                   timingMode, timingRxRst, triggerSource, xpmTriggerDataSlv,
+                   xpmTriggerDataValid) is
+      variable v         : RegType;
+      variable axilEp    : AxiLiteEndpointType;
       variable eventData : XpmEventDataType;
    begin
       v := r;
@@ -297,18 +299,18 @@ begin
          v.streamValid := '0';
          v.msgFifoWr   := '0';
          v.inhFifoWr   := r.msgFifoWr;
-         if (r.streamValid = '1' and r.transitionData.header/=toSlv(10,6)) then
-           v.inhFifoWr := '1';
+         if (r.streamValid = '1' and r.transitionData.header /= toSlv(10, 6)) then
+            v.inhFifoWr := '1';
          end if;
 
-         v.l0Rejects   := (others=>'0');
+         v.l0Rejects := (others => '0');
          if (alignedTimingStrobe = '1' and alignedXpmMessage.valid = '1') then
             -- Decode event data from configured partitionWord
             -- Decode as both event and transition and use the .valid field to determine which one to use
             v.eventData      := toXpmEventDataType(alignedXpmMessage.partitionWord(v.partitionV));
             v.transitionData := toXpmTransitionDataType(alignedXpmMessage.partitionWord(v.partitionV));
             for i in 0 to XPM_PARTITIONS_C-1 loop
-               eventData     := toXpmEventDataType(alignedXpmMessage.partitionWord(i));
+               eventData := toXpmEventDataType(alignedXpmMessage.partitionWord(i));
                if (eventData.valid = '1' and eventData.l0Reject = '1') then
                   v.l0Rejects(i) := '1';
                end if;
@@ -388,7 +390,7 @@ begin
          else
             for i in 0 to XPM_PARTITIONS_C-1 loop
                if r.l0Rejects(i) = '1' then
-                 v.l0RejectCounts.inhibits(i) := r.l0RejectCounts.inhibits(i) + 1;
+                  v.l0RejectCounts.inhibits(i) := r.l0RejectCounts.inhibits(i) + 1;
                end if;
             end loop;
          end if;
@@ -417,7 +419,7 @@ begin
          delayedTriggerDataSlv   <= xpmTriggerDataSlv;
          delayedTriggerDataValid <= xpmTriggerDataValid;
       else
-         delayedTriggerDataSlv <= (others => '0');
+         delayedTriggerDataSlv   <= (others => '0');
          delayedTriggerDataValid <= '0';
       end if;  -- LCLS-II XPM logic
 
@@ -512,11 +514,11 @@ begin
          FIFO_ADDR_WIDTH_G  => FIFO_ADDR_WIDTH_C,
          FIFO_MEMORY_TYPE_G => "block")
       port map (
-         clk         => timingRxClk,               -- [in]
-         rst         => timingRxRst,               -- [in]
-         delay       => triggerDelay,              -- [in]
-         inputData   => triggerDataSlv,            -- [in]
-         inputValid  => triggerDataValid,          -- [in]
+         clk         => timingRxClk,           -- [in]
+         rst         => timingRxRst,           -- [in]
+         delay       => triggerDelay,          -- [in]
+         inputData   => triggerDataSlv,        -- [in]
+         inputValid  => triggerDataValid,      -- [in]
          outputData  => xpmTriggerDataSlv,     -- [out]
          outputValid => xpmTriggerDataValid);  -- [out]
 
@@ -547,20 +549,20 @@ begin
    end generate NO_TRIGGER_SYNC_GEN;
 
    U_SynchronizerClearReadout : entity surf.SynchronizerOneShot
-     generic map (
-       TPD_G => TPD_G)
-     port map (
-       clk     => eventClk,
-       dataIn  => fifoRst,
-       dataOut => clearReadout);
+      generic map (
+         TPD_G => TPD_G)
+      port map (
+         clk     => eventClk,
+         dataIn  => fifoRst,
+         dataOut => clearReadout);
 
    eventAxisRst <= eventRst or fifoRst;
 
    U_EventAxisRst : entity surf.RstSync
-     port map (
-       clk       => eventClk,
-       asyncRst  => eventAxisRst,
-       syncRst   => eventAxisRstSync );
+      port map (
+         clk      => eventClk,
+         asyncRst => eventAxisRst,
+         syncRst  => eventAxisRstSync);
 
    -----------------------------------------------
    -- Buffer event data in a fifo
@@ -602,15 +604,15 @@ begin
             GEN_SYNC_FIFO_G => EVENT_CLK_IS_TIMING_RX_CLK_G,
             MEMORY_TYPE_G   => "block",
             FWFT_EN_G       => true,
-            PIPE_STAGES_G   => 1,               -- make sure this lines up right with event fifo
+            PIPE_STAGES_G   => 1,  -- make sure this lines up right with event fifo
             DATA_WIDTH_G    => TIMING_MESSAGE_BITS_NO_BSA_C,
             ADDR_WIDTH_G    => FIFO_ADDR_WIDTH_C)
          port map (
-            rst    => fifoRst,                  -- [in]
-            wr_clk => timingRxClk,              -- [in]
-            wr_en  => r.msgFifoWr,              -- [in]
+            rst    => fifoRst,          -- [in]
+            wr_clk => timingRxClk,      -- [in]
+            wr_en  => r.msgFifoWr,      -- [in]
             din    => alignedTimingMessageSlv,  -- [in]
-            rd_clk => eventClk,                 -- [in]
+            rd_clk => eventClk,         -- [in]
             rd_en  => eventTimingMessageRd,     -- [in]
             valid  => eventTimingMessageValid,  -- [out]
             dout   => eventTimingMessageSlv);   -- [out]
@@ -625,20 +627,20 @@ begin
             GEN_SYNC_FIFO_G => EVENT_CLK_IS_TIMING_RX_CLK_G,
             MEMORY_TYPE_G   => "block",
             FWFT_EN_G       => true,
-            PIPE_STAGES_G   => 1,               -- make sure this lines up right with event fifo
+            PIPE_STAGES_G   => 1,  -- make sure this lines up right with event fifo
             DATA_WIDTH_G    => eventInhibitCountsSlv'length,
             ADDR_WIDTH_G    => FIFO_ADDR_WIDTH_C)
          port map (
-            rst    => fifoRst,                  -- [in]
-            wr_clk => timingRxClk,              -- [in]
-            wr_en  => r.inhFifoWr,              -- [in]
+            rst    => fifoRst,          -- [in]
+            wr_clk => timingRxClk,      -- [in]
+            wr_en  => r.inhFifoWr,      -- [in]
             din    => triggerInhibitCountsSlv,  -- [in]
-            rd_clk => eventClk,                 -- [in]
+            rd_clk => eventClk,         -- [in]
             rd_en  => eventInhibitCountsRd,     -- [in]
             valid  => eventInhibitCountsValid,  -- [out]
             dout   => eventInhibitCountsSlv);   -- [out]
       eventInhibitCounts <= toXpmInhibitCountsType(eventInhibitCountsSlv);
-end generate GEN_INHIBIT_COUNTS;
+   end generate GEN_INHIBIT_COUNTS;
 
 end architecture rtl;
 

@@ -42,8 +42,8 @@ package XpmPkg is
    constant XPM_LCTR_DEPTH_C      : integer := 40;
 
    --  Async ethernet message types
-   constant XPM_MESSAGE_SEQUENCE_DONE : slv(15 downto 0) := toSlv(0,16);
-   constant XPM_MESSAGE_STEP_DONE     : slv(15 downto 0) := toSlv(1,16);
+   constant XPM_MESSAGE_SEQUENCE_DONE : slv(15 downto 0) := toSlv(0, 16);
+   constant XPM_MESSAGE_STEP_DONE     : slv(15 downto 0) := toSlv(1, 16);
 
    -- This doesn't belong here but not sure where to move it
    constant NSTREAMS_C : integer := 3;
@@ -85,39 +85,39 @@ package XpmPkg is
 
    --  Status of downstream links
    type XpmLinkStatusType is record
-      txResetDone : sl;                 -- Downstream link transmit initialization status
-      txReady     : sl;
-      rxResetDone : sl;                 -- Downstream link receive initialization status
-      rxReady     : sl;
-      rxErr       : sl;
-      rxErrCnts   : slv(15 downto 0);
-      rxRcvCnts   : slv(31 downto 0);
-      rxIsXpm     : sl;
-      rxId        : slv(31 downto 0);
-      rxcdrlock   : sl;
-      gtpowergood : sl;
-      rxpmarstdone: sl;
-      txpmarstdone: sl;
+      txResetDone   : sl;  -- Downstream link transmit initialization status
+      txReady       : sl;
+      rxResetDone   : sl;  -- Downstream link receive initialization status
+      rxReady       : sl;
+      rxErr         : sl;
+      rxErrCnts     : slv(15 downto 0);
+      rxRcvCnts     : slv(31 downto 0);
+      rxIsXpm       : sl;
+      rxId          : slv(31 downto 0);
+      rxcdrlock     : sl;
+      gtpowergood   : sl;
+      rxpmarstdone  : sl;
+      txpmarstdone  : sl;
       rxGTHWordCnts : slv(31 downto 0);
       rxGTHErrCnts  : slv(31 downto 0);
    end record;
    type XpmLinkStatusArray is array (natural range<>) of XpmLinkStatusType;
    constant XPM_LINK_STATUS_INIT_C : XpmLinkStatusType := (
-      txResetDone => '0',
-      txReady     => '0',
-      rxResetDone => '0',
-      rxReady     => '0',
-      rxErr       => '0',
-      rxErrCnts   => (others => '0'),
-      rxRcvCnts   => (others => '0'),
+      txResetDone   => '0',
+      txReady       => '0',
+      rxResetDone   => '0',
+      rxReady       => '0',
+      rxErr         => '0',
+      rxErrCnts     => (others => '0'),
+      rxRcvCnts     => (others => '0'),
       rxGTHWordCnts => (others => '0'),
       rxGTHErrCnts  => (others => '0'),
-      rxIsXpm     => '0',
-      rxId        => (others => '0'),
-      rxcdrlock   => '0',
-      gtpowergood => '0',
-      rxpmarstdone=> '0',
-      txpmarstdone=> '0');
+      rxIsXpm       => '0',
+      rxId          => (others => '0'),
+      rxcdrlock     => '0',
+      gtpowergood   => '0',
+      rxpmarstdone  => '0',
+      txpmarstdone  => '0');
 
    type XpmBpLinkStatusType is record
       linkUp : sl;
@@ -216,37 +216,37 @@ package XpmPkg is
    type XpmPllConfigArray is array(natural range<>) of XpmPllConfigType;
 
    type XpmLinkConfigType is record
-      enable     : sl;
-      loopback   : sl;
-      txReset    : sl;
-      rxReset    : sl;
-      txPllReset : sl;
-      rxPllReset : sl;
-      txDelayRst : sl;
-      eyescanrst : sl;
-      rxpmarst   : sl;
-      txDelay    : slv(8 downto 0);
-      rxTimeOut  : slv(8 downto 0);
-      groupMask  : slv(XPM_PARTITIONS_C-1 downto 0);
-      trigsrc    : slv(3 downto 0);
-      rstGthCnter: sl;
+      enable      : sl;
+      loopback    : sl;
+      txReset     : sl;
+      rxReset     : sl;
+      txPllReset  : sl;
+      rxPllReset  : sl;
+      txDelayRst  : sl;
+      eyescanrst  : sl;
+      rxpmarst    : sl;
+      txDelay     : slv(8 downto 0);
+      rxTimeOut   : slv(8 downto 0);
+      groupMask   : slv(XPM_PARTITIONS_C-1 downto 0);
+      trigsrc     : slv(3 downto 0);
+      rstGthCnter : sl;
    end record;
    type XpmLinkConfigArray is array (natural range<>) of XpmLinkConfigType;
    constant XPM_LINK_CONFIG_INIT_C : XpmLinkConfigType := (
-      enable     => '0',
-      loopback   => '0',
-      txReset    => '0',
-      rxReset    => '0',
-      txPllReset => '0',
-      rxPllReset => '0',
-      txDelayRst => '0',
-      eyescanrst => '0',
-      rxpmarst   => '0',
+      enable      => '0',
+      loopback    => '0',
+      txReset     => '0',
+      rxReset     => '0',
+      txPllReset  => '0',
+      rxPllReset  => '0',
+      txDelayRst  => '0',
+      eyescanrst  => '0',
+      rxpmarst    => '0',
       rstGthCnter => '0',
-      txDelay    => (others => '0'),
-      rxTimeOut  => toSlv(200, 9),
-      groupMask  => (others => '0'),
-      trigsrc    => (others => '0'));
+      txDelay     => (others => '0'),
+      rxTimeOut   => toSlv(200, 9),
+      groupMask   => (others => '0'),
+      trigsrc     => (others => '0'));
    type XpmL0SelectConfigType is record
       reset     : sl;
       enabled   : sl;
@@ -258,8 +258,8 @@ package XpmPkg is
       -- seq  :  bit    = 4:0;  seq = 12:8
       -- cu   :  event  = 7:0
       destSel   : slv(15 downto 0);
-   -- 15:15 = DONT_CARE
-   --  3:0  = Destination
+      -- 15:15 = DONT_CARE
+      --  3:0  = Destination
       groups    : slv(XPM_PARTITIONS_C-1 downto 0);
       rawPeriod : slv(19 downto 0);
    end record;
@@ -413,7 +413,7 @@ package XpmPkg is
       tag       => (others => '0'),
       trigword  => (others => '0'));
 
-   function toSlv(s : XpmL1FeedbackType) return slv;
+   function toSlv(s             : XpmL1FeedbackType) return slv;
    function toL1Feedback(vector : slv) return XpmL1FeedbackType;
 
 
@@ -454,8 +454,8 @@ package body XpmPkg is
    end function;
 
    function toSlv(s : XpmL1FeedbackType) return slv is
-      variable vector : slv(21 downto 0) := (others=>'0');
-      variable i      : integer := 0;
+      variable vector : slv(21 downto 0) := (others => '0');
+      variable i      : integer          := 0;
    begin
       assignSlv(i, vector, s.valid);
       assignSlv(i, vector, s.partition);
@@ -467,7 +467,7 @@ package body XpmPkg is
 
    function toL1Feedback(vector : slv) return XpmL1FeedbackType is
       variable s : XpmL1FeedbackType := XPM_L1_FEEDBACK_INIT_C;
-      variable i : integer := 0;
+      variable i : integer           := 0;
    begin
       assignRecord(i, vector, s.valid);
       assignRecord(i, vector, s.partition);

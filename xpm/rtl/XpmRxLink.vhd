@@ -197,7 +197,7 @@ begin
             v.id(31 downto 16) := rxData;
             v.state            := PAUSE_S;
          when PAUSE_S =>
-            v.pause    := rxData( 7 downto 0);
+            v.pause    := rxData(7 downto 0);
             v.overflow := rxData(15 downto 8);
             v.state    := PDATA1_S;
          when PDATA1_S =>
@@ -219,7 +219,7 @@ begin
       end if;
 
       if (rxRst = '1' or rxErr = '1') then
-         v          := REG_INIT_C;
+         v := REG_INIT_C;
       end if;
 
       if (uconfig.enable = '0') then

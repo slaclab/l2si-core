@@ -313,21 +313,21 @@ begin
             COMMON_CLK_G => AXIL_CLK_IS_TIMING_RX_CLK_G,
             TF_DELAY_G   => 100)
          port map (
-            timingRxClk          => timingRxClk,                          -- [in]
-            timingRxRst          => timingRxRst,                          -- [in]
-            axilClk              => axilClk,                              -- [in]
-            axilRst              => axilRst,                              -- [in]
-            axilReadMaster       => locAxilReadMasters(AXIL_ALIGNER_C),   -- [in]
-            axilReadSlave        => locAxilReadSlaves(AXIL_ALIGNER_C),    -- [out]
+            timingRxClk          => timingRxClk,           -- [in]
+            timingRxRst          => timingRxRst,           -- [in]
+            axilClk              => axilClk,               -- [in]
+            axilRst              => axilRst,               -- [in]
+            axilReadMaster       => locAxilReadMasters(AXIL_ALIGNER_C),  -- [in]
+            axilReadSlave        => locAxilReadSlaves(AXIL_ALIGNER_C),  -- [out]
             axilWriteMaster      => locAxilWriteMasters(AXIL_ALIGNER_C),  -- [in]
-            axilWriteSlave       => locAxilWriteSlaves(AXIL_ALIGNER_C),   -- [out]
-            xpmId                => xpmId,                                -- [out]
-            promptTimingStrobe   => timingBus.strobe,                     -- [in]
-            promptTimingMessage  => timingBus.message,                    -- [in]
-            promptXpmMessage     => xpmMessage,                           -- [in]
-            alignedTimingStrobe  => alignedTimingStrobe,                  -- [out]
-            alignedTimingMessage => alignedTimingMessage,                 -- [out]
-            alignedXpmMessage    => alignedXpmMessage);                   -- [out]
+            axilWriteSlave       => locAxilWriteSlaves(AXIL_ALIGNER_C),  -- [out]
+            xpmId                => xpmId,                 -- [out]
+            promptTimingStrobe   => timingBus.strobe,      -- [in]
+            promptTimingMessage  => timingBus.message,     -- [in]
+            promptXpmMessage     => xpmMessage,            -- [in]
+            alignedTimingStrobe  => alignedTimingStrobe,   -- [out]
+            alignedTimingMessage => alignedTimingMessage,  -- [out]
+            alignedXpmMessage    => alignedXpmMessage);    -- [out]
    end generate;
 
    -------------------------------------------------------------------------------------------------
@@ -346,40 +346,40 @@ begin
             TRIGGER_CLK_IS_TIMING_RX_CLK_G => TRIGGER_CLK_IS_TIMING_RX_CLK_G,
             EVENT_CLK_IS_TIMING_RX_CLK_G   => EVENT_CLK_IS_TIMING_RX_CLK_G)
          port map (
-            timingRxClk             => timingRxClk,                         -- [in]
-            timingRxRst             => timingRxRst,                         -- [in]
-            axilClk                 => axilClk,                             -- [in]
-            axilRst                 => axilRst,                             -- [in]
-            axilReadMaster          => locAxilReadMasters(AXIL_TEB_C(i)),   -- [in]
-            axilReadSlave           => locAxilReadSlaves(AXIL_TEB_C(i)),    -- [out]
+            timingRxClk             => timingRxClk,                  -- [in]
+            timingRxRst             => timingRxRst,                  -- [in]
+            axilClk                 => axilClk,                      -- [in]
+            axilRst                 => axilRst,                      -- [in]
+            axilReadMaster          => locAxilReadMasters(AXIL_TEB_C(i)),  -- [in]
+            axilReadSlave           => locAxilReadSlaves(AXIL_TEB_C(i)),  -- [out]
             axilWriteMaster         => locAxilWriteMasters(AXIL_TEB_C(i)),  -- [in]
-            axilWriteSlave          => locAxilWriteSlaves(AXIL_TEB_C(i)),   -- [out]
-            timingMode              => timingMode,                          -- [in]
-            evrTriggers             => evrTriggers,                         -- [out]
-            promptTimingStrobe      => timingBus.strobe,                    -- [in]
-            promptTimingMessage     => timingBus.message,                   -- [in]
-            promptXpmMessage        => xpmMessage,                          -- [in]
-            alignedTimingstrobe     => alignedTimingStrobe,                 -- [in]
-            alignedTimingMessage    => alignedTimingMessage,                -- [in]
-            alignedXpmMessage       => alignedXpmMessage,                   -- [in]
-            partition               => detectorPartitions(i),               -- [out]
-            pause                   => pause(i),                            -- [out]
-            overflow                => overflow(i),                         -- [out]
-            triggerClk              => triggerClk,                          -- [in]
-            triggerRst              => triggerRst,                          -- [in]
-            triggerData             => triggerData(i),                      -- [out]
-            eventClk                => eventClk,                            -- [in]
-            eventRst                => eventRst,                            -- [in]
-            eventTimingMessageValid => eventTimingMessagesValid(i),         -- [out]
-            eventTimingMessage      => eventTimingMessages(i),              -- [out]
-            eventTimingMessageRd    => eventTimingMessagesRd(i),            -- [in]
-            eventInhibitCountsValid => eventInhibitCountsValid(i),          -- [out]
-            eventInhibitCounts      => eventInhibitCounts(i),               -- [out]
-            eventInhibitCountsRd    => eventInhibitCountsRd(i),             -- [in]
-            eventAxisMaster         => eventAxisMasters(i),                 -- [out]
-            eventAxisSlave          => eventAxisSlaves(i),                  -- [in]
-            eventAxisCtrl           => eventAxisCtrl(i),                    -- [in]
-            clearReadout            => clearReadout(i));                    -- [out]
+            axilWriteSlave          => locAxilWriteSlaves(AXIL_TEB_C(i)),  -- [out]
+            timingMode              => timingMode,                   -- [in]
+            evrTriggers             => evrTriggers,                  -- [out]
+            promptTimingStrobe      => timingBus.strobe,             -- [in]
+            promptTimingMessage     => timingBus.message,            -- [in]
+            promptXpmMessage        => xpmMessage,                   -- [in]
+            alignedTimingstrobe     => alignedTimingStrobe,          -- [in]
+            alignedTimingMessage    => alignedTimingMessage,         -- [in]
+            alignedXpmMessage       => alignedXpmMessage,            -- [in]
+            partition               => detectorPartitions(i),        -- [out]
+            pause                   => pause(i),                     -- [out]
+            overflow                => overflow(i),                  -- [out]
+            triggerClk              => triggerClk,                   -- [in]
+            triggerRst              => triggerRst,                   -- [in]
+            triggerData             => triggerData(i),               -- [out]
+            eventClk                => eventClk,                     -- [in]
+            eventRst                => eventRst,                     -- [in]
+            eventTimingMessageValid => eventTimingMessagesValid(i),  -- [out]
+            eventTimingMessage      => eventTimingMessages(i),       -- [out]
+            eventTimingMessageRd    => eventTimingMessagesRd(i),     -- [in]
+            eventInhibitCountsValid => eventInhibitCountsValid(i),   -- [out]
+            eventInhibitCounts      => eventInhibitCounts(i),        -- [out]
+            eventInhibitCountsRd    => eventInhibitCountsRd(i),      -- [in]
+            eventAxisMaster         => eventAxisMasters(i),          -- [out]
+            eventAxisSlave          => eventAxisSlaves(i),           -- [in]
+            eventAxisCtrl           => eventAxisCtrl(i),             -- [in]
+            clearReadout            => clearReadout(i));             -- [out]
    end generate GEN_DETECTORS;
 
 
@@ -401,7 +401,8 @@ begin
             rd_clk => timingTxClk,                    -- [in]
             dout   => timingRxToTimingTxSyncSlvOut);  -- [out]
 
-      conv_slv : process (timingRxToTimingTxSyncSlvOut) is
+      conv_slv : process (detectorPartitionsSync, overflowSync, pauseSync,
+                          timingRxToTimingTxSyncSlvOut, xpmIdSync) is
       begin
          fromSlv(timingRxToTimingTxSyncSlvOut, xpmIdSync, detectorPartitionsSync, pauseSync, overflowSync);
       end process conv_slv;
@@ -446,7 +447,7 @@ begin
             mAxisMaster => l1MasterSync,
             mAxisSlave  => l1SlaveSync);
 
-      partitions : process (detectorPartitionsSync, pauseSync, overflowSync) is
+      partitions : process (detectorPartitionsSync, overflowSync, pauseSync) is
       begin
          partitionsPause    <= (others => '0');
          partitionsOverflow <= (others => '0');

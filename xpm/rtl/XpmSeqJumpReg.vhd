@@ -69,7 +69,7 @@ begin
    -------------------------------
    -- Configuration Register
    -------------------------------
-   comb : process (axiReadMaster, axiRst, axiWriteMaster, r, status) is
+   comb : process (axiReadMaster, axiWriteMaster, r) is
       variable v            : RegType;
       variable axiStatus    : AxiLiteStatusType;
       variable axiWriteResp : slv(1 downto 0);
@@ -105,8 +105,8 @@ begin
             axiWriteResp := AXI_RESP_OK_C;
             case wrPntr is
                when 0 to XPM_SEQ_DEPTH_C*16-1 =>
-                  iseq                             := conv_integer(regAddr(ADDR_BITS_G-1 downto 6));
-                  ichn                             := conv_integer(regAddr(5 downto 2));
+                  iseq := conv_integer(regAddr(ADDR_BITS_G-1 downto 6));
+                  ichn := conv_integer(regAddr(5 downto 2));
                   if (ichn = 15) then
                      v.config.seqJumpConfig(iseq).syncSel   := regWrData(31 downto 16);
                      v.config.seqJumpConfig(iseq).syncClass := regWrData(15 downto 12);
@@ -115,7 +115,7 @@ begin
                when others => axiWriteResp := AXI_ERROR_RESP_G;
             end case;
             axiSlaveWriteResponse(v.axiWriteSlave, axiWriteResp);
-         else                           -- if axiWriteMaster.awaddr(1 downto 0) = "00"
+         else  -- if axiWriteMaster.awaddr(1 downto 0) = "00"
             axiSlaveWriteResponse(v.axiWriteSlave, AXI_ERROR_RESP_G);
          end if;
       end if;
@@ -128,17 +128,17 @@ begin
 
       if (axiStatus.readEnable = '1') then
          -- Reset the bus
-         regAddr              := axiReadMaster.araddr(regAddr'range);
+         regAddr := axiReadMaster.araddr(regAddr'range);
          -- Check for alignment
          if axiReadMaster.araddr(1 downto 0) = "00" then
             -- Address is aligned
-            tmpRdData   := (others=>'0');
+            tmpRdData   := (others => '0');
             axiReadResp := AXI_RESP_OK_C;
             -- Decode the read address
             case rdPntr is
                when 0 to XPM_SEQ_DEPTH_C*16-1 =>
-                  iseq                             := conv_integer(regAddr(ADDR_BITS_G-1 downto 6));
-                  ichn                             := conv_integer(regAddr(5 downto 2));
+                  iseq := conv_integer(regAddr(ADDR_BITS_G-1 downto 6));
+                  ichn := conv_integer(regAddr(5 downto 2));
                   if (ichn = 15) then
                      tmpRdData(31 downto 16)      := r.config.seqJumpConfig(iseq).syncSel;
                      tmpRdData(15 downto 12)      := r.config.seqJumpConfig(iseq).syncClass;

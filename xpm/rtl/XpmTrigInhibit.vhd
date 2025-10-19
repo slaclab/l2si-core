@@ -46,13 +46,13 @@ architecture rtl of XpmTrigInhibit is
       count  : slv(config.interval'range);
       target : slv(config.interval'range);
       rd_cnt : sl;
-      pause   : sl;
+      pause  : sl;
    end record;
    constant REG_INIT_C : RegType := (
       count  => (others => '0'),
       target => (others => '0'),
       rd_cnt => '0',
-      pause   => '0');
+      pause  => '0');
 
    signal r   : RegType := REG_INIT_C;
    signal rin : RegType;

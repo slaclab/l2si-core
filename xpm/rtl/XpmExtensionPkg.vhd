@@ -80,17 +80,17 @@ package XpmExtensionPkg is
    function toXpmEventDataType(partitionWord : slv(47 downto 0); valid : sl) return XpmEventDataType;
 
    type XpmTransitionDataType is record
-      valid   : sl;
-      l0Tag   : slv(4 downto 0);
-      header  : slv(6 downto 0);
-      count   : slv(23 downto 0);
+      valid  : sl;
+      l0Tag  : slv(4 downto 0);
+      header : slv(6 downto 0);
+      count  : slv(23 downto 0);
    end record;
 
    constant XPM_TRANSITION_DATA_INIT_C : XpmTransitionDataType := (
-      valid   => '0',
-      l0Tag   => (others => '0'),
-      header  => (others => '0'),
-      count   => (others => '0'));
+      valid  => '0',
+      l0Tag  => (others => '0'),
+      header => (others => '0'),
+      count  => (others => '0'));
 
    --  Clear event buffers (transition data header)
    constant MSG_CLEAR_FIFO_C  : slv(7 downto 0) := toSlv(0, 8);
@@ -116,17 +116,17 @@ package XpmExtensionPkg is
    function toXpmPartitionAddress (broadcast  : XpmBroadcastType) return slv;
 
    type XpmInhibitCountsType is record
-     inhibits : Slv32Array(XPM_PARTITIONS_C-1 downto 0);
+      inhibits : Slv32Array(XPM_PARTITIONS_C-1 downto 0);
    end record;
 
    type XpmInhibitCountsArray is array (integer range<>) of XpmInhibitCountsType;
 
    constant XPM_INHIBIT_COUNTS_INIT_C : XpmInhibitCountsType := (
-     inhibits => (others=>(others=>'0')) );
+      inhibits => (others => (others => '0')));
 
    constant XPM_INHIBIT_COUNTS_LEN_C : integer := 32*XPM_PARTITIONS_C;
 
-   function toSlv(a : XpmInhibitCountsType) return slv;
+   function toSlv(a                  : XpmInhibitCountsType) return slv;
    function toXpmInhibitCountsType(a : slv) return XpmInhibitCountsType;
 
 end package XpmExtensionPkg;
@@ -253,8 +253,8 @@ package body XpmExtensionPkg is
    end function;
 
    function toSlv(a : XpmInhibitCountsType) return slv is
-      variable i,j           : integer;
-      variable ret           : slv(XPM_INHIBIT_COUNTS_LEN_C-1 downto 0);
+      variable i, j : integer;
+      variable ret  : slv(XPM_INHIBIT_COUNTS_LEN_C-1 downto 0);
    begin
       i := 0;
       for j in 0 to XPM_PARTITIONS_C-1 loop
@@ -264,8 +264,8 @@ package body XpmExtensionPkg is
    end function;
 
    function toXpmInhibitCountsType(a : slv) return XpmInhibitCountsType is
-      variable i,j           : integer;
-      variable ret           : XpmInhibitCountsType;
+      variable i, j : integer;
+      variable ret  : XpmInhibitCountsType;
    begin
       i := 0;
       for j in 0 to XPM_PARTITIONS_C-1 loop

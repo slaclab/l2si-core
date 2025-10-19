@@ -68,11 +68,11 @@ begin
 
    U_SYNC : entity surf.SynchronizerOneShot
       generic map (
-         TPD_G   => TPD_G )
+         TPD_G => TPD_G)
       port map (
-         clk        => clk,
-         dataIn     => clear,
-         dataOut    => uclear);
+         clk     => clk,
+         dataIn  => clear,
+         dataOut => uclear);
 
    comb : process (push, r, skip, uclear) is
       variable v : RegType;

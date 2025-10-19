@@ -60,12 +60,12 @@ entity MpsPgpFrontEnd is
       pgpRxMasters : out AxiStreamMasterArray(3 downto 0);
       pgpRxCtrl    : in  AxiStreamCtrlArray(3 downto 0);
       --  DRP Interface (stableClk domain)
-      drpaddr_in   : in  slv(8 DOWNTO 0) := (others=>'0');
-      drpdi_in     : in  slv(15 DOWNTO 0) := (others=>'0');
-      drpen_in     : in  sl := '0';
-      drpwe_in     : in  sl := '0';
-      drpdo_out    : out slv(15 DOWNTO 0);
-      drprdy_out   : out sl );
+      drpaddr_in   : in  slv(8 downto 0)  := (others => '0');
+      drpdi_in     : in  slv(15 downto 0) := (others => '0');
+      drpen_in     : in  sl               := '0';
+      drpwe_in     : in  sl               := '0';
+      drpdo_out    : out slv(15 downto 0);
+      drprdy_out   : out sl);
 end MpsPgpFrontEnd;
 
 architecture mapping of MpsPgpFrontEnd is
@@ -85,11 +85,11 @@ architecture mapping of MpsPgpFrontEnd is
          gtwiz_reset_rx_done_out            : out std_logic_vector(0 downto 0);
          gtwiz_userdata_tx_in               : in  std_logic_vector(15 downto 0);
          gtwiz_userdata_rx_out              : out std_logic_vector(15 downto 0);
-         drpaddr_in                         : IN STD_LOGIC_VECTOR(8 DOWNTO 0);
-         drpclk_in                          : IN STD_LOGIC_VECTOR(0 DOWNTO 0);
-         drpdi_in                           : IN STD_LOGIC_VECTOR(15 DOWNTO 0);
-         drpen_in                           : IN STD_LOGIC_VECTOR(0 DOWNTO 0);
-         drpwe_in                           : IN STD_LOGIC_VECTOR(0 DOWNTO 0);
+         drpaddr_in                         : in  std_logic_vector(8 downto 0);
+         drpclk_in                          : in  std_logic_vector(0 downto 0);
+         drpdi_in                           : in  std_logic_vector(15 downto 0);
+         drpen_in                           : in  std_logic_vector(0 downto 0);
+         drpwe_in                           : in  std_logic_vector(0 downto 0);
          gthrxn_in                          : in  std_logic_vector(0 downto 0);
          gthrxp_in                          : in  std_logic_vector(0 downto 0);
          gtrefclk0_in                       : in  std_logic_vector(0 downto 0);
@@ -108,8 +108,8 @@ architecture mapping of MpsPgpFrontEnd is
          txctrl2_in                         : in  std_logic_vector(7 downto 0);
          txusrclk_in                        : in  std_logic_vector(0 downto 0);
          txusrclk2_in                       : in  std_logic_vector(0 downto 0);
-         drpdo_out                          : OUT STD_LOGIC_VECTOR(15 DOWNTO 0);
-         drprdy_out                         : OUT STD_LOGIC_VECTOR(0 DOWNTO 0);
+         drpdo_out                          : out std_logic_vector(15 downto 0);
+         drprdy_out                         : out std_logic_vector(0 downto 0);
          gthtxn_out                         : out std_logic_vector(0 downto 0);
          gthtxp_out                         : out std_logic_vector(0 downto 0);
          rxbufstatus_out                    : out std_logic_vector(2 downto 0);
@@ -144,14 +144,14 @@ begin
    gtTxUserReset <= pgpRst;
 
    U_BUFG : BUFG_GT
-     port map (
-        I       => gtTxOutClk,
-        CE      => '1',
-        CEMASK  => '1',
-        CLR     => '0',
-        CLRMASK => '1',
-        DIV     => "000",
-        O       => txOutClk );
+      port map (
+         I       => gtTxOutClk,
+         CE      => '1',
+         CEMASK  => '1',
+         CLR     => '0',
+         CLRMASK => '1',
+         DIV     => "000",
+         O       => txOutClk);
 
    U_Pgp2bLane : entity surf.Pgp2bLane
       generic map (
@@ -161,7 +161,7 @@ begin
          PAYLOAD_CNT_TOP_G => PAYLOAD_CNT_TOP_G,
          NUM_VC_EN_G       => NUM_VC_EN_G,
          TX_ENABLE_G       => PGP_TX_ENABLE_G,
-         RX_ENABLE_G       => PGP_RX_ENABLE_G )
+         RX_ENABLE_G       => PGP_RX_ENABLE_G)
       port map (
          pgpTxClk         => pgpClk,
          pgpTxClkRst      => pgpRst,
