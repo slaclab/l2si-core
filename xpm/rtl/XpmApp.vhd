@@ -167,7 +167,7 @@ architecture top_level_app of XpmApp is
    signal pmaster              : slv (XPM_PARTITIONS_C-1 downto 0);
    signal pdepthI              : Slv8Array (XPM_PARTITIONS_C-1 downto 0);
    signal pdepth               : Slv8Array (XPM_PARTITIONS_C-1 downto 0);
-   signal expWord,expWordQ     : Slv48Array(XPM_PARTITIONS_C-1 downto 0);
+   signal expWord, expWordQ    : Slv48Array(XPM_PARTITIONS_C-1 downto 0);
    signal expWordValid         : slv (XPM_PARTITIONS_C-1 downto 0);
    signal pausefb              : slv (XPM_PARTITIONS_C-1 downto 0);
    signal overflowfb           : slv (XPM_PARTITIONS_C-1 downto 0);
@@ -176,41 +176,41 @@ architecture top_level_app of XpmApp is
    signal grejectMsg           : slv (XPM_PARTITIONS_C-1 downto 0);
 
    constant MSG_CONFIG_LEN_C : integer := XPM_PARTITIONS_C*(XpmPartitionConfigType.message.header'length+1);
-   signal msgConfig        : slv(MSG_CONFIG_LEN_C-1 downto 0);
-   signal msgConfigS       : slv(MSG_CONFIG_LEN_C-1 downto 0);
-   signal msgValid         : sl;
-   signal configS          : XpmConfigType;
+   signal msgConfig          : slv(MSG_CONFIG_LEN_C-1 downto 0);
+   signal msgConfigS         : slv(MSG_CONFIG_LEN_C-1 downto 0);
+   signal msgValid           : sl;
+   signal configS            : XpmConfigType;
 
    function extractMsgConfig (c : XpmConfigType) return slv is
-     variable vector : slv(MSG_CONFIG_LEN_C-1 downto 0) := (others=>'0');
-     variable i : integer := 0;
+      variable vector : slv(MSG_CONFIG_LEN_C-1 downto 0) := (others => '0');
+      variable i      : integer                          := 0;
    begin
-     for j in 0 to XPM_PARTITIONS_C-1 loop
-       assignSlv(i, vector, c.partition(j).message.insert);
-       assignSlv(i, vector, c.partition(j).message.header);
-     end loop;  -- j
-     return vector;
+      for j in 0 to XPM_PARTITIONS_C-1 loop
+         assignSlv(i, vector, c.partition(j).message.insert);
+         assignSlv(i, vector, c.partition(j).message.header);
+      end loop;  -- j
+      return vector;
    end function;
 
    function insertMsgConfig (c : XpmConfigType;
                              r : slv;
                              v : sl) return XpmConfigType is
-     variable o : XpmConfigType;
-     variable u : sl;
-     variable i : integer := 0;
+      variable o : XpmConfigType;
+      variable u : sl;
+      variable i : integer := 0;
    begin
-     o := c;
-     for j in 0 to XPM_PARTITIONS_C-1 loop
-       assignRecord(i, r, u);
-       o.partition(j).message.insert := u and v;
-       assignRecord(i, r, o.partition(j).message.header);
-     end loop;  -- j
-     return o;
+      o := c;
+      for j in 0 to XPM_PARTITIONS_C-1 loop
+         assignRecord(i, r, u);
+         o.partition(j).message.insert := u and v;
+         assignRecord(i, r, o.partition(j).message.header);
+      end loop;  -- j
+      return o;
    end function;
 
 begin
 
-   linkstatp : process (bpStatus, dsLinkStatus, dsRxRcvs, isXpm, dsId) is
+   linkstatp : process (bpStatus, dsId, dsLinkStatus, dsRxRcvs, isXpm) is
       variable linkStat : XpmLinkStatusType;
    begin
       for i in status.dsLink'range loop
@@ -221,7 +221,7 @@ begin
             linkStat.rxIsXpm   := isXpm (i);
             linkStat.rxId      := dsId (i);
          end if;
-         status.dsLink(i)   <= linkStat;
+         status.dsLink(i) <= linkStat;
       end loop;
       status.bpLink(bpStatus'range) <= bpStatus;
    end process;
@@ -387,9 +387,9 @@ begin
          timingDataIn    => timingStream.streams(0).data,
          timingDataOut   => stream0_data,
          seqCountRst     => seqCountRst,
-         seqCount        => seqCount );
+         seqCount        => seqCount);
 
-   streams_p : process (timingStream, stream0_data) is
+   streams_p : process (stream0_data, timingStream) is
    begin
       timingStream_streams         <= timingStream.streams;
       timingStream_streams(0).data <= stream0_data;
@@ -429,17 +429,17 @@ begin
    msgConfig <= extractMsgConfig(config);
    configS   <= insertMsgConfig (config, msgConfigS, msgValid);
    U_SyncMsg : entity surf.SynchronizerFifo
-     generic map (
-       DATA_WIDTH_G => MSG_CONFIG_LEN_C )
-     port map (
-       rst    => timingRst,
-       -- Write Ports (wr_clk domain)
-       wr_clk => regclk,
-       din    => msgConfig,
-       -- Read Ports (rd_clk domain)
-       rd_clk => timingClk,
-       valid  => msgValid,
-       dout   => msgConfigS );
+      generic map (
+         DATA_WIDTH_G => MSG_CONFIG_LEN_C)
+      port map (
+         rst    => timingRst,
+         -- Write Ports (wr_clk domain)
+         wr_clk => regclk,
+         din    => msgConfig,
+         -- Read Ports (rd_clk domain)
+         rd_clk => timingClk,
+         valid  => msgValid,
+         dout   => msgConfigS);
 
    GEN_PART : for i in 0 to XPM_PARTITIONS_C-1 generate
       --
@@ -450,28 +450,28 @@ begin
             TPD_G          => TPD_G,
             NUM_DS_LINKS_G => NUM_DS_LINKS_G,
 --            DEBUG_G        => (i < 1))
-            DEBUG_G        => false )
+            DEBUG_G        => false)
          port map (
-            regclk     => regclk,
-            update     => update (i),
-            config     => configS.partition(i),
-            status     => status.partition(i),
-            timingClk  => timingClk,
-            timingRst  => timingRst,
-            streams    => timingStream_streams,
-            streamIds  => streamIds,
-            advance    => timingStream.advance,
-            fiducial   => timingStream.fiducial,
-            pause      => r.pause (i),
-            overflow   => r.overflow(i),
-            greject    => grejectL0,
-            lreject    => grejectL0(i),
-            grejectMsg => grejectMsg,
-            lrejectMsg => grejectMsg(i),
-            l1Feedback => l1Partitions(i),
-            l1Ack      => l1PartitionAcks(i),
-            result     => expWord (i),
-            resultValid=> expWordValid(i));
+            regclk      => regclk,
+            update      => update (i),
+            config      => configS.partition(i),
+            status      => status.partition(i),
+            timingClk   => timingClk,
+            timingRst   => timingRst,
+            streams     => timingStream_streams,
+            streamIds   => streamIds,
+            advance     => timingStream.advance,
+            fiducial    => timingStream.fiducial,
+            pause       => r.pause (i),
+            overflow    => r.overflow(i),
+            greject     => grejectL0,
+            lreject     => grejectL0(i),
+            grejectMsg  => grejectMsg,
+            lrejectMsg  => grejectMsg(i),
+            l1Feedback  => l1Partitions(i),
+            l1Ack       => l1PartitionAcks(i),
+            result      => expWord (i),
+            resultValid => expWordValid(i));
 
       U_SyncMaster : entity surf.Synchronizer
          generic map(
@@ -497,22 +497,23 @@ begin
    end generate;
 
    U_RawInsert : entity l2si_core.XpmRawInsert
-     generic map (
-       TPD_G => TPD_G)
-     port map (
-       clk       => timingClk,
-       rst       => timingRst,
-       config    => configS,
-       start     => expWordValid(0),
-       shift     => r.streamReset,
-       data_in   => expWord,
-       data_out  => expWordQ);
+      generic map (
+         TPD_G => TPD_G)
+      port map (
+         clk      => timingClk,
+         rst      => timingRst,
+         config   => configS,
+         start    => expWordValid(0),
+         shift    => r.streamReset,
+         data_in  => expWord,
+         data_out => expWordQ);
 
    --
    -- timingStream carries its own 'advance' signal as well as fiducial.
    --
-   comb : process (advance, bpRxLinkPauseS, dsPause, dsOverflow, expWordQ, fstreams, paddr,
-                   pdepth, pmaster, r, timingRst, timingStream) is
+   comb : process (advance, bpRxLinkPauseS, dsOverflow, dsPause, expWordQ,
+                   fstreams, paddr, pdepth, pmaster, r, timingRst,
+                   timingStream) is
       variable v         : RegType;
       variable tidx      : integer;
       variable mhdr      : slv(6 downto 0);
@@ -589,7 +590,7 @@ begin
             if r.source = '1' then
                -- master of all : compose the word
                if r.bcastCount = 8 then
-                  v.paddr       := (others=>'1');
+                  v.paddr       := (others => '1');
                   v.bcastf      := paddr;
                   v.bcastCount  := 0;
                   v.paddrStrobe := '1';

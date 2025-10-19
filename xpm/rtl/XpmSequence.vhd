@@ -54,24 +54,24 @@ entity XpmSequence is
       timingDataIn    : in  slv(15 downto 0);
       timingDataOut   : out slv(15 downto 0);
       seqCountRst     : in  sl := '0';
-      seqCount        : out Slv128Array(XPM_SEQ_DEPTH_C-1 downto 0) );
+      seqCount        : out Slv128Array(XPM_SEQ_DEPTH_C-1 downto 0));
 end XpmSequence;
 
 architecture mapping of XpmSequence is
 
-   signal status       : XpmSeqStatusType;
-   signal config       : XpmSeqConfigType;
-   signal seqData      : Slv17Array (XPM_SEQ_DEPTH_C-1 downto 0);
-   signal seqReset     : slv (XPM_SEQ_DEPTH_C-1 downto 0);
-   signal seqJump      : slv (XPM_SEQ_DEPTH_C-1 downto 0);
-   signal seqJumpAddr  : SeqAddrArray(XPM_SEQ_DEPTH_C-1 downto 0);
-   signal frameSlv     : slv(TIMING_MESSAGE_BITS_C-1 downto 0);
-   signal frame        : TimingMessageType;
-   signal tframeSlv    : slv(TIMING_MESSAGE_BITS_C-1 downto 0);
-   signal tframe       : TimingMessageType;
+   signal status      : XpmSeqStatusType;
+   signal config      : XpmSeqConfigType;
+   signal seqData     : Slv17Array (XPM_SEQ_DEPTH_C-1 downto 0);
+   signal seqReset    : slv (XPM_SEQ_DEPTH_C-1 downto 0);
+   signal seqJump     : slv (XPM_SEQ_DEPTH_C-1 downto 0);
+   signal seqJumpAddr : SeqAddrArray(XPM_SEQ_DEPTH_C-1 downto 0);
+   signal frameSlv    : slv(TIMING_MESSAGE_BITS_C-1 downto 0);
+   signal frame       : TimingMessageType;
+   signal tframeSlv   : slv(TIMING_MESSAGE_BITS_C-1 downto 0);
+   signal tframe      : TimingMessageType;
 
-   constant S0 : integer := 12;
-   constant SN : integer := S0+46;
+   constant S0      : integer := 12;
+   constant SN      : integer := S0+46;
    constant SEQBITS : integer := 4;
 
    type RegType is record
@@ -107,8 +107,8 @@ begin
 
    timingDataOut <= r_in.data;
 
-   status.nexptseq    <= toSlv(XPM_SEQ_DEPTH_C,status.nexptseq'length);
-   status.seqaddrlen  <= toSlv(SEQADDRLEN,status.seqaddrlen'length);
+   status.nexptseq    <= toSlv(XPM_SEQ_DEPTH_C, status.nexptseq'length);
+   status.seqaddrlen  <= toSlv(SEQADDRLEN, status.seqaddrlen'length);
    status.countUpdate <= '0';
    seqCount           <= status.countRequest;
 
@@ -181,9 +181,9 @@ begin
             jumpAddr => seqJumpAddr(i));
 
       U_Seq : entity l2si_core.Sequence
-          generic map (
-            MON_SUM_G => false )
-          port map (
+         generic map (
+            MON_SUM_G => false)
+         port map (
             clkA         => timingClk,
             rstA         => timingRst,
             wrEnA        => config.seqWrEn (i),
@@ -212,9 +212,9 @@ begin
    --  Replace words in the timing frame.  Skip recalculating the CRC
    --  in the frame, since it will be done on transmission.
    --
-   comb : process (timingRst, r, config, timingDataIn, timingAdvance,
-                   seqData, seqNotify, seqNotifyValid, axisSlave) is
-      variable v : RegType;
+   comb : process (axisSlave, config, r, seqData, seqNotify, seqNotifyValid,
+                   timingAdvance, timingDataIn, timingRst) is
+      variable v     : RegType;
       variable iword : integer;
       variable ibit  : integer;
    begin
@@ -231,11 +231,11 @@ begin
       v.data := timingDataIn;
 
       for i in 0 to XPM_SEQ_DEPTH_C-1 loop
-        iword := SN - (XPM_SEQ_DEPTH_C + SEQBITS -1 -i)/SEQBITS;
-        ibit  := i mod (16/SEQBITS);
-        if r.strobe(iword) = '1' then
+         iword := SN - (XPM_SEQ_DEPTH_C + SEQBITS -1 -i)/SEQBITS;
+         ibit  := i mod (16/SEQBITS);
+         if r.strobe(iword) = '1' then
             if config.seqEnable(i) = '1' then
-              v.data((ibit+1)*SEQBITS-1 downto ibit*SEQBITS) := seqData(i)(SEQBITS-1 downto 0);
+               v.data((ibit+1)*SEQBITS-1 downto ibit*SEQBITS) := seqData(i)(SEQBITS-1 downto 0);
             end if;
          end if;
       end loop;

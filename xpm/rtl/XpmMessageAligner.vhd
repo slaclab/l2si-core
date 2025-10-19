@@ -37,8 +37,8 @@ entity XpmMessageAligner is
       COMMON_CLK_G : boolean := false;  -- true if axilClk = timingRxClk
       TF_DELAY_G   : integer := 100);   -- this is defunct
    port (
-      timingRxClk       : in  sl;
-      timingRxRst       : in  sl;
+      timingRxClk : in sl;
+      timingRxRst : in sl;
 
       -- Axi Lite bus for reading back current partitionDelays
       axilClk         : in  sl;
@@ -69,8 +69,8 @@ architecture rtl of XpmMessageAligner is
    type RegType is record
       txId            : slv(31 downto 0);
       rxId            : slv(31 downto 0);
-      delayRst        : slv( 3 downto 0);
-      timingMsgDelay  : slv( 6 downto 0);
+      delayRst        : slv(3 downto 0);
+      timingMsgDelay  : slv(6 downto 0);
       timingMsgIndex  : integer;
       partitionDelays : Slv7Array(XPM_PARTITIONS_C-1 downto 0);
       axilWriteSlave  : AxiLiteWriteSlaveType;
@@ -81,7 +81,7 @@ architecture rtl of XpmMessageAligner is
       txId            => (others => '0'),
       rxId            => (others => '1'),
       delayRst        => (others => '1'),
-      timingMsgDelay  => toSlv(0,7),
+      timingMsgDelay  => toSlv(0, 7),
       timingMsgIndex  => 0,
       partitionDelays => (others => (others => '0')),
       axilWriteSlave  => AXI_LITE_WRITE_SLAVE_INIT_C,
@@ -184,9 +184,7 @@ begin
    -- This never happens during normal running but could happen breifly after switching delays
    alignedXpmMessage.valid <= uAnd(alignedXpmMessageValid);
 
-   comb : process(axilReadMaster, axilWriteMaster,
-                  promptXpmMessage, promptTimingStrobe,
-                  r, timingRxRst) is
+   comb : process(promptTimingStrobe, promptXpmMessage, r, timingRxRst) is
       variable v                : RegType;
       variable broadcastMessage : XpmBroadcastType;
    begin
@@ -200,7 +198,7 @@ begin
          if (broadcastMessage.btype = XPM_BROADCAST_PDELAY_C) then
             v.partitionDelays(broadcastMessage.index) := broadcastMessage.value;
             if (r.partitionDelays(broadcastMessage.index) /= broadcastMessage.value) then
-               v.delayRst := (others=>'1');
+               v.delayRst := (others => '1');
             end if;
             if (broadcastMessage.value > v.timingMsgDelay or
                 broadcastMessage.index = v.timingMsgIndex) then
@@ -213,7 +211,7 @@ begin
       end if;
 
       if timingRxRst = '1' then
-         v      := REG_INIT_C;
+         v := REG_INIT_C;
       end if;
 
       rin <= v;

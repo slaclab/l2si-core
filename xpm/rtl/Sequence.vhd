@@ -5,7 +5,7 @@
 -- Author     : Matt Weaver  <weaver@slac.stanford.edu>
 -- Company    : SLAC National Accelerator Laboratory
 -- Created    : 2015-09-15
--- Last update: 2023-11-08
+-- Last update: 2025-10-19
 -- Platform   :
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -56,12 +56,12 @@ library surf;
 use surf.StdRtlPkg.all;
 
 entity Sequence is
-   generic ( TPD_G       : time := 1 ns;
-             MON_SUM_G   : boolean := true;  -- monCount is the sum of requests
-             EN_NOTIFY_G : boolean := true;
-             MON_WIDTH_G : integer range 1 to 32 := 20;
-             MON_DEPTH_G : integer := 4;
-             DEBUG       : boolean := false );
+   generic (TPD_G       : time                  := 1 ns;
+            MON_SUM_G   : boolean               := true;  -- monCount is the sum of requests
+            EN_NOTIFY_G : boolean               := true;
+            MON_WIDTH_G : integer range 1 to 32 := 20;
+            MON_DEPTH_G : integer               := 4;
+            DEBUG       : boolean               := false);
    port (
       -- Clock and reset
       clkA         : in  sl;
@@ -106,7 +106,7 @@ architecture ISequence of Sequence is
       jump       : sl;
       notify     : sl;
       notifyaddr : slv(SEQADDRLEN-1 downto 0);
-      returnaddr : slv(SEQADDRLEN-1 downto 0); -- a one-deep stack
+      returnaddr : slv(SEQADDRLEN-1 downto 0);  -- a one-deep stack
       state      : SEQ_STATE;
       monCount   : Slv32Array(MON_DEPTH_G-1 downto 0);
    end record RegType;
@@ -123,7 +123,7 @@ architecture ISequence of Sequence is
       notifyaddr => (others => '0'),
       returnaddr => (others => '0'),
       state      => SEQ_STOPPED,
-      monCount   => (others=>(others => '0')));
+      monCount   => (others => (others => '0')));
 
    signal rdStepB : slv(31 downto 0);
 
@@ -136,47 +136,47 @@ architecture ISequence of Sequence is
    signal monResetS : sl;
 
    component ila_0
-     port ( clk    : in  sl;
-            probe0 : in slv(255 downto 0) );
+      port (clk    : in sl;
+            probe0 : in slv(255 downto 0));
    end component;
 begin
 
-   GEN_DEBUG: if DEBUG generate
-     istate <= "000" when r.state=SEQ_STOPPED else
-               "001" when r.state=SEQ_LOAD else
-               "010" when r.state=SEQ_TEST_BRANCH else
-               "011" when r.state=SEQ_TEST_OCC else
-               "100" when r.state=SEQ_STEP_WAIT else
-               "101";
-     icount <= toSlv(r.counterI,2);
-     U_ILA : ila_0
-       port map ( clk                    => clkB,
-                  probe0( 31 downto   0) => rdStepB,
-                  probe0( 39 downto  32) => r.count(0)(7 downto 0),
-                  probe0( 47 downto  40) => r.count(1)(7 downto 0),
-                  probe0( 55 downto  48) => r.count(2)(7 downto 0),
-                  probe0( 63 downto  56) => r.count(3)(7 downto 0),
-                  probe0( 79 downto  64) => r.data(15 downto 0),
-                  probe0( 95 downto  80) => r.delaycount,
-                  probe0(103 downto  96) => r.counter(7 downto 0),
-                  probe0(106 downto 104) => istate,
-                  probe0(108 downto 107) => icount,
-                  probe0(118 downto 109) => fixedRate,
-                  probe0(119)            => seqReset,
-                  probe0(120)            => rdEnB,
-                  probe0(255 downto 121) => (others=>'0') );
+   GEN_DEBUG : if DEBUG generate
+      istate <= "000" when r.state = SEQ_STOPPED else
+                "001" when r.state = SEQ_LOAD else
+                "010" when r.state = SEQ_TEST_BRANCH else
+                "011" when r.state = SEQ_TEST_OCC else
+                "100" when r.state = SEQ_STEP_WAIT else
+                "101";
+      icount <= toSlv(r.counterI, 2);
+      U_ILA : ila_0
+         port map (clk                    => clkB,
+                   probe0(31 downto 0)    => rdStepB,
+                   probe0(39 downto 32)   => r.count(0)(7 downto 0),
+                   probe0(47 downto 40)   => r.count(1)(7 downto 0),
+                   probe0(55 downto 48)   => r.count(2)(7 downto 0),
+                   probe0(63 downto 56)   => r.count(3)(7 downto 0),
+                   probe0(79 downto 64)   => r.data(15 downto 0),
+                   probe0(95 downto 80)   => r.delaycount,
+                   probe0(103 downto 96)  => r.counter(7 downto 0),
+                   probe0(106 downto 104) => istate,
+                   probe0(108 downto 107) => icount,
+                   probe0(118 downto 109) => fixedRate,
+                   probe0(119)            => seqReset,
+                   probe0(120)            => rdEnB,
+                   probe0(255 downto 121) => (others => '0'));
    end generate GEN_DEBUG;
 
    dataO          <= r.data;
    seqState.index <= SeqAddrType(r.index);
    GEN_COUNT : for i in r.count'range generate
-     seqState.count(i) <= r.count(i)(7 downto 0);
+      seqState.count(i) <= r.count(i)(7 downto 0);
    end generate;
-   seqNotifyWr    <= r.notify;
-   seqNotify      <= SeqAddrType(r.notifyaddr);
+   seqNotifyWr <= r.notify;
+   seqNotify   <= SeqAddrType(r.notifyaddr);
 
    GEN_MONCOUNT : for i in 0 to MON_DEPTH_G-1 generate
-     monCount(i*32+MON_WIDTH_G-1 downto i*32) <= r.monCount(i)(MON_WIDTH_G-1 downto 0);
+      monCount(i*32+MON_WIDTH_G-1 downto i*32) <= r.monCount(i)(MON_WIDTH_G-1 downto 0);
    end generate;
 
    U_Ram : entity surf.DualPortRam
@@ -200,13 +200,14 @@ begin
          doutb => rdStepB);
 
    U_MonReset : entity surf.RstSync
-     port map (
-       clk      => clkB,
-       asyncRst => monReset,
-       syncRst  => monResetS );
+      port map (
+         clk      => clkB,
+         asyncRst => monReset,
+         syncRst  => monResetS);
 
-   process (r, seqReset, rdStepB, fixedRate, acRate, acTS, rdEnB, waitB, startAddr, seqNotifyAck, monResetS)
-      variable v : RegType;
+   process (acRate, acTS, fixedRate, monResetS, r, rdEnB, rdStepB,
+            seqNotifyAck, seqReset, startAddr, waitB)
+      variable v            : RegType;
       variable rateI, acTSI : integer;
    begin  -- process
 
@@ -229,8 +230,8 @@ begin
             v.state := SEQ_TEST_BRANCH;
          when SEQ_TEST_BRANCH =>
             case rdStepB(31 downto 29) is
-               when "000" =>                                     -- Branch
-                  if rdStepB(24) = '0' then                      -- unconditional
+               when "000" =>                           -- Branch
+                  if rdStepB(24) = '0' then            -- unconditional
                      v.index := rdStepB(v.index'range);
                   elsif (r.jump = '1') then
                      v.index             := r.index+1;
@@ -240,16 +241,16 @@ begin
                      v.count(r.counterI) := r.count(r.counterI)+1;
                   end if;
                   v.state := SEQ_LOAD;
-               when "001" =>                                     -- Notify
-                  v.index      := r.index+1;
+               when "001" =>                           -- Notify
+                  v.index := r.index+1;
                   if EN_NOTIFY_G then
-                    v.notify     := '1';
-                    v.notifyaddr := r.index;
+                     v.notify     := '1';
+                     v.notifyaddr := r.index;
                   end if;
-                  v.state      := SEQ_LOAD;
-               when "100" =>                                    -- Request
+                  v.state := SEQ_LOAD;
+               when "100" =>                           -- Request
                   if MON_SUM_G then
-                     v.monCount(0)   := r.monCount(0)+1;
+                     v.monCount(0) := r.monCount(0)+1;
                   else
                      for i in 0 to MON_DEPTH_G-1 loop
                         if rdStepB(i) = '1' then
@@ -257,37 +258,37 @@ begin
                         end if;
                      end loop;
                   end if;
-                  v.index      := r.index+1;
-                  v.data       := '1' & rdStepB(15 downto 0);
-                  v.state      := SEQ_LOAD;
-                when "101" =>                                    -- Call/Return
-                  if rdStepB(12) = '1' then  -- return
-                     v.index := r.returnaddr;
-                     v.returnaddr := (others=>'0');  -- some stack safety
+                  v.index := r.index+1;
+                  v.data  := '1' & rdStepB(15 downto 0);
+                  v.state := SEQ_LOAD;
+               when "101" =>                           -- Call/Return
+                  if rdStepB(12) = '1' then            -- return
+                     v.index      := r.returnaddr;
+                     v.returnaddr := (others => '0');  -- some stack safety
                   else
-                     v.index := rdStepB(v.index'range);
+                     v.index      := rdStepB(v.index'range);
                      v.returnaddr := r.index+1;
                   end if;
-                  v.state      := SEQ_LOAD;
-               when others =>                                   -- Sync
+                  v.state := SEQ_LOAD;
+               when others =>                          -- Sync
                   v.state := SEQ_TEST_OCC;
             end case;
-         when SEQ_TEST_OCC =>                                   -- Sync
+         when SEQ_TEST_OCC =>                          -- Sync
             if rdStepB(11 downto 0) = r.delaycount then
                v.state := SEQ_STEP_LOAD;
             else
                v.state := SEQ_STEP_WAIT;
             end if;
-         when SEQ_STEP_WAIT =>                                  -- Sync
+         when SEQ_STEP_WAIT =>                         -- Sync
             if waitB = '1' then
                rateI := conv_integer(rdStepB(19 downto 16));
                acTSI := conv_integer(acTS);
-               if rdStepB(29) = '0' then                        -- FixedRate
-                  if (rateI<fixedRate'length and fixedRate(rateI) = '1') then
+               if rdStepB(29) = '0' then               -- FixedRate
+                  if (rateI < fixedRate'length and fixedRate(rateI) = '1') then
                      v.delaycount := r.delaycount+1;
                   end if;
-               elsif (rdStepB(22+acTSI) = '1') then  -- 28:23
-                  if (rateI<acRate'length and acRate(rateI) = '1') then
+               elsif (rdStepB(22+acTSI) = '1') then    -- 28:23
+                  if (rateI < acRate'length and acRate(rateI) = '1') then
                      v.delaycount := r.delaycount+1;
                   end if;
                end if;
@@ -304,7 +305,7 @@ begin
       end if;
 
       if monResetS = '1' then
-         v.monCount := (others=>(others => '0'));
+         v.monCount := (others => (others => '0'));
       end if;
 
       -- from any state
