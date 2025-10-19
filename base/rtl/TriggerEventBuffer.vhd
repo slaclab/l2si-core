@@ -83,7 +83,7 @@ entity TriggerEventBuffer is
       eventTimingMessageValid : out sl;
       eventTimingMessage      : out TimingMessageType;
       eventTimingMessageRd    : in  sl := '1';
-      eventInhibitCountsValid : out sl;
+      eventInhibitCountsValid : out sl := '0';
       eventInhibitCounts      : out TriggerInhibitCountsType;
       eventInhibitCountsRd    : in  sl := '1';
       eventAxisMaster         : out AxiStreamMasterType;
