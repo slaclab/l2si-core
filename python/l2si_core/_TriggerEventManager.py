@@ -20,7 +20,7 @@ class TriggerEventManager(pr.Device):
             **kwargs):
         super().__init__(**kwargs)
 
-        self.add(LclsTimingCore.EvrV2CoreTriggers(
+        self.add(LclsTimingCore.EvrV2CoreChannels(
             offset  = 0x0000,
             numTrig = numDetectors,
         ))
