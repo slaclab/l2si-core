@@ -281,8 +281,7 @@ begin
          TPD_G           => TPD_G,
          NCHANNELS_G     => NUM_DETECTORS_G,
          COMMON_CLK_G    => AXIL_CLK_IS_TIMING_RX_CLK_G,
-         EVR_CARD_G      => false,
-         AXIL_BASEADDR_G => AXIL_XBAR_CONFIG_C(AXIL_EVR_C).baseAddr)
+         EVR_CARD_G      => false)
       port map (
          axilClk         => axilClk,                          -- [in]
          axilRst         => axilRst,                          -- [in]
