@@ -273,19 +273,15 @@ begin
          mAxiReadSlaves      => locAxilReadSlaves);   -- [in]
 
    -------------------------------------------------------------------------------------------------
-   -- LCLS-I timing uses EvrV2CoreTrigers to decode triggers from the EVR timing stream
-   -- LCLS-II timing uses EvrV2CoreTrigers to decode triggers from the LCLS-II timing stream
+   -- LCLS-I timing uses EvrV2CoreChannels to decode triggers from the EVR timing stream
+   -- LCLS-II timing uses EvrV2CoreChannels to decode triggers from the LCLS-II timing stream
    -------------------------------------------------------------------------------------------------
-   U_EvrV2CoreTriggers_1 : entity lcls_timing_core.EvrV2CoreTriggers
+   U_EvrV2CoreChannels_1 : entity lcls_timing_core.EvrV2CoreChannels
       generic map (
          TPD_G           => TPD_G,
          NCHANNELS_G     => NUM_DETECTORS_G,
-         NTRIGGERS_G     => NUM_DETECTORS_G,
-         TRIG_DEPTH_G    => 28,
-         TRIG_PIPE_G     => TRIGGER_PIPELINE_DEPTH_G,
          COMMON_CLK_G    => AXIL_CLK_IS_TIMING_RX_CLK_G,
-         EVR_CARD_G      => false,
-         AXIL_BASEADDR_G => AXIL_XBAR_CONFIG_C(AXIL_EVR_C).baseAddr)
+         EVR_CARD_G      => false)
       port map (
          axilClk         => axilClk,                          -- [in]
          axilRst         => axilRst,                          -- [in]
