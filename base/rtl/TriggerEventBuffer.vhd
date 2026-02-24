@@ -267,8 +267,8 @@ begin
 
          end if;
 
-         delayedTriggerDataSlv   <= toSlv(r.triggerData);
-         delayedTriggerDataValid <= r.triggerData.valid and r.triggerData.l0Accept;
+         delayedTriggerDataSlv   <= xpmTriggerDataSlv;
+         delayedTriggerDataValid <= xpmTriggerDataValid;
 
       elsif (EN_LCLS_II_TIMING_G and timingMode = '1' and triggerSource = XPM_TRIGGER_SOURCE_C) then
 
