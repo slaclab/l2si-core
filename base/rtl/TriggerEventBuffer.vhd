@@ -256,6 +256,7 @@ begin
             v.fifoAxisMaster.tValid               := '1';
             v.fifoAxisMaster.tdata(63 downto 0)   := (others => '0');
             v.fifoAxisMaster.tdata(127 downto 64) := evrTriggers.timeStamp;
+            v.fifoAxisMaster.tUser(7 downto 0)    := v.triggerCount(7 downto 0); -- Encode the trigCnt into the tUserFirst for debugging and alignment checking
             v.fifoAxisMaster.tLast                := '1';
 
             v.triggerData.valid    := '1';
