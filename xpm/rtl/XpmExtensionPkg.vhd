@@ -88,11 +88,11 @@ package XpmExtensionPkg is
    end record;
 
    constant XPM_TRANSITION_DATA_INIT_C : XpmTransitionDataType := (
-      valid   => '0',
-      l0Tag   => (others => '0'),
-      l0Rject => '0',
-      header  => (others => '0'),
-      count   => (others => '0'));
+      valid    => '0',
+      l0Tag    => (others => '0'),
+      l0Reject => '0',
+      header   => (others => '0'),
+      count    => (others => '0'));
 
    --  Clear event buffers (transition data header)
    constant MSG_CLEAR_FIFO_C  : slv(7 downto 0) := toSlv(0, 8);
