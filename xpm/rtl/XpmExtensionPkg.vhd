@@ -80,17 +80,19 @@ package XpmExtensionPkg is
    function toXpmEventDataType(partitionWord : slv(47 downto 0); valid : sl) return XpmEventDataType;
 
    type XpmTransitionDataType is record
-      valid  : sl;
-      l0Tag  : slv(4 downto 0);
-      header : slv(6 downto 0);
-      count  : slv(23 downto 0);
+      valid    : sl;
+      l0Tag    : slv(4 downto 0);
+      l0Reject : sl;
+      header   : slv(6 downto 0);
+      count    : slv(23 downto 0);
    end record;
 
    constant XPM_TRANSITION_DATA_INIT_C : XpmTransitionDataType := (
-      valid  => '0',
-      l0Tag  => (others => '0'),
-      header => (others => '0'),
-      count  => (others => '0'));
+      valid   => '0',
+      l0Tag   => (others => '0'),
+      l0Rject => '0',
+      header  => (others => '0'),
+      count   => (others => '0'));
 
    --  Clear event buffers (transition data header)
    constant MSG_CLEAR_FIFO_C  : slv(7 downto 0) := toSlv(0, 8);
@@ -198,7 +200,8 @@ package body XpmExtensionPkg is
    begin
       assignSlv(i, vector, "0");                               -- 0
       assignSlv(i, vector, xpmTransition.l0Tag);               -- 5:1
-      assignSlv(i, vector, "00");                              -- 7:6
+      assignSlv(i, vector, "0");                               -- 6
+      assignSlv(i, vector, xpmTransition.l0Reject);            -- 7
       assignSlv(i, vector, xpmTransition.header(6 downto 0));  -- 14:8
       assignSlv(i, vector, not(xpmTransition.valid));          -- 15
       assignSlv(i, vector, xpmTransition.count);               -- 39:16
@@ -211,7 +214,8 @@ package body XpmExtensionPkg is
    begin
       i := 1;
       assignRecord(i, partitionWord, xpmTransition.l0Tag);
-      i := 8;
+      i := 7;
+      assignRecord(i, partitionWord, xpmTransition.l0Reject);
       assignRecord(i, partitionWord, xpmTransition.header);
 
       assignRecord(i, partitionWord, xpmTransition.valid);

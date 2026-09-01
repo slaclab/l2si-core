@@ -235,6 +235,7 @@ begin
       variable v         : RegType;
       variable axilEp    : AxiLiteEndpointType;
       variable eventData : XpmEventDataType;
+      variable transData : XpmTransitionDataType;
    begin
       v := r;
 
@@ -310,8 +311,10 @@ begin
             v.eventData      := toXpmEventDataType(alignedXpmMessage.partitionWord(v.partitionV));
             v.transitionData := toXpmTransitionDataType(alignedXpmMessage.partitionWord(v.partitionV));
             for i in 0 to XPM_PARTITIONS_C-1 loop
-               eventData := toXpmEventDataType(alignedXpmMessage.partitionWord(i));
-               if (eventData.valid = '1' and eventData.l0Reject = '1') then
+               eventData := toXpmEventDataType     (alignedXpmMessage.partitionWord(i));
+               transData := toXpmTransitionDataType(alignedXpmMessage.partitionWord(i));
+               if ((eventData.valid = '1' and eventData.l0Reject = '1') or
+                   (transData.valid = '1' and transData.l0Reject = '1')) then
                   v.l0Rejects(i) := '1';
                end if;
             end loop;
