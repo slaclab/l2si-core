@@ -347,6 +347,7 @@ begin
                if (fifoAxisCtrl.overflow = '0') then
                   v.fifoAxisMaster.tValid                                := '1';
                   v.fifoAxisMaster.tdata(EVENT_HEADER_BITS_C-1 downto 0) := toSlv(v.eventHeader);
+                  v.fifoAxisMaster.tUser(7 downto 0)                     := v.eventData.count(7 downto 0); -- Encode the eventCount into the tUserFirst for debugging and alignment checking
                   v.fifoAxisMaster.tDest(0)                              := v.transitionData.valid;
                   v.fifoAxisMaster.tLast                                 := '1';
                end if;
