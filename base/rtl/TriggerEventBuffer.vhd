@@ -82,6 +82,7 @@ entity TriggerEventBuffer is
       eventRst                : in  sl;
       eventTimingMessageValid : out sl;
       eventTimingMessage      : out TimingMessageType;
+      eventTimingMessageCount : out slv(7 downto 0) := (others => '0');  -- eventData.count(7:0) of the event that eventTimingMessage belongs to
       eventTimingMessageRd    : in  sl := '1';
       eventInhibitCountsValid : out sl := '0';
       eventInhibitCounts      : out TriggerInhibitCountsType;
@@ -186,6 +187,8 @@ architecture rtl of TriggerEventBuffer is
 
    signal alignedTimingMessageSlv : slv(TIMING_MESSAGE_BITS_NO_BSA_C-1 downto 0) := (others => '0');
    signal eventTimingMessageSlv   : slv(TIMING_MESSAGE_BITS_NO_BSA_C-1 downto 0) := (others => '0');
+   signal msgFifoDin              : slv(TIMING_MESSAGE_BITS_NO_BSA_C+7 downto 0) := (others => '0');
+   signal msgFifoDout             : slv(TIMING_MESSAGE_BITS_NO_BSA_C+7 downto 0) := (others => '0');
 
    signal triggerDataValid        : sl               := '0';
    signal triggerDataSlv          : slv(47 downto 0) := (others => '0');
@@ -603,6 +606,8 @@ begin
    -----------------------------------------------
    GEN_EVENT_TIMING_MESSAGE : if (EN_LCLS_II_TIMING_G) generate
       alignedTimingMessageSlv <= toSlvNoBsa(alignedTimingMessage);
+      -- Store the eventCount next to the TimingMessage so it can be used as tUserFirst for alignment checking
+      msgFifoDin              <= r.eventData.count(7 downto 0) & alignedTimingMessageSlv;
       U_Fifo_1 : entity surf.Fifo
          generic map (
             TPD_G           => TPD_G,
@@ -610,18 +615,20 @@ begin
             MEMORY_TYPE_G   => "block",
             FWFT_EN_G       => true,
             PIPE_STAGES_G   => 1,  -- make sure this lines up right with event fifo
-            DATA_WIDTH_G    => TIMING_MESSAGE_BITS_NO_BSA_C,
+            DATA_WIDTH_G    => TIMING_MESSAGE_BITS_NO_BSA_C+8,
             ADDR_WIDTH_G    => FIFO_ADDR_WIDTH_C)
          port map (
             rst    => fifoRst,          -- [in]
             wr_clk => timingRxClk,      -- [in]
             wr_en  => r.msgFifoWr,      -- [in]
-            din    => alignedTimingMessageSlv,  -- [in]
+            din    => msgFifoDin,       -- [in]
             rd_clk => eventClk,         -- [in]
             rd_en  => eventTimingMessageRd,     -- [in]
             valid  => eventTimingMessageValid,  -- [out]
-            dout   => eventTimingMessageSlv);   -- [out]
-      eventTimingMessage <= toTimingMessageType(eventTimingMessageSlv);
+            dout   => msgFifoDout);     -- [out]
+      eventTimingMessageSlv   <= msgFifoDout(TIMING_MESSAGE_BITS_NO_BSA_C-1 downto 0);
+      eventTimingMessageCount <= msgFifoDout(TIMING_MESSAGE_BITS_NO_BSA_C+7 downto TIMING_MESSAGE_BITS_NO_BSA_C);
+      eventTimingMessage      <= toTimingMessageType(eventTimingMessageSlv);
    end generate GEN_EVENT_TIMING_MESSAGE;
 
    GEN_INHIBIT_COUNTS : if (EN_LCLS_II_INHIBIT_COUNTS_G) generate
