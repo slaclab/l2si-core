@@ -74,6 +74,7 @@ entity TriggerEventManager is
       eventRst                 : in  sl;
       eventTimingMessagesValid : out slv(NUM_DETECTORS_G-1 downto 0);
       eventTimingMessages      : out TimingMessageArray(NUM_DETECTORS_G-1 downto 0);
+      eventTimingMessagesCount : out Slv8Array(NUM_DETECTORS_G-1 downto 0);  -- eventData.count(7:0) for each eventTimingMessages
       eventTimingMessagesRd    : in  slv(NUM_DETECTORS_G-1 downto 0) := (others => '1');
       eventInhibitCountsValid  : out slv(NUM_DETECTORS_G-1 downto 0);
       eventInhibitCounts       : out TriggerInhibitCountsArray(NUM_DETECTORS_G-1 downto 0);
@@ -368,6 +369,7 @@ begin
             eventRst                => eventRst,                     -- [in]
             eventTimingMessageValid => eventTimingMessagesValid(i),  -- [out]
             eventTimingMessage      => eventTimingMessages(i),       -- [out]
+            eventTimingMessageCount => eventTimingMessagesCount(i),  -- [out]
             eventTimingMessageRd    => eventTimingMessagesRd(i),     -- [in]
             eventInhibitCountsValid => eventInhibitCountsValid(i),   -- [out]
             eventInhibitCounts      => eventInhibitCounts(i),        -- [out]

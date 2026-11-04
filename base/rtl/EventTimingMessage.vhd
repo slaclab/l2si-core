@@ -35,6 +35,7 @@ entity EventTimingMessage is
       -- Input Streams
       eventTimingMessagesValid : in  slv(NUM_DETECTORS_G-1 downto 0);
       eventTimingMessages      : in  TimingMessageArray(NUM_DETECTORS_G-1 downto 0);
+      eventTimingMessagesCount : in  Slv8Array(NUM_DETECTORS_G-1 downto 0) := (others => (others => '0'));
       eventTimingMessagesRd    : out slv(NUM_DETECTORS_G-1 downto 0);
       -- Output Streams
       eventTimingMsgMasters    : out AxiStreamMasterArray(NUM_DETECTORS_G-1 downto 0);
@@ -49,8 +50,8 @@ architecture mapping of EventTimingMessage is
       TDEST_BITS_C  => 0,
       TID_BITS_C    => 0,
       TKEEP_MODE_C  => TKEEP_NORMAL_C,
-      TUSER_BITS_C  => 1,
-      TUSER_MODE_C  => TUSER_NONE_C);
+      TUSER_BITS_C  => 8,
+      TUSER_MODE_C  => TUSER_FIRST_LAST_C);
 
    function toSlvFormatted(msg : TimingMessageType) return slv is
       variable v : slv(383 downto 0) := (others => '0');
@@ -76,6 +77,7 @@ begin
 
       axisMasters(i).tValid              <= eventTimingMessagesValid(i);
       axisMasters(i).tData(383 downto 0) <= toSlvFormatted(eventTimingMessages(i));
+      axisMasters(i).tUser(7 downto 0)   <= eventTimingMessagesCount(i);  -- Encode the eventCount into the tUserFirst for debugging and alignment checking
       axisMasters(i).tLast               <= '1';
       eventTimingMessagesRd(i)           <= axisSlaves(i).tReady;
 
