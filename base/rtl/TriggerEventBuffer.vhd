@@ -261,6 +261,7 @@ begin
             v.fifoAxisMaster.tdata(63 downto 0)   := (others => '0');
             v.fifoAxisMaster.tdata(127 downto 64) := evrTriggers.timeStamp;
             v.fifoAxisMaster.tUser(7 downto 0)    := v.triggerCount(7 downto 0); -- Encode the trigCnt into the tUserFirst for debugging and alignment checking
+            v.fifoAxisMaster.tDest(0)             := '0';  -- No transitions on the EVR path, so clear the tDest left over from the last XPM transition
             v.fifoAxisMaster.tLast                := '1';
 
             v.triggerData.valid    := '1';
